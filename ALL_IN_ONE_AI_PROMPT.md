@@ -2342,8 +2342,17 @@ BEGIN
       word = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word ELSE user_vocab_entries.word END,
       folder = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.folder ELSE user_vocab_entries.folder END,
       category = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.category ELSE user_vocab_entries.category END,
-      card_data = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.card_data ELSE user_vocab_entries.card_data END,
       is_deleted = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.is_deleted ELSE user_vocab_entries.is_deleted END,
+      -- カード内容・フォルダ・削除状態は updated_at が新しい方を採用し、SRS復習進捗は独立して最新値を card_data JSONB にも合成
+      card_data = (
+        CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.card_data ELSE user_vocab_entries.card_data END
+      ) || jsonb_build_object(
+        'interval', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,
+        'repetition', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.repetition ELSE user_vocab_entries.repetition END,
+        'efactor', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.efactor ELSE user_vocab_entries.efactor END,
+        'nextReview', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.next_review ELSE user_vocab_entries.next_review END,
+        'reviewUpdatedAt', GREATEST(user_vocab_entries.review_updated_at, EXCLUDED.review_updated_at)
+      ),
       updated_at = GREATEST(user_vocab_entries.updated_at, EXCLUDED.updated_at),
       -- SM-2復習進捗は review_updated_at が新しい方を独立して採用（Macでのフォルダ移動でスマホの学習履歴が消えるのを防ぐ）
       interval = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,
@@ -7387,6 +7396,7 @@ etymology:${eInst}`;
           }));
 
           syncActiveLang();
+          if (global.VocabSRS?.flushOfflineReviews) global.VocabSRS.flushOfflineReviews();
           if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false);
           if (manualSalvage) {
             const tot = LANG_KEYS.reduce((s, l) => s + getJson(LANGS[l].key).length, 0);
@@ -7601,6 +7611,14 @@ etymology:${eInst}`;
     window.addEventListener('afterprint', () => { App.printAllMode = false; render(); });
     window.addEventListener('storage', e => {
       if (e.key && global.VocabStorage) syncFromIdbForLang(keyToLang(e.key));
+    });
+    window.addEventListener('online', () => {
+      if (global.VocabSRS?.flushOfflineReviews) global.VocabSRS.flushOfflineReviews();
+      if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false);
+      showToast('オンラインに復帰しました。クラウド同期を再開します。', 'info', 2500);
+    });
+    window.addEventListener('offline', () => {
+      showToast('オフラインモードです。復習や編集は端末内に安全に保持されます。', 'info', 3000);
     });
 
     const dz = $('ocrDropzone');
@@ -7853,11 +7871,21 @@ etymology:${eInst}`;
 
     const remoteUpdById = new Map();
     const remoteUpdByWk = new Map();
+    const remoteRevUpdById = new Map();
+    const remoteRevUpdByWk = new Map();
     (Array.isArray(remoteEntries) ? remoteEntries : []).forEach(r => {
       if (!r) return;
       const wk = r.wordKey || makeWordKeyFn(r.word, lang, r.meanings?.[0]?.pos, r.homographIndex);
-      if (r.id) remoteUpdById.set(r.id, r.updatedAt || 0);
-      if (wk) remoteUpdByWk.set(wk, r.updatedAt || 0);
+      const rUpd = Number(r.updatedAt) || 1;
+      const rRevUpd = Number(r.reviewUpdatedAt) || 0;
+      if (r.id) {
+        remoteUpdById.set(r.id, rUpd);
+        remoteRevUpdById.set(r.id, rRevUpd);
+      }
+      if (wk) {
+        remoteUpdByWk.set(wk, rUpd);
+        remoteRevUpdByWk.set(wk, rRevUpd);
+      }
     });
 
     const mergedEntries = mergeWordsFn(
@@ -7870,10 +7898,17 @@ etymology:${eInst}`;
     );
 
     const entriesToPush = mergedEntries.filter(it => {
-      const upd = it.updatedAt || 1;
-      if (upd <= lastSyncAt) return false;
+      const localUpd = Number(it.updatedAt) || 1;
+      const localRevUpd = Number(it.reviewUpdatedAt) || 0;
+      const localMaxTs = Math.max(localUpd, localRevUpd);
+      if (localMaxTs <= lastSyncAt) return false;
+
       const rUpd = Math.max(remoteUpdById.get(it.id) || 0, remoteUpdByWk.get(it.wordKey) || 0);
-      return upd > rUpd && !isTombstonedFn(it, mergedTombMap, lang, mergedClearedAt);
+      const rRevUpd = Math.max(remoteRevUpdById.get(it.id) || 0, remoteRevUpdByWk.get(it.wordKey) || 0);
+
+      const hasContentUpdate = localUpd > rUpd;
+      const hasReviewUpdate = localRevUpd > rRevUpd;
+      return (hasContentUpdate || hasReviewUpdate) && !isTombstonedFn(it, mergedTombMap, lang, mergedClearedAt);
     });
 
     const remoteTombLookup = new Map(
@@ -8021,8 +8056,9 @@ etymology:${eInst}`;
       return allRows;
     }
 
+    const uveCols = 'id,lang,word_key,num,word,homograph_index,folder,category,interval,repetition,efactor,next_review,updated_at,review_updated_at,is_deleted,card_data,server_updated_at';
     const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&updated_at=gt.${lastSyncAt}&select=card_data,updated_at`),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&or=(server_updated_at.gt.${lastSyncAt},updated_at.gt.${lastSyncAt},review_updated_at.gt.${lastSyncAt})&select=${uveCols}`),
       fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`),
       fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&select=cleared_at`, { headers })
     ]);
@@ -8033,10 +8069,24 @@ etymology:${eInst}`;
 
     const remoteWmRows = await wmRes.json();
 
-    const remoteEntries = (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).map(r => ({
-      ...(r.card_data || {}),
-      updatedAt: Number(r.updated_at) || 1
-    }));
+    const remoteEntries = (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).map(r => {
+      const base = (r.card_data && typeof r.card_data === 'object') ? r.card_data : {};
+      return {
+        ...base,
+        id: r.id || base.id,
+        word: r.word || base.word,
+        wordKey: r.word_key || base.wordKey,
+        folder: r.folder !== undefined && r.folder !== null ? r.folder : base.folder,
+        category: r.category !== undefined && r.category !== null ? r.category : base.category,
+        interval: Number(r.interval) || base.interval || 0,
+        repetition: Number(r.repetition) || base.repetition || 0,
+        efactor: Number(r.efactor) || base.efactor || 2.5,
+        nextReview: Number(r.next_review) || base.nextReview || 0,
+        updatedAt: Number(r.updated_at) || base.updatedAt || 1,
+        reviewUpdatedAt: Number(r.review_updated_at) || base.reviewUpdatedAt || 0,
+        isDeleted: Boolean(r.is_deleted !== undefined ? r.is_deleted : base.isDeleted)
+      };
+    });
     const remoteTombstones = (Array.isArray(remoteTombRows) ? remoteTombRows : []).map(r => ({
       key: String(r.tomb_key),
       deletedAt: Number(r.deleted_at) || 0
@@ -8128,7 +8178,12 @@ etymology:${eInst}`;
       }
     }
 
-    safeLsSet(lastSyncKey, String(syncStartTs));
+    let maxServerTs = syncStartTs;
+    (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).forEach(r => {
+      const sTs = Number(r.server_updated_at) || 0;
+      if (sTs > maxServerTs) maxServerTs = sTs;
+    });
+    safeLsSet(lastSyncKey, String(maxServerTs));
     return {
       pulled: remoteEntries.length,
       pushed: delta.entriesToPush.length,
@@ -8861,8 +8916,9 @@ etymology:${eInst}`;
     if (!q.length || !navigator.onLine || !global.VocabSync?.isCloudReady?.()) return;
 
     try {
-      if (global.syncCloudNow) {
-        await global.syncCloudNow(false);
+      const syncFn = global.syncCloudNow || global.VocabCore?.syncCloudNow;
+      if (typeof syncFn === 'function') {
+        await syncFn(false);
         saveOfflineQueue([]);
       }
     } catch {}

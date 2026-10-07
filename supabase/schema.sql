@@ -595,8 +595,17 @@ BEGIN
       word = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word ELSE user_vocab_entries.word END,
       folder = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.folder ELSE user_vocab_entries.folder END,
       category = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.category ELSE user_vocab_entries.category END,
-      card_data = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.card_data ELSE user_vocab_entries.card_data END,
       is_deleted = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.is_deleted ELSE user_vocab_entries.is_deleted END,
+      -- カード内容・フォルダ・削除状態は updated_at が新しい方を採用し、SRS復習進捗は独立して最新値を card_data JSONB にも合成
+      card_data = (
+        CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.card_data ELSE user_vocab_entries.card_data END
+      ) || jsonb_build_object(
+        'interval', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,
+        'repetition', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.repetition ELSE user_vocab_entries.repetition END,
+        'efactor', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.efactor ELSE user_vocab_entries.efactor END,
+        'nextReview', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.next_review ELSE user_vocab_entries.next_review END,
+        'reviewUpdatedAt', GREATEST(user_vocab_entries.review_updated_at, EXCLUDED.review_updated_at)
+      ),
       updated_at = GREATEST(user_vocab_entries.updated_at, EXCLUDED.updated_at),
       -- SM-2復習進捗は review_updated_at が新しい方を独立して採用（Macでのフォルダ移動でスマホの学習履歴が消えるのを防ぐ）
       interval = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,

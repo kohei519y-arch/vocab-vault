@@ -93,8 +93,9 @@
     if (!q.length || !navigator.onLine || !global.VocabSync?.isCloudReady?.()) return;
 
     try {
-      if (global.syncCloudNow) {
-        await global.syncCloudNow(false);
+      const syncFn = global.syncCloudNow || global.VocabCore?.syncCloudNow;
+      if (typeof syncFn === 'function') {
+        await syncFn(false);
         saveOfflineQueue([]);
       }
     } catch {}

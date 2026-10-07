@@ -44,11 +44,21 @@
 
     const remoteUpdById = new Map();
     const remoteUpdByWk = new Map();
+    const remoteRevUpdById = new Map();
+    const remoteRevUpdByWk = new Map();
     (Array.isArray(remoteEntries) ? remoteEntries : []).forEach(r => {
       if (!r) return;
       const wk = r.wordKey || makeWordKeyFn(r.word, lang, r.meanings?.[0]?.pos, r.homographIndex);
-      if (r.id) remoteUpdById.set(r.id, r.updatedAt || 0);
-      if (wk) remoteUpdByWk.set(wk, r.updatedAt || 0);
+      const rUpd = Number(r.updatedAt) || 1;
+      const rRevUpd = Number(r.reviewUpdatedAt) || 0;
+      if (r.id) {
+        remoteUpdById.set(r.id, rUpd);
+        remoteRevUpdById.set(r.id, rRevUpd);
+      }
+      if (wk) {
+        remoteUpdByWk.set(wk, rUpd);
+        remoteRevUpdByWk.set(wk, rRevUpd);
+      }
     });
 
     const mergedEntries = mergeWordsFn(
@@ -61,10 +71,17 @@
     );
 
     const entriesToPush = mergedEntries.filter(it => {
-      const upd = it.updatedAt || 1;
-      if (upd <= lastSyncAt) return false;
+      const localUpd = Number(it.updatedAt) || 1;
+      const localRevUpd = Number(it.reviewUpdatedAt) || 0;
+      const localMaxTs = Math.max(localUpd, localRevUpd);
+      if (localMaxTs <= lastSyncAt) return false;
+
       const rUpd = Math.max(remoteUpdById.get(it.id) || 0, remoteUpdByWk.get(it.wordKey) || 0);
-      return upd > rUpd && !isTombstonedFn(it, mergedTombMap, lang, mergedClearedAt);
+      const rRevUpd = Math.max(remoteRevUpdById.get(it.id) || 0, remoteRevUpdByWk.get(it.wordKey) || 0);
+
+      const hasContentUpdate = localUpd > rUpd;
+      const hasReviewUpdate = localRevUpd > rRevUpd;
+      return (hasContentUpdate || hasReviewUpdate) && !isTombstonedFn(it, mergedTombMap, lang, mergedClearedAt);
     });
 
     const remoteTombLookup = new Map(
@@ -212,8 +229,9 @@
       return allRows;
     }
 
+    const uveCols = 'id,lang,word_key,num,word,homograph_index,folder,category,interval,repetition,efactor,next_review,updated_at,review_updated_at,is_deleted,card_data,server_updated_at';
     const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&updated_at=gt.${lastSyncAt}&select=card_data,updated_at`),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&or=(server_updated_at.gt.${lastSyncAt},updated_at.gt.${lastSyncAt},review_updated_at.gt.${lastSyncAt})&select=${uveCols}`),
       fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`),
       fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&select=cleared_at`, { headers })
     ]);
@@ -224,10 +242,24 @@
 
     const remoteWmRows = await wmRes.json();
 
-    const remoteEntries = (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).map(r => ({
-      ...(r.card_data || {}),
-      updatedAt: Number(r.updated_at) || 1
-    }));
+    const remoteEntries = (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).map(r => {
+      const base = (r.card_data && typeof r.card_data === 'object') ? r.card_data : {};
+      return {
+        ...base,
+        id: r.id || base.id,
+        word: r.word || base.word,
+        wordKey: r.word_key || base.wordKey,
+        folder: r.folder !== undefined && r.folder !== null ? r.folder : base.folder,
+        category: r.category !== undefined && r.category !== null ? r.category : base.category,
+        interval: Number(r.interval) || base.interval || 0,
+        repetition: Number(r.repetition) || base.repetition || 0,
+        efactor: Number(r.efactor) || base.efactor || 2.5,
+        nextReview: Number(r.next_review) || base.nextReview || 0,
+        updatedAt: Number(r.updated_at) || base.updatedAt || 1,
+        reviewUpdatedAt: Number(r.review_updated_at) || base.reviewUpdatedAt || 0,
+        isDeleted: Boolean(r.is_deleted !== undefined ? r.is_deleted : base.isDeleted)
+      };
+    });
     const remoteTombstones = (Array.isArray(remoteTombRows) ? remoteTombRows : []).map(r => ({
       key: String(r.tomb_key),
       deletedAt: Number(r.deleted_at) || 0
@@ -319,7 +351,12 @@
       }
     }
 
-    safeLsSet(lastSyncKey, String(syncStartTs));
+    let maxServerTs = syncStartTs;
+    (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).forEach(r => {
+      const sTs = Number(r.server_updated_at) || 0;
+      if (sTs > maxServerTs) maxServerTs = sTs;
+    });
+    safeLsSet(lastSyncKey, String(maxServerTs));
     return {
       pulled: remoteEntries.length,
       pushed: delta.entriesToPush.length,

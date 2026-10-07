@@ -4205,6 +4205,7 @@ etymology:${eInst}`;
           }));
 
           syncActiveLang();
+          if (global.VocabSRS?.flushOfflineReviews) global.VocabSRS.flushOfflineReviews();
           if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false);
           if (manualSalvage) {
             const tot = LANG_KEYS.reduce((s, l) => s + getJson(LANGS[l].key).length, 0);
@@ -4419,6 +4420,14 @@ etymology:${eInst}`;
     window.addEventListener('afterprint', () => { App.printAllMode = false; render(); });
     window.addEventListener('storage', e => {
       if (e.key && global.VocabStorage) syncFromIdbForLang(keyToLang(e.key));
+    });
+    window.addEventListener('online', () => {
+      if (global.VocabSRS?.flushOfflineReviews) global.VocabSRS.flushOfflineReviews();
+      if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false);
+      showToast('オンラインに復帰しました。クラウド同期を再開します。', 'info', 2500);
+    });
+    window.addEventListener('offline', () => {
+      showToast('オフラインモードです。復習や編集は端末内に安全に保持されます。', 'info', 3000);
     });
 
     const dz = $('ocrDropzone');
