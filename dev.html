@@ -329,12 +329,36 @@
           <div class="ocr-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
           <div class="f-col" style="gap:1px">
             <span style="font-size:12px;font-weight:700">画像からテキストを文字起こし（OCR）</span>
-            <span style="font-size:10.5px;color:var(--m)">クリックして画像選択 / ドロップ / 画像単体をコピーして貼り付け</span>
+            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクリーンショット貼り付け (Cmd+V)</span>
           </div>
         </div>
         <button type="button" class="btn-o btn-xs" style="pointer-events:none">画像選択</button>
       </div>
       <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageFile(this.files[0])">
+      <div id="ocrPreviewSec" style="display:none;margin-top:6px;padding:8px 10px;background:var(--bg-hov);border:1px solid var(--b);border-radius:6px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img id="ocrThumbImg" src="" alt="選択画像" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--b);background:var(--bg-card)">
+          <div style="flex:1;min-width:0">
+            <div id="ocrFileName" style="font-size:12px;font-weight:700;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スクリーンショット</div>
+            <div id="ocrFileMeta" style="font-size:11px;color:var(--m);margin-top:1px">0 KB</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" id="btnRunOcrAgain" class="btn-ac btn-xs" onclick="runOcrCurrentFile()">文字起こし</button>
+            <button type="button" class="btn-o btn-xs" onclick="clearOcrPreview()">削除</button>
+          </div>
+        </div>
+        <div id="ocrApiKeyPrompt" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--b)">
+          <div style="font-size:11.5px;color:var(--t);font-weight:600">★ 高精度 AI 文字起こし (Gemini Vision OCR)</div>
+          <div style="font-size:11px;color:var(--s);margin-top:2px;line-height:1.5">
+            画像・スクショを自動文字起こしするには、無料のGoogle Gemini APIキーを入力してください（Google AI Studioで1分で取得可能・完全無料）。
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input type="password" id="ocrInlineApiKey" placeholder="AIzaSy... (Gemini APIキーを入力)" style="flex:1;font-size:11.5px;padding:4px 8px;border:1px solid var(--b);border-radius:4px;background:var(--bg-card);color:var(--t)">
+            <button type="button" class="btn-ac btn-xs" onclick="saveOcrKeyAndExecute()">設定して文字起こし</button>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn-o btn-xs" style="text-decoration:none;display:inline-flex;align-items:center">無料キー取得</a>
+          </div>
+        </div>
+      </div>
       <div class="f-col">
         <div class="flx-sb"><label class="lbl-sm">長文テキスト（最大12,000字）</label><button type="button" class="btn-o btn-xs" onclick="$('extTextarea').value='';$('extResSec').style.display='none';$('extTextarea').focus()">クリア</button></div>
         <textarea id="extTextarea" rows="6" placeholder="長文を貼り付けるか、上の枠から画像を読み込んでください..."></textarea>
