@@ -203,8 +203,13 @@
     if (typeof window === 'undefined') return false;
     if (global.DEV_MASTER_MODE === true || window.DEV_MASTER_MODE === true) return true;
     try {
+      const p = window.location.pathname || '';
+      if (p === '/dev' || p === '/master' || p.endsWith('/dev.html')) {
+        lsSet('vv_dev_unlocked', '1');
+        return true;
+      }
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('dev') === 'master' || urlParams.get('dev') === '1' || urlParams.get('role') === 'developer') {
+      if (urlParams.get('dev') === 'master' || urlParams.get('dev') === '1' || urlParams.get('role') === 'developer' || urlParams.get('master') === '1' || urlParams.get('plan') === 'master') {
         lsSet('vv_dev_unlocked', '1');
         return true;
       }

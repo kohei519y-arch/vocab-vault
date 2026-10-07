@@ -2,6 +2,18 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/dev",
+      "destination": "/dev.html"
+    },
+    {
+      "source": "/master",
+      "destination": "/dev.html"
+    },
+    {
+      "source": "/dev.html",
+      "destination": "/dev.html"
+    },
+    {
       "source": "/index.html",
       "destination": "/index.html"
     },
