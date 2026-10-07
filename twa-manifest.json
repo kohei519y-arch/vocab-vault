@@ -1,0 +1,33 @@
+{
+  "packageId": "app.vocabvault.twa",
+  "host": "vocabvault.app",
+  "name": "Vocab Vault — 語源・概念史・単語帳",
+  "launcherName": "Vocab Vault",
+  "display": "standalone",
+  "themeColor": "#1b1b1c",
+  "themeColorDark": "#1b1b1c",
+  "navigationColor": "#1e1e1e",
+  "navigationColorDark": "#1e1e1e",
+  "backgroundColor": "#1e1e1e",
+  "enableNotifications": true,
+  "startUrl": "/index.html",
+  "iconUrl": "https://vocabvault.app/icons/icon-512.png",
+  "maskableIconUrl": "https://vocabvault.app/icons/icon-512.png",
+  "appVersionName": "2.0.0",
+  "appVersionCode": 1,
+  "signing": {
+    "file": "./android.keystore",
+    "alias": "vocabvault"
+  },
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://vocabvault.app/manifest.json",
+  "fallbackType": "customtabs",
+  "features": {
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  }
+}
