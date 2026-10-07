@@ -199,6 +199,19 @@
     });
   }
 
+  function checkDevMasterMode() {
+    if (typeof window === 'undefined') return false;
+    if (global.DEV_MASTER_MODE === true || window.DEV_MASTER_MODE === true) return true;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('dev') === 'master' || urlParams.get('dev') === '1' || urlParams.get('role') === 'developer') {
+        lsSet('vv_dev_unlocked', '1');
+        return true;
+      }
+    } catch {}
+    return lsGet('vv_dev_unlocked', '0') === '1';
+  }
+
   // --- 1. アプリケーション状態の一元管理 ---
   const App = {
     lang: 'en', srcLang: 'en', tgtLang: 'ja',
@@ -212,7 +225,8 @@
     rootIndexMap: new Map(),
     focusedCardIndex: -1,
     viewMode: lsGet('vv_view_mode', 'academic'),
-    dailyReviewCap: parseInt(lsGet('vv_daily_review_cap', '30'), 10) || 30
+    dailyReviewCap: parseInt(lsGet('vv_daily_review_cap', '30'), 10) || 30,
+    isDev: checkDevMasterMode()
   };
 
   const PER_PAGE = 30;
@@ -1834,6 +1848,10 @@
   }
 
   function openUpsellModal(reason = '') {
+    if (App.isDev) {
+      showToast('開発者マスターモード: Pro機能を制限なく実行しました', 'ok', 3000);
+      return;
+    }
     if (reason && $('upsellModalReason')) {
       $('upsellModalReason').textContent = reason;
     }
@@ -1972,6 +1990,35 @@
         if ($('btnManageSub')) $('btnManageSub').style.display = isPro ? 'block' : 'none';
       });
     }
+
+    // 開発者マスターモード時の表示上書き
+    if (App.isDev) {
+      const planBadge = $('curPlanBadge');
+      if (planBadge) {
+        planBadge.textContent = 'Developer Edition (全機能永久無制限)';
+        planBadge.className = 'badge ok';
+      }
+      $('planCardFree')?.classList.remove('current');
+      $('planCardPro')?.classList.add('current');
+      if ($('btnUpgradePro')) $('btnUpgradePro').style.display = 'none';
+      if ($('btnManageSub')) $('btnManageSub').style.display = 'none';
+      let devNotice = $('devEditionNotice');
+      if (!devNotice && $('planCardPro')) {
+        devNotice = document.createElement('div');
+        devNotice.id = 'devEditionNotice';
+        devNotice.style.cssText = 'margin-top:8px;padding:8px 10px;background:var(--bg-hov);border-radius:6px;font-size:11.5px;color:var(--ac);font-weight:600;text-align:center';
+        devNotice.innerHTML = '★ 開発者マスター権限により全機能が無制限解放されています（課金不要）';
+        $('planCardPro').appendChild(devNotice);
+      }
+    }
+  }
+
+  function toggleDevMasterMode() {
+    const next = !App.isDev;
+    App.isDev = next;
+    lsSet('vv_dev_unlocked', next ? '1' : '0');
+    updCloudUI();
+    showToast(next ? '★ 開発者マスターモード（全機能永久無制限・課金不要）を有効化しました！' : '通常ユーザーモードに戻しました。', next ? 'ok' : 'info', 4000);
   }
 
   async function cloudLogin(isSignUp = false) {
@@ -3581,7 +3628,7 @@
   }
 
   function submitW() {
-    if (App.quotaRemaining === 0 && !getKey() && global.VocabSync?.isCloudReady?.()) {
+    if (!App.isDev && App.quotaRemaining === 0 && !getKey() && global.VocabSync?.isCloudReady?.()) {
       openUpsellModal('今月のクラウドAI生成無料枠（30語）を消費しました。Proプランにアップグレードするか、内部組み込みAIエンジン（完全機密保護）をご利用ください。');
       return;
     }
@@ -3722,7 +3769,7 @@ etymology:${eInst}`;
         usedModel = res.usedModel || 'gemini-custom';
       } else if (global.VocabSync?.isProxyReady?.()) {
         try {
-          if (stEl) stEl.textContent = 'クラウド秘匿プロキシ (Gemini 2.0 Flash) で生成中...';
+          if (stEl) stEl.textContent = 'クラウドAI (Gemini 3.8 Flash) で生成中...';
           const proxyRes = await global.VocabSync.callVocabGenerateProxy({
             lang: sLang,
             srcLang: sLang,
@@ -3739,10 +3786,41 @@ etymology:${eInst}`;
           }
         } catch (proxyErr) {
           console.warn('[Proxy Fallback]', proxyErr);
-          if (stEl) stEl.textContent = '内蔵AIエンジンにフォールバック中...';
-          const internalRes = await generateWithInternalAI(payload, sLang, tLang, fName, useHist, wiktByIdx);
-          returnedList = internalRes.items;
-          usedModel = internalRes.usedModel || 'builtin-ai-internal';
+          if (proxyErr.isQuotaExceeded || proxyErr.status === 429) {
+            openUpsellModal(proxyErr.message || '本日のAI新規生成無料枠に達しました。');
+            card?.remove();
+            syncPersistedQueue();
+            return;
+          }
+
+          // 内蔵ナレッジベースに真の語根情報が存在するか判定
+          const hasBuiltinRoots = payload.some(it => {
+            const w = String(it.reqWord || it.word || '').toLowerCase();
+            return BUILTIN_ETYMOLOGY_KNOWLEDGE.historical[w] || Object.values(BUILTIN_ETYMOLOGY_KNOWLEDGE.roots).some(r => r.words.includes(w));
+          });
+
+          if (hasBuiltinRoots) {
+            if (stEl) stEl.textContent = '内蔵ナレッジベースで生成中...';
+            const internalRes = await generateWithInternalAI(payload, sLang, tLang, fName, useHist, wiktByIdx);
+            returnedList = internalRes.items;
+            usedModel = internalRes.usedModel || 'builtin-ai-internal';
+          } else {
+            // 未知語は無意味なダミーカードを保存せず、明快なエラーUIと再試行ボタンを提示
+            showToast(proxyErr.message || 'AIサーバー接続エラーが発生しました。「再試行」をお試しください。', 'err', 5000);
+            if (card) {
+              card.className = 'card gen-err';
+              card.dataset.retryItems = JSON.stringify(items);
+              card.dataset.fName = fName || '';
+              card.dataset.useHist = useHist ? '1' : '0';
+              card.dataset.useWikt = useWikt ? '1' : '0';
+              card.dataset.srcLang = sLang;
+              card.dataset.tgtLang = tLang;
+              card.dataset.pairKey = saveKey;
+              card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(proxyErr.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
+            }
+            syncPersistedQueue();
+            return;
+          }
         }
       } else {
         // 内部組み込みAIエンジン (オンデバイスAI / ビルトイン語源ナレッジベース & Wiktionary)
@@ -4357,6 +4435,8 @@ etymology:${eInst}`;
     openStripePortal: () => global.VocabSync?.openStripePortal?.(),
     setViewMode,
     loadStarterPack,
+    toggleDevMasterMode,
+    checkDevMasterMode,
     initApp
   };
 

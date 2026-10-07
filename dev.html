@@ -14,6 +14,10 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%237c3aed'/%3E%3Cpath d='M28 26h44a6 6 0 0 1 6 6v40a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6V32a6 6 0 0 1 6-6zm6 12v28h32V38H34zm8 8h16v4H42v-4zm0 8h12v4H42v-4z' fill='%23fff'/%3E%3C/svg%3E">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/app.css">
+  <script>
+    window.DEV_MASTER_MODE = true;
+    try { localStorage.setItem('vv_dev_unlocked', '1'); } catch(e){}
+  </script>
 </head>
 <body class="dark">
 <div class="workspace">
@@ -84,6 +88,7 @@
     <header class="tab-bar">
       <div class="tab" id="activeTabTitle">English — すべての単語</div>
       <div class="tab-acts">
+        <span class="badge ok" style="background:#7c3aed;color:#fff;font-weight:700;border:none;letter-spacing:0.5px">DEV MASTER (全機能無制限)</span>
         <span id="storageWarnBanner" class="storage-warn-banner" onclick="openSettings()" title="ストレージ状態"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>保存状態を確認</span>
         <span id="cloudSyncBadge" class="badge ok" style="cursor:pointer" onclick="openSettings()" title="AIエンジン稼働・機密保護状態">内蔵AI: 稼働中 (完全機密保護)</span>
       </div>

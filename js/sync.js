@@ -372,7 +372,9 @@
     const cfg = getConfig();
     const token = await ensureValidToken();
     if (!cfg.configured || !token) {
-      alert('Stripe決済をご利用いただくには、まずアカウントでログイン（または新規登録）してください。');
+      alert('Stripe決済をご利用いただくには、まずアカウントでログイン（または新規登録）してください。設定画面を開きます。');
+      if (typeof global.openSettings === 'function') global.openSettings();
+      else if (typeof openSettings === 'function') openSettings();
       return;
     }
     const btn = document.getElementById('btnUpgradePro');
@@ -389,13 +391,16 @@
         },
         body: JSON.stringify({ priceId, returnUrl: window.location.href.split('?')[0] })
       });
+      if (r.status === 404) {
+        throw new Error('決済サーバーが現在メンテナンス中または未接続です。開発者のStripe開通完了まで今しばらくお待ちください。');
+      }
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Checkoutの作成に失敗しました。');
       if (data.url) {
         window.location.href = data.url;
       }
     } catch (e) {
-      alert(`決済エラー: ${e.message}`);
+      alert(`決済のご案内: ${e.message}`);
     } finally {
       if (btn) { btn.disabled = false; btn.textContent = 'Proにアップグレード (¥480/月)'; }
       if (upsellBtn) { upsellBtn.disabled = false; upsellBtn.textContent = '今すぐProにアップグレード'; }
