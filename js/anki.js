@@ -41,7 +41,8 @@
       repetition: nextRepetition,
       efactor: nextEfactor,
       nextReview: nextReviewDate,
-      updatedAt: now
+      updatedAt: now,
+      reviewUpdatedAt: now
     };
   }
 

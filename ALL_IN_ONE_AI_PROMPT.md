@@ -491,7 +491,7 @@
         </div>
         <div id="sbTermsAgreeRow" style="margin-top:4px;font-size:11px;color:var(--s);display:flex;align-items:center;gap:6px">
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="chkTermsAgree" checked>
+            <input type="checkbox" id="chkTermsAgree">
             <span><button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">利用規約</button> および <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">プライバシーポリシー</button> に同意する</span>
           </label>
         </div>
@@ -538,6 +538,12 @@
               </ul>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:10px;line-height:1.4;color:var(--m);background:var(--bg);padding:6px 8px;border-radius:4px;border:1px solid var(--bd)">
+                <strong>【定期課金・解約に関する法定明示】</strong><br>
+                ・月額480円（税込）/ 1ヶ月ごとの自動更新<br>
+                ・次回更新日の前日までに設定画面（またはStripeポータル）よりいつでも解約可能<br>
+                ・解約後も次回更新日まではPro機能を利用可能（日割り精算なし）
+              </div>
               <button type="button" id="btnUpgradePro" onclick="startStripeCheckout('price_pro_monthly')" style="width:100%">Proにアップグレード (¥480/月)</button>
               <button type="button" id="btnManageSub" class="btn-o btn-xs" onclick="openStripePortal()" style="display:none;width:100%">契約管理・領収書 (Stripe)</button>
             </div>
@@ -893,7 +899,2287 @@
 
 ```
 
-### 【ファイル: js/app.js — コアロジック・SM-2暗記・OCR・UI制御】
+
+### 【ファイル: dev.html — 開発者マスター版（課金制限完全バイパス）】
+```html
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://*.wiktionary.org https://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="theme-color" content="#1b1b1c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vocab Vault">
+  <title>Vocab Vault — 語源・概念史・単語帳</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%237c3aed'/%3E%3Cpath d='M28 26h44a6 6 0 0 1 6 6v40a6 6 0 0 1-6 6H28a6 6 0 0 1-6-6V32a6 6 0 0 1 6-6zm6 12v28h32V38H34zm8 8h16v4H42v-4zm0 8h12v4H42v-4z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    window.DEV_MASTER_MODE = true;
+    try { localStorage.setItem('vv_dev_unlocked', '1'); } catch(e){}
+  </script>
+</head>
+<body class="dark">
+<div class="workspace">
+  <nav class="ribbon" aria-label="メインナビゲーション">
+    <div class="rib-grp">
+      <button class="rib-btn" onclick="toggleSidebar()" title="サイドバー開閉" aria-label="サイドバー開閉"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
+      <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
+      <button class="rib-btn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></button>
+      <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></button>
+      <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
+      <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button class="rib-btn" onclick="window.print()" title="フィルタ結果の全件をA4・2段組でPDF印刷" aria-label="PDF印刷"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
+    </div>
+    <div class="rib-grp">
+      <button class="rib-btn" onclick="toggleModal('shortcutsModal',true)" title="キーボードショートカット一覧 (?)" aria-label="ショートカット一覧">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </button>
+      <button class="rib-btn" onclick="window.VocabFeedback.openFeedbackModal()" title="ご意見・ヒアリング参加 (需要検証)" aria-label="ご意見・ヒアリング">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <button class="rib-btn" onclick="syncCloudNow(true)" title="クラウド差分同期" aria-label="クラウド差分同期">
+        <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      </button>
+      <button class="rib-btn" id="ribInstallBtn" onclick="promptAppInstall()" title="アプリを単体インストール（Chromeなしで独立起動）" aria-label="アプリを単体インストール">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+      <button class="rib-btn" onclick="openSettings()" title="設定・データ管理" aria-label="設定・データ管理">
+        <svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+        <span id="cfgDot" class="cfg-dot"></span>
+      </button>
+    </div>
+  </nav>
+
+  <div class="side-backdrop" onclick="toggleSidebar()"></div>
+
+  <aside class="sidebar">
+    <div class="side-top">
+      <div class="flx-sb lbl-sm"><span>エクスプローラ・検索</span><span class="kbd-hint">/ または Alt+F</span></div>
+      <div class="search-wrap">
+        <input type="text" id="qSearch" placeholder="複数語・語根(*sta-)・意味で検索 (スペース/カンマ可)..." autocomplete="off">
+        <button type="button" id="qClear" class="search-clear" onclick="setSearch('')" aria-label="検索クリア">×</button>
+      </div>
+      <div class="flx-sb" style="font-size:11px;color:var(--m)">
+        <span id="sideCount">0 件</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <button type="button" id="xLangBtn" class="btn-xlang" onclick="toggleCrossLang()" title="全言語ペアを横断検索">全言語横断</button>
+          <button type="button" id="resetFiltBtn" onclick="resetAllFilters()">解除</button>
+        </div>
+      </div>
+    </div>
+    <div class="side-tree">
+      <div class="tree-sec" id="secLang"><div class="tree-hd" onclick="toggleSec('secLang')"><span><span class="arr"></span>言語ペア (Language Pairs)</span></div><div class="tree-list" id="treeLang"></div></div>
+      <div class="tree-sec" id="secStat"><div class="tree-hd" onclick="toggleSec('secStat')"><span><span class="arr"></span>状態・要確認フィルタ</span></div><div class="tree-list" id="treeStat"></div></div>
+      <div class="tree-sec" id="secFol"><div class="tree-hd" onclick="toggleSec('secFol')"><span><span class="arr"></span>タイトル・分野</span></div><div class="tree-list" id="treeFol"></div></div>
+      <div class="tree-sec" id="secPos"><div class="tree-hd" onclick="toggleSec('secPos')"><span><span class="arr"></span>品詞 (POS)</span></div><div class="tree-list" id="treePos"></div></div>
+      <div class="tree-sec" id="secCat"><div class="tree-hd" onclick="toggleSec('secCat')"><span><span class="arr"></span>カテゴリ</span></div><div class="tree-list" id="treeCat"></div></div>
+    </div>
+    <div class="side-foot flx-sb">
+      <span id="vaultLabel">Vocab Vault (EN)</span>
+      <div style="display:flex;gap:4px">
+        <button type="button" class="side-foot-btn" onclick="window.VocabFeedback.openFeedbackModal()" title="ご意見・フィードバック">ご意見</button>
+        <button type="button" class="side-foot-btn" onclick="openSettings()">設定</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main-pane">
+    <header class="tab-bar">
+      <div class="tab" id="activeTabTitle">English — すべての単語</div>
+      <div class="tab-acts">
+        <span class="badge ok" style="background:#7c3aed;color:#fff;font-weight:700;border:none;letter-spacing:0.5px">DEV MASTER (全機能無制限)</span>
+        <span id="storageWarnBanner" class="storage-warn-banner" onclick="openSettings()" title="ストレージ状態"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>保存状態を確認</span>
+        <span id="cloudSyncBadge" class="badge ok" style="cursor:pointer" onclick="openSettings()" title="AIエンジン稼働・機密保護状態">内蔵AI: 稼働中 (完全機密保護)</span>
+      </div>
+    </header>
+
+    <!-- スマート言語ペア・ファイルタブバー -->
+    <div class="lang-pair-bar" id="langPairBar">
+      <div class="pair-bar-left">
+        <span class="pair-bar-meta">単語帳</span>
+        <div class="pair-file-tabs" id="pairFileTabs">
+          <!-- 作成済みファイル（単語が存在するペア）および現在開いているペアのみ動的描画 -->
+        </div>
+      </div>
+
+      <div class="pair-bar-right">
+        <div class="compact-pair-picker" title="新規ペアの作成・切り替え">
+          <select id="srcLangSel" class="compact-sel" onchange="onLanguagePairChange()" aria-label="学習言語">
+            <option value="en">英語 (EN)</option>
+            <option value="fr">仏語 (FR)</option>
+            <option value="de">独語 (DE)</option>
+            <option value="ja">日本語 (JA)</option>
+          </select>
+          <button type="button" class="btn-swap-compact" id="btnSwapLang" onclick="swapLanguagePair()" title="言語を入れ替え (⇄)" aria-label="入れ替え">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/></svg>
+          </button>
+          <select id="tgtLangSel" class="compact-sel" onchange="onLanguagePairChange()" aria-label="解説言語">
+            <option value="ja">日本語 (JA)</option>
+            <option value="en">英語 (EN)</option>
+            <option value="fr">仏語 (FR)</option>
+            <option value="de">独語 (DE)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <form class="add-bar" id="ctrlForm" onsubmit="event.preventDefault(); submitW();">
+      <input type="text" id="inFol" class="in-fol-box" placeholder="分野 (任意)" autocomplete="off">
+      <div class="in-word-wrap f1" id="inWordWrap" style="position:relative;display:flex">
+        <input type="text" id="inWord" class="f1" placeholder="単語・熟語を入力（カンマや改行で複数一括登録 / 例: wet blanket, look up）" autocomplete="off" style="width:100%">
+        <div id="wordSuggestBox" class="word-suggest-box" style="display:none"></div>
+      </div>
+      <div class="add-opts">
+        <label class="chk-lbl xs" title="歴史・制度・時代背景を深く解説">
+          <input type="checkbox" id="chkHist" checked onchange="lsSet('vv_use_hist_mode', this.checked ? '1' : '0')">歴史
+        </label>
+        <label class="chk-lbl xs" title="Wiktionary語源・IPAと照合裏付け">
+          <input type="checkbox" id="chkWikt" checked onchange="lsSet('vv_use_wikt', this.checked ? '1' : '0')">Wikt
+        </label>
+      </div>
+      <button type="submit">登録</button>
+    </form>
+
+    <div class="content-scroll" id="mainScroll">
+      <div class="content-inner">
+        <!-- 需要検証バナー (ステップ0) -->
+        <div class="feedback-banner" id="userFeedbackBanner" style="display:none">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="banner-badge">ご案内</span>
+            <span>機能改善や学術語彙・語源学習に関するご意見・ヒアリングを募集しています（参加者にProプラン1年分進呈）</span>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn-ac-o btn-xs" onclick="window.VocabFeedback.openFeedbackModal('interview')">参加・回答する</button>
+            <button type="button" class="btn-o btn-xs" onclick="$('userFeedbackBanner').style.display='none';lsSet('vv_banner_closed','1')">閉じる</button>
+          </div>
+        </div>
+
+        <div id="listView">
+          <h1 class="doc-title">
+            <span id="docHeading">すべての単語</span>
+            <div class="doc-title-right" style="display:flex;align-items:center;gap:8px">
+              <div class="view-mode-toggle" role="group" aria-label="表示モード切替">
+                <button type="button" id="btnModeAcademic" class="btn-xs btn-mode active" onclick="setViewMode('academic')" title="語源・概念史・コアイメージを常時フル表示">学術・詳細</button>
+                <button type="button" id="btnModeSimple" class="btn-xs btn-mode" onclick="setViewMode('simple')" title="意味と例文のみをスッキリ表示（タップで語源展開）">シンプル</button>
+              </div>
+              <select id="sortSel" class="sort-sel" onchange="setSortOrder(this.value)" aria-label="並び順">
+                <option value="new">並び順: 新しい順</option>
+                <option value="old">並び順: 古い順 (#1〜)</option>
+                <option value="due">並び順: 復習期日が近い順</option>
+                <option value="alpha">並び順: アルファベット順</option>
+              </select>
+              <small id="docSubCount"></small>
+            </div>
+          </h1>
+          <div id="list"></div>
+          <div id="pag" class="pag"></div>
+        </div>
+
+        <div id="anki">
+          <div class="flx-sb" style="margin-bottom:8px">
+            <span id="offlineSyncBadge" class="offline-sync-badge"><span class="badge-dot"></span><span id="offlineSyncText">未同期の復習: 0件</span></span>
+          </div>
+          <div class="a-card" id="aCard">
+            <!-- スワイプ判定インジケータ -->
+            <div class="swipe-badge again">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span>もう一度</span>
+            </div>
+            <div class="swipe-badge good">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>覚えた</span>
+            </div>
+
+            <div style="position:absolute;top:14px;left:18px"><button type="button" id="btnUndoAnki" class="btn-o btn-xs" data-act="undo-anki" style="display:none;align-items:center;gap:4px" title="直前の判定を取り消す (Z)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>元に戻す (Z)</button></div>
+            <div style="position:absolute;top:14px;right:18px;font-size:13px;color:var(--m)" id="aProg"></div>
+            <div class="a-front"><span id="aWord"></span><button type="button" class="spk-btn" data-act="speak-current" title="ネイティブ発音 (R)" aria-label="発音"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button></div>
+            <div class="a-pho" id="aPho"></div>
+            <div class="a-div" id="aDiv"></div>
+            <div class="a-back" id="aBack"></div>
+            <div class="flx-c" style="margin-top:28px">
+              <button type="button" id="btnAns" onclick="showAns()" style="width:180px;padding:10px;font-size:15px">解答を表示 (Space)</button>
+            </div>
+            <div class="r-grp" id="aRat"></div>
+            <div class="swipe-hint"><span>← 左スワイプ: もう一度</span><span style="opacity:.3">•</span><span>右スワイプ: 覚えた →</span></div>
+            <button type="button" onclick="exitAnki()" class="btn-o btn-xs" style="margin-top:14px;border:none;text-decoration:underline">終了してリストに戻る</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- 需要検証・フィードバック用モーダル (ステップ0) -->
+<div id="feedbackModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="fbModalTitle" onclick="if(event.target===this) window.VocabFeedback.closeFeedbackModal()">
+  <div class="modal-box">
+    <div class="modal-hd flx-sb">
+      <h2 id="fbModalTitle">ご意見・フィードバック ＆ ユーザーヒアリング</h2>
+      <button type="button" class="btn-o btn-xs" onclick="window.VocabFeedback.closeFeedbackModal()" aria-label="閉じる">×</button>
+    </div>
+    <form class="modal-bd" id="feedbackForm" onsubmit="event.preventDefault(); window.VocabFeedback.submitFeedback();">
+      <div class="f-col">
+        <label class="lbl-sm">投稿種別</label>
+        <select id="fbCategory">
+          <option value="opinion">機能・使い勝手のご意見</option>
+          <option value="interview">30分オンラインヒアリングに参加希望（謝礼あり）</option>
+          <option value="feature">欲しい機能・言語の要望</option>
+          <option value="bug">不具合・表示崩れの報告</option>
+        </select>
+      </div>
+      <div class="f-col">
+        <label class="lbl-sm">本アプリの満足度</label>
+        <div style="display:flex;gap:12px;font-size:13px;padding:4px 0">
+          <label><input type="radio" name="fbRating" value="5" checked> 大変満足</label>
+          <label><input type="radio" name="fbRating" value="4"> 満足</label>
+          <label><input type="radio" name="fbRating" value="3"> 普通</label>
+          <label><input type="radio" name="fbRating" value="2"> 不満</label>
+        </div>
+      </div>
+      <div class="f-col">
+        <label class="lbl-sm">ご意見・詳細内容</label>
+        <textarea id="fbContent" rows="4" placeholder="「語源解説が分かりやすかった」「フランス語の活用形をこう表示してほしい」「月額980円なら課金したい」など、率直なご意見をお願いします..."></textarea>
+      </div>
+      <div class="f-col">
+        <label class="lbl-sm">適正と感じる月額料金（任意）</label>
+        <select id="fbWtp">
+          <option value="">未選択</option>
+          <option value="free_only">無料のみ（課金はしない）</option>
+          <option value="sub_500">〜500円 / 月</option>
+          <option value="sub_980">〜980円 / 月（おすすめ）</option>
+          <option value="sub_1500">〜1,500円 / 月</option>
+          <option value="lifetime">買い切り型なら払いたい</option>
+        </select>
+      </div>
+      <div class="f-col">
+        <label class="lbl-sm">メールアドレス（ヒアリング希望者または返信希望時）</label>
+        <input type="email" id="fbEmail" placeholder="user@example.com" autocomplete="email">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px">
+        <button type="button" class="btn-o" onclick="window.VocabFeedback.closeFeedbackModal()">キャンセル</button>
+        <button type="submit" id="btnSubmitFb">フィードバックを送信</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- カード手動編集モーダル -->
+<div id="editModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="editModalTitle" onclick="if(event.target===this) toggleModal('editModal',false)">
+  <div class="modal-box wide">
+    <div class="modal-hd flx-sb">
+      <h2 id="editModalTitle"><span>単語カードの完全編集（復習履歴は維持されます）</span></h2>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('editModal',false)" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-bd">
+      <input type="hidden" id="editId">
+      <input type="hidden" id="editLang">
+      <div class="f-row">
+        <div class="f-col" style="flex:1.2;min-width:140px"><label class="lbl-sm">見出し語</label><input type="text" id="editWord"></div>
+        <div class="f-col" style="width:72px"><label class="lbl-sm" title="同形異義語の識別番号（通常は1）">同形#</label><input type="text" id="editHomo" placeholder="1"></div>
+        <div class="f-col" style="flex:1;min-width:120px"><label class="lbl-sm">発音記号 (IPA)</label><input type="text" id="editPho"></div>
+        <div class="f-col" style="flex:1.2;min-width:150px"><label class="lbl-sm">屈折・変化形 (複数形/三基本形)</label><input type="text" id="editGram" placeholder="例: l'arbre, pl. -s"></div>
+      </div>
+      <div class="f-row">
+        <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm">カテゴリ</label><select id="editCat"></select></div>
+        <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm">タイトル・分野</label><input type="text" id="editFol"></div>
+        <div class="f-col" style="width:155px"><label class="lbl-sm">語源の確実性</label><select id="editConf"><option value="">未設定 (変更しない)</option><option value="certain">確実 (certain)</option><option value="probable">有力 (probable)</option><option value="disputed">諸説 (disputed)</option><option value="unknown">不明 (unknown)</option></select></div>
+      </div>
+      <div class="f-col"><label class="lbl-sm">意味（1行に1つ「品詞 | 意味」形式。例: N[m] | 木、樹木）</label><textarea id="editMeanings" rows="2"></textarea></div>
+      <div class="f-row">
+        <div class="f-col" style="flex:1;min-width:200px"><label class="lbl-sm">歴史・専門補足（赤字括弧内に表示）</label><input type="text" id="editHistNote"></div>
+        <div class="f-col" style="flex:1;min-width:200px"><label class="lbl-sm">コアイメージ</label><input type="text" id="editCore"></div>
+      </div>
+      <div class="f-col"><label class="lbl-sm">語源・概念史解説</label><textarea id="editEty" rows="2"></textarea></div>
+      <div class="f-col"><label class="lbl-sm">語源タグ（カンマ区切り。例: ラテン語: arbor (木)）</label><input type="text" id="editEtyTags"></div>
+      <div class="f-row">
+        <div class="f-col" style="flex:1.2;min-width:200px"><label class="lbl-sm">例文 (外国語)</label><input type="text" id="editExForeign"></div>
+        <div class="f-col" style="width:120px"><label class="lbl-sm" title="例文中で使われている活用形">文中活用形</label><input type="text" id="editExUsed"></div>
+        <div class="f-col" style="flex:1.2;min-width:200px"><label class="lbl-sm">例文和訳（強調は &lt;b&gt;語&lt;/b&gt;）</label><input type="text" id="editExJa"></div>
+      </div>
+      <div class="f-row">
+        <div class="f-col" style="flex:1;min-width:220px"><label class="lbl-sm">重要表現（1行1件: 外国語表現 | 和訳）</label><textarea id="editPhrases" rows="2"></textarea></div>
+        <div class="f-col" style="flex:1.3;min-width:260px"><label class="lbl-sm">派生語（1行1件: 単語 | IPA | 品詞 | 意味 | 用例 | 用例訳）</label><textarea id="editDerivatives" rows="2"></textarea></div>
+      </div>
+      <div class="flx-sb" style="margin-top:4px">
+        <span id="editGenMeta" style="font-size:11px;color:var(--m);font-family:var(--mono)"></span>
+        <div class="f-row">
+          <button type="button" class="btn-o" onclick="toggleModal('editModal',false)">キャンセル</button>
+          <button type="button" onclick="saveEditCard()">変更を保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 長文・画像抽出モーダル -->
+<div id="extractModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="extModalTitle" onclick="if(event.target===this) toggleModal('extractModal',false)">
+  <div class="modal-box wide">
+    <div class="modal-hd flx-sb">
+      <h2 id="extModalTitle"><span>長文・画像からレベル別単語ピックアップ</span><span id="extLangBadge" class="badge ok">English</span></h2>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('extractModal',false)" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-bd">
+      <div class="f-row" style="align-items:flex-end">
+        <div class="f-col" style="flex:1;min-width:220px"><label class="lbl-sm">対象者のレベル</label><select id="extLevelSel" onchange="lsSet('vv_ext_level', this.value)"></select></div>
+        <div class="f-col" style="width:120px"><label class="lbl-sm">最大抽出数</label><select id="extMaxCnt"><option value="8">最大 8 語</option><option value="12" selected>最大 12 語</option><option value="18">最大 18 語</option><option value="24">最大 24 語</option></select></div>
+        <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm">保存先タイトル（任意）</label><input type="text" id="extFolInput" placeholder="例: 2026 フランス演習" autocomplete="off"></div>
+      </div>
+      <div class="ocr-dropzone flx-sb" id="ocrDropzone" onclick="$('ocrFileInput').click()">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="ocr-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+          <div class="f-col" style="gap:1px">
+            <span style="font-size:12px;font-weight:700">画像からテキストを文字起こし（OCR）</span>
+            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクリーンショット貼り付け (Cmd+V)</span>
+          </div>
+        </div>
+        <button type="button" class="btn-o btn-xs" style="pointer-events:none">画像選択</button>
+      </div>
+      <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageFile(this.files[0])">
+      <div id="ocrPreviewSec" style="display:none;margin-top:6px;padding:8px 10px;background:var(--bg-hov);border:1px solid var(--b);border-radius:6px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <img id="ocrThumbImg" src="" alt="選択画像" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--b);background:var(--bg-card)">
+          <div style="flex:1;min-width:0">
+            <div id="ocrFileName" style="font-size:12px;font-weight:700;color:var(--t);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">スクリーンショット</div>
+            <div id="ocrFileMeta" style="font-size:11px;color:var(--m);margin-top:1px">0 KB</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" id="btnRunOcrAgain" class="btn-ac btn-xs" onclick="runOcrCurrentFile()">文字起こし</button>
+            <button type="button" class="btn-o btn-xs" onclick="clearOcrPreview()">削除</button>
+          </div>
+        </div>
+        <div id="ocrApiKeyPrompt" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--b)">
+          <div style="font-size:11.5px;color:var(--t);font-weight:600">★ 高精度 AI 文字起こし (Gemini Vision OCR)</div>
+          <div style="font-size:11px;color:var(--s);margin-top:2px;line-height:1.5">
+            画像・スクショを自動文字起こしするには、無料のGoogle Gemini APIキーを入力してください（Google AI Studioで1分で取得可能・完全無料）。
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px">
+            <input type="password" id="ocrInlineApiKey" placeholder="AIzaSy... (Gemini APIキーを入力)" style="flex:1;font-size:11.5px;padding:4px 8px;border:1px solid var(--b);border-radius:4px;background:var(--bg-card);color:var(--t)">
+            <button type="button" class="btn-ac btn-xs" onclick="saveOcrKeyAndExecute()">設定して文字起こし</button>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn-o btn-xs" style="text-decoration:none;display:inline-flex;align-items:center">無料キー取得</a>
+          </div>
+        </div>
+      </div>
+      <div class="f-col">
+        <div class="flx-sb"><label class="lbl-sm">長文テキスト（最大12,000字）</label><button type="button" class="btn-o btn-xs" onclick="$('extTextarea').value='';$('extResSec').style.display='none';$('extTextarea').focus()">クリア</button></div>
+        <textarea id="extTextarea" rows="6" placeholder="長文を貼り付けるか、上の枠から画像を読み込んでください..."></textarea>
+      </div>
+      <div class="flx-sb">
+        <span style="font-size:11px;color:var(--m)">※入力された本文や画像は解析のため AI エンドポイントへ送信されます。機密情報は入力しないでください。</span>
+        <button type="button" id="btnRunExtract" onclick="runPassageExtract()">長文を解析して単語をピックアップ</button>
+      </div>
+      <div id="extLoadBox" style="display:none;padding:10px;justify-content:center" class="load"><div class="spin"></div><span id="extLoadText">処理中...</span></div>
+      <div id="extResSec" class="cfg-sec" style="display:none;border-top:1px solid var(--b);padding-top:10px">
+        <div class="cfg-title flx-sb">
+          <span id="extResCount">抽出された単語</span>
+          <div class="f-row"><button type="button" class="btn-o btn-xs" onclick="toggleAllExtChecks(true)">未登録を全選択</button><button type="button" class="btn-o btn-xs" onclick="toggleAllExtChecks(false)">全解除</button></div>
+        </div>
+        <div id="extCandidateGrid" class="ext-grid"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
+          <button type="button" class="btn-o" onclick="toggleModal('extractModal',false)">キャンセル</button>
+          <button type="button" id="btnCommitExt" onclick="commitExtractedWords()">選択した単語を単語帳に登録</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 設定・データ管理・クラウド同期モーダル -->
+<div id="settingsModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="cfgModalTitle" onclick="if(event.target===this) toggleModal('settingsModal',false)">
+  <div class="modal-box wide">
+    <div class="modal-hd flx-sb"><h2 id="cfgModalTitle">設定・クラウド同期・データ管理</h2><button type="button" class="btn-o btn-xs" onclick="toggleModal('settingsModal',false)" aria-label="閉じる">×</button></div>
+    <div class="modal-bd">
+      <div class="cfg-sec">
+        <div class="cfg-title">表示・音声設定</div>
+        <div class="flx-sb" style="flex-wrap:wrap">
+          <label class="chk-lbl"><input type="checkbox" id="chkDark" onchange="toggleDarkMode(this.checked)">ダークモード</label>
+          <label class="chk-lbl" title="暗記復習(Anki)モードでカード表示時に自動発音"><input type="checkbox" id="chkAutoSpeak" checked onchange="lsSet('vv_tts_auto_anki',this.checked?'1':'0')">復習時に自動発音</label>
+          <select id="ttsRateSel" onchange="lsSet('vv_tts_rate',this.value)" title="読み上げ速度">
+            <option value="0.85">速度: 0.85x (ゆっくり)</option>
+            <option value="0.95" selected>速度: 0.95x (自然)</option>
+            <option value="1.05">速度: 1.05x (やや速め)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>アプリ単体で開く (Chrome等のブラウザ枠なし起動)</span>
+          <span id="pwaStatusBadge" class="badge ok">単体起動対応</span>
+        </div>
+        <p class="cfg-desc">ChromeのURLバーやタブを介さず、Mac・Windows・スマホで独立した専用アプリウィンドウとして快適にご利用いただけます。</p>
+        <div class="f-row" style="flex-wrap:wrap;gap:8px">
+          <button type="button" id="btnPwaInstall" class="btn-ac-o" onclick="promptAppInstall()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>アプリをインストール（単独起動）</button>
+          <button type="button" class="btn-o" onclick="toggleModal('installGuideModal', true)">OS別セットアップ手順</button>
+        </div>
+        <p class="cfg-desc" style="margin-top:6px;color:var(--ac);font-weight:600">※Macの方は、本フォルダ内の「Vocab Vault.app」または「Vocab Vault.command」をダブルクリックするだけで、ブラウザ枠なしの単体アプリとして直接起動できます。</p>
+      </div>
+
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>クラウド同期 ＆ 共有キャッシュAIプロキシ (Supabase)</span>
+          <span id="sbStatusBadge" class="badge ng">未ログイン</span>
+        </div>
+        <div class="f-row">
+          <input type="text" id="sbUrlInput" class="f1" placeholder="Supabase URL (https://xxx.supabase.co)" autocomplete="off">
+          <input type="password" id="sbAnonInput" class="f1" placeholder="Supabase Anon Public Key" autocomplete="off">
+        </div>
+        <div class="f-row" id="sbAuthFormRow">
+          <input type="email" id="sbEmailInput" class="f1" placeholder="メールアドレス" autocomplete="username">
+          <input type="password" id="sbPassInput" class="f1" placeholder="パスワード (6文字以上)" autocomplete="current-password">
+          <button type="button" onclick="cloudLogin(false)">ログイン</button>
+          <button type="button" class="btn-o" onclick="cloudLogin(true)">新規登録</button>
+        </div>
+        <div id="sbTermsAgreeRow" style="margin-top:4px;font-size:11px;color:var(--s);display:flex;align-items:center;gap:6px">
+          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="chkTermsAgree">
+            <span><button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">利用規約</button> および <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">プライバシーポリシー</button> に同意する</span>
+          </label>
+        </div>
+        <div class="flx-sb" id="sbLoggedInRow" style="display:none">
+          <span id="sbUserText" style="font-size:12px;font-weight:600;color:var(--ok)"></span>
+          <div class="f-row">
+            <button type="button" class="btn-ac-o btn-xs" onclick="syncCloudNow(true)">今すぐ差分同期</button>
+            <button type="button" class="btn-o btn-xs" onclick="cloudLogout()">ログアウト</button>
+          </div>
+        </div>
+        <p class="cfg-desc" id="sbQuotaText">※ログインすると複数端末間で単語・SRS履歴・削除情報が自動同期され、共有辞書キャッシュによりAI生成コストと待機時間が削減されます。</p>
+      </div>
+
+      <!-- ステップ6: Stripe 課金・プラン管理 -->
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>プラン ＆ サブスクリプション (Stripe決済)</span>
+          <span id="curPlanBadge" class="badge ok">Free プラン</span>
+        </div>
+        <div class="plan-grid">
+          <div class="plan-card current" id="planCardFree">
+            <div>
+              <div style="font-weight:700;font-size:13px">Free プラン</div>
+              <div class="plan-price">¥0 <small>/ 月</small></div>
+              <ul class="plan-features" style="margin-top:8px">
+                <li>月 30 語までのAI新規生成</li>
+                <li>共有辞書キャッシュの利用（無制限）</li>
+                <li>SM-2暗記復習・スワイプUI</li>
+                <li>オフライン復習・印刷対応</li>
+              </ul>
+            </div>
+            <div style="font-size:11px;color:var(--m)">現在のプラン</div>
+          </div>
+          <div class="plan-card pro" id="planCardPro">
+            <span class="plan-badge">おすすめ</span>
+            <div>
+              <div style="font-weight:700;font-size:13px">Pro プラン</div>
+              <div class="plan-price">¥480 <small>/ 月 (年額 ¥4,800)</small></div>
+              <ul class="plan-features" style="margin-top:8px">
+                <li>AI新規生成・概念史深掘り 無制限</li>
+                <li>長文・画像OCR抽出 無制限</li>
+                <li>複数端末クラウド自動差分同期</li>
+                <li>優先サポート</li>
+              </ul>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:10px;line-height:1.4;color:var(--m);background:var(--bg);padding:6px 8px;border-radius:4px;border:1px solid var(--bd)">
+                <strong>【定期課金・解約に関する法定明示】</strong><br>
+                ・月額480円（税込）/ 1ヶ月ごとの自動更新<br>
+                ・次回更新日の前日までに設定画面（またはStripeポータル）よりいつでも解約可能<br>
+                ・解約後も次回更新日まではPro機能を利用可能（日割り精算なし）
+              </div>
+              <button type="button" id="btnUpgradePro" onclick="startStripeCheckout('price_pro_monthly')" style="width:100%">Proにアップグレード (¥480/月)</button>
+              <button type="button" id="btnManageSub" class="btn-o btn-xs" onclick="openStripePortal()" style="display:none;width:100%">契約管理・領収書 (Stripe)</button>
+            </div>
+          </div>
+        </div>
+        <div class="flx-sb" style="margin-top:8px;font-size:11px;color:var(--m);flex-wrap:wrap;gap:6px">
+          <span>※決済はStripeのSSL暗号化決済ページで行われます。</span>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline">利用規約</button>
+            <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline">プライバシー</button>
+            <button type="button" class="btn-link" onclick="openLegalModal('tokusho')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline">特定商取引法</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>AI生成エンジン ＆ プライバシー機密保護</span>
+          <span id="apiBadge" class="badge ok">内蔵AI稼働中 (完全機密保護)</span>
+        </div>
+        <p class="cfg-desc" style="line-height:1.6;color:var(--t)">
+          <strong>完全機密保護・内部AIアーキテクチャ:</strong> 本アプリは内部にAIエンジンが埋め込まれており、個人のAPIキーを入力することなく安全にご利用いただけます。データは暗号化され、プライバシーは厳格に保護されます。
+        </p>
+
+        <!-- 上級者向けカスタムAPIキー (BYOK) アコーディオン -->
+        <details class="byok-details" style="margin-top:10px;border:1px solid var(--b);border-radius:6px;padding:8px 12px;background:var(--bg-card)">
+          <summary style="font-size:12px;font-weight:600;color:var(--s);cursor:pointer;user-select:none">
+            上級者向け設定: カスタムGemini APIキー (BYOK: 直接暗号化通信)
+          </summary>
+          <div style="margin-top:10px">
+            <div style="display:flex;gap:6px">
+              <input type="password" id="apiKeyInput" class="f1" placeholder="AIzaSy... (通常は未入力で問題ありません)" autocomplete="off">
+              <button type="button" class="btn-o btn-xs" onclick="const i=$('apiKeyInput'),p=i.type==='password';i.type=p?'text':'password';this.textContent=p?'隠す':'表示'">表示</button>
+              <button type="button" onclick="saveKeyFromModal()">保存・確認</button>
+            </div>
+            <p class="cfg-desc" style="margin-top:6px;font-size:11px">※ご自身のGoogle AI Studio発行キーで直接通信したい場合のみ設定してください。キーはローカルブラウザ内にのみ厳重に保持され、外部サーバーには一切送信・共有されません。</p>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+              <span style="font-size:11.5px;color:var(--s);font-weight:600">使用AIモデル:</span>
+              <select id="modelSel" class="f1" onchange="lsSet('vv_gemini_model', this.value)" style="font-size:12px"><option value="auto">自動（モード別最適モデル）</option></select>
+              <button type="button" class="btn-o btn-xs" onclick="App.cachedModels=null;fetchModels(getKey()).then(m=>alert('更新完了:'+m.length+'件')).catch(e=>alert(e.message))">再取得</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb"><span>データ管理・大容量IndexedDB主ストア</span><span id="storageBadge" class="badge ok">保存正常</span></div>
+        <p class="cfg-desc" id="dataStatText"></p>
+        <p class="cfg-desc" id="lastBackupText"></p>
+        <div class="cfg-grid">
+          <button type="button" class="cfg-card" onclick="exportJSON()"><span>JSON保存</span><small>全言語データを保存</small></button>
+          <button type="button" class="cfg-card" onclick="$('fileIn').click()"><span>JSON復元</span><small>バックアップを統合</small></button>
+          <button type="button" class="cfg-card" onclick="exportAnkiTSV()"><span>Anki / TSV出力</span><small>表示中リストを出力</small></button>
+          <button type="button" class="cfg-card" onclick="exportObsidianMarkdown()"><span>Obsidian出力</span><small>Wikiリンク・語根付き.md</small></button>
+          <button type="button" class="cfg-card" onclick="salvageAll(true)" style="border-color:var(--ac-b)"><span>全ストレージ救出</span><small>退避スナップショットを含め復元</small></button>
+        </div>
+        <input type="file" id="fileIn" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
+      </div>
+
+      <!-- 暗記復習 (SM-2 SRS) キャッチアップ設定 -->
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>暗記復習・学習継続設定 (SM-2 SRS)</span>
+          <span class="badge ok">最適化済</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+          <div>
+            <div style="font-size:12px;font-weight:700">1日の最大復習上限 (Daily Review Cap)</div>
+            <p class="cfg-desc" style="margin:2px 0 0">復習が溜まりすぎて学習破綻するのを防ぐため、1日のセッション数を制限します。</p>
+          </div>
+          <select id="selDailyCap" class="sort-sel" onchange="setDailyReviewCap(this.value)">
+            <option value="20">20 語 (ゆったり)</option>
+            <option value="30" selected>30 語 (推奨・標準)</option>
+            <option value="50">50 語 (集中)</option>
+            <option value="99999">無制限 (すべて)</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
+          <div>
+            <div style="font-size:12px;font-weight:700">溜まった復習のなだらかな再分散 (Snooze)</div>
+            <p class="cfg-desc" style="margin:2px 0 0">長期不在等で溜まった復習期日超過単語を、今後7日間に均等になだらかに再配分します。</p>
+          </div>
+          <button type="button" class="btn-o btn-xs" onclick="rescheduleOverdueReviews()">均等に再配分</button>
+        </div>
+      </div>
+
+      <!-- データ主権と永久無料保証 -->
+      <div class="cfg-sec" style="background:var(--bg-hov);padding:10px 12px;border-radius:6px;border-left:3px solid var(--ok)">
+        <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:2px">データ主権と永久無料の安心保証</div>
+        <p class="cfg-desc" style="margin:0;color:var(--s);line-height:1.55">
+          有料Proプランをご解約された後でも、これまでに登録・生成されたすべての単語データ、暗記復習機能（Anki SRS）、およびJSON / TSV / Obsidianエクスポート機能は<strong>永久に完全無料</strong>でご利用いただけます。お客様の大切な知的学習資産がロックされることは一切ありません。
+        </p>
+      </div>
+
+      <!-- 開発者マスター権限（完全無制限・課金不要） -->
+      <div class="cfg-sec" style="background:var(--bg-card);padding:10px 12px;border-radius:6px;border-left:3px solid var(--ac);border:1px solid var(--b)">
+        <div class="flx-sb">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--t)">開発者マスター権限 (Developer Mode)</div>
+            <p class="cfg-desc" style="margin:2px 0 0">開発者・管理者向けに課金制限・クォータ制限を完全解除し、全機能を無制限・無料で利用します。</p>
+          </div>
+          <button type="button" class="btn-xs btn-ac" onclick="toggleDevMasterMode()" style="white-space:nowrap;padding:5px 12px">権限を切替</button>
+        </div>
+      </div>
+
+      <div class="cfg-sec" style="border-top:1px dashed var(--b);padding-top:10px">
+        <div class="flx-sb">
+          <div><div style="font-size:12px;font-weight:700;color:var(--r)">現在の言語データを全削除</div><p class="cfg-desc">選択中の言語（<span id="curLangLabel">English</span>）を消去します（リロードしても復活しません）。</p></div>
+          <button type="button" onclick="clearCurrentLang()" style="background:var(--r)">全削除</button>
+        </div>
+      </div>
+
+      <div class="cfg-sec" id="sbDeleteAccountSec" style="border-top:1px dashed var(--b);padding-top:10px;display:none">
+        <div class="flx-sb">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:var(--r)">アカウント完全削除（退会）</div>
+            <p class="cfg-desc">クラウド上の全ての単語データ・学習履歴・アカウント情報を恒久的に抹消します。この操作は取り消せません。</p>
+          </div>
+          <button type="button" onclick="deleteAccountPermanently()" style="background:var(--r);white-space:nowrap">退会・データ抹消</button>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:6px;padding-top:8px;border-top:1px solid var(--b)">
+        <button type="button" class="btn-o" onclick="toggleModal('settingsModal',false)">設定を閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 利用規約・プライバシーポリシー・特定商取引法 モーダル -->
+<div id="legalModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle" onclick="if(event.target===this) toggleModal('legalModal',false)">
+  <div class="modal" style="max-width:680px;max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal-hd flx-sb">
+      <span class="modal-title" id="legalModalTitle">法務・ポリシー情報</span>
+      <button type="button" class="modal-close" onclick="toggleModal('legalModal',false)" aria-label="閉じる">&times;</button>
+    </div>
+    <div style="display:flex;gap:8px;border-bottom:1px solid var(--b);padding:6px 0;margin-bottom:8px">
+      <button type="button" id="tabLegalTerms" class="btn-xs" onclick="switchLegalTab('terms')">利用規約</button>
+      <button type="button" id="tabLegalPrivacy" class="btn-xs btn-o" onclick="switchLegalTab('privacy')">プライバシーポリシー</button>
+      <button type="button" id="tabLegalTokusho" class="btn-xs btn-o" onclick="switchLegalTab('tokusho')">特定商取引法表記</button>
+    </div>
+    <div id="legalModalContent" style="flex:1;overflow-y:auto;font-size:12px;line-height:1.7;color:var(--s);padding-right:4px">
+      <!-- JavaScriptで動的流し込み -->
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid var(--b)">
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('legalModal',false)">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- アプリ単体起動・インストール案内モーダル -->
+<div id="installGuideModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="installGuideModalTitle" onclick="if(event.target===this) toggleModal('installGuideModal',false)">
+  <div class="modal" style="max-width:620px;max-height:85vh;display:flex;flex-direction:column">
+    <div class="modal-hd flx-sb">
+      <span class="modal-title" id="installGuideModalTitle">単体アプリケーションとして起動（ブラウザ枠なし）</span>
+      <button type="button" class="modal-close" onclick="toggleModal('installGuideModal',false)" aria-label="閉じる">&times;</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;font-size:13px;line-height:1.7;color:var(--s);padding-right:4px">
+      <p style="margin-top:0">Vocab Vault は <strong>PWA（Progressive Web App）</strong> および単独起動に対応しており、Chromeなどのブラウザ枠（URLバーやタブ）を通さず、独立した専用アプリとして起動できます。</p>
+
+      <div style="background:var(--bg-hov);padding:12px;border-radius:8px;margin-bottom:12px">
+        <h4 style="margin:0 0 6px;color:var(--t)">macOS (Mac) で単体起動する</h4>
+        <ul style="margin:0;padding-left:20px;font-size:12px">
+          <li><strong>方法1（ワンクリックインストール）:</strong> 設定の「アプリをインストール」ボタンを押すか、Chromeのアドレスバー右端にある「インストール」アイコンをクリックすると、MacのDockやLaunchpadに登録され、独立アプリとして直接起動できます。</li>
+          <li><strong>方法2（SafariのDock追加）:</strong> Safariのメニュー「ファイル」→「Dockに追加」を選ぶと、専用の「Vocab Vault.app」が作成されます。</li>
+          <li><strong>方法3（付属ランチャー）:</strong> 本フォルダ内の <code>Vocab Vault.command</code> をダブルクリックすると、Chrome等のブラウザ枠なし専用ウィンドウで即座に直接開きます。</li>
+        </ul>
+      </div>
+
+      <div style="background:var(--bg-hov);padding:12px;border-radius:8px;margin-bottom:12px">
+        <h4 style="margin:0 0 6px;color:var(--t)">iOS (iPhone / iPad Safari)</h4>
+        <ol style="margin:0;padding-left:20px;font-size:12px">
+          <li>Safariで本ページを開き、画面下部（または上部）の <strong>共有ボタン</strong> をタップします。</li>
+          <li>メニュー内の <strong>「ホーム画面に追加」</strong> を選択します。</li>
+          <li>ホーム画面にアプリアイコンが追加され、次回から全画面のネイティブアプリとして起動します。</li>
+        </ol>
+      </div>
+
+      <div style="background:var(--bg-hov);padding:12px;border-radius:8px;margin-bottom:12px">
+        <h4 style="margin:0 0 6px;color:var(--t)">Android (Chrome)</h4>
+        <ol style="margin:0;padding-left:20px;font-size:12px">
+          <li>画面上の「アプリをインストール」ボタンをタップするか、右上のメニューから「アプリをインストール」をタップします。</li>
+          <li>ホーム画面やアプリ一覧から直接独立して起動します。</li>
+        </ol>
+      </div>
+
+      <div style="background:var(--bg-hov);padding:12px;border-radius:8px">
+        <h4 style="margin:0 0 6px;color:var(--t)">Windows (Chrome / Edge)</h4>
+        <p style="margin:0;font-size:12px">「アプリをインストール」を押すと、デスクトップおよびスタートメニューにショートカットが作成され、独立した専用ウィンドウで起動します。</p>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid var(--b)">
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('installGuideModal',false)">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Proプラン アップセルモーダル (CVR最大化・クォータ制限到達時UX) -->
+<div id="upsellModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="upsellModalTitle" onclick="if(event.target===this) toggleModal('upsellModal',false)">
+  <div class="modal" style="max-width:540px;max-height:85vh;display:flex;flex-direction:column;border:2px solid var(--ac)">
+    <div class="modal-hd flx-sb" style="border-bottom:1px solid var(--b);padding-bottom:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="pro-crown-tag">PRO</span>
+        <span class="modal-title" id="upsellModalTitle" style="font-size:16px;font-weight:700">Vocab Vault Pro で無制限解放</span>
+      </div>
+      <button type="button" class="modal-close" onclick="toggleModal('upsellModal',false)" aria-label="閉じる">&times;</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px 2px;font-size:13px;line-height:1.6;color:var(--t)">
+      <div style="background:var(--bg-hov);padding:12px 14px;border-radius:8px;margin-bottom:14px;border-left:4px solid var(--ac)">
+        <div style="font-weight:700;color:var(--t);margin-bottom:4px" id="upsellModalReason">今月のAI新規生成無料枠（30語）に達しました</div>
+        <div style="font-size:12px;color:var(--s)">Proプランにアップグレードすると、AI生成制限が解除され、すべての専門機能が無制限で使い放題になります。</div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div style="font-weight:700;font-size:12px;color:var(--m);margin-bottom:8px;letter-spacing:0.05em">PRO プラン限定の特典</div>
+        <ul style="margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:8px;font-size:12.5px">
+          <li style="display:flex;align-items:flex-start;gap:8px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <div><strong>AI新規生成・語源解析 無制限</strong><br><span style="font-size:11.5px;color:var(--s)">月間上限なし。大量の読書や論文、試験対策の単語を一気に登録可能。</span></div>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:8px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <div><strong>印欧祖語・概念史の徹底深掘り</strong><br><span style="font-size:11.5px;color:var(--s)">単なる訳語の暗記を超え、語根ネットワークと歴史的背景を深く記憶に定着。</span></div>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:8px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <div><strong>長文・画像OCR抽出が無制限</strong><br><span style="font-size:11.5px;color:var(--s)">洋書や学術ニュースのスクショ・テキストから重要語彙を瞬時に抽出。</span></div>
+          </li>
+          <li style="display:flex;align-items:flex-start;gap:8px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
+            <div><strong>全端末リアルタイム差分同期</strong><br><span style="font-size:11.5px;color:var(--s)">PC・タブレット・スマホ間でSM-2暗記復習スケジュールを完全同期。</span></div>
+          </li>
+        </ul>
+      </div>
+
+      <div style="background:var(--bg);border:1.5px solid var(--ac);border-radius:10px;padding:14px;text-align:center;margin-bottom:12px">
+        <div style="font-size:12px;color:var(--s);margin-bottom:2px">いつでもワンクリックで解約可能（縛りなし）</div>
+        <div style="font-size:24px;font-weight:800;color:var(--ac);margin-bottom:8px">¥480 <span style="font-size:13px;font-weight:normal;color:var(--s)">/ 月 (税込)</span></div>
+        <button type="button" id="btnUpsellUpgrade" onclick="startStripeCheckout('price_pro_monthly')" style="width:100%;padding:10px 16px;font-size:14px;font-weight:700">今すぐProにアップグレード</button>
+        <div style="font-size:11px;color:var(--m);margin-top:6px">※安全なStripe SSL暗号化決済ページへ移動します</div>
+      </div>
+
+      <!-- [P1-4 解決] 改正特定商取引法に基づく定期課金の法定表示事項 -->
+      <div style="background:var(--bg-hov);padding:10px 12px;border-radius:6px;font-size:11px;line-height:1.5;color:var(--s);margin-bottom:12px;text-align:left">
+        <div style="font-weight:bold;color:var(--t);margin-bottom:4px">【定期課金・ご契約条件に関する表記】</div>
+        <div>・<strong>販売価格</strong>: 月額 480 円（税込）</div>
+        <div>・<strong>サービス提供内容</strong>: AI新規生成（月間3,000語上限）、語源・概念史無制限、端末間クラウド同期</div>
+        <div>・<strong>お支払時期・方法</strong>: 初回申込み時および毎月同日の自動更新（Stripe クレジットカード決済）</div>
+        <div>・<strong>契約期間</strong>: 1ヶ月単位（自動更新）</div>
+        <div>・<strong>解約方法・条件</strong>: 設定モーダル内の「契約管理」ボタン（Stripeポータル）より次回更新日前日までに解約手続きを行うことで、次回以降の請求は発生しません。解約後も現在の課金期間満了までPro機能をご利用いただけます（日割り返金は不可）。</div>
+      </div>
+
+      <div style="display:flex;justify-content:center;gap:12px;font-size:11px;color:var(--m)">
+        <button type="button" class="btn-link" onclick="openLegalModal('tokusho')" style="background:none;border:none;color:var(--ac);padding:0;cursor:pointer;text-decoration:underline">特定商取引法表記</button>
+        <span>•</span>
+        <button type="button" class="btn-link" onclick="openLegalModal('terms')" style="background:none;border:none;color:var(--ac);padding:0;cursor:pointer;text-decoration:underline">利用規約</button>
+        <span>•</span>
+        <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="background:none;border:none;color:var(--ac);padding:0;cursor:pointer;text-decoration:underline">プライバシー</button>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:8px;padding-top:8px;border-top:1px solid var(--b)">
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('upsellModal',false)">今は見送る</button>
+    </div>
+  </div>
+</div>
+
+<!-- 語根・語源ネットワーク グラフビュー モーダル (Obsidian-like Graph View) -->
+<div id="graphModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="graphModalTitle" onclick="if(event.target===this) toggleModal('graphModal',false)">
+  <div class="modal graph-modal" style="width:96vw;max-width:1200px;height:90vh;max-height:900px;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div class="modal-hd flx-sb" style="padding:10px 16px;border-bottom:1px solid var(--b);background:var(--bg-side)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+        <span class="modal-title" id="graphModalTitle" style="font-size:14px;font-weight:700">語根・語源ネットワーク (Graph View)</span>
+        <span id="graphMetaCount" style="font-size:11px;color:var(--m);font-family:var(--mono)"></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="text" id="graphFilterInput" placeholder="語根・単語で絞り込み..." style="font-size:11.5px;padding:3px 8px;width:150px;height:26px" autocomplete="off">
+        <button type="button" class="btn-o btn-xs" id="graphClusterFilterBtn" onclick="toggleGraphClusterOnly()" title="2単語以上つながる重要語根クラスタのみ表示">星団のみ</button>
+        <button type="button" class="btn-o btn-xs" onclick="fitGraphToView()" title="全ノードが画面に収まるよう自動調整">全体表示</button>
+        <button type="button" class="btn-o btn-xs" onclick="resetGraphZoom()" title="等倍(1.0x)・中心に戻す">1.0×</button>
+        <button type="button" class="modal-close" onclick="toggleModal('graphModal',false)" aria-label="閉じる" title="閉じる">&times;</button>
+      </div>
+    </div>
+    <div id="graphCanvasWrap" style="position:relative;flex:1;width:100%;height:100%;overflow:hidden;background:var(--bg-main);cursor:grab">
+      <canvas id="graphCanvas" style="display:block;width:100%;height:100%"></canvas>
+      <div id="graphTooltip" class="graph-tooltip" style="display:none"></div>
+      <div class="graph-legend" style="position:absolute;bottom:12px;left:12px;background:var(--bg-side);border:1px solid var(--b);border-radius:6px;padding:6px 10px;font-size:10.5px;display:flex;gap:10px;align-items:center;pointer-events:none">
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ac)"></span>語根(Root)</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#2563eb"></span>英語</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#06b6d4"></span>仏語</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></span>独語</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#10b981"></span>日本語</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- キーボードショートカット一覧モーダル -->
+<div id="shortcutsModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="shortcutsModalTitle" onclick="if(event.target===this) toggleModal('shortcutsModal',false)">
+  <div class="modal" style="max-width:540px;max-height:85vh;display:flex;flex-direction:column;background:var(--bg-side)">
+    <div class="modal-hd flx-sb">
+      <span class="modal-title" id="shortcutsModalTitle">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ac)"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>キーボードショートカット一覧</span>
+      </span>
+      <button type="button" class="modal-close" onclick="toggleModal('shortcutsModal',false)" aria-label="閉じる">×</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:12px 16px;font-size:12px">
+      <table style="width:100%;border-collapse:collapse">
+        <tr style="border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">機能（通常一覧モード）</th></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">j</kbd> / <kbd class="kbd-hint">↓</kbd></td><td style="padding:6px 10px">次の単語カードへ移動・フォーカス</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">k</kbd> / <kbd class="kbd-hint">↑</kbd></td><td style="padding:6px 10px">前の単語カードへ移動・フォーカス</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">s</kbd></td><td style="padding:6px 10px">フォーカス中の単語を発音・音声再生</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">e</kbd></td><td style="padding:6px 10px">フォーカス中の単語を編集モーダルで開く</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">d</kbd></td><td style="padding:6px 10px">フォーカス中の単語を削除</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">/</kbd></td><td style="padding:6px 10px">検索バーに即座にフォーカス</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">n</kbd> / <kbd class="kbd-hint">Alt+K</kbd></td><td style="padding:6px 10px">新規単語入力欄へフォーカス</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">r</kbd></td><td style="padding:6px 10px">暗記復習 (Anki) モードを開始</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">g</kbd></td><td style="padding:6px 10px">語根ネットワーク (Graph View) を表示</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">?</kbd></td><td style="padding:6px 10px">このショートカット一覧を開く</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Esc</kbd></td><td style="padding:6px 10px">モーダルを閉じる / フォーカス解除</td></tr>
+        <tr style="border-top:2px solid var(--b);border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">機能（Anki復習モード）</th></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Space</kbd> / <kbd class="kbd-hint">Enter</kbd></td><td style="padding:6px 10px">解答・裏面を表示</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">1</kbd> / <kbd class="kbd-hint">2</kbd> / <kbd class="kbd-hint">3</kbd> / <kbd class="kbd-hint">4</kbd></td><td style="padding:6px 10px">復習評価（1:もう一度 / 2:難しい / 3:普通 / 4:簡単）</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">s</kbd> / <kbd class="kbd-hint">r</kbd></td><td style="padding:6px 10px">音声を再発音</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">z</kbd></td><td style="padding:6px 10px">直前の回答を取り消し (Undo)</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Esc</kbd></td><td style="padding:6px 10px">復習モードを終了して一覧へ戻る</td></tr>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--b);background:var(--bg-rib)">
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('shortcutsModal',false)">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- スクリプトの読み込み（モジュール順序） -->
+<script src="js/storage.js"></script>
+<script src="js/anki.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/feedback.js"></script>
+<script src="js/starter_pack.js"></script>
+<script src="js/app.js"></script>
+<script>
+  // Service Worker 登録
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+</body>
+</html>
+
+```
+
+
+### 【ファイル: supabase/schema.sql — データベーススキーマ・RLS・クォータ管理・差分同期RPC】
+```sql
+-- ==============================================================================
+-- Vocab Vault — Supabase Database Schema (supabase/schema.sql)
+-- 本番運用仕様: RLS、厳格な権限管理、事前予約＆補償返還クォータ、
+-- アトミックWebhook、カラムグループ別LWW分散同期、GDPR完全抹消
+-- ==============================================================================
+
+-- 1. profiles テーブル（プラン判定・月間クォータ・Stripe契約情報・法務証跡）
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  email TEXT,
+  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'academic')),
+  monthly_quota INTEGER NOT NULL DEFAULT 30,
+  usage_count INTEGER NOT NULL DEFAULT 0,
+  pro_monthly_cap INTEGER NOT NULL DEFAULT 3000,
+  quota_reset_at TIMESTAMPTZ NOT NULL DEFAULT (date_trunc('month', NOW()) + INTERVAL '1 month'),
+  stripe_customer_id TEXT,
+  stripe_subscription_id TEXT,
+  subscription_status TEXT DEFAULT 'inactive',
+  cancel_at_period_end BOOLEAN DEFAULT FALSE,
+  current_period_end TIMESTAMPTZ,
+  grace_period_until TIMESTAMPTZ,
+  stripe_last_event_created BIGINT NOT NULL DEFAULT 0,
+  terms_accepted_at TIMESTAMPTZ,
+  terms_version TEXT DEFAULT '1.0.0',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_profiles_stripe_customer
+  ON public.profiles (stripe_customer_id)
+  WHERE stripe_customer_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_profiles_stripe_subscription
+  ON public.profiles (stripe_subscription_id)
+  WHERE stripe_subscription_id IS NOT NULL;
+
+-- Stripe Webhook 冪等性（Idempotency）保証用テーブル
+CREATE TABLE IF NOT EXISTS public.stripe_events (
+  id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 新規ユーザー作成時に profile を自動生成するトリガー
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (
+    id, email, plan, monthly_quota, usage_count, pro_monthly_cap,
+    quota_reset_at, terms_accepted_at, terms_version
+  )
+  VALUES (
+    NEW.id,
+    NEW.email,
+    'free',
+    30,
+    0,
+    3000,
+    (date_trunc('month', NOW()) + INTERVAL '1 month'),
+    NOW(),
+    '1.0.0'
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 2. user_vocab_entries テーブル（単語帳データ・差分同期・Tombstone論理削除・カラム別LWW）
+CREATE TABLE IF NOT EXISTS public.user_vocab_entries (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  id TEXT NOT NULL,
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  word_key TEXT NOT NULL,
+  num INTEGER NOT NULL DEFAULT 1,
+  word TEXT NOT NULL,
+  homograph_index INTEGER NOT NULL DEFAULT 1,
+  folder TEXT,
+  category TEXT DEFAULT 'その他',
+  interval NUMERIC NOT NULL DEFAULT 0,
+  repetition INTEGER NOT NULL DEFAULT 0,
+  efactor NUMERIC NOT NULL DEFAULT 2.5,
+  next_review BIGINT NOT NULL,
+  card_data JSONB NOT NULL,
+  updated_at BIGINT NOT NULL,
+  review_updated_at BIGINT NOT NULL DEFAULT 0,
+  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+  server_updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
+  PRIMARY KEY (user_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_uve_user_server_sync
+  ON public.user_vocab_entries (user_id, lang, server_updated_at);
+CREATE INDEX IF NOT EXISTS idx_uve_user_wordkey
+  ON public.user_vocab_entries (user_id, word_key);
+
+-- 3. user_tombstones テーブル（旧互換用削除ログ）
+CREATE TABLE IF NOT EXISTS public.user_tombstones (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  tomb_key TEXT NOT NULL,
+  deleted_at BIGINT NOT NULL,
+  PRIMARY KEY (user_id, lang, tomb_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ut_user_lang_del ON public.user_tombstones (user_id, lang, deleted_at);
+
+-- 4. user_lang_watermarks テーブル（言語全削除ウォーターマーク）
+CREATE TABLE IF NOT EXISTS public.user_lang_watermarks (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  cleared_at BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, lang)
+);
+
+-- 5. global_dictionary_cache テーブル（共有辞書キャッシュ: コスト0円化＆高速化）
+CREATE TABLE IF NOT EXISTS public.global_dictionary_cache (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  word TEXT NOT NULL,
+  homograph_index INTEGER NOT NULL DEFAULT 1,
+  word_key TEXT NOT NULL,
+  card_data JSONB NOT NULL,
+  hit_count INTEGER NOT NULL DEFAULT 0,
+  verified BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT uq_gdc_lang_wordkey UNIQUE (lang, word_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gdc_lookup ON public.global_dictionary_cache (lang, word, homograph_index);
+CREATE INDEX IF NOT EXISTS idx_gdc_lang_wordkey ON public.global_dictionary_cache (lang, word_key);
+
+-- 6. wiktionary_references テーブル（Wiktionary事前取り込み用）
+CREATE TABLE IF NOT EXISTS public.wiktionary_references (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  word TEXT NOT NULL,
+  clean_ipa TEXT,
+  section_extract TEXT,
+  source_url TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (lang, word)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wikt_lookup ON public.wiktionary_references (lang, word);
+
+-- 7. user_feedbacks テーブル（需要検証・ヒアリング回答）
+CREATE TABLE IF NOT EXISTS public.user_feedbacks (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  category TEXT NOT NULL,
+  rating INTEGER DEFAULT 5,
+  content TEXT,
+  email TEXT,
+  willingness_to_pay TEXT,
+  app_version TEXT,
+  active_lang TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 8. guest_rate_limits テーブル（未ログインゲストのレート制限・アトミック保護）
+CREATE TABLE IF NOT EXISTS public.guest_rate_limits (
+  ip TEXT PRIMARY KEY,
+  usage_count INTEGER NOT NULL DEFAULT 0,
+  reset_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ==============================================================================
+-- RLS (Row Level Security) 設定
+-- ==============================================================================
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stripe_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_vocab_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_tombstones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_lang_watermarks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.global_dictionary_cache ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.wiktionary_references ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_feedbacks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.guest_rate_limits ENABLE ROW LEVEL SECURITY;
+
+-- profiles: 本人のみ参照（直接の更新・挿入は権限剥奪）
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
+CREATE POLICY "Users can read own profile" ON public.profiles
+  FOR SELECT USING (auth.uid() = id);
+
+-- user_vocab_entries: 本人のみ全操作
+DROP POLICY IF EXISTS "Users can manage own vocab entries" ON public.user_vocab_entries;
+CREATE POLICY "Users can manage own vocab entries" ON public.user_vocab_entries
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- user_tombstones: 本人のみ全操作
+DROP POLICY IF EXISTS "Users can manage own tombstones" ON public.user_tombstones;
+CREATE POLICY "Users can manage own tombstones" ON public.user_tombstones
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- user_lang_watermarks: 本人のみ全操作
+DROP POLICY IF EXISTS "Users can manage own watermarks" ON public.user_lang_watermarks;
+CREATE POLICY "Users can manage own watermarks" ON public.user_lang_watermarks
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- global_dictionary_cache: 全員参照可（未ログイン・ゲスト含む）、書込はService Roleのみ
+DROP POLICY IF EXISTS "Authenticated users can read dictionary cache" ON public.global_dictionary_cache;
+DROP POLICY IF EXISTS "Anyone can read dictionary cache" ON public.global_dictionary_cache;
+CREATE POLICY "Anyone can read dictionary cache" ON public.global_dictionary_cache
+  FOR SELECT TO authenticated, anon USING (true);
+
+-- wiktionary_references: 全認証ユーザー参照可
+DROP POLICY IF EXISTS "Authenticated users can read wiktionary refs" ON public.wiktionary_references;
+CREATE POLICY "Authenticated users can read wiktionary refs" ON public.wiktionary_references
+  FOR SELECT TO authenticated USING (true);
+
+-- user_feedbacks: インサートは誰でも可、閲覧は本人のみ
+DROP POLICY IF EXISTS "Anyone can insert feedback" ON public.user_feedbacks;
+DROP POLICY IF EXISTS "Users can view own feedbacks" ON public.user_feedbacks;
+CREATE POLICY "Anyone can insert feedback" ON public.user_feedbacks
+  FOR INSERT WITH CHECK (true);
+CREATE POLICY "Users can view own feedbacks" ON public.user_feedbacks
+  FOR SELECT USING (auth.uid() = user_id);
+
+
+-- ==============================================================================
+-- [P0-1 & P0-2 解決] 事前予約(Reserve) & 補償返還(Refund) クォータ管理関数
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.reserve_or_refund_quota(
+  p_user_id UUID,
+  p_item_count INTEGER,
+  p_is_refund BOOLEAN DEFAULT FALSE
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_profile public.profiles%ROWTYPE;
+  v_now TIMESTAMPTZ := NOW();
+  v_effective_limit INTEGER;
+BEGIN
+  -- 境界値・異常値ガード（1リクエスト1〜15語に厳格制限）
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'INVALID_USER_ID: p_user_id cannot be null';
+  END IF;
+
+  IF p_item_count IS NULL OR p_item_count <= 0 OR p_item_count > 15 THEN
+    RAISE EXCEPTION 'INVALID_ITEM_COUNT: p_item_count must be between 1 and 15 (got %)', p_item_count;
+  END IF;
+
+  -- 行ロック取得（並列リクエストを直列化しTOCTOUを完全遮断）
+  SELECT * INTO v_profile
+  FROM public.profiles
+  WHERE id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'PROFILE_NOT_FOUND: user % does not exist', p_user_id;
+  END IF;
+
+  -- 月初クォータリセット判定
+  IF v_now >= v_profile.quota_reset_at THEN
+    v_profile.usage_count := 0;
+    v_profile.quota_reset_at := (date_trunc('month', v_now) + INTERVAL '1 month');
+  END IF;
+
+  -- [P0-3 解決] サブスクリプション期限切れ＆猶予期間（Grace Period）満了の厳格判定
+  IF v_profile.plan = 'pro' AND v_profile.current_period_end IS NOT NULL THEN
+    IF v_now > v_profile.current_period_end AND (v_profile.grace_period_until IS NULL OR v_now > v_profile.grace_period_until) THEN
+      v_profile.plan := 'free';
+      v_profile.monthly_quota := 30;
+      v_profile.subscription_status := 'canceled';
+      v_profile.cancel_at_period_end := FALSE;
+    END IF;
+  END IF;
+
+  -- プラン別の上限決定（Proプランにもフェアユース上限 pro_monthly_cap を適用し赤字爆弾を防止）
+  IF v_profile.plan IN ('pro', 'academic') THEN
+    v_effective_limit := v_profile.pro_monthly_cap;
+  ELSE
+    v_effective_limit := v_profile.monthly_quota;
+  END IF;
+
+  -- A. 補償返還（AI呼び出し失敗時の払い戻し）モード
+  IF p_is_refund THEN
+    v_profile.usage_count := GREATEST(0, v_profile.usage_count - p_item_count);
+    UPDATE public.profiles
+    SET usage_count = v_profile.usage_count,
+        plan = v_profile.plan,
+        monthly_quota = v_profile.monthly_quota,
+        subscription_status = v_profile.subscription_status,
+        cancel_at_period_end = v_profile.cancel_at_period_end,
+        quota_reset_at = v_profile.quota_reset_at,
+        updated_at = v_now
+    WHERE id = p_user_id;
+
+    RETURN jsonb_build_object(
+      'allowed', true,
+      'action', 'refunded',
+      'plan', v_profile.plan,
+      'usage_count', v_profile.usage_count,
+      'effective_limit', v_effective_limit,
+      'remaining', GREATEST(0, v_effective_limit - v_profile.usage_count)
+    );
+  END IF;
+
+  -- B. 事前予約（Reserve）モード：上限超過チェック
+  IF (v_profile.usage_count + p_item_count) > v_effective_limit THEN
+    UPDATE public.profiles
+    SET usage_count = v_profile.usage_count,
+        plan = v_profile.plan,
+        monthly_quota = v_profile.monthly_quota,
+        subscription_status = v_profile.subscription_status,
+        cancel_at_period_end = v_profile.cancel_at_period_end,
+        quota_reset_at = v_profile.quota_reset_at,
+        updated_at = v_now
+    WHERE id = p_user_id;
+
+    RETURN jsonb_build_object(
+      'allowed', false,
+      'action', 'rejected_quota_exceeded',
+      'plan', v_profile.plan,
+      'usage_count', v_profile.usage_count,
+      'effective_limit', v_effective_limit,
+      'remaining', GREATEST(0, v_effective_limit - v_profile.usage_count)
+    );
+  END IF;
+
+  -- 枠を即座に仮引き落とし（Reserve）して確定
+  v_profile.usage_count := v_profile.usage_count + p_item_count;
+
+  UPDATE public.profiles
+  SET usage_count = v_profile.usage_count,
+      plan = v_profile.plan,
+      monthly_quota = v_profile.monthly_quota,
+      subscription_status = v_profile.subscription_status,
+      cancel_at_period_end = v_profile.cancel_at_period_end,
+      quota_reset_at = v_profile.quota_reset_at,
+      updated_at = v_now
+  WHERE id = p_user_id;
+
+  RETURN jsonb_build_object(
+    'allowed', true,
+    'action', 'reserved',
+    'plan', v_profile.plan,
+    'usage_count', v_profile.usage_count,
+    'effective_limit', v_effective_limit,
+    'remaining', GREATEST(0, v_effective_limit - v_profile.usage_count)
+  );
+END;
+$$;
+
+-- [P0-1 解決] 一般ユーザーからの直接RPC呼び出しを完全遮断し、service_role のみに限定
+REVOKE ALL ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN) TO service_role;
+
+-- 旧関数の安全な廃止
+DROP FUNCTION IF EXISTS public.check_and_consume_quota(UUID, INTEGER, BOOLEAN);
+
+
+-- ==============================================================================
+-- [P0-6 解決] 未ログイン・ゲストユーザー用のアトミックな日次クォータ消費関数
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.consume_guest_quota(
+  p_ip TEXT,
+  p_count INTEGER,
+  p_daily_limit INTEGER DEFAULT 30
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now TIMESTAMPTZ := NOW();
+  v_tomorrow TIMESTAMPTZ := (date_trunc('day', v_now) + INTERVAL '1 day');
+  v_rec public.guest_rate_limits%ROWTYPE;
+  v_current_usage INTEGER := 0;
+BEGIN
+  IF p_ip IS NULL OR length(trim(p_ip)) = 0 THEN
+    p_ip := 'unknown_guest';
+  END IF;
+
+  IF p_count IS NULL OR p_count <= 0 THEN
+    p_count := 1;
+  END IF;
+
+  -- 行ロック付きで取得
+  SELECT * INTO v_rec FROM public.guest_rate_limits WHERE ip = p_ip FOR UPDATE;
+
+  IF NOT FOUND THEN
+    IF p_count > p_daily_limit THEN
+      RETURN jsonb_build_object('allowed', false, 'usage_count', 0, 'remaining', 0);
+    END IF;
+
+    INSERT INTO public.guest_rate_limits (ip, usage_count, reset_at, updated_at)
+    VALUES (p_ip, p_count, v_tomorrow, v_now);
+
+    RETURN jsonb_build_object('allowed', true, 'usage_count', p_count, 'remaining', GREATEST(0, p_daily_limit - p_count));
+  END IF;
+
+  -- 日付リセット判定
+  IF v_now >= v_rec.reset_at THEN
+    v_rec.usage_count := 0;
+    v_rec.reset_at := v_tomorrow;
+  END IF;
+
+  v_current_usage := v_rec.usage_count;
+
+  IF (v_current_usage + p_count) > p_daily_limit THEN
+    RETURN jsonb_build_object('allowed', false, 'usage_count', v_current_usage, 'remaining', GREATEST(0, p_daily_limit - v_current_usage));
+  END IF;
+
+  v_current_usage := v_current_usage + p_count;
+
+  UPDATE public.guest_rate_limits
+  SET usage_count = v_current_usage,
+      reset_at = v_rec.reset_at,
+      updated_at = v_now
+  WHERE ip = p_ip;
+
+  RETURN jsonb_build_object('allowed', true, 'usage_count', v_current_usage, 'remaining', GREATEST(0, p_daily_limit - v_current_usage));
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_guest_quota(TEXT, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consume_guest_quota(TEXT, INTEGER, INTEGER) TO service_role;
+
+
+-- ============================================================================
+-- [P0-3 解決] アトミック＆順序逆転耐性付き Stripe Webhook 処理関数
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.process_stripe_webhook_atomic(
+  p_event_id TEXT,
+  p_event_type TEXT,
+  p_event_created BIGINT,
+  p_user_id UUID,
+  p_stripe_customer_id TEXT,
+  p_stripe_subscription_id TEXT,
+  p_plan TEXT,
+  p_subscription_status TEXT,
+  p_cancel_at_period_end BOOLEAN,
+  p_current_period_end TIMESTAMPTZ,
+  p_grace_period_until TIMESTAMPTZ DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_target_user_id UUID;
+  v_last_created BIGINT;
+BEGIN
+  IF p_event_id IS NULL OR length(trim(p_event_id)) = 0 THEN
+    RAISE EXCEPTION 'INVALID_EVENT_ID';
+  END IF;
+
+  -- 1. 冪等性チェック（単一トランザクション内でINSERT、重複なら何もせず正常終了）
+  INSERT INTO public.stripe_events (id, event_type, processed_at)
+  VALUES (p_event_id, p_event_type, NOW())
+  ON CONFLICT (id) DO NOTHING;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('status', 'duplicate_ignored', 'event_id', p_event_id);
+  END IF;
+
+  -- 2. 対象ユーザーの特定（user_id または stripe_customer_id から逆引き）
+  IF p_user_id IS NOT NULL THEN
+    SELECT id, stripe_last_event_created INTO v_target_user_id, v_last_created
+    FROM public.profiles WHERE id = p_user_id FOR UPDATE;
+  ELSE
+    SELECT id, stripe_last_event_created INTO v_target_user_id, v_last_created
+    FROM public.profiles WHERE stripe_customer_id = p_stripe_customer_id FOR UPDATE;
+  END IF;
+
+  IF v_target_user_id IS NULL THEN
+    -- user_id も stripe_customer_id も指定されていないイベントは無視
+    IF p_user_id IS NULL AND (p_stripe_customer_id IS NULL OR length(trim(p_stripe_customer_id)) = 0) THEN
+      RETURN jsonb_build_object('status', 'unassociated_event_skipped', 'event_id', p_event_id);
+    END IF;
+    -- プロファイル生成のレースコンディション時は、例外を投げてStripeに再送させる
+    RAISE EXCEPTION 'TARGET_PROFILE_NOT_FOUND: customer % / user % not ready, retry later', p_stripe_customer_id, p_user_id;
+  END IF;
+
+  -- 3. イベント順序逆転（Out-of-Order Delivery）ガード
+  -- 既に処理済みのより新しいイベントが存在する場合は、プロフィールの状態巻き戻しをスキップ
+  IF p_event_created < v_last_created THEN
+    RETURN jsonb_build_object(
+      'status', 'out_of_order_skipped',
+      'event_id', p_event_id,
+      'event_created', p_event_created,
+      'last_event_created', v_last_created
+    );
+  END IF;
+
+  -- 4. プロフィール状態の更新
+  UPDATE public.profiles
+  SET stripe_customer_id = COALESCE(p_stripe_customer_id, stripe_customer_id),
+      stripe_subscription_id = COALESCE(p_stripe_subscription_id, stripe_subscription_id),
+      plan = p_plan,
+      monthly_quota = CASE WHEN p_plan = 'free' THEN 30 ELSE monthly_quota END,
+      subscription_status = p_subscription_status,
+      cancel_at_period_end = COALESCE(p_cancel_at_period_end, cancel_at_period_end),
+      current_period_end = COALESCE(p_current_period_end, current_period_end),
+      grace_period_until = p_grace_period_until,
+      stripe_last_event_created = p_event_created,
+      updated_at = NOW()
+  WHERE id = v_target_user_id;
+
+  RETURN jsonb_build_object(
+    'status', 'processed',
+    'user_id', v_target_user_id,
+    'plan', p_plan,
+    'subscription_status', p_subscription_status
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.process_stripe_webhook_atomic(TEXT, TEXT, BIGINT, UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.process_stripe_webhook_atomic(TEXT, TEXT, BIGINT, UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
+
+
+-- ============================================================================
+-- [P1-1 解決] 端末時計ズレ防止 & カラムグループ別マージ対応 差分同期RPC
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.sync_vocab_entries_batch(
+  p_entries JSONB
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_server_now BIGINT := (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::BIGINT;
+  v_upserted_count INTEGER := 0;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'UNAUTHORIZED: auth.uid() is null';
+  END IF;
+
+  IF p_entries IS NULL OR jsonb_typeof(p_entries) != 'array' THEN
+    RAISE EXCEPTION 'INVALID_PAYLOAD: p_entries must be a JSON array';
+  END IF;
+
+  IF jsonb_array_length(p_entries) > 500 THEN
+    RAISE EXCEPTION 'PAYLOAD_TOO_LARGE: maximum 500 entries per sync batch';
+  END IF;
+
+  WITH input_rows AS (
+    SELECT
+      v_uid AS user_id,
+      (elem->>'id')::TEXT AS id,
+      (elem->>'lang')::TEXT AS lang,
+      (elem->>'word_key')::TEXT AS word_key,
+      COALESCE((elem->>'num')::INTEGER, 1) AS num,
+      (elem->>'word')::TEXT AS word,
+      COALESCE((elem->>'homograph_index')::INTEGER, 1) AS homograph_index,
+      (elem->>'folder')::TEXT AS folder,
+      COALESCE((elem->>'category')::TEXT, 'その他') AS category,
+      COALESCE((elem->>'interval')::NUMERIC, 0) AS interval,
+      COALESCE((elem->>'repetition')::INTEGER, 0) AS repetition,
+      COALESCE((elem->>'efactor')::NUMERIC, 2.5) AS efactor,
+      COALESCE((elem->>'next_review')::BIGINT, v_server_now) AS next_review,
+      COALESCE(elem->'card_data', '{}'::JSONB) AS card_data,
+      -- クライアント時計が未来にズレていても server_now + 60秒 でクランプ（Clock Skew対策）
+      LEAST(COALESCE((elem->>'updated_at')::BIGINT, v_server_now), v_server_now + 60000) AS updated_at,
+      LEAST(COALESCE((elem->>'review_updated_at')::BIGINT, v_server_now), v_server_now + 60000) AS review_updated_at,
+      COALESCE((elem->>'is_deleted')::BOOLEAN, FALSE) AS is_deleted
+    FROM jsonb_array_elements(p_entries) AS elem
+    WHERE elem->>'id' IS NOT NULL AND elem->>'lang' IN ('en', 'ja', 'fr', 'de')
+  ),
+  upserted AS (
+    INSERT INTO public.user_vocab_entries (
+      user_id, id, lang, word_key, num, word, homograph_index,
+      folder, category, interval, repetition, efactor, next_review,
+      card_data, updated_at, review_updated_at, is_deleted, server_updated_at
+    )
+    SELECT
+      user_id, id, lang, word_key, num, word, homograph_index,
+      folder, category, interval, repetition, efactor, next_review,
+      card_data, updated_at, review_updated_at, is_deleted, v_server_now
+    FROM input_rows
+    ON CONFLICT (user_id, id) DO UPDATE
+    SET
+      -- カード内容・フォルダ・削除状態は updated_at が新しい方を採用
+      word_key = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word_key ELSE user_vocab_entries.word_key END,
+      word = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word ELSE user_vocab_entries.word END,
+      folder = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.folder ELSE user_vocab_entries.folder END,
+      category = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.category ELSE user_vocab_entries.category END,
+      card_data = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.card_data ELSE user_vocab_entries.card_data END,
+      is_deleted = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.is_deleted ELSE user_vocab_entries.is_deleted END,
+      updated_at = GREATEST(user_vocab_entries.updated_at, EXCLUDED.updated_at),
+      -- SM-2復習進捗は review_updated_at が新しい方を独立して採用（Macでのフォルダ移動でスマホの学習履歴が消えるのを防ぐ）
+      interval = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,
+      repetition = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.repetition ELSE user_vocab_entries.repetition END,
+      efactor = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.efactor ELSE user_vocab_entries.efactor END,
+      next_review = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.next_review ELSE user_vocab_entries.next_review END,
+      review_updated_at = GREATEST(user_vocab_entries.review_updated_at, EXCLUDED.review_updated_at),
+      -- サーバー同期タイムスタンプは常に現在のサーバー時刻で更新
+      server_updated_at = v_server_now
+    WHERE EXCLUDED.updated_at >= user_vocab_entries.updated_at
+       OR EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at
+    RETURNING 1
+  )
+  SELECT count(*) INTO v_upserted_count FROM upserted;
+
+  RETURN jsonb_build_object(
+    'upserted_count', v_upserted_count,
+    'server_timestamp', v_server_now
+  );
+END;
+$$;
+
+
+-- ==============================================================================
+-- ユーザー自己退会・全データ抹消用ストアドプロシージャ（GDPR / 法令対応）
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.delete_user_account()
+RETURNS BOOLEAN AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_status TEXT;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- [P0-4 解決] Stripeアクティブ定期課金の残留チェック（幽霊課金防止）
+  SELECT subscription_status INTO v_status FROM public.profiles WHERE id = v_uid;
+  IF v_status IN ('active', 'trialing') THEN
+    RAISE EXCEPTION 'ACTIVE_SUBSCRIPTION: Stripe定期課金が有効な状態です。Stripeカスタマーポータルまたはdelete-account APIから解約の上、退会してください。';
+  END IF;
+
+  -- 関連データの抹消
+  DELETE FROM public.user_vocab_entries WHERE user_id = v_uid;
+  DELETE FROM public.user_tombstones WHERE user_id = v_uid;
+  DELETE FROM public.user_lang_watermarks WHERE user_id = v_uid;
+  DELETE FROM public.user_feedbacks WHERE user_id = v_uid;
+  DELETE FROM public.profiles WHERE id = v_uid;
+
+  -- auth.users からの削除
+  DELETE FROM auth.users WHERE id = v_uid;
+
+  RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+```
+
+
+### 【ファイル: supabase/functions/vocab-generate/index.ts — AIプロキシ・キャッシュ・クォータ制御】
+```typescript
+/**
+ * Vocab Vault — Supabase Edge Function: vocab-generate
+ * ステップ2: Geminiプロキシ、共有キャッシュ照会、クォータ判定
+ */
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+interface RequestItem {
+  reqIndex: number;
+  reqWord: string;
+  homographIndex?: number;
+  contextPos?: string;
+  targetSenseOrMeaning?: string;
+  contextSentence?: string;
+  wiktionaryRef?: string;
+  wiktionaryIpa?: string;
+}
+
+function cleanJsonString(str: string): string {
+  return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ");
+}
+
+const guestRateMemory = new Map<string, number>();
+
+// [P0-6 解決] 信頼性の高いIP取得（Cloudflare / リバースプロキシスプーフィング対策）
+function getClientIp(req: Request): string {
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",").map(s => s.trim()).filter(Boolean).pop() ||
+    "unknown_guest"
+  );
+}
+
+const DUMMY_OCR_SENSES = new Set([
+  "文脈上の重要語",
+  "重要語",
+  "文脈語",
+  "重要単語",
+  "語彙",
+  "抽出語",
+  "OCR抽出",
+]);
+
+function sanitizeCard(card: any, origItem?: RequestItem) {
+  const norm = (s: any) => String(s || "").normalize("NFC").trim();
+  const word = norm(card?.word || origItem?.reqWord);
+  const phonetic = norm(card?.phonetic);
+  const grammar_forms = norm(card?.grammar_forms);
+  const etymology = norm(card?.etymology);
+  const core = norm(card?.core);
+  const history_note = norm(card?.history_note);
+
+  const meanings = (Array.isArray(card?.meanings) ? card.meanings : [])
+    .map((m: any) => ({
+      pos: norm(m?.pos || "N"),
+      text: norm(m?.text),
+    }))
+    .filter((m: any) => m.text.length > 0);
+  if (meanings.length === 0) meanings.push({ pos: "N", text: word });
+
+  // [P1-2 解決] 外国語例文はプレーンテキストとして保持（<b>タグの強制埋め込みを撤廃）
+  const exForeign = norm(card?.example?.foreign);
+  const exJa = norm(card?.example?.ja);
+  const exTrans = norm(card?.example?.trans || exJa);
+  const usedForm = norm(card?.example?.used_form || word);
+
+  const derivatives = (Array.isArray(card?.derivatives) ? card.derivatives : [])
+    .map((d: any) => ({
+      word: norm(d?.word),
+      meaning: norm(d?.meaning),
+      pos: d?.pos ? norm(d.pos) : undefined,
+      phonetic: d?.phonetic ? norm(d.phonetic) : undefined,
+      sub_phrase: d?.sub_phrase ? norm(d.sub_phrase) : undefined,
+      sub_trans: d?.sub_trans ? norm(d.sub_trans) : undefined,
+    }))
+    .filter((d: any) => d.word.length > 0);
+
+  const phrases = (Array.isArray(card?.phrases) ? card.phrases : [])
+    .map((p: any) => ({
+      foreign: norm(p?.foreign),
+      ja: norm(p?.ja),
+    }))
+    .filter((p: any) => p.foreign.length > 0);
+
+  const etymologyTags = (Array.isArray(card?.etymologyTags) ? card.etymologyTags : [])
+    .map((t: any) => norm(t))
+    .filter((t: any) => t.length > 0);
+
+  return {
+    ...card,
+    reqIndex: origItem?.reqIndex ?? card?.reqIndex ?? 0,
+    word,
+    homographIndex: Math.max(1, parseInt(String(card?.homographIndex || origItem?.homographIndex || 1), 10) || 1),
+    category: typeof card?.category === "number" ? card.category : 1,
+    phonetic,
+    grammar_forms,
+    etymologyConfidence: ["certain", "probable", "disputed", "unknown"].includes(card?.etymologyConfidence)
+      ? card.etymologyConfidence
+      : "probable",
+    etymology,
+    etymologyTags,
+    history_note,
+    core,
+    meanings,
+    example: {
+      foreign: exForeign,
+      ja: exJa,
+      trans: exTrans,
+      used_form: usedForm,
+    },
+    phrases,
+    derivatives,
+  };
+}
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return new Response(JSON.stringify({ error: "Server misconfigured (missing Supabase keys)" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    let user = null;
+
+    // 認証確認 (ログインユーザーはトークン検証、未ログイン時はゲストアクセスを許可)
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+      if (!authError && authUser) {
+        user = authUser;
+      }
+    }
+
+    const body = await req.json();
+    const {
+      lang = "en",
+      srcLang: rawSrc,
+      targetLang: rawTgt,
+      tgtLang: rawTgt2,
+      useHist = true,
+      fName,
+      items
+    } = body as {
+      lang?: string;
+      srcLang?: string;
+      targetLang?: string;
+      tgtLang?: string;
+      useHist?: boolean;
+      fName?: string;
+      items: RequestItem[];
+    };
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return new Response(JSON.stringify({ error: "Invalid items array" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 批判的セキュリティ対策: 1回のリクエスト数を最大15語に制限（APIタダ乗り・DoS防止）
+    if (items.length > 15) {
+      return new Response(JSON.stringify({ error: "1回のリクエストあたりの生成単語数は最大15語までです。" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 言語ペアの決定（4言語: en, ja, fr, de）
+    const validLangs = ["en", "ja", "fr", "de"];
+    const sLang = validLangs.includes(rawSrc || "") ? (rawSrc as string) : (validLangs.includes(lang) ? lang : "en");
+    const tLang = validLangs.includes(rawTgt || rawTgt2 || "") ? ((rawTgt || rawTgt2) as string) : "ja";
+
+    // [P1-3 解決] プロンプトインジェクション防壁: fName のサニタイズ（制御文字・改行排除、英数日本語記号のみ、最大40文字）
+    const safeFName = fName ? String(fName).replace(/[\r\n\x00-\x1f`]/g, " ").trim().slice(0, 40) : "";
+
+    // 各単語のサニタイズ（100文字上限、空文字除外）
+    const sanitizedItems = items
+      .map(it => ({
+        ...it,
+        reqWord: String(it.reqWord || "").trim().slice(0, 100),
+        homographIndex: Math.max(1, parseInt(String(it.homographIndex || 1), 10) || 1),
+      }))
+      .filter(it => it.reqWord.length > 0);
+
+    if (sanitizedItems.length === 0) {
+      return new Response(JSON.stringify({ error: "有効な単語が指定されていません。" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 言語名の多言語表記マッピング
+    const LANG_INFO: Record<string, { ja: string; en: string; fr: string; de: string; pos: string }> = {
+      en: { ja: "英語", en: "English", fr: "Anglais", de: "Englisch", pos: "N[C], N[U], V[T], V[I], Adj, Adv" },
+      ja: { ja: "日本語", en: "Japanese", fr: "Japonais", de: "Japanisch", pos: "名詞, 動詞, 形容詞, 副詞, 熟語" },
+      fr: { ja: "フランス語", en: "French", fr: "Français", de: "Französisch", pos: "N[m], N[f], V[T], V[I], Adj, Adv" },
+      de: { ja: "ドイツ語", en: "German", fr: "Allemand", de: "Deutsch", pos: "N[m], N[f], N[n], V[T], V[I], Adj, Adv" },
+    };
+
+    const sInfo = LANG_INFO[sLang] || LANG_INFO.en;
+    const tInfo = LANG_INFO[tLang] || LANG_INFO.ja;
+
+    // --- [4×4 全16ペア対応] 動的システムプロンプト生成 ---
+    let serverSystemPrompt = "";
+    if (sLang === tLang) {
+      // 同言語ペア（英英、仏仏、独独、国語・概念史）
+      if (sLang === "en") {
+        serverSystemPrompt = `You are an authoritative academic English monolingual etymological dictionary and conceptual history lexicon (such as Oxford English Dictionary / Merriam-Webster Unabridged).
+Explain each English word STRICTLY IN ENGLISH with deep Indo-European roots, Greek/Latin cognates, philosophical/institutional evolution, and precise definitions.
+Requirements:
+1. Etymology: reconstruct PIE roots (*root), Proto-Germanic/Latin pathways, and semantic shifts in English.
+2. Meanings: provide rigorous academic English definitions and core imagery.
+3. Example: provide an authentic English sentence (example.foreign) and an explanatory English paraphrase (example.ja & example.trans). Keep example.foreign as plain text without HTML tags.
+4. Part of speech: strictly follow ${sInfo.pos}.
+${safeFName ? `Subject field: ${safeFName}` : ""}`;
+      } else if (sLang === "fr") {
+        serverSystemPrompt = `Vous êtes un dictionnaire étymologique académique et un lexique d'histoire des concepts de langue française (style Littré / Le Robert).
+Expliquez chaque mot français STRICTEMENT EN FRANÇAIS avec ses racines indo-européennes, origines gréco-latines et son évolution philosophique.
+1. Étymologie et image centrale (core) rédigées en français.
+2. Définitions rigoureuses (meanings.text) en français.
+3. Exemple en français (example.foreign) et explication/reformulation en français (example.ja & example.trans).
+${safeFName ? `Domaine: ${safeFName}` : ""}`;
+      } else if (sLang === "de") {
+        serverSystemPrompt = `Sie sind ein maßgebliches deutsches Begriffsgeschichte- und etymologisches Wörterbuch (Stil Duden / Grimm).
+Erklären Sie deutsche Stichwörter AUSSCHLIESSLICH AUF DEUTSCH mit indogermanischen Wurzeln und geistesgeschichtlichen Zusammenhängen.
+1. Etymologie und semantischer Kern auf Deutsch.
+2. Präzise Definitionen (meanings.text) auf Deutsch.
+3. Deutsches Beispiel (example.foreign) und deutsche Paraphrase (example.ja & example.trans).
+${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
+      } else {
+        serverSystemPrompt = `あなたは学術的な日本語の語源・概念史・国語大辞典エンジンです。
+各日本語の見出し語について、漢字・漢語の成り立ち、仏教・東洋思想・近代西欧語翻訳史（明治期の翻訳語形成）の変遷を深く日本語で解説してください。
+1. 語源（etymology）およびコアイメージ（core）の解説。
+2. 現代および歴史的な語義の解説。
+3. 自然な用例・例文（example.foreign）とその現代語解説（example.ja & example.trans）。
+${safeFName ? `分野: ${safeFName}` : ""}`;
+      }
+    } else {
+      // 異言語ペア（英和、仏和、独和、和英、仏独、仏英、独英、和仏、和独など）
+      if (tLang === "ja") {
+        serverSystemPrompt = `あなたは最高峰の学術的${sInfo.ja}から日本語への語源・概念史辞典および高度な単語帳データ生成エンジンです。
+各${sInfo.ja}の対象語について、以下の学術的基準を厳守した正確なJSON配列を出力してください。
+
+【厳格な学術基準・ハルシネーション完全排除】
+1. 印欧祖語(PIE)や古典諸語の照合:
+   - 実在が言語学的に広く認められている真の語根のみを記載（Pokorny, LIV, Mallory-Adams, OED, Wiktionary Etymology準拠）。
+   - 実在しない語根の捏造・無理なこじつけ（ハルシネーション）を厳禁。語根が不詳の単語（借用語、新造語、オノマトペ等）は率直に「PIE語根不明」または借用元の言語から解説し、etymologyConfidenceを "disputed" または "unknown" とすること。
+   - 民間語源（俗説）を事実として解説することを厳禁。
+2. etymologyTagsの厳格化:
+   - 【対象見出し語自身】の真の語根のみをアスタリスク付き(例: "*sta-", "*leuk-")で出力。例文や派生語に出てくる別語の語根は絶対に含めない。
+3. 【歴史的・文脈的用法の反映】:
+   - 見出し語に特定の時代・歴史的出来事（例: wet＝米国禁酒法下の反禁酒派、dry＝禁酒派、dove＝冷戦期の反戦ハト派、quarantine＝ベネチアの40日検疫等）に根ざす顕著な歴史的・政治的・制度的用法がある場合、現代標準語義に加えて必ずmeaningsに歴史的語義（【歴史】や【禁酒法】等のラベル付き）を含め、history_noteに時代背景や制度的文脈を具体的に記述すること（最大70字）。特筆すべき歴史的用法がない一般的な語彙はhistory_noteを空文字""とすること。架空の歴史的事実を捏造しないこと。
+4. 自然な例文(example.foreign)と日本語訳(example.ja & example.trans):
+   - 例文には必ず見出し語を含めること。外国語例文(example.foreign)はHTMLタグを付与せずプレーンテキストとすること。
+5. Unicode文字化け防止:
+   - 発音記号(IPA)、ウムラウト、アクサン記号、長音記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること。
+6. 品詞(pos)は ${sInfo.pos} 等に準拠すること。
+${safeFName ? `分野の指定: ${safeFName}` : ""}`;
+      } else if (tLang === "en") {
+        serverSystemPrompt = `You are a high-level academic dictionary from ${sInfo.en} to English specializing in etymology, cognate networks, and conceptual history.
+For each ${sInfo.en} word, provide definitions, PIE root connections, and historical context STRICTLY IN ENGLISH.
+1. Etymology and core semantic concept explained in English.
+2. English translation and definition (meanings.text).
+3. Example in ${sInfo.en} (example.foreign) with accurate English translation (example.ja & example.trans). Keep example.foreign as plain text.
+${safeFName ? `Field: ${safeFName}` : ""}`;
+      } else if (tLang === "fr") {
+        serverSystemPrompt = `Vous êtes un dictionnaire académique de ${sInfo.fr} vers le français, spécialisé en étymologie et histoire conceptuelle.
+Expliquez les mots ${sInfo.fr} EN FRANÇAIS avec leurs racines indo-européennes et leurs équivalents français.
+1. Étymologie et concept central expliqués en français.
+2. Définition et traduction en français (meanings.text).
+3. Exemple en ${sInfo.fr} (example.foreign) avec traduction française (example.ja & example.trans).
+${safeFName ? `Domaine: ${safeFName}` : ""}`;
+      } else {
+        serverSystemPrompt = `Sie sind ein akademisches Wörterbuch von ${sInfo.de} ins Deutsche, spezialisiert auf Etymologie und Begriffsgeschichte.
+Erklären Sie ${sInfo.de} Wörter AUF DEUTSCH mit indogermanischen Wurzeln und semantischen Vergleichen.
+1. Etymologie und Kernkonzept auf Deutsch erklärt.
+2. Deutsche Übersetzung und Definition (meanings.text).
+3. Beispiel auf ${sInfo.de} (example.foreign) mit deutscher Übersetzung (example.ja & example.trans).
+${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
+      }
+    }
+
+    const serverResponseSchema = {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          reqIndex: { type: "INTEGER" },
+          word: { type: "STRING" },
+          homographIndex: { type: "INTEGER" },
+          category: { type: "INTEGER" },
+          phonetic: { type: "STRING" },
+          grammar_forms: { type: "STRING" },
+          etymologyConfidence: { type: "STRING", enum: ["certain", "probable", "disputed", "unknown"] },
+          etymology: { type: "STRING" },
+          etymologyTags: { type: "ARRAY", items: { type: "STRING" } },
+          history_note: { type: "STRING" },
+          core: { type: "STRING" },
+          meanings: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                pos: { type: "STRING" },
+                text: { type: "STRING" },
+              },
+              required: ["pos", "text"],
+            },
+          },
+          example: {
+            type: "OBJECT",
+            properties: {
+              foreign: { type: "STRING" },
+              ja: { type: "STRING" },
+              trans: { type: "STRING" },
+              used_form: { type: "STRING" },
+            },
+            required: ["foreign", "ja"],
+          },
+          phrases: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: { foreign: { type: "STRING" }, ja: { type: "STRING" } },
+              required: ["foreign", "ja"],
+            },
+          },
+          derivatives: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                word: { type: "STRING" },
+                phonetic: { type: "STRING" },
+                pos: { type: "STRING" },
+                meaning: { type: "STRING" },
+                sub_phrase: { type: "STRING" },
+                sub_trans: { type: "STRING" },
+              },
+              required: ["word", "meaning"],
+            },
+          },
+        },
+        required: ["word", "meanings", "example", "etymology", "core"],
+      },
+    };
+
+    // --- 1. 共有辞書キャッシュの検索 (Unicode NFC 正規化 & 言語ペア対応) ---
+    const pairCode = `${sLang}_${tLang}`;
+    const makeWordKey = (w: string, pair: string, h: number = 1) => {
+      const normW = w.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
+      return `${pair}:${normW}#${h > 1 ? h : 1}`;
+    };
+
+    // 共有辞書キャッシュのバッチ検索 (言語ペアごとに独立)
+    const allKeys = sanitizedItems.map(it => makeWordKey(it.reqWord, pairCode, it.homographIndex || 1));
+    const { data: cachedRows } = await supabaseAdmin
+      .from("global_dictionary_cache")
+      .select("card_data, hit_count, word_key")
+      .eq("lang", sLang)
+      .in("word_key", allKeys);
+
+    const cachedMap = new Map((cachedRows || []).map((r: any) => [r.word_key, r]));
+    const cachedResults: any[] = [];
+    const itemsToGenerate: RequestItem[] = [];
+
+    for (const item of sanitizedItems) {
+      const hIdx = item.homographIndex || 1;
+      const wk = makeWordKey(item.reqWord, pairCode, hIdx);
+      const cached = cachedMap.get(wk);
+
+      // [P0-2 解決] OCR抽出時のダミー訳語（文脈上の重要語など）はキャッシュバイパスせず共有キャッシュをヒットさせる
+      const hasRealCustomSense = item.targetSenseOrMeaning && !DUMMY_OCR_SENSES.has(item.targetSenseOrMeaning.trim());
+
+      if (cached && cached.card_data && !hasRealCustomSense) {
+        cachedResults.push(sanitizeCard(cached.card_data, item));
+        // hit_countをインクリメント（バックグラウンド非同期）
+        supabaseAdmin
+          .from("global_dictionary_cache")
+          .update({ hit_count: (cached.hit_count || 0) + 1, updated_at: new Date().toISOString() })
+          .eq("lang", sLang)
+          .eq("word_key", wk)
+          .then();
+      } else {
+        itemsToGenerate.push(item);
+      }
+    }
+
+    let quotaRemaining = 9999;
+    let generatedResults: any[] = [];
+    let usedModel = "shared-cache";
+
+    // --- 2. 未キャッシュ分のみクォータ事前予約 (Reserve) & Gemini API呼び出し ---
+    if (itemsToGenerate.length > 0) {
+      if (!geminiApiKey) {
+        return new Response(JSON.stringify({ error: "Gemini API key is not configured on server" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // [P0-2 解決] TOCTOU排除: ログインユーザーのみアトミックにクォータを事前仮引き落とし（Reserve）
+      if (user) {
+        const { data: quotaReserve, error: quotaError } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
+          p_user_id: user.id,
+          p_item_count: itemsToGenerate.length,
+          p_is_refund: false,
+        });
+
+        if (quotaError || !quotaReserve?.allowed) {
+          return new Response(
+            JSON.stringify({
+              error: `今月のAI新規生成上限に達しました（残り: ${quotaReserve?.remaining ?? 0}語）。Proプランにアップグレードすると無制限に生成できます。`,
+              quotaRemaining: quotaReserve?.remaining ?? 0,
+            }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        quotaRemaining = quotaReserve.remaining;
+      } else {
+        // [P0-6 解決] 未ログインゲストの日次クォータ判定（DBアトミックRPC優先 ＆ インメモリ保護）
+        const clientIp = getClientIp(req);
+        let guestAllowed = true;
+        let currentUsage = 0;
+
+        try {
+          const { data: gqData, error: gqErr } = await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: itemsToGenerate.length,
+            p_daily_limit: 30,
+          });
+
+          if (!gqErr && gqData) {
+            guestAllowed = Boolean(gqData.allowed);
+            currentUsage = Number(gqData.usage_count) || 0;
+            if (!guestAllowed) {
+              return new Response(
+                JSON.stringify({
+                  error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${currentUsage}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
+                  quotaRemaining: 0,
+                }),
+                { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+          }
+        } catch {
+          // RPCエラー時はインメモリフォールバック
+        }
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const rateKey = `${clientIp}_${todayStr}`;
+        const currentMemoryCount = guestRateMemory.get(rateKey) || 0;
+        if (currentMemoryCount + itemsToGenerate.length > 30) {
+          return new Response(
+            JSON.stringify({
+              error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${currentMemoryCount}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
+              quotaRemaining: 0,
+            }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        guestRateMemory.set(rateKey, currentMemoryCount + itemsToGenerate.length);
+      }
+
+      // Gemini呼び出し (Google推奨の最新フラッグシップモデル gemini-3.8-flash)
+      const targetModel = "gemini-3.8-flash";
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`;
+      const userContent = `<user_request>\n対象語(${itemsToGenerate.length}件):\n${JSON.stringify(itemsToGenerate)}\n${safeFName ? `分野:${safeFName}\n` : ""}</user_request>`;
+
+      let aiResponse: Response;
+      try {
+        aiResponse = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: serverSystemPrompt }] },
+            contents: [{ role: "user", parts: [{ text: userContent }] }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json",
+              responseSchema: serverResponseSchema,
+            },
+          }),
+        });
+      } catch (fetchErr: any) {
+        if (user) {
+          // [P0-7 解決] 返金処理の堅牢化（.catch チェーンを排除し直接 await）
+          await supabaseAdmin.rpc("reserve_or_refund_quota", {
+            p_user_id: user.id,
+            p_item_count: itemsToGenerate.length,
+            p_is_refund: true,
+          });
+        }
+        return new Response(JSON.stringify({ error: `Gemini API fetch failed: ${fetchErr?.message || fetchErr}` }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!aiResponse.ok) {
+        if (user) {
+          await supabaseAdmin.rpc("reserve_or_refund_quota", {
+            p_user_id: user.id,
+            p_item_count: itemsToGenerate.length,
+            p_is_refund: true,
+          });
+        }
+        const errBody = await aiResponse.text();
+        return new Response(JSON.stringify({ error: `Gemini API error (${aiResponse.status}): ${errBody}` }), {
+          status: 502,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const aiData = await aiResponse.json();
+      const rawText = aiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
+      let parsedAi: any;
+      try {
+        parsedAi = JSON.parse(cleanJsonString(rawText));
+      } catch (parseErr: any) {
+        if (user) {
+          await supabaseAdmin.rpc("reserve_or_refund_quota", {
+            p_user_id: user.id,
+            p_item_count: itemsToGenerate.length,
+            p_is_refund: true,
+          });
+        }
+        return new Response(
+          JSON.stringify({ error: "AI応答の解析に失敗しました。クォータは全額返還されました。" }),
+          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const rawArr = Array.isArray(parsedAi) ? parsedAi : [parsedAi];
+
+      // [P1-1 解決] モデル出力の配列インデックスずれ防止（reqIndex および見出し語での厳密突合）
+      generatedResults = itemsToGenerate.map((origItem) => {
+        let match = rawArr.find((c: any) => c?.reqIndex === origItem.reqIndex);
+        if (!match) {
+          const origNorm = origItem.reqWord.toLowerCase().trim();
+          match = rawArr.find((c: any) => String(c?.word || "").toLowerCase().trim() === origNorm);
+        }
+        if (!match) {
+          // 残りの配列から使用されていない要素を順次割り当て
+          match = rawArr.find((c: any) => !itemsToGenerate.some(it => it !== origItem && (it.reqIndex === c?.reqIndex || it.reqWord.toLowerCase().trim() === String(c?.word || "").toLowerCase().trim())));
+        }
+        return sanitizeCard(match || {}, origItem);
+      });
+      usedModel = targetModel;
+
+      // 部分失敗差分の自動返還 (例: 10語中8語のみ成功した場合、未生成2語分を返還)
+      const failedCount = itemsToGenerate.length - generatedResults.length;
+      if (user && failedCount > 0) {
+        const { data: refundData } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
+          p_user_id: user.id,
+          p_item_count: failedCount,
+          p_is_refund: true,
+        });
+        if (refundData?.remaining !== undefined) quotaRemaining = refundData.remaining;
+      }
+
+      // [P0-4 解決] 共有辞書キャッシュへの保存（汚染防止: 特殊な文脈・カスタム意味指定のない標準語彙のみを保存）
+      const cacheRows = generatedResults
+        .filter((card) => {
+          const orig = itemsToGenerate.find(it => it.reqIndex === card.reqIndex);
+          const hasCustom = orig?.targetSenseOrMeaning && !DUMMY_OCR_SENSES.has(orig.targetSenseOrMeaning.trim());
+          return !hasCustom && !orig?.contextSentence && card.word && card.meanings?.length > 0;
+        })
+        .map((card) => {
+          const hIdx = card.homographIndex || 1;
+          const wk = makeWordKey(card.word, pairCode, hIdx);
+          return {
+            lang: sLang,
+            word: card.word,
+            homograph_index: hIdx,
+            word_key: wk,
+            card_data: card,
+            hit_count: 1,
+            verified: false,
+          };
+        });
+
+      if (cacheRows.length > 0) {
+        supabaseAdmin
+          .from("global_dictionary_cache")
+          .upsert(cacheRows, { onConflict: "lang,word_key" })
+          .then()
+          .catch(() => {});
+      }
+
+      // ゲスト（未ログイン）の部分失敗時のクォータ返還調整（もし失敗があれば）
+      if (!user && failedCount > 0) {
+        const clientIp = getClientIp(req);
+        try {
+          // 失敗分をアトミックに差し戻し
+          await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: -failedCount,
+            p_daily_limit: 30,
+          });
+        } catch {}
+      }
+    }
+
+    // 全結果をマージ
+    const finalItems = [...cachedResults, ...generatedResults];
+
+    return new Response(
+      JSON.stringify({
+        items: finalItems,
+        usedModel,
+        cachedCount: cachedResults.length,
+        generatedCount: generatedResults.length,
+        quotaRemaining,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message || "Unknown internal error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+```
+
+
+### 【ファイル: supabase/functions/delete-account/index.ts — アカウント完全抹消・Stripe定期課金即時解約】
+```typescript
+/**
+ * Vocab Vault — Supabase Edge Function: delete-account
+ * 本番仕様: GDPR / 法令準拠のアカウント完全抹消 ＆ Stripe サブスクリプション即時解約
+ * 幽霊課金（Phantom Billing）の完全防止
+ */
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+import Stripe from "https://esm.sh/stripe@14.18.0?target=deno";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY") ?? "";
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 1. ユーザー認証の確認
+    const supabaseUserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await supabaseUserClient.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+
+    // 2. Stripe サブスクリプション情報の取得
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("stripe_customer_id, stripe_subscription_id, plan")
+      .eq("id", user.id)
+      .single();
+
+    // 3. [P0-4 解決] Stripe サブスクリプションの即時解約（幽霊課金防止）
+    // stripe_customer_id または stripe_subscription_id から紐づく全契約を確実にキャンセル
+    if (stripeSecretKey && (profile?.stripe_customer_id || profile?.stripe_subscription_id)) {
+      try {
+        const stripe = new Stripe(stripeSecretKey, {
+          apiVersion: "2023-10-16",
+          httpClient: Stripe.createFetchHttpClient(),
+        });
+
+        // 顧客IDが存在する場合は、アクティブ・トライアル中の全サブスクリプションを走査して解約
+        if (profile?.stripe_customer_id) {
+          const subs = await stripe.subscriptions.list({
+            customer: profile.stripe_customer_id,
+            status: "all",
+            limit: 10,
+          });
+          for (const sub of subs.data) {
+            if (["active", "trialing", "past_due", "unpaid"].includes(sub.status)) {
+              console.log(`[Account Deletion] Canceling active Stripe sub: ${sub.id} (status: ${sub.status})`);
+              await stripe.subscriptions.cancel(sub.id);
+            }
+          }
+        } else if (profile?.stripe_subscription_id) {
+          // customer_id が未取得の場合は subscription_id を直接解約
+          console.log(`[Account Deletion] Canceling Stripe subscription directly: ${profile.stripe_subscription_id}`);
+          await stripe.subscriptions.cancel(profile.stripe_subscription_id);
+        }
+      } catch (stripeErr: any) {
+        console.warn(`[Account Deletion Warning] Failed to cancel Stripe sub: ${stripeErr.message}`);
+        // サブスクが既に解約済み（resource_missing）等のエラーは処理を続行
+      }
+    }
+
+    // 4. Supabase DB データおよび auth.users の完全抹消
+    // トランザクション処理として関連テーブルを削除
+    await supabaseAdmin.from("user_vocab_entries").delete().eq("user_id", user.id);
+    await supabaseAdmin.from("user_tombstones").delete().eq("user_id", user.id);
+    await supabaseAdmin.from("user_lang_watermarks").delete().eq("user_id", user.id);
+    await supabaseAdmin.from("user_feedbacks").delete().eq("user_id", user.id);
+    await supabaseAdmin.from("profiles").delete().eq("id", user.id);
+
+    // auth.users から物理削除
+    const { error: deleteUserErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+    if (deleteUserErr) {
+      console.error(`[Account Deletion Error] Failed to delete auth user: ${deleteUserErr.message}`);
+      return new Response(JSON.stringify({ error: deleteUserErr.message }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`[Account Deletion] User ${user.id} and all related data completely wiped.`);
+
+    return new Response(JSON.stringify({ success: true, message: "Account and all data wiped permanently" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (err: any) {
+    console.error(`[Account Deletion Internal Error] ${err.message}`);
+    return new Response(JSON.stringify({ error: err.message || "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
+
+```
+
+
+### 【ファイル: js/app.js — コアロジック・UI制御・暗記復習・語根ネットワーク】
 ```javascript
 /**
  * Vocab Vault — Main Application Module (js/app.js)
@@ -1622,8 +3908,16 @@
         wkToId.set(wk, it.id);
       } else {
         const ex = byId.get(existingId);
+        // [P0-3 解決] カード情報・メタデータは updatedAt が新しい方を採用
         const itWins = (it.updatedAt || 0) >= (ex.updatedAt || 0);
         const win = itWins ? it : ex, lose = itWins ? ex : it;
+
+        // [P0-3 解決] SM-2復習進捗（暗記データ）は reviewUpdatedAt が新しい方を独立して採用（Macでのフォルダ整理でスマホの復習が消えるのを防止）
+        const itRevTime = Number(it.reviewUpdatedAt || it.updatedAt) || 0;
+        const exRevTime = Number(ex.reviewUpdatedAt || ex.updatedAt) || 0;
+        const revWins = itRevTime >= exRevTime;
+        const revWin = revWins ? it : ex, revLose = revWins ? ex : it;
+
         const merged = {
           ...lose, ...win,
           id: ex.id || it.id,
@@ -1631,7 +3925,14 @@
           wiktGrounded: win.wiktGrounded || lose.wiktGrounded,
           wiktUrl: win.wiktUrl || lose.wiktUrl,
           etymologyTags: win.etymologyTags?.length ? win.etymologyTags : lose.etymologyTags,
-          updatedAt: Math.max(win.updatedAt || 1, lose.updatedAt || 1)
+          updatedAt: Math.max(win.updatedAt || 1, lose.updatedAt || 1),
+          // SRS フィールドの独立マージ
+          interval: revWin.interval !== undefined ? revWin.interval : revLose.interval,
+          repetition: revWin.repetition !== undefined ? revWin.repetition : revLose.repetition,
+          efactor: revWin.efactor !== undefined ? revWin.efactor : revLose.efactor,
+          nextReview: revWin.nextReview !== undefined ? revWin.nextReview : revLose.nextReview,
+          reviewUpdatedAt: Math.max(itRevTime, exRevTime),
+          isDeleted: Boolean(win.isDeleted !== undefined ? win.isDeleted : lose.isDeleted)
         };
         if (ex.wordKey && ex.wordKey !== merged.wordKey) wkToId.delete(ex.wordKey);
         byId.set(merged.id, merged);
@@ -2535,8 +4836,9 @@
       if (histData?.etymologyTags?.length) {
         rootKey = histData.etymologyTags[0];
       } else {
+        // [P1-3 解決] 語根ハルシネーション完全排除: startsWith/endsWith こじつけを撤廃し完全一致のみ
         for (const [rKey, rInfo] of Object.entries(BUILTIN_ETYMOLOGY_KNOWLEDGE.roots)) {
-          if (rInfo.words.includes(normW) || rInfo.words.some(w => normW.startsWith(w) || normW.endsWith(w))) {
+          if (rInfo.words && rInfo.words.includes(normW)) {
             rootKey = rKey;
             break;
           }
@@ -2562,12 +4864,12 @@
         } else if (wRef?.extract) {
           etymology = `語源資料（Wiktionary等）の記録に基づく学術語彙。古期英語・ラテン語等の語形成を経る。`;
         } else {
-          etymology = `ゲルマン祖語・印欧祖語に起源を持つ古典的語彙。`;
+          etymology = `個別語源（借用語・新造語等）。確固たるPIE語根は未確定。`;
         }
       }
 
       const etymologyTags = rootKey ? [rootKey] : (histData?.etymologyTags || []);
-      const etymologyConfidence = rootKey ? 'certain' : (histData ? 'certain' : 'probable');
+      const etymologyConfidence = rootKey ? 'certain' : (histData ? 'certain' : 'unknown');
       const core = histData?.core || (rootInfo ? `「${rootInfo.meaning}」をコアイメージとして語義が展開。` : `「${rawW}」の持つ本質的・直感的なイメージ。`);
       const history_note = (useHist && histData?.history_note) ? histData.history_note : '';
 
@@ -3152,21 +5454,64 @@
     throw lastErr || new Error('API通信エラー');
   }
 
-  function compressImage(file) {
+  async function compressImage(file) {
+    const max = 1600;
+
+    // [P2-1 解決] createImageBitmap による低メモリ高速処理
+    if (typeof createImageBitmap === 'function') {
+      try {
+        let bitmap = await createImageBitmap(file);
+        let { width: w, height: h } = bitmap;
+        if (w > max || h > max) {
+          if (w > h) { h = Math.round(h * max / w); w = max; }
+          else { w = Math.round(w * max / h); h = max; }
+          try {
+            const resizedBitmap = await createImageBitmap(file, { resizeWidth: w, resizeHeight: h, resizeQuality: 'medium' });
+            bitmap.close();
+            bitmap = resizedBitmap;
+          } catch {}
+        }
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        // 透過PNGの黒化防止: 白背景を敷く
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        bitmap.close();
+        const b64 = cv.toDataURL('image/jpeg', 0.85).split(',')[1];
+        cv.width = cv.height = 0;
+        return b64;
+      } catch (bmpErr) {
+        // フォールバックへ
+      }
+    }
+
+    // フォールバック (HTMLImageElement)
     return new Promise((res, rej) => {
       const url = URL.createObjectURL(file), img = new Image();
       img.onload = () => {
         URL.revokeObjectURL(url);
-        let { width:w, height:h } = img, max = 1600;
-        if (w > max || h > max) { if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; } }
+        let { width: w, height: h } = img;
+        if (w > max || h > max) {
+          if (w > h) { h = Math.round(h * max / w); w = max; }
+          else { w = Math.round(w * max / h); h = max; }
+        }
         const cv = document.createElement('canvas');
         cv.width = w; cv.height = h;
-        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        const ctx = cv.getContext('2d');
+        // 透過PNGの黒化防止: 白背景を敷く
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
         const b64 = cv.toDataURL('image/jpeg', 0.85).split(',')[1];
         cv.width = cv.height = 0;
         res(b64);
       };
-      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('画像の読み込みに失敗しました。')); };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        rej(new Error('画像の読み込みに失敗しました。'));
+      };
       img.src = url;
     });
   }
@@ -3656,7 +6001,7 @@
 
     if (global.VocabSRS) {
       const nextSRS = global.VocabSRS.calculateNextReview(e, r);
-      Object.assign(e, nextSRS);
+      Object.assign(e, nextSRS, { reviewUpdatedAt: Date.now() });
       if (r === 0) App.aList.push(e);
 
       // オフライン復習キューに登録（未接続時）
@@ -3679,7 +6024,7 @@
     const list = last.lang === App.lang ? App.entries : getJson(LANGS[last.lang].key);
     const e = list.find(x => x.id === last.id);
     if (!e) return;
-    Object.assign(e, last.prevProps, { updatedAt: Date.now() });
+    Object.assign(e, last.prevProps, { updatedAt: Date.now(), reviewUpdatedAt: Date.now() });
     if (last.requeued) {
       const pIdx = App.aList.findIndex(x => x.id === e.id);
       if (pIdx !== -1) App.aList.splice(pIdx, 1);
@@ -4461,7 +6806,10 @@
     const k = LANGS[tL].key, cur = getJson(k);
     const target = cur.find(i => (typeof idOrNum === 'string' && i.id === idOrNum) || (Number.isInteger(idOrNum) && i.num === idOrNum));
     if (!target) return;
-    if (global.VocabStorage) global.VocabStorage.recordTombstone(target, tL, Date.now());
+    const now = Date.now();
+    target.isDeleted = true;
+    target.updatedAt = now;
+    if (global.VocabStorage) global.VocabStorage.recordTombstone(target, tL, now);
     setJson(k, cur.filter(i => i !== target).map((it, idx) => ({ ...it, num: idx + 1 })), true, true);
     load(App.page);
   }
@@ -5448,7 +7796,8 @@ etymology:${eInst}`;
 
 ```
 
-### 【ファイル: js/sync.js — Supabase差分同期・Stripe決済・プロキシクライアント】
+
+### 【ファイル: js/sync.js — Supabase差分同期・Stripe決済・クォータクライアント】
 ```javascript
 /**
  * Vocab Vault — Supabase Sync & Proxy Module (js/sync.js)
@@ -5645,18 +7994,35 @@ etymology:${eInst}`;
       'Content-Type': 'application/json'
     };
 
-    const [entRes, tombRes, wmRes] = await Promise.all([
-      fetch(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&updated_at=gt.${lastSyncAt}&select=card_data,updated_at`, { headers }),
-      fetch(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`, { headers }),
+    // [P0-5 解決] PostgREST 1000件リミット回避: キーセット/ページネーションによる完全Pullループ
+    async function fetchAllPaginated(baseUrl) {
+      const PAGE_SIZE = 1000;
+      let allRows = [];
+      let offset = 0;
+      while (true) {
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        const pageUrl = `${baseUrl}${sep}limit=${PAGE_SIZE}&offset=${offset}`;
+        const r = await fetch(pageUrl, { headers });
+        if (!r.ok) throw new Error(`同期Pull失敗 (HTTP ${r.status})`);
+        const rows = await r.json();
+        if (!Array.isArray(rows) || rows.length === 0) break;
+        allRows.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+      return allRows;
+    }
+
+    const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&updated_at=gt.${lastSyncAt}&select=card_data,updated_at`),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`),
       fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&select=cleared_at`, { headers })
     ]);
 
-    if (!entRes.ok || !tombRes.ok || !wmRes.ok) {
-      throw new Error(`同期Pull失敗 (HTTP ${entRes.status}/${tombRes.status}/${wmRes.status})`);
+    if (!wmRes.ok) {
+      throw new Error(`ウォーターマークPull失敗 (HTTP ${wmRes.status})`);
     }
 
-    const remoteEntryRows = await entRes.json();
-    const remoteTombRows = await tombRes.json();
     const remoteWmRows = await wmRes.json();
 
     const remoteEntries = (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).map(r => ({
@@ -5688,12 +8054,14 @@ etymology:${eInst}`;
 
     const pushHeaders = { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' };
 
+    // [P0-6 解決] Push処理の厳格検証（失敗時はlastSyncAtを進めず例外スロー）
     if (delta.watermarkNeedsPush) {
-      await fetch(`${cfg.url}/rest/v1/user_lang_watermarks?on_conflict=user_id,lang`, {
+      const wmPushRes = await fetch(`${cfg.url}/rest/v1/user_lang_watermarks?on_conflict=user_id,lang`, {
         method: 'POST',
         headers: pushHeaders,
         body: JSON.stringify([{ user_id: uid, lang, cleared_at: delta.mergedClearedAt }])
       });
+      if (!wmPushRes.ok) throw new Error(`ウォーターマークPush失敗 (HTTP ${wmPushRes.status})`);
     }
 
     if (delta.tombstonesToPush.length > 0) {
@@ -5703,15 +8071,16 @@ etymology:${eInst}`;
         tomb_key: t.key,
         deleted_at: t.deletedAt
       }));
-      await fetch(`${cfg.url}/rest/v1/user_tombstones?on_conflict=user_id,lang,tomb_key`, {
+      const tombPushRes = await fetch(`${cfg.url}/rest/v1/user_tombstones?on_conflict=user_id,lang,tomb_key`, {
         method: 'POST',
         headers: pushHeaders,
         body: JSON.stringify(tombPayload)
       });
+      if (!tombPushRes.ok) throw new Error(`削除ログPush失敗 (HTTP ${tombPushRes.status})`);
     }
 
     if (delta.entriesToPush.length > 0) {
-      // [P1-1 解決] HTTP 413防止: 50件ごとのバッチに分割して同期
+      // HTTP 413防止: 50件ごとのバッチに分割して同期
       const CHUNK_SIZE = 50;
       for (let i = 0; i < delta.entriesToPush.length; i += CHUNK_SIZE) {
         const chunk = delta.entriesToPush.slice(i, i + CHUNK_SIZE);
@@ -5735,25 +8104,18 @@ etymology:${eInst}`;
           is_deleted: Boolean(it.isDeleted)
         }));
 
-        try {
-          const rpcRes = await fetch(`${cfg.url}/rest/v1/rpc/sync_vocab_entries_batch`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_entries: entryPayload })
-          });
-          if (!rpcRes.ok) {
-            await fetch(`${cfg.url}/rest/v1/user_vocab_entries?on_conflict=user_id,id`, {
-              method: 'POST',
-              headers: pushHeaders,
-              body: JSON.stringify(entryPayload)
-            });
-          }
-        } catch {
-          await fetch(`${cfg.url}/rest/v1/user_vocab_entries?on_conflict=user_id,id`, {
+        const rpcRes = await fetch(`${cfg.url}/rest/v1/rpc/sync_vocab_entries_batch`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_entries: entryPayload })
+        });
+        if (!rpcRes.ok) {
+          const fallbackRes = await fetch(`${cfg.url}/rest/v1/user_vocab_entries?on_conflict=user_id,id`, {
             method: 'POST',
             headers: pushHeaders,
             body: JSON.stringify(entryPayload)
           });
+          if (!fallbackRes.ok) throw new Error(`単語データPush失敗 (HTTP ${fallbackRes.status})`);
         }
       }
     }
@@ -5916,19 +8278,24 @@ etymology:${eInst}`;
     });
 
     if (!r.ok) {
-      // Edge Function が未デプロイ時のフェイルセーフ: RPCフォールバック
-      const rRpc = await fetch(`${cfg.url}/rest/v1/rpc/delete_user_account`, {
-        method: 'POST',
-        headers: {
-          apikey: cfg.anonKey,
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-      });
-      if (!rRpc.ok) {
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err.error || err.message || `アカウント削除に失敗しました (HTTP ${r.status})`);
+      const errData = await r.json().catch(() => ({}));
+      // 404 (Edge Function未デプロイ時) の場合のみDB直接RPCを試行（DB側でもアクティブ課金をブロック）
+      if (r.status === 404) {
+        const rRpc = await fetch(`${cfg.url}/rest/v1/rpc/delete_user_account`, {
+          method: 'POST',
+          headers: {
+            apikey: cfg.anonKey,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({})
+        });
+        if (!rRpc.ok) {
+          const rpcErr = await rRpc.json().catch(() => ({}));
+          throw new Error(rpcErr.message || rpcErr.error || `アカウント削除エラー (HTTP ${rRpc.status})`);
+        }
+      } else {
+        throw new Error(errData.error || errData.message || `アカウント削除・課金解約に失敗しました (HTTP ${r.status})。Stripeポータルより定期課金を解約の上、再度お試しください。`);
       }
     }
 
@@ -5939,7 +8306,7 @@ etymology:${eInst}`;
   // [GDPR対応] ユーザーの全登録単語・学習進捗の完全JSONエクスポート
   async function exportAllUserDataJson() {
     const bundle = {};
-    for (const l of ['en', 'fr', 'de']) {
+    for (const l of ['en', 'ja', 'fr', 'de']) {
       const b = await global.VocabStorage?.idbFetchLangBundle?.(l, true);
       bundle[l] = b || { words: [] };
     }
@@ -5979,1192 +8346,714 @@ etymology:${eInst}`;
 
 ```
 
-### 【ファイル: supabase/functions/vocab-generate/index.ts — Edge Function: Gemini 3.8 Flashプロキシ & 共有キャッシュ】
-```typescript
+
+### 【ファイル: js/storage.js — 階層化ストレージ (LocalStorage + IndexedDB + Tombstone)】
+```javascript
 /**
- * Vocab Vault — Supabase Edge Function: vocab-generate
- * ステップ2: Geminiプロキシ、共有キャッシュ照会、クォータ判定
+ * Vocab Vault — Storage & Tombstone Module (js/storage.js)
+ * 本番仕様: IndexedDB を SSOT（単一の信頼できる情報源）とする堅牢アーキテクチャ
+ * LocalStorage 5MB上限 & iOS Safari 7日間パージ耐性、アトミックマイグレーション
  */
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
+(function (global) {
+  'use strict';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-interface RequestItem {
-  reqIndex: number;
-  reqWord: string;
-  homographIndex?: number;
-  contextPos?: string;
-  targetSenseOrMeaning?: string;
-  contextSentence?: string;
-  wiktionaryRef?: string;
-  wiktionaryIpa?: string;
-}
-
-function cleanJsonString(str: string): string {
-  return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ");
-}
-
-const guestRateMemory = new Map<string, number>();
-
-function sanitizeCard(card: any, origItem?: RequestItem) {
-  const norm = (s: any) => String(s || "").normalize("NFC").trim();
-  const word = norm(card?.word || origItem?.reqWord);
-  const phonetic = norm(card?.phonetic);
-  const grammar_forms = norm(card?.grammar_forms);
-  const etymology = norm(card?.etymology);
-  const core = norm(card?.core);
-  const history_note = norm(card?.history_note);
-
-  const meanings = (Array.isArray(card?.meanings) ? card.meanings : [])
-    .map((m: any) => ({
-      pos: norm(m?.pos || "N"),
-      text: norm(m?.text),
-    }))
-    .filter((m: any) => m.text.length > 0);
-  if (meanings.length === 0) meanings.push({ pos: "N", text: word });
-
-  const exForeign = norm(card?.example?.foreign);
-  const exJa = norm(card?.example?.ja);
-  const exTrans = norm(card?.example?.trans || exJa);
-  const usedForm = norm(card?.example?.used_form || word);
-
-  let fixedForeign = exForeign;
-  if (!fixedForeign.includes("<b>") && word) {
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const wRegex = new RegExp(`\\b(${escaped})\\b`, "gi");
-    if (wRegex.test(fixedForeign)) {
-      fixedForeign = fixedForeign.replace(wRegex, "<b>$1</b>");
-    }
-  }
-
-  const derivatives = (Array.isArray(card?.derivatives) ? card.derivatives : [])
-    .map((d: any) => ({
-      word: norm(d?.word),
-      meaning: norm(d?.meaning),
-      pos: d?.pos ? norm(d.pos) : undefined,
-      phonetic: d?.phonetic ? norm(d.phonetic) : undefined,
-      sub_phrase: d?.sub_phrase ? norm(d.sub_phrase) : undefined,
-      sub_trans: d?.sub_trans ? norm(d.sub_trans) : undefined,
-    }))
-    .filter((d: any) => d.word.length > 0);
-
-  const phrases = (Array.isArray(card?.phrases) ? card.phrases : [])
-    .map((p: any) => ({
-      foreign: norm(p?.foreign),
-      ja: norm(p?.ja),
-    }))
-    .filter((p: any) => p.foreign.length > 0);
-
-  const etymologyTags = (Array.isArray(card?.etymologyTags) ? card.etymologyTags : [])
-    .map((t: any) => norm(t))
-    .filter((t: any) => t.length > 0);
-
-  return {
-    ...card,
-    reqIndex: origItem?.reqIndex ?? card?.reqIndex ?? 0,
-    word,
-    homographIndex: Math.max(1, parseInt(String(card?.homographIndex || origItem?.homographIndex || 1), 10) || 1),
-    category: typeof card?.category === "number" ? card.category : 1,
-    phonetic,
-    grammar_forms,
-    etymologyConfidence: ["certain", "probable", "disputed", "unknown"].includes(card?.etymologyConfidence)
-      ? card.etymologyConfidence
-      : "probable",
-    etymology,
-    etymologyTags,
-    history_note,
-    core,
-    meanings,
-    example: {
-      foreign: fixedForeign,
-      ja: exJa,
-      trans: exTrans,
-      used_form: usedForm,
-    },
-    phrases,
-    derivatives,
+  const LANGS = {
+    en: { key: 'distinction_entries', snap: 'vocab_snapshot_en', tomb: 'vv_tombstones_en', clearKey: 'vv_cleared_at_en' },
+    fr: { key: 'distinction_entries_fr', snap: 'vocab_snapshot_fr', tomb: 'vv_tombstones_fr', clearKey: 'vv_cleared_at_fr' },
+    de: { key: 'distinction_entries_de', snap: 'vocab_snapshot_de', tomb: 'vv_tombstones_de', clearKey: 'vv_cleared_at_de' },
+    ja: { key: 'distinction_entries_ja', snap: 'vocab_snapshot_ja', tomb: 'vv_tombstones_ja', clearKey: 'vv_cleared_at_ja' }
   };
-}
+  const LANG_KEYS = Object.keys(LANGS);
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  const Storage = {
+    dbInst: null,
+    dbReadyPromise: null,
+    bc: null,
+    idbOnlyMode: true, // IndexedDB をプライマリストレージとする
+    storageError: false,
+    migratedFromLs: false,
+    loadFailed: {},
+    mem: {},
+    tombstones: {},
+    clearedAt: {}
+  };
+
+  const _warn = (...args) => typeof console !== 'undefined' && console.warn && console.warn(...args);
+  const _log = (...args) => typeof console !== 'undefined' && console.log && console.log(...args);
+
+  // --- IndexedDB の初期化 & 永続化要請 ---
+  function initDatabase() {
+    if (Storage.dbReadyPromise) return Storage.dbReadyPromise;
+    if (typeof indexedDB === 'undefined') {
+      _warn('[Storage] IndexedDB not supported; falling back to memory/LocalStorage');
+      return Promise.resolve(null);
+    }
+
+    Storage.dbReadyPromise = new Promise(resolve => {
+      try {
+        const req = indexedDB.open('VocabVaultDB', 2);
+        req.onupgradeneeded = e => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('vaults')) {
+            db.createObjectStore('vaults');
+          }
+        };
+        req.onsuccess = async e => {
+          Storage.dbInst = e.target.result;
+          // iOS Safari等のパージ対策: 永続化ストレージ要求
+          if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
+            navigator.storage.persist().catch(() => {});
+          }
+          // 初回マイグレーション（LocalStorage -> IndexedDB）
+          await migrateFromLocalStorageIfNeeded();
+          resolve(Storage.dbInst);
+        };
+        req.onerror = () => {
+          _warn('[Storage] IndexedDB open error');
+          resolve(null);
+        };
+      } catch (err) {
+        _warn('[Storage] IndexedDB init exception:', err);
+        resolve(null);
+      }
+    });
+
+    return Storage.dbReadyPromise;
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      return new Response(JSON.stringify({ error: "Server misconfigured (missing Supabase keys)" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    let user = null;
-
-    // 認証確認 (ログインユーザーはトークン検証、未ログイン時はゲストアクセスを許可)
-    const authHeader = req.headers.get("Authorization");
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
-      if (!authError && authUser) {
-        user = authUser;
-      }
-    }
-
-    const body = await req.json();
-    const {
-      lang = "en",
-      srcLang: rawSrc,
-      targetLang: rawTgt,
-      tgtLang: rawTgt2,
-      useHist = true,
-      fName,
-      items
-    } = body as {
-      lang?: string;
-      srcLang?: string;
-      targetLang?: string;
-      tgtLang?: string;
-      useHist?: boolean;
-      fName?: string;
-      items: RequestItem[];
-    };
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return new Response(JSON.stringify({ error: "Invalid items array" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // 批判的セキュリティ対策: 1回のリクエスト数を最大15語に制限（APIタダ乗り・DoS防止）
-    if (items.length > 15) {
-      return new Response(JSON.stringify({ error: "1回のリクエストあたりの生成単語数は最大15語までです。" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // 言語ペアの決定（4言語: en, ja, fr, de）
-    const validLangs = ["en", "ja", "fr", "de"];
-    const sLang = validLangs.includes(rawSrc || "") ? (rawSrc as string) : (validLangs.includes(lang) ? lang : "en");
-    const tLang = validLangs.includes(rawTgt || rawTgt2 || "") ? ((rawTgt || rawTgt2) as string) : "ja";
-
-    // 各単語のサニタイズ（100文字上限、空文字除外）
-    const sanitizedItems = items
-      .map(it => ({
-        ...it,
-        reqWord: String(it.reqWord || "").trim().slice(0, 100),
-        homographIndex: Math.max(1, parseInt(String(it.homographIndex || 1), 10) || 1),
-      }))
-      .filter(it => it.reqWord.length > 0);
-
-    if (sanitizedItems.length === 0) {
-      return new Response(JSON.stringify({ error: "有効な単語が指定されていません。" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // 言語名の多言語表記マッピング
-    const LANG_INFO: Record<string, { ja: string; en: string; fr: string; de: string; pos: string }> = {
-      en: { ja: "英語", en: "English", fr: "Anglais", de: "Englisch", pos: "N[C], N[U], V[T], V[I], Adj, Adv" },
-      ja: { ja: "日本語", en: "Japanese", fr: "Japonais", de: "Japanisch", pos: "名詞, 動詞, 形容詞, 副詞, 熟語" },
-      fr: { ja: "フランス語", en: "French", fr: "Français", de: "Französisch", pos: "N[m], N[f], V[T], V[I], Adj, Adv" },
-      de: { ja: "ドイツ語", en: "German", fr: "Allemand", de: "Deutsch", pos: "N[m], N[f], N[n], V[T], V[I], Adj, Adv" },
-    };
-
-    const sInfo = LANG_INFO[sLang] || LANG_INFO.en;
-    const tInfo = LANG_INFO[tLang] || LANG_INFO.ja;
-
-    // --- [4×4 全16ペア対応] 動的システムプロンプト生成 ---
-    let serverSystemPrompt = "";
-    if (sLang === tLang) {
-      // 同言語ペア（英英、仏仏、独独、国語・概念史）
-      if (sLang === "en") {
-        serverSystemPrompt = `You are an authoritative academic English monolingual etymological dictionary and conceptual history lexicon (such as Oxford English Dictionary / Merriam-Webster Unabridged).
-Explain each English word STRICTLY IN ENGLISH with deep Indo-European roots, Greek/Latin cognates, philosophical/institutional evolution, and precise definitions.
-Requirements:
-1. Etymology: reconstruct PIE roots (*root), Proto-Germanic/Latin pathways, and semantic shifts in English.
-2. Meanings: provide rigorous academic English definitions and core imagery.
-3. Example: provide an authentic English sentence (example.foreign) and an explanatory English paraphrase (example.ja & example.trans), enclosing the headword with <b>bold tags</b>.
-4. Part of speech: strictly follow ${sInfo.pos}.
-${fName ? `Subject field: ${fName}` : ""}`;
-      } else if (sLang === "fr") {
-        serverSystemPrompt = `Vous êtes un dictionnaire étymologique académique et un lexique d'histoire des concepts de langue française (style Littré / Le Robert).
-Expliquez chaque mot français STRICTEMENT EN FRANÇAIS avec ses racines indo-européennes, origines gréco-latines et son évolution philosophique.
-1. Étymologie et image centrale (core) rédigées en français.
-2. Définitions rigoureuses (meanings.text) en français.
-3. Exemple en français (example.foreign) et explication/reformulation en français (example.ja & example.trans).
-${fName ? `Domaine: ${fName}` : ""}`;
-      } else if (sLang === "de") {
-        serverSystemPrompt = `Sie sind ein maßgebliches deutsches Begriffsgeschichte- und etymologisches Wörterbuch (Stil Duden / Grimm).
-Erklären Sie deutsche Stichwörter AUSSCHLIESSLICH AUF DEUTSCH mit indogermanischen Wurzeln und geistesgeschichtlichen Zusammenhängen.
-1. Etymologie und semantischer Kern auf Deutsch.
-2. Präzise Definitionen (meanings.text) auf Deutsch.
-3. Deutsches Beispiel (example.foreign) und deutsche Paraphrase (example.ja & example.trans).
-${fName ? `Fachbereich: ${fName}` : ""}`;
-      } else {
-        serverSystemPrompt = `あなたは学術的な日本語の語源・概念史・国語大辞典エンジンです。
-各日本語の見出し語について、漢字・漢語の成り立ち、仏教・東洋思想・近代西欧語翻訳史（明治期の翻訳語形成）の変遷を深く日本語で解説してください。
-1. 語源（etymology）およびコアイメージ（core）の解説。
-2. 現代および歴史的な語義の解説。
-3. 自然な用例・例文（example.foreign）とその現代語解説（example.ja & example.trans）。
-${fName ? `分野: ${fName}` : ""}`;
-      }
-    } else {
-      // 異言語ペア（英和、仏和、独和、和英、仏独、仏英、独英、和仏、和独など）
-      if (tLang === "ja") {
-        serverSystemPrompt = `あなたは最高峰の学術的${sInfo.ja}から日本語への語源・概念史辞典および高度な単語帳データ生成エンジンです。
-各${sInfo.ja}の対象語について、以下の学術的基準を厳守した正確なJSON配列を出力してください。
-
-【厳格な学術基準・ハルシネーション完全排除】
-1. 印欧祖語(PIE)や古典諸語の照合:
-   - 実在が言語学的に広く認められている真の語根のみを記載（Pokorny, LIV, Mallory-Adams, OED, Wiktionary Etymology準拠）。
-   - 実在しない語根の捏造・無理なこじつけ（ハルシネーション）を厳禁。語根が不詳の単語（借用語、新造語、オノマトペ等）は率直に「PIE語根不明」または借用元の言語から解説し、etymologyConfidenceを "disputed" または "unknown" とすること。
-   - 民間語源（俗説）を事実として解説することを厳禁。
-2. etymologyTagsの厳格化:
-   - 【対象見出し語自身】の真の語根のみをアスタリスク付き(例: "*sta-", "*leuk-")で出力。例文や派生語に出てくる別語の語根は絶対に含めない。
-3. 【歴史的・文脈的用法の反映】:
-   - 見出し語に特定の時代・歴史的出来事（例: wet＝米国禁酒法下の反禁酒派、dry＝禁酒派、dove＝冷戦期の反戦ハト派、quarantine＝ベネチアの40日検疫等）に根ざす顕著な歴史的・政治的・制度的用法がある場合、現代標準語義に加えて必ずmeaningsに歴史的語義（【歴史】や【禁酒法】等のラベル付き）を含め、history_noteに時代背景や制度的文脈を具体的に記述すること（最大70字）。特筆すべき歴史的用法がない一般的な語彙はhistory_noteを空文字""とすること。架空の歴史的事実を捏造しないこと。
-4. 自然な例文(example.foreign)と日本語訳(example.ja & example.trans):
-   - 例文には必ず見出し語を含め、日本語訳内の該当語を必ず<b>見出し語の訳</b>で囲むこと。歴史的用法を持つ語はその文脈を反映した用例を優先。
-5. Unicode文字化け防止:
-   - 発音記号(IPA)、ウムラウト、アクサン記号、長音記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること。
-6. 品詞(pos)は ${sInfo.pos} 等に準拠すること。
-${fName ? `分野の指定: ${fName}` : ""}`;
-      } else if (tLang === "en") {
-        serverSystemPrompt = `You are a high-level academic dictionary from ${sInfo.en} to English specializing in etymology, cognate networks, and conceptual history.
-For each ${sInfo.en} word, provide definitions, PIE root connections, and historical context STRICTLY IN ENGLISH.
-1. Etymology and core semantic concept explained in English.
-2. English translation and definition (meanings.text).
-3. Example in ${sInfo.en} (example.foreign) with accurate English translation (example.ja & example.trans), bolding the matching term.
-${fName ? `Field: ${fName}` : ""}`;
-      } else if (tLang === "fr") {
-        serverSystemPrompt = `Vous êtes un dictionnaire académique de ${sInfo.fr} vers le français, spécialisé en étymologie et histoire conceptuelle.
-Expliquez les mots ${sInfo.fr} EN FRANÇAIS avec leurs racines indo-européennes et leurs équivalents français.
-1. Étymologie et concept central expliqués en français.
-2. Définition et traduction en français (meanings.text).
-3. Exemple en ${sInfo.fr} (example.foreign) avec traduction française (example.ja & example.trans).
-${fName ? `Domaine: ${fName}` : ""}`;
-      } else {
-        serverSystemPrompt = `Sie sind ein akademisches Wörterbuch von ${sInfo.de} ins Deutsche, spezialisiert auf Etymologie und Begriffsgeschichte.
-Erklären Sie ${sInfo.de} Wörter AUF DEUTSCH mit indogermanischen Wurzeln und semantischen Vergleichen.
-1. Etymologie und Kernkonzept auf Deutsch erklärt.
-2. Deutsche Übersetzung und Definition (meanings.text).
-3. Beispiel auf ${sInfo.de} (example.foreign) mit deutscher Übersetzung (example.ja & example.trans).
-${fName ? `Fachbereich: ${fName}` : ""}`;
-      }
-    }
-
-    const serverResponseSchema = {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          reqIndex: { type: "INTEGER" },
-          word: { type: "STRING" },
-          homographIndex: { type: "INTEGER" },
-          category: { type: "INTEGER" },
-          phonetic: { type: "STRING" },
-          grammar_forms: { type: "STRING" },
-          etymologyConfidence: { type: "STRING", enum: ["certain", "probable", "disputed", "unknown"] },
-          etymology: { type: "STRING" },
-          etymologyTags: { type: "ARRAY", items: { type: "STRING" } },
-          history_note: { type: "STRING" },
-          core: { type: "STRING" },
-          meanings: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                pos: { type: "STRING" },
-                text: { type: "STRING" },
-              },
-              required: ["pos", "text"],
-            },
-          },
-          example: {
-            type: "OBJECT",
-            properties: {
-              foreign: { type: "STRING" },
-              ja: { type: "STRING" },
-              trans: { type: "STRING" },
-              used_form: { type: "STRING" },
-            },
-            required: ["foreign", "ja"],
-          },
-          phrases: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: { foreign: { type: "STRING" }, ja: { type: "STRING" } },
-              required: ["foreign", "ja"],
-            },
-          },
-          derivatives: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                word: { type: "STRING" },
-                phonetic: { type: "STRING" },
-                pos: { type: "STRING" },
-                meaning: { type: "STRING" },
-                sub_phrase: { type: "STRING" },
-                sub_trans: { type: "STRING" },
-              },
-              required: ["word", "meaning"],
-            },
-          },
-        },
-        required: ["word", "meanings", "example", "etymology", "core"],
-      },
-    };
-
-    // --- 1. 共有辞書キャッシュの検索 (Unicode NFC 正規化 & 言語ペア対応) ---
-    const pairCode = `${sLang}_${tLang}`;
-    const makeWordKey = (w: string, pair: string, h: number = 1) => {
-      const normW = w.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
-      return `${pair}:${normW}#${h > 1 ? h : 1}`;
-    };
-
-    // 共有辞書キャッシュのバッチ検索 (言語ペアごとに独立)
-    const allKeys = sanitizedItems.map(it => makeWordKey(it.reqWord, pairCode, it.homographIndex || 1));
-    const { data: cachedRows } = await supabaseAdmin
-      .from("global_dictionary_cache")
-      .select("card_data, hit_count, word_key")
-      .eq("lang", sLang)
-      .in("word_key", allKeys);
-
-    const cachedMap = new Map((cachedRows || []).map((r: any) => [r.word_key, r]));
-    const cachedResults: any[] = [];
-    const itemsToGenerate: RequestItem[] = [];
-
-    for (const item of sanitizedItems) {
-      const hIdx = item.homographIndex || 1;
-      const wk = makeWordKey(item.reqWord, pairCode, hIdx);
-      const cached = cachedMap.get(wk);
-
-      if (cached && cached.card_data && !item.targetSenseOrMeaning) {
-        cachedResults.push(sanitizeCard(cached.card_data, item));
-        // hit_countをインクリメント（バックグラウンド非同期）
-        supabaseAdmin
-          .from("global_dictionary_cache")
-          .update({ hit_count: (cached.hit_count || 0) + 1, updated_at: new Date().toISOString() })
-          .eq("lang", sLang)
-          .eq("word_key", wk)
-          .then();
-      } else {
-        itemsToGenerate.push(item);
-      }
-    }
-
-    let quotaRemaining = 9999;
-    let generatedResults: any[] = [];
-    let usedModel = "shared-cache";
-
-    // --- 2. 未キャッシュ分のみクォータ事前予約 (Reserve) & Gemini API呼び出し ---
-    if (itemsToGenerate.length > 0) {
-      if (!geminiApiKey) {
-        return new Response(JSON.stringify({ error: "Gemini API key is not configured on server" }), {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // [P0-2 解決] TOCTOU排除: ログインユーザーのみアトミックにクォータを事前仮引き落とし（Reserve）
-      if (user) {
-        const { data: quotaReserve, error: quotaError } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
-          p_user_id: user.id,
-          p_item_count: itemsToGenerate.length,
-          p_is_refund: false,
-        });
-
-        if (quotaError || !quotaReserve?.allowed) {
-          return new Response(
-            JSON.stringify({
-              error: `今月のAI新規生成上限に達しました（残り: ${quotaReserve?.remaining ?? 0}語）。Proプランにアップグレードすると無制限に生成できます。`,
-              quotaRemaining: quotaReserve?.remaining ?? 0,
-            }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+  // --- LocalStorage と IndexedDB の双方向安全同期 & データ完全復旧 ---
+  async function migrateFromLocalStorageIfNeeded() {
+    if (!Storage.dbInst || Storage.migratedFromLs) return;
+    try {
+      for (const l of LANG_KEYS) {
+        const k = LANGS[l].key;
+        const idbData = await idbGet(k);
+        const rawLs = lsGet(k, '');
+        let lsWords = [];
+        try { if (rawLs && rawLs !== '[]') lsWords = JSON.parse(rawLs); } catch {}
+        
+        let idbWords = [];
+        if (Array.isArray(idbData)) idbWords = idbData;
+        else if (typeof idbData === 'string') {
+          try { idbWords = JSON.parse(idbData); } catch {}
         }
 
-        quotaRemaining = quotaReserve.remaining;
-      } else {
-        // ゲスト（未ログイン）のデイリー生成上限チェック（1日30語まで・悪用およびDoS防止）
-        const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown_guest";
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const rateKey = `${clientIp}_${todayStr}`;
-        const currentMemoryCount = guestRateMemory.get(rateKey) || 0;
+        const tMap = getTombstones(l);
+        const cAt = getClearedAt(l);
+        const filterLive = arr => arr.filter(it => !isTombstoned(it, tMap, l, cAt));
+        lsWords = filterLive(lsWords);
+        idbWords = filterLive(idbWords);
 
-        if (currentMemoryCount + itemsToGenerate.length > 30) {
-          return new Response(
-            JSON.stringify({
-              error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${currentMemoryCount}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
-              quotaRemaining: 0,
-            }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+        // どちらかにある有効な単語を合算・保護
+        let merged = [];
+        if (lsWords.length && idbWords.length) {
+          merged = global.VocabCore?.mergeWords ? global.VocabCore.mergeWords(idbWords, lsWords, l, false, tMap, cAt) : (idbWords.length >= lsWords.length ? idbWords : lsWords);
+        } else if (idbWords.length) {
+          merged = idbWords;
+        } else if (lsWords.length) {
+          merged = lsWords;
         }
 
-        try {
-          const { data: ipRow } = await supabaseAdmin
-            .from("guest_rate_limits")
-            .select("usage_count, reset_at")
-            .eq("ip", clientIp)
-            .maybeSingle();
-
-          const nowIso = new Date().toISOString();
-          let currentDbCount = 0;
-          if (ipRow && ipRow.reset_at > nowIso) {
-            currentDbCount = Number(ipRow.usage_count) || 0;
-            guestRateMemory.set(rateKey, Math.max(currentMemoryCount, currentDbCount));
-          }
-
-          if (Math.max(currentMemoryCount, currentDbCount) + itemsToGenerate.length > 30) {
-            return new Response(
-              JSON.stringify({
-                error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${Math.max(currentMemoryCount, currentDbCount)}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
-                quotaRemaining: 0,
-              }),
-              { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-        } catch {
-          // DBテーブル未作成時はインメモリ判定を継続
+        if (merged.length > 0) {
+          _log(`[Storage Recovery] Restored ${merged.length} ${l} words`);
+          Storage.mem[k] = merged;
+          Storage.mem[l] = merged;
+          await idbPut(k, merged);
+          try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
         }
       }
+      Storage.migratedFromLs = true;
+    } catch (e) {
+      _warn('[Storage Migration Error]', e);
+    }
+  }
 
-      // Gemini呼び出し (Google推奨の最新フラッグシップモデル gemini-3.8-flash)
-      const targetModel = "gemini-3.8-flash";
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`;
-      const userContent = `対象語(${itemsToGenerate.length}件):${JSON.stringify(itemsToGenerate)}${fName ? `\n分野:${fName}` : ""}`;
+  function lsGet(k, d = '') {
+    try {
+      const v = localStorage.getItem(k);
+      if (v !== null) return v;
+      if (k.startsWith('vv_')) {
+        const legacy = localStorage.getItem(k.slice(3));
+        if (legacy !== null) return legacy;
+      } else {
+        const prefixed = localStorage.getItem('vv_' + k);
+        if (prefixed !== null) return prefixed;
+      }
+      return d;
+    } catch { return d; }
+  }
 
-      let aiResponse: Response;
+  function lsSet(k, v) {
+    try {
+      localStorage.setItem(k, v);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function getPairConfig(srcLang = 'en', tgtLang = 'ja') {
+    const s = String(srcLang || 'en').toLowerCase();
+    const t = String(tgtLang || 'ja').toLowerCase();
+    // 既存データ（en->ja, fr->ja, de->ja）への後方互換性エイリアス
+    if (t === 'ja' && (s === 'en' || s === 'fr' || s === 'de')) {
+      return LANGS[s];
+    }
+    const pairId = `${s}_${t}`;
+    return {
+      key: `distinction_entries_${pairId}`,
+      snap: `vocab_snapshot_${pairId}`,
+      tomb: `vv_tombstones_${pairId}`,
+      clearKey: `vv_cleared_at_${pairId}`,
+      srcLang: s,
+      tgtLang: t,
+      pairId
+    };
+  }
+
+  function getPairKey(srcLang = 'en', tgtLang = 'ja') {
+    return getPairConfig(srcLang, tgtLang).key;
+  }
+
+  function keyToLang(k) {
+    if (!k) return 'en';
+    const str = String(k);
+    if (str.includes('_fr') || str.endsWith('_fr') || str.includes('french')) return 'fr';
+    if (str.includes('_de') || str.endsWith('_de') || str.includes('german')) return 'de';
+    if (str.includes('_ja') || str.endsWith('_ja') || str.includes('japanese')) return 'ja';
+    const m = str.match(/(?:entries|snapshot|tombstones|cleared_at)_([a-z]{2})/);
+    if (m && LANGS[m[1]]) return m[1];
+    return 'en';
+  }
+
+  function keyToPair(k) {
+    if (!k) return { srcLang: 'en', tgtLang: 'ja' };
+    const str = String(k);
+    if (str === 'distinction_entries') return { srcLang: 'en', tgtLang: 'ja' };
+    if (str === 'distinction_entries_fr') return { srcLang: 'fr', tgtLang: 'ja' };
+    if (str === 'distinction_entries_de') return { srcLang: 'de', tgtLang: 'ja' };
+    if (str === 'distinction_entries_ja') return { srcLang: 'ja', tgtLang: 'ja' };
+    const m = str.match(/^(?:distinction_entries|vocab_snapshot|vv_tombstones|vv_cleared_at)_([a-z]{2})_([a-z]{2})/);
+    if (m && LANGS[m[1]] && LANGS[m[2]]) return { srcLang: m[1], tgtLang: m[2] };
+    const sLang = keyToLang(str);
+    return { srcLang: sLang, tgtLang: 'ja' };
+  }
+
+  function resolveConfig(target) {
+    if (!target) return LANGS.en;
+    if (typeof target === 'object' && target.key) return target;
+    if (typeof target === 'object' && target.srcLang) return getPairConfig(target.srcLang, target.tgtLang || 'ja');
+    if (typeof target === 'string') {
+      if (LANGS[target]) return LANGS[target];
+      if (target.includes('_') && target.length === 5) {
+        const [s, t] = target.split('_');
+        return getPairConfig(s, t);
+      }
+      const pair = keyToPair(target);
+      return getPairConfig(pair.srcLang, pair.tgtLang);
+    }
+    return LANGS.en;
+  }
+
+  function idbPut(k, v) {
+    if (!Storage.dbInst) return Promise.resolve(false);
+    return new Promise(res => {
       try {
-        aiResponse = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: serverSystemPrompt }] },
-            contents: [{ role: "user", parts: [{ text: userContent }] }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 8192,
-              responseMimeType: "application/json",
-              responseSchema: serverResponseSchema,
-            },
-          }),
-        });
-      } catch (fetchErr: any) {
-        if (user) {
-          await supabaseAdmin.rpc("reserve_or_refund_quota", {
-            p_user_id: user.id,
-            p_item_count: itemsToGenerate.length,
-            p_is_refund: true,
-          }).catch(() => {});
-        }
-        return new Response(JSON.stringify({ error: `Gemini API fetch failed: ${fetchErr?.message || fetchErr}` }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      if (!aiResponse.ok) {
-        if (user) {
-          await supabaseAdmin.rpc("reserve_or_refund_quota", {
-            p_user_id: user.id,
-            p_item_count: itemsToGenerate.length,
-            p_is_refund: true,
-          }).catch(() => {});
-        }
-        const errBody = await aiResponse.text();
-        return new Response(JSON.stringify({ error: `Gemini API error (${aiResponse.status}): ${errBody}` }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      const aiData = await aiResponse.json();
-      const rawText = aiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
-      let parsedAi: any;
-      try {
-        parsedAi = JSON.parse(cleanJsonString(rawText));
-      } catch (parseErr: any) {
-        if (user) {
-          await supabaseAdmin.rpc("reserve_or_refund_quota", {
-            p_user_id: user.id,
-            p_item_count: itemsToGenerate.length,
-            p_is_refund: true,
-          }).catch(() => {});
-        }
-        return new Response(
-          JSON.stringify({ error: "AI応答の解析に失敗しました。クォータは全額返還されました。" }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const rawArr = Array.isArray(parsedAi) ? parsedAi : [parsedAi];
-      generatedResults = rawArr.map((c: any, idx: number) => sanitizeCard(c, itemsToGenerate[idx]));
-      usedModel = targetModel;
-
-      // 部分失敗差分の自動返還 (例: 10語中8語のみ成功した場合、未生成2語分を返還)
-      const failedCount = itemsToGenerate.length - generatedResults.length;
-      if (user && failedCount > 0) {
-        const { data: refundData } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
-          p_user_id: user.id,
-          p_item_count: failedCount,
-          p_is_refund: true,
-        }).catch(() => {});
-        if (refundData?.remaining !== undefined) quotaRemaining = refundData.remaining;
-      }
-
-      // 生成結果を共有キャッシュに保存（非同期）
-      const cacheRows = generatedResults.map((card) => {
-        const hIdx = card.homographIndex || 1;
-        const wk = makeWordKey(card.word, pairCode, hIdx);
-        return {
-          lang: sLang,
-          word: card.word,
-          homograph_index: hIdx,
-          word_key: wk,
-          card_data: card,
-          hit_count: 1,
-          verified: false,
-        };
-      });
-
-      if (cacheRows.length > 0) {
-        supabaseAdmin
-          .from("global_dictionary_cache")
-          .upsert(cacheRows, { onConflict: "lang,word_key" })
-          .then()
-          .catch(() => {});
-      }
-
-      // ゲスト（未ログイン）のデイリー生成利用カウントを加算（インメモリ & DB）
-      if (!user && generatedResults.length > 0) {
-        const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown_guest";
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const rateKey = `${clientIp}_${todayStr}`;
-        const newUsage = (guestRateMemory.get(rateKey) || 0) + generatedResults.length;
-        guestRateMemory.set(rateKey, newUsage);
-
-        const tomorrow = new Date();
-        tomorrow.setHours(24, 0, 0, 0);
-
-        supabaseAdmin
-          .from("guest_rate_limits")
-          .upsert({
-            ip: clientIp,
-            usage_count: newUsage,
-            reset_at: tomorrow.toISOString(),
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "ip" })
-          .then()
-          .catch(() => {});
-      }
-    }
-
-    // 全結果をマージ
-    const finalItems = [...cachedResults, ...generatedResults];
-
-    return new Response(
-      JSON.stringify({
-        items: finalItems,
-        usedModel,
-        cachedCount: cachedResults.length,
-        generatedCount: generatedResults.length,
-        quotaRemaining,
-      }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message || "Unknown internal error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const tx = Storage.dbInst.transaction('vaults', 'readwrite');
+        tx.objectStore('vaults').put(v, k);
+        tx.oncomplete = () => res(true);
+        tx.onerror = tx.onabort = () => res(false);
+      } catch { res(false); }
     });
   }
-});
+
+  function idbGet(k) {
+    if (!Storage.dbInst) return Promise.resolve(null);
+    return new Promise(res => {
+      try {
+        const tx = Storage.dbInst.transaction('vaults', 'readonly');
+        const req = tx.objectStore('vaults').get(k);
+        req.onsuccess = () => res(req.result ?? null);
+        req.onerror = () => res(null);
+      } catch { res(null); }
+    });
+  }
+
+  function idbAddSnap(l, arr) {
+    if (!Storage.dbInst) return;
+    const cfg = resolveConfig(l);
+    try {
+      const tx = Storage.dbInst.transaction('vaults', 'readwrite'), st = tx.objectStore('vaults');
+      const r = st.add(arr, `${cfg.snap}:${new Date().toISOString().slice(0, 10)}`);
+      r.onerror = e => { e.preventDefault(); e.stopPropagation(); };
+      const kr = st.getAllKeys(IDBKeyRange.bound(`${cfg.snap}:`, `${cfg.snap}:\uffff`));
+      kr.onsuccess = () => {
+        const keys = (kr.result || []).map(String).sort();
+        while (keys.length > 7) { const oldK = keys.shift(); if (oldK) st.delete(oldK); }
+      };
+    } catch {}
+  }
+
+  function getClearedAt(l = 'en') {
+    const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
+    return Storage.clearedAt[id] > 0 ? Storage.clearedAt[id] : (Storage.clearedAt[id] = Number(lsGet(cfg.clearKey, '0')) || 0);
+  }
+
+  function saveClearedAt(l = 'en', ts = Date.now()) {
+    const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
+    Storage.clearedAt[id] = ts;
+    lsSet(cfg.clearKey, String(ts));
+    idbPut(cfg.clearKey, ts);
+  }
+
+  function absorbTombArray(map, arr) {
+    if (!Array.isArray(arr)) return;
+    arr.forEach(t => {
+      if (t && typeof t.key === 'string' && !t.key.startsWith('fold:') && Number.isFinite(t.deletedAt)) {
+        map.set(t.key, Math.max(map.get(t.key) || 0, t.deletedAt));
+      }
+    });
+  }
+
+  function getTombstones(l = 'en') {
+    const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
+    if (Storage.tombstones[id]) return Storage.tombstones[id];
+    const map = new Map();
+    try { absorbTombArray(map, JSON.parse(lsGet(cfg.tomb, '[]'))); } catch {}
+    return (Storage.tombstones[id] = map);
+  }
+
+  function saveTombstones(l = 'en', map = getTombstones(l)) {
+    const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
+    const cutoff = Date.now() - 180 * 86400000;
+    const sorted = [...map.entries()].filter(([k, ts]) => !k.startsWith('fold:') && ts >= cutoff).sort((a, b) => b[1] - a[1]).slice(0, 2000);
+    Storage.tombstones[id] = new Map(sorted);
+    const arr = sorted.map(([key, deletedAt]) => ({ key, deletedAt }));
+    lsSet(cfg.tomb, JSON.stringify(arr));
+    idbPut(cfg.tomb, arr);
+  }
+
+  function recordTombstone(item, l = 'en', deletedAt = Date.now()) {
+    const map = getTombstones(l);
+    if (item.id) map.set(`id:${item.id}`, deletedAt);
+    const sLang = (typeof l === 'string' && l.length === 2) ? l : (resolveConfig(l).srcLang || 'en');
+    const wk = item.wordKey || (global.VocabCore?.makeWordKey ? global.VocabCore.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
+    if (wk) map.set(`wk:${wk}`, deletedAt);
+    const normW = String(item.word || '').trim().toLowerCase();
+    if (normW) map.set(`word:${normW}`, deletedAt);
+    saveTombstones(l, map);
+  }
+
+  function isTombstoned(item, tombMap, l = 'en', clearedAt = getClearedAt(l)) {
+    // updatedAt が未設定または無効な場合は過去のデータ(0)とし、現在時刻(Date.now())にフォールバックして削除マーカーを突破させない
+    const upd = (Number.isFinite(item.updatedAt) && item.updatedAt > 1) ? item.updatedAt : 0;
+    if (clearedAt > 0 && (upd <= clearedAt || upd === 0)) return true;
+    const delById = item.id ? (tombMap.get(`id:${item.id}`) || 0) : 0;
+    const sLang = (typeof l === 'string' && l.length === 2) ? l : (resolveConfig(l).srcLang || 'en');
+    const wk = item.wordKey || (global.VocabCore?.makeWordKey ? global.VocabCore.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
+    const delByWk = wk ? (tombMap.get(`wk:${wk}`) || 0) : 0;
+    const normW = String(item.word || '').trim().toLowerCase();
+    const delByWord = normW ? (tombMap.get(`word:${normW}`) || 0) : 0;
+    const maxDel = Math.max(delById, delByWk, delByWord);
+    return maxDel > 0 && (upd === 0 || maxDel >= upd);
+  }
+
+  function parseIdbResult(raw, l) {
+    const sLang = typeof l === 'string' && l.length === 2 ? l : (resolveConfig(l).srcLang || 'en');
+    if (global.safeParseWords) return global.safeParseWords(raw, sLang)[sLang] || [];
+    if (global.VocabCore?.safeParseWords) return global.VocabCore.safeParseWords(raw, sLang)[sLang] || [];
+    try {
+      const p = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      if (Array.isArray(p)) return p;
+      if (p && typeof p === 'object') {
+        if (Array.isArray(p[sLang])) return p[sLang];
+        if (p.data && Array.isArray(p.data[sLang])) return p.data[sLang];
+      }
+    } catch {}
+    return [];
+  }
+
+  function idbCommitLangData(l, next, forceOverwrite = false) {
+    if (!Storage.dbInst) return Promise.resolve({ ok: false, data: next });
+    const cfg = resolveConfig(l);
+    return new Promise(res => {
+      try {
+        const tx = Storage.dbInst.transaction('vaults', 'readwrite'), st = tx.objectStore('vaults');
+        let finalData = next;
+        if (forceOverwrite) {
+          st.put(next, cfg.key);
+        } else {
+          const gMain = st.get(cfg.key);
+          gMain.onsuccess = () => {
+            const idbWords = parseIdbResult(gMain.result, l);
+            finalData = idbWords.length && global.VocabCore?.mergeWords ? global.VocabCore.mergeWords(idbWords, next, cfg.srcLang || l, false) : next;
+            st.put(finalData, cfg.key);
+          };
+          gMain.onerror = () => st.put(next, cfg.key);
+        }
+        tx.oncomplete = () => res({ ok: true, data: finalData });
+        tx.onerror = tx.onabort = () => res({ ok: false, data: next });
+      } catch { res({ ok: false, data: next }); }
+    });
+  }
+
+  function idbFetchLangBundle(l, includeSnaps = false) {
+    if (!Storage.dbInst) return Promise.resolve(null);
+    const cfg = resolveConfig(l);
+    return new Promise(res => {
+      try {
+        const tx = Storage.dbInst.transaction('vaults', 'readonly'), st = tx.objectStore('vaults');
+        const rClear = st.get(cfg.clearKey);
+        const rTomb = st.get(cfg.tomb);
+        const rMain = st.get(cfg.key);
+        const rSnaps = includeSnaps ? st.getAll(IDBKeyRange.bound(`${cfg.snap}:`, `${cfg.snap}:\uffff`)) : null;
+        tx.oncomplete = () => res({
+          clearAt: Number(rClear.result) || 0,
+          tombs: rTomb.result,
+          words: parseIdbResult(rMain.result, l),
+          snaps: rSnaps ? (rSnaps.result || []) : []
+        });
+        tx.onerror = tx.onabort = () => res(null);
+      } catch { res(null); }
+    });
+  }
+
+  global.VocabStorage = {
+    LANGS,
+    LANG_KEYS,
+    state: Storage,
+    initDatabase,
+    lsGet,
+    lsSet,
+    keyToLang,
+    keyToPair,
+    getPairConfig,
+    getPairKey,
+    resolveConfig,
+    getClearedAt,
+    saveClearedAt,
+    absorbTombArray,
+    getTombstones,
+    saveTombstones,
+    recordTombstone,
+    isTombstoned,
+    idbPut,
+    idbGet,
+    idbAddSnap,
+    idbCommitLangData,
+    idbFetchLangBundle
+  };
+
+  // 即時初期化開始
+  if (typeof window !== 'undefined') {
+    initDatabase();
+  }
+
+  global.lsGet = global.lsGet || lsGet;
+  global.lsSet = global.lsSet || lsSet;
+})(typeof window !== 'undefined' ? window : globalThis);
 
 ```
 
-### 【ファイル: supabase/schema.sql — PostgreSQL DDL・RLSポリシー・ストアドプロシージャ】
-```sql
--- ==============================================================================
--- Vocab Vault — Supabase Database Schema (supabase/schema.sql)
--- 本番運用仕様: RLS、厳格な権限管理、事前予約＆補償返還クォータ、
--- アトミックWebhook、カラムグループ別LWW分散同期、GDPR完全抹消
--- ==============================================================================
 
--- 1. profiles テーブル（プラン判定・月間クォータ・Stripe契約情報・法務証跡）
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
-  email TEXT,
-  plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'academic')),
-  monthly_quota INTEGER NOT NULL DEFAULT 30,
-  usage_count INTEGER NOT NULL DEFAULT 0,
-  pro_monthly_cap INTEGER NOT NULL DEFAULT 3000,
-  quota_reset_at TIMESTAMPTZ NOT NULL DEFAULT (date_trunc('month', NOW()) + INTERVAL '1 month'),
-  stripe_customer_id TEXT,
-  stripe_subscription_id TEXT,
-  subscription_status TEXT DEFAULT 'inactive',
-  cancel_at_period_end BOOLEAN DEFAULT FALSE,
-  current_period_end TIMESTAMPTZ,
-  grace_period_until TIMESTAMPTZ,
-  stripe_last_event_created BIGINT NOT NULL DEFAULT 0,
-  terms_accepted_at TIMESTAMPTZ,
-  terms_version TEXT DEFAULT '1.0.0',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+### 【ファイル: js/anki.js — SM-2アルゴリズム・スワイプ復習・オフラインキュー】
+```javascript
+/**
+ * Vocab Vault — SM-2 SRS Algorithm & Mobile Review Module (js/anki.js)
+ * ステップ5: スワイプUI、オフライン復習キュー管理
+ */
+(function (global) {
+  'use strict';
 
-CREATE INDEX IF NOT EXISTS idx_profiles_stripe_customer
-  ON public.profiles (stripe_customer_id)
-  WHERE stripe_customer_id IS NOT NULL;
+  const OFFLINE_QUEUE_KEY = 'vv_offline_review_queue';
 
-CREATE INDEX IF NOT EXISTS idx_profiles_stripe_subscription
-  ON public.profiles (stripe_subscription_id)
-  WHERE stripe_subscription_id IS NOT NULL;
+  function predDays(e, rating) {
+    const iv = Number(e.interval) || 0;
+    const ef = Number(e.efactor) || 2.5;
+    if (rating === 0) return 0; // もう一度: 1分後
+    if (rating === 1) return Math.max(1, iv * 1.2); // 難しい
+    if (rating === 2) return !e.repetition ? 1 : iv * 2.5; // 普通
+    return !e.repetition ? 4 : iv * ef; // 簡単
+  }
 
--- Stripe Webhook 冪等性（Idempotency）保証用テーブル
-CREATE TABLE IF NOT EXISTS public.stripe_events (
-  id TEXT PRIMARY KEY,
-  event_type TEXT NOT NULL,
-  processed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+  function calculateNextReview(e, rating) {
+    const now = Date.now();
+    let nextInterval = 0;
+    let nextRepetition = Number(e.repetition) || 0;
+    let nextEfactor = Number(e.efactor) || 2.5;
+    let nextReviewDate = now;
 
--- 新規ユーザー作成時に profile を自動生成するトリガー
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (
-    id, email, plan, monthly_quota, usage_count, pro_monthly_cap,
-    quota_reset_at, terms_accepted_at, terms_version
-  )
-  VALUES (
-    NEW.id,
-    NEW.email,
-    'free',
-    30,
-    0,
-    3000,
-    (date_trunc('month', NOW()) + INTERVAL '1 month'),
-    NOW(),
-    '1.0.0'
-  )
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+    if (rating === 0) {
+      nextRepetition = 0;
+      nextInterval = 1;
+      nextReviewDate = now + 60000; // 1分後
+    } else {
+      const baseDays = predDays(e, rating);
+      const fuzz = baseDays >= 2 ? (0.96 + Math.random() * 0.08) : 1; // 間隔の分散
+      nextInterval = Number((baseDays * fuzz).toFixed(2));
+      nextEfactor = Math.max(1.3, nextEfactor + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0));
+      if (rating >= 2) nextRepetition++;
+      nextReviewDate = now + Math.round(nextInterval * 86400000);
+    }
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+    return {
+      interval: nextInterval,
+      repetition: nextRepetition,
+      efactor: nextEfactor,
+      nextReview: nextReviewDate,
+      updatedAt: now,
+      reviewUpdatedAt: now
+    };
+  }
 
--- 2. user_vocab_entries テーブル（単語帳データ・差分同期・Tombstone論理削除・カラム別LWW）
-CREATE TABLE IF NOT EXISTS public.user_vocab_entries (
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  id TEXT NOT NULL,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
-  word_key TEXT NOT NULL,
-  num INTEGER NOT NULL DEFAULT 1,
-  word TEXT NOT NULL,
-  homograph_index INTEGER NOT NULL DEFAULT 1,
-  folder TEXT,
-  category TEXT DEFAULT 'その他',
-  interval NUMERIC NOT NULL DEFAULT 0,
-  repetition INTEGER NOT NULL DEFAULT 0,
-  efactor NUMERIC NOT NULL DEFAULT 2.5,
-  next_review BIGINT NOT NULL,
-  card_data JSONB NOT NULL,
-  updated_at BIGINT NOT NULL,
-  review_updated_at BIGINT NOT NULL DEFAULT 0,
-  is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-  server_updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM NOW()) * 1000)::BIGINT,
-  PRIMARY KEY (user_id, id)
-);
+  // --- オフライン復習キュー管理 ---
+  function getOfflineQueue() {
+    try {
+      return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+    } catch {
+      return [];
+    }
+  }
 
-CREATE INDEX IF NOT EXISTS idx_uve_user_server_sync
-  ON public.user_vocab_entries (user_id, lang, server_updated_at);
-CREATE INDEX IF NOT EXISTS idx_uve_user_wordkey
-  ON public.user_vocab_entries (user_id, word_key);
+  function saveOfflineQueue(q) {
+    try {
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
+      updateOfflineBadgeUI();
+    } catch {}
+  }
 
--- 3. user_tombstones テーブル（旧互換用削除ログ）
-CREATE TABLE IF NOT EXISTS public.user_tombstones (
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
-  tomb_key TEXT NOT NULL,
-  deleted_at BIGINT NOT NULL,
-  PRIMARY KEY (user_id, lang, tomb_key)
-);
+  function queueOfflineReview(record) {
+    const q = getOfflineQueue();
+    q.push({
+      ...record,
+      queuedAt: Date.now()
+    });
+    saveOfflineQueue(q);
+  }
 
-CREATE INDEX IF NOT EXISTS idx_ut_user_lang_del ON public.user_tombstones (user_id, lang, deleted_at);
+  function updateOfflineBadgeUI() {
+    const badge = document.getElementById('offlineSyncBadge');
+    if (!badge) return;
+    const q = getOfflineQueue();
+    if (q.length > 0) {
+      const textEl = document.getElementById('offlineSyncText');
+      if (textEl) {
+        textEl.textContent = `未同期の復習: ${q.length}件`;
+      } else {
+        badge.textContent = `未同期の復習: ${q.length}件`;
+      }
+      badge.classList.add('active');
+    } else {
+      badge.classList.remove('active');
+    }
+  }
 
--- 4. user_lang_watermarks テーブル（言語全削除ウォーターマーク）
-CREATE TABLE IF NOT EXISTS public.user_lang_watermarks (
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
-  cleared_at BIGINT NOT NULL DEFAULT 0,
-  PRIMARY KEY (user_id, lang)
-);
+  async function flushOfflineReviews() {
+    const q = getOfflineQueue();
+    if (!q.length || !navigator.onLine || !global.VocabSync?.isCloudReady?.()) return;
 
--- 5. global_dictionary_cache テーブル（共有辞書キャッシュ: コスト0円化＆高速化）
-CREATE TABLE IF NOT EXISTS public.global_dictionary_cache (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
-  word TEXT NOT NULL,
-  homograph_index INTEGER NOT NULL DEFAULT 1,
-  word_key TEXT NOT NULL,
-  card_data JSONB NOT NULL,
-  hit_count INTEGER NOT NULL DEFAULT 0,
-  verified BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CONSTRAINT uq_gdc_lang_wordkey UNIQUE (lang, word_key)
-);
+    try {
+      if (global.syncCloudNow) {
+        await global.syncCloudNow(false);
+        saveOfflineQueue([]);
+      }
+    } catch {}
+  }
 
-CREATE INDEX IF NOT EXISTS idx_gdc_lookup ON public.global_dictionary_cache (lang, word, homograph_index);
-CREATE INDEX IF NOT EXISTS idx_gdc_lang_wordkey ON public.global_dictionary_cache (lang, word_key);
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    window.addEventListener('online', flushOfflineReviews);
+  }
 
--- 6. wiktionary_references テーブル（Wiktionary事前取り込み用）
-CREATE TABLE IF NOT EXISTS public.wiktionary_references (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
-  word TEXT NOT NULL,
-  clean_ipa TEXT,
-  section_extract TEXT,
-  source_url TEXT,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (lang, word)
-);
+  // --- 触覚フィードバック (Web Vibration API) ---
+  function triggerHaptic(type = 'light') {
+    if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+    try {
+      if (type === 'light') navigator.vibrate(15);
+      else if (type === 'again') navigator.vibrate([40, 50, 40]);
+      else if (type === 'good') navigator.vibrate([20, 40, 20]);
+      else if (type === 'easy') navigator.vibrate(30);
+      else navigator.vibrate(20);
+    } catch {}
+  }
 
-CREATE INDEX IF NOT EXISTS idx_wikt_lookup ON public.wiktionary_references (lang, word);
+  // --- モバイル用スワイプUIコントローラー ---
+  function attachSwipeGesture(cardEl, onSwipeCallback) {
+    if (!cardEl || cardEl._swipeAttached) return;
+    cardEl._swipeAttached = true;
 
--- 7. user_feedbacks テーブル（需要検証・ヒアリング回答）
-CREATE TABLE IF NOT EXISTS public.user_feedbacks (
-  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
-  category TEXT NOT NULL,
-  rating INTEGER DEFAULT 5,
-  content TEXT,
-  email TEXT,
-  willingness_to_pay TEXT,
-  app_version TEXT,
-  active_lang TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+    let startX = 0, startY = 0;
+    let currentX = 0, currentY = 0;
+    let isSwiping = false;
+    let isHorizontal = false;
+    let isMouseDown = false;
+    let hapticFiredOnThreshold = false;
+    const threshold = 75; // スワイプ確定の閾値(px)
 
--- ==============================================================================
--- RLS (Row Level Security) 設定
--- ==============================================================================
+    const againBadge = cardEl.querySelector('.swipe-badge.again');
+    const goodBadge = cardEl.querySelector('.swipe-badge.good');
 
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.stripe_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_vocab_entries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_tombstones ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_lang_watermarks ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.global_dictionary_cache ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.wiktionary_references ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.user_feedbacks ENABLE ROW LEVEL SECURITY;
+    const resetCardState = () => {
+      cardEl.classList.remove('swiping');
+      cardEl.style.transform = '';
+      if (againBadge) againBadge.style.opacity = '0';
+      if (goodBadge) goodBadge.style.opacity = '0';
+      isSwiping = false;
+      isHorizontal = false;
+      isMouseDown = false;
+      hapticFiredOnThreshold = false;
+    };
 
--- profiles: 本人のみ参照（直接の更新・挿入は権限剥奪）
-DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
-DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
-CREATE POLICY "Users can read own profile" ON public.profiles
-  FOR SELECT USING (auth.uid() = id);
+    const isAnswerShown = () => {
+      const btnAns = document.getElementById('btnAns');
+      return !btnAns || btnAns.style.display === 'none';
+    };
 
--- user_vocab_entries: 本人のみ全操作
-DROP POLICY IF EXISTS "Users can manage own vocab entries" ON public.user_vocab_entries;
-CREATE POLICY "Users can manage own vocab entries" ON public.user_vocab_entries
-  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    const onStart = (clientX, clientY) => {
+      startX = clientX;
+      startY = clientY;
+      currentX = clientX;
+      currentY = clientY;
+      isSwiping = true;
+      isHorizontal = false;
+      hapticFiredOnThreshold = false;
+      cardEl.classList.add('swiping');
+    };
 
--- user_tombstones: 本人のみ全操作
-DROP POLICY IF EXISTS "Users can manage own tombstones" ON public.user_tombstones;
-CREATE POLICY "Users can manage own tombstones" ON public.user_tombstones
-  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    const onMove = (clientX, clientY, e) => {
+      if (!isSwiping) return;
+      currentX = clientX;
+      currentY = clientY;
+      const dx = currentX - startX;
+      const dy = currentY - startY;
 
--- user_lang_watermarks: 本人のみ全操作
-DROP POLICY IF EXISTS "Users can manage own watermarks" ON public.user_lang_watermarks;
-CREATE POLICY "Users can manage own watermarks" ON public.user_lang_watermarks
-  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+      if (!isHorizontal) {
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+          isHorizontal = true;
+        } else if (Math.abs(dy) > 10) {
+          isSwiping = false; // 縦スクロールを優先
+          resetCardState();
+          return;
+        }
+      }
 
--- global_dictionary_cache: 全員参照可（未ログイン・ゲスト含む）、書込はService Roleのみ
-DROP POLICY IF EXISTS "Authenticated users can read dictionary cache" ON public.global_dictionary_cache;
-DROP POLICY IF EXISTS "Anyone can read dictionary cache" ON public.global_dictionary_cache;
-CREATE POLICY "Anyone can read dictionary cache" ON public.global_dictionary_cache
-  FOR SELECT TO authenticated, anon USING (true);
+      if (isHorizontal) {
+        if (e && e.cancelable) e.preventDefault();
+        const rot = dx * 0.08;
+        cardEl.style.transform = `translateX(${dx}px) rotate(${rot}deg)`;
 
--- wiktionary_references: 全認証ユーザー参照可
-DROP POLICY IF EXISTS "Authenticated users can read wiktionary refs" ON public.wiktionary_references;
-CREATE POLICY "Authenticated users can read wiktionary refs" ON public.wiktionary_references
-  FOR SELECT TO authenticated USING (true);
+        const absDx = Math.abs(dx);
+        if (absDx >= threshold && !hapticFiredOnThreshold) {
+          triggerHaptic('light');
+          hapticFiredOnThreshold = true;
+        } else if (absDx < threshold && hapticFiredOnThreshold) {
+          hapticFiredOnThreshold = false;
+        }
 
--- user_feedbacks: インサートは誰でも可、閲覧は本人のみ
-DROP POLICY IF EXISTS "Anyone can insert feedback" ON public.user_feedbacks;
-DROP POLICY IF EXISTS "Users can view own feedbacks" ON public.user_feedbacks;
-CREATE POLICY "Anyone can insert feedback" ON public.user_feedbacks
-  FOR INSERT WITH CHECK (true);
-CREATE POLICY "Users can view own feedbacks" ON public.user_feedbacks
-  FOR SELECT USING (auth.uid() = user_id);
+        const opacity = Math.min(1, Math.max(0, absDx / (threshold * 0.85)));
+        if (dx < 0) {
+          if (againBadge) againBadge.style.opacity = String(opacity);
+          if (goodBadge) goodBadge.style.opacity = '0';
+        } else {
+          if (goodBadge) goodBadge.style.opacity = String(opacity);
+          if (againBadge) againBadge.style.opacity = '0';
+        }
+      }
+    };
 
+    const onEnd = () => {
+      if (!isSwiping || !isHorizontal) {
+        resetCardState();
+        return;
+      }
 
--- ==============================================================================
--- [P0-1 & P0-2 解決] 事前予約(Reserve) & 補償返還(Refund) クォータ管理関数
--- ==============================================================================
-CREATE OR REPLACE FUNCTION public.reserve_or_refund_quota(
-  p_user_id UUID,
-  p_item_count INTEGER,
-  p_is_refund BOOLEAN DEFAULT FALSE
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_profile public.profiles%ROWTYPE;
-  v_now TIMESTAMPTZ := NOW();
-  v_effective_limit INTEGER;
-BEGIN
-  -- 境界値・異常値ガード（1リクエスト1〜15語に厳格制限）
-  IF p_user_id IS NULL THEN
-    RAISE EXCEPTION 'INVALID_USER_ID: p_user_id cannot be null';
-  END IF;
+      const dx = currentX - startX;
+      cardEl.classList.remove('swiping');
 
-  IF p_item_count IS NULL OR p_item_count <= 0 OR p_item_count > 15 THEN
-    RAISE EXCEPTION 'INVALID_ITEM_COUNT: p_item_count must be between 1 and 15 (got %)', p_item_count;
-  END IF;
+      // 解答がまだ表示されていない状態でスワイプされた場合：
+      // 誤送信を防ぐため、解答を表示してカードを一旦中央に戻す
+      if (!isAnswerShown()) {
+        resetCardState();
+        if (Math.abs(dx) > threshold) {
+          triggerHaptic('light');
+          if (typeof global.showAns === 'function') {
+            global.showAns();
+          } else if (typeof global.VocabCore?.showAns === 'function') {
+            global.VocabCore.showAns();
+          }
+        }
+        return;
+      }
 
-  -- 行ロック取得（並列リクエストを直列化しTOCTOUを完全遮断）
-  SELECT * INTO v_profile
-  FROM public.profiles
-  WHERE id = p_user_id
-  FOR UPDATE;
+      if (dx < -threshold) {
+        // 左スワイプ: もう一度 (Rating 0)
+        triggerHaptic('again');
+        cardEl.classList.add('swipe-out-left');
+        setTimeout(() => {
+          resetCardState();
+          cardEl.classList.remove('swipe-out-left');
+          if (typeof onSwipeCallback === 'function') onSwipeCallback(0);
+        }, 220);
+      } else if (dx > threshold) {
+        // 右スワイプ: 普通・覚えた (Rating 2)
+        triggerHaptic('good');
+        cardEl.classList.add('swipe-out-right');
+        setTimeout(() => {
+          resetCardState();
+          cardEl.classList.remove('swipe-out-right');
+          if (typeof onSwipeCallback === 'function') onSwipeCallback(2);
+        }, 220);
+      } else {
+        // スナップバック
+        resetCardState();
+      }
+    };
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'PROFILE_NOT_FOUND: user % does not exist', p_user_id;
-  END IF;
+    // タッチイベント
+    cardEl.addEventListener('touchstart', e => {
+      if (e.target.closest('button, a, input, select, .spk-btn, .b-rat')) return;
+      if (e.touches.length === 1) onStart(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
 
-  -- 月初クォータリセット判定
-  IF v_now >= v_profile.quota_reset_at THEN
-    v_profile.usage_count := 0;
-    v_profile.quota_reset_at := (date_trunc('month', v_now) + INTERVAL '1 month');
-  END IF;
+    cardEl.addEventListener('touchmove', e => {
+      if (e.touches.length === 1) onMove(e.touches[0].clientX, e.touches[0].clientY, e);
+    }, { passive: false });
 
-  -- [P0-3 解決] サブスクリプション期限切れ＆猶予期間（Grace Period）満了の厳格判定
-  IF v_profile.plan = 'pro' AND v_profile.current_period_end IS NOT NULL THEN
-    IF v_now > v_profile.current_period_end AND (v_profile.grace_period_until IS NULL OR v_now > v_profile.grace_period_until) THEN
-      v_profile.plan := 'free';
-      v_profile.monthly_quota := 30;
-      v_profile.subscription_status := 'canceled';
-      v_profile.cancel_at_period_end := FALSE;
-    END IF;
-  END IF;
+    cardEl.addEventListener('touchend', onEnd, { passive: true });
+    cardEl.addEventListener('touchcancel', resetCardState, { passive: true });
 
-  -- プラン別の上限決定（Proプランにもフェアユース上限 pro_monthly_cap を適用し赤字爆弾を防止）
-  IF v_profile.plan IN ('pro', 'academic') THEN
-    v_effective_limit := v_profile.pro_monthly_cap;
-  ELSE
-    v_effective_limit := v_profile.monthly_quota;
-  END IF;
+    // マウスドラッグ対応 (動的リスナー登録でリーク防止)
+    const onDocMouseMove = e => {
+      if (isMouseDown) onMove(e.clientX, e.clientY, e);
+    };
 
-  -- A. 補償返還（AI呼び出し失敗時の払い戻し）モード
-  IF p_is_refund THEN
-    v_profile.usage_count := GREATEST(0, v_profile.usage_count - p_item_count);
-    UPDATE public.profiles
-    SET usage_count = v_profile.usage_count,
-        plan = v_profile.plan,
-        monthly_quota = v_profile.monthly_quota,
-        subscription_status = v_profile.subscription_status,
-        cancel_at_period_end = v_profile.cancel_at_period_end,
-        quota_reset_at = v_profile.quota_reset_at,
-        updated_at = v_now
-    WHERE id = p_user_id;
+    const onDocMouseUp = () => {
+      if (isMouseDown) {
+        isMouseDown = false;
+        document.removeEventListener('mousemove', onDocMouseMove);
+        document.removeEventListener('mouseup', onDocMouseUp);
+        onEnd();
+      }
+    };
 
-    RETURN jsonb_build_object(
-      'allowed', true,
-      'action', 'refunded',
-      'plan', v_profile.plan,
-      'usage_count', v_profile.usage_count,
-      'effective_limit', v_effective_limit,
-      'remaining', GREATEST(0, v_effective_limit - v_profile.usage_count)
-    );
-  END IF;
+    cardEl.addEventListener('mousedown', e => {
+      if (e.button === 0 && !e.target.closest('button, a, input, select, .spk-btn, .b-rat')) {
+        isMouseDown = true;
+        onStart(e.clientX, e.clientY);
+        document.addEventListener('mousemove', onDocMouseMove);
+        document.addEventListener('mouseup', onDocMouseUp);
+      }
+    });
+  }
 
-  -- B. 事前予約（Reserve）モード：上限超過チェック
-  IF (v_profile.usage_count + p_item_count) > v_effective_limit THEN
-    UPDATE public.profiles
-    SET usage_count = v_profile.usage_count,
-        plan = v_profile.plan,
-        monthly_quota = v_profile.monthly_quota,
-        subscription_status = v_profile.subscription_status,
-        cancel_at_period_end = v_profile.cancel_at_period_end,
-        quota_reset_at = v_profile.quota_reset_at,
-        updated_at = v_now
-    WHERE id = p_user_id;
-
-    RETURN jsonb_build_object(
-      'allowed', false,
-      'action', 'rejected_quota_exceeded',
-      'plan', v_profile.plan,
-      'usage_count', v_profile.usage_count,
-      'effective_limit', v_effective_limit,
-      'remaining', GREATEST(0, v_effective_limit - v_profile.usage_count)
-    );
-  END IF;
-
-  -- 枠を即座に仮引き落とし（Reserve）して確定
-  v_profile.usage_count := v_profile.usage_count + p_item_count;
-
-  UPDATE public.profiles
-  SET usage_count = v_profile.usage_count,
-      plan = v_profile.plan,
-      monthly_quota = v_profile.monthly_quota,
-      subscription_status = v_profile.subscription_status,
-      cancel_at_period_end = v_profile.cancel_at_period_end,
-      quota_reset_at = v_profile.quota_reset_at,
-      updated_at = v_now
-  WHERE id = p_user_id;
-
-  RETURN jsonb_build_object(
-    'allowed', true,
-    'action', 'reserved',
-    'plan', v_profile.plan,
-    'usage_count', v_profile.usage_count,
-    'effective_limit', v_effective_limit,
-    'remaining', GREATEST(0, v_effective_limit - v_profile.usage_count)
-  );
-END;
-$$;
-
--- [P0-1 解決] 一般ユーザーからの直接RPC呼び出しを完全遮断し、service_role のみに限定
-REVOKE ALL ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN) TO service_role;
-
--- 旧関数の安全な廃止
-DROP FUNCTION IF EXISTS public.check_and_consume_quota(UUID, INTEGER, BOOLEAN);
-
-
--- ============================================================================
--- [P0-3 解決] アトミック＆順序逆転耐性付き Stripe Webhook 処理関数
--- ============================================================================
-CREATE OR REPLACE FUNCTION public.process_stripe_webhook_atomic(
-  p_event_id TEXT,
-  p_event_type TEXT,
-  p_event_created BIGINT,
-  p_user_id UUID,
-  p_stripe_customer_id TEXT,
-  p_stripe_subscription_id TEXT,
-  p_plan TEXT,
-  p_subscription_status TEXT,
-  p_cancel_at_period_end BOOLEAN,
-  p_current_period_end TIMESTAMPTZ,
-  p_grace_period_until TIMESTAMPTZ DEFAULT NULL
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_target_user_id UUID;
-  v_last_created BIGINT;
-BEGIN
-  IF p_event_id IS NULL OR length(trim(p_event_id)) = 0 THEN
-    RAISE EXCEPTION 'INVALID_EVENT_ID';
-  END IF;
-
-  -- 1. 冪等性チェック（単一トランザクション内でINSERT、重複なら何もせず正常終了）
-  INSERT INTO public.stripe_events (id, event_type, processed_at)
-  VALUES (p_event_id, p_event_type, NOW())
-  ON CONFLICT (id) DO NOTHING;
-
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('status', 'duplicate_ignored', 'event_id', p_event_id);
-  END IF;
-
-  -- 2. 対象ユーザーの特定（user_id または stripe_customer_id から逆引き）
-  IF p_user_id IS NOT NULL THEN
-    SELECT id, stripe_last_event_created INTO v_target_user_id, v_last_created
-    FROM public.profiles WHERE id = p_user_id FOR UPDATE;
-  ELSE
-    SELECT id, stripe_last_event_created INTO v_target_user_id, v_last_created
-    FROM public.profiles WHERE stripe_customer_id = p_stripe_customer_id FOR UPDATE;
-  END IF;
-
-  IF v_target_user_id IS NULL THEN
-    RETURN jsonb_build_object('status', 'target_profile_not_found', 'event_id', p_event_id);
-  END IF;
-
-  -- 3. イベント順序逆転（Out-of-Order Delivery）ガード
-  -- 既に処理済みのより新しいイベントが存在する場合は、プロフィールの状態巻き戻しをスキップ
-  IF p_event_created < v_last_created THEN
-    RETURN jsonb_build_object(
-      'status', 'out_of_order_skipped',
-      'event_id', p_event_id,
-      'event_created', p_event_created,
-      'last_event_created', v_last_created
-    );
-  END IF;
-
-  -- 4. プロフィール状態の更新
-  UPDATE public.profiles
-  SET stripe_customer_id = COALESCE(p_stripe_customer_id, stripe_customer_id),
-      stripe_subscription_id = COALESCE(p_stripe_subscription_id, stripe_subscription_id),
-      plan = p_plan,
-      monthly_quota = CASE WHEN p_plan = 'free' THEN 30 ELSE monthly_quota END,
-      subscription_status = p_subscription_status,
-      cancel_at_period_end = COALESCE(p_cancel_at_period_end, cancel_at_period_end),
-      current_period_end = COALESCE(p_current_period_end, current_period_end),
-      grace_period_until = p_grace_period_until,
-      stripe_last_event_created = p_event_created,
-      updated_at = NOW()
-  WHERE id = v_target_user_id;
-
-  RETURN jsonb_build_object(
-    'status', 'processed',
-    'user_id', v_target_user_id,
-    'plan', p_plan,
-    'subscription_status', p_subscription_status
-  );
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.process_stripe_webhook_atomic(TEXT, TEXT, BIGINT, UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.process_stripe_webhook_atomic(TEXT, TEXT, BIGINT, UUID, TEXT, TEXT, TEXT, TEXT, BOOLEAN, TIMESTAMPTZ, TIMESTAMPTZ) TO service_role;
-
-
--- ============================================================================
--- [P1-1 解決] 端末時計ズレ防止 & カラムグループ別マージ対応 差分同期RPC
--- ============================================================================
-CREATE OR REPLACE FUNCTION public.sync_vocab_entries_batch(
-  p_entries JSONB
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = public
-AS $$
-DECLARE
-  v_uid UUID := auth.uid();
-  v_server_now BIGINT := (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::BIGINT;
-  v_upserted_count INTEGER := 0;
-BEGIN
-  IF v_uid IS NULL THEN
-    RAISE EXCEPTION 'UNAUTHORIZED: auth.uid() is null';
-  END IF;
-
-  IF p_entries IS NULL OR jsonb_typeof(p_entries) != 'array' THEN
-    RAISE EXCEPTION 'INVALID_PAYLOAD: p_entries must be a JSON array';
-  END IF;
-
-  IF jsonb_array_length(p_entries) > 500 THEN
-    RAISE EXCEPTION 'PAYLOAD_TOO_LARGE: maximum 500 entries per sync batch';
-  END IF;
-
-  WITH input_rows AS (
-    SELECT
-      v_uid AS user_id,
-      (elem->>'id')::TEXT AS id,
-      (elem->>'lang')::TEXT AS lang,
-      (elem->>'word_key')::TEXT AS word_key,
-      COALESCE((elem->>'num')::INTEGER, 1) AS num,
-      (elem->>'word')::TEXT AS word,
-      COALESCE((elem->>'homograph_index')::INTEGER, 1) AS homograph_index,
-      (elem->>'folder')::TEXT AS folder,
-      COALESCE((elem->>'category')::TEXT, 'その他') AS category,
-      COALESCE((elem->>'interval')::NUMERIC, 0) AS interval,
-      COALESCE((elem->>'repetition')::INTEGER, 0) AS repetition,
-      COALESCE((elem->>'efactor')::NUMERIC, 2.5) AS efactor,
-      COALESCE((elem->>'next_review')::BIGINT, v_server_now) AS next_review,
-      COALESCE(elem->'card_data', '{}'::JSONB) AS card_data,
-      -- クライアント時計が未来にズレていても server_now + 60秒 でクランプ（Clock Skew対策）
-      LEAST(COALESCE((elem->>'updated_at')::BIGINT, v_server_now), v_server_now + 60000) AS updated_at,
-      LEAST(COALESCE((elem->>'review_updated_at')::BIGINT, v_server_now), v_server_now + 60000) AS review_updated_at,
-      COALESCE((elem->>'is_deleted')::BOOLEAN, FALSE) AS is_deleted
-    FROM jsonb_array_elements(p_entries) AS elem
-    WHERE elem->>'id' IS NOT NULL AND elem->>'lang' IN ('en', 'fr', 'de')
-  ),
-  upserted AS (
-    INSERT INTO public.user_vocab_entries (
-      user_id, id, lang, word_key, num, word, homograph_index,
-      folder, category, interval, repetition, efactor, next_review,
-      card_data, updated_at, review_updated_at, is_deleted, server_updated_at
-    )
-    SELECT
-      user_id, id, lang, word_key, num, word, homograph_index,
-      folder, category, interval, repetition, efactor, next_review,
-      card_data, updated_at, review_updated_at, is_deleted, v_server_now
-    FROM input_rows
-    ON CONFLICT (user_id, id) DO UPDATE
-    SET
-      -- カード内容・フォルダ・削除状態は updated_at が新しい方を採用
-      word_key = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word_key ELSE user_vocab_entries.word_key END,
-      word = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word ELSE user_vocab_entries.word END,
-      folder = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.folder ELSE user_vocab_entries.folder END,
-      category = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.category ELSE user_vocab_entries.category END,
-      card_data = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.card_data ELSE user_vocab_entries.card_data END,
-      is_deleted = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.is_deleted ELSE user_vocab_entries.is_deleted END,
-      updated_at = GREATEST(user_vocab_entries.updated_at, EXCLUDED.updated_at),
-      -- SM-2復習進捗は review_updated_at が新しい方を独立して採用（Macでのフォルダ移動でスマホの学習履歴が消えるのを防ぐ）
-      interval = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,
-      repetition = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.repetition ELSE user_vocab_entries.repetition END,
-      efactor = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.efactor ELSE user_vocab_entries.efactor END,
-      next_review = CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.next_review ELSE user_vocab_entries.next_review END,
-      review_updated_at = GREATEST(user_vocab_entries.review_updated_at, EXCLUDED.review_updated_at),
-      -- サーバー同期タイムスタンプは常に現在のサーバー時刻で更新
-      server_updated_at = v_server_now
-    WHERE EXCLUDED.updated_at >= user_vocab_entries.updated_at
-       OR EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at
-    RETURNING 1
-  )
-  SELECT count(*) INTO v_upserted_count FROM upserted;
-
-  RETURN jsonb_build_object(
-    'upserted_count', v_upserted_count,
-    'server_timestamp', v_server_now
-  );
-END;
-$$;
-
-
--- ==============================================================================
--- ユーザー自己退会・全データ抹消用ストアドプロシージャ（GDPR / 法令対応）
--- ==============================================================================
-CREATE OR REPLACE FUNCTION public.delete_user_account()
-RETURNS BOOLEAN AS $$
-DECLARE
-  v_uid UUID := auth.uid();
-BEGIN
-  IF v_uid IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
-
-  -- 関連データの抹消
-  DELETE FROM public.user_vocab_entries WHERE user_id = v_uid;
-  DELETE FROM public.user_tombstones WHERE user_id = v_uid;
-  DELETE FROM public.user_lang_watermarks WHERE user_id = v_uid;
-  DELETE FROM public.user_feedbacks WHERE user_id = v_uid;
-  DELETE FROM public.profiles WHERE id = v_uid;
-
-  -- auth.users からの削除
-  DELETE FROM auth.users WHERE id = v_uid;
-
-  RETURN TRUE;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+  global.VocabSRS = {
+    predDays,
+    calculateNextReview,
+    queueOfflineReview,
+    flushOfflineReviews,
+    updateOfflineBadgeUI,
+    attachSwipeGesture,
+    triggerHaptic
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
 
 ```

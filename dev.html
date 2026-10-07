@@ -431,7 +431,7 @@
         </div>
         <div id="sbTermsAgreeRow" style="margin-top:4px;font-size:11px;color:var(--s);display:flex;align-items:center;gap:6px">
           <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="chkTermsAgree" checked>
+            <input type="checkbox" id="chkTermsAgree">
             <span><button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">利用規約</button> および <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">プライバシーポリシー</button> に同意する</span>
           </label>
         </div>
@@ -478,6 +478,12 @@
               </ul>
             </div>
             <div style="display:flex;flex-direction:column;gap:6px">
+              <div style="font-size:10px;line-height:1.4;color:var(--m);background:var(--bg);padding:6px 8px;border-radius:4px;border:1px solid var(--bd)">
+                <strong>【定期課金・解約に関する法定明示】</strong><br>
+                ・月額480円（税込）/ 1ヶ月ごとの自動更新<br>
+                ・次回更新日の前日までに設定画面（またはStripeポータル）よりいつでも解約可能<br>
+                ・解約後も次回更新日まではPro機能を利用可能（日割り精算なし）
+              </div>
               <button type="button" id="btnUpgradePro" onclick="startStripeCheckout('price_pro_monthly')" style="width:100%">Proにアップグレード (¥480/月)</button>
               <button type="button" id="btnManageSub" class="btn-o btn-xs" onclick="openStripePortal()" style="display:none;width:100%">契約管理・領収書 (Stripe)</button>
             </div>

@@ -163,6 +163,14 @@ CREATE TABLE IF NOT EXISTS public.user_feedbacks (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 8. guest_rate_limits テーブル（未ログインゲストのレート制限・アトミック保護）
+CREATE TABLE IF NOT EXISTS public.guest_rate_limits (
+  ip TEXT PRIMARY KEY,
+  usage_count INTEGER NOT NULL DEFAULT 0,
+  reset_at TIMESTAMPTZ NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ==============================================================================
 -- RLS (Row Level Security) 設定
 -- ==============================================================================
@@ -175,6 +183,7 @@ ALTER TABLE public.user_lang_watermarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.global_dictionary_cache ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.wiktionary_references ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_feedbacks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.guest_rate_limits ENABLE ROW LEVEL SECURITY;
 
 -- profiles: 本人のみ参照（直接の更新・挿入は権限剥奪）
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
@@ -354,6 +363,75 @@ GRANT EXECUTE ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN)
 DROP FUNCTION IF EXISTS public.check_and_consume_quota(UUID, INTEGER, BOOLEAN);
 
 
+-- ==============================================================================
+-- [P0-6 解決] 未ログイン・ゲストユーザー用のアトミックな日次クォータ消費関数
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.consume_guest_quota(
+  p_ip TEXT,
+  p_count INTEGER,
+  p_daily_limit INTEGER DEFAULT 30
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_now TIMESTAMPTZ := NOW();
+  v_tomorrow TIMESTAMPTZ := (date_trunc('day', v_now) + INTERVAL '1 day');
+  v_rec public.guest_rate_limits%ROWTYPE;
+  v_current_usage INTEGER := 0;
+BEGIN
+  IF p_ip IS NULL OR length(trim(p_ip)) = 0 THEN
+    p_ip := 'unknown_guest';
+  END IF;
+
+  IF p_count IS NULL OR p_count <= 0 THEN
+    p_count := 1;
+  END IF;
+
+  -- 行ロック付きで取得
+  SELECT * INTO v_rec FROM public.guest_rate_limits WHERE ip = p_ip FOR UPDATE;
+
+  IF NOT FOUND THEN
+    IF p_count > p_daily_limit THEN
+      RETURN jsonb_build_object('allowed', false, 'usage_count', 0, 'remaining', 0);
+    END IF;
+
+    INSERT INTO public.guest_rate_limits (ip, usage_count, reset_at, updated_at)
+    VALUES (p_ip, p_count, v_tomorrow, v_now);
+
+    RETURN jsonb_build_object('allowed', true, 'usage_count', p_count, 'remaining', GREATEST(0, p_daily_limit - p_count));
+  END IF;
+
+  -- 日付リセット判定
+  IF v_now >= v_rec.reset_at THEN
+    v_rec.usage_count := 0;
+    v_rec.reset_at := v_tomorrow;
+  END IF;
+
+  v_current_usage := v_rec.usage_count;
+
+  IF (v_current_usage + p_count) > p_daily_limit THEN
+    RETURN jsonb_build_object('allowed', false, 'usage_count', v_current_usage, 'remaining', GREATEST(0, p_daily_limit - v_current_usage));
+  END IF;
+
+  v_current_usage := v_current_usage + p_count;
+
+  UPDATE public.guest_rate_limits
+  SET usage_count = v_current_usage,
+      reset_at = v_rec.reset_at,
+      updated_at = v_now
+  WHERE ip = p_ip;
+
+  RETURN jsonb_build_object('allowed', true, 'usage_count', v_current_usage, 'remaining', GREATEST(0, p_daily_limit - v_current_usage));
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_guest_quota(TEXT, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consume_guest_quota(TEXT, INTEGER, INTEGER) TO service_role;
+
+
 -- ============================================================================
 -- [P0-3 解決] アトミック＆順序逆転耐性付き Stripe Webhook 処理関数
 -- ============================================================================
@@ -402,7 +480,12 @@ BEGIN
   END IF;
 
   IF v_target_user_id IS NULL THEN
-    RETURN jsonb_build_object('status', 'target_profile_not_found', 'event_id', p_event_id);
+    -- user_id も stripe_customer_id も指定されていないイベントは無視
+    IF p_user_id IS NULL AND (p_stripe_customer_id IS NULL OR length(trim(p_stripe_customer_id)) = 0) THEN
+      RETURN jsonb_build_object('status', 'unassociated_event_skipped', 'event_id', p_event_id);
+    END IF;
+    -- プロファイル生成のレースコンディション時は、例外を投げてStripeに再送させる
+    RAISE EXCEPTION 'TARGET_PROFILE_NOT_FOUND: customer % / user % not ready, retry later', p_stripe_customer_id, p_user_id;
   END IF;
 
   -- 3. イベント順序逆転（Out-of-Order Delivery）ガード
@@ -492,7 +575,7 @@ BEGIN
       LEAST(COALESCE((elem->>'review_updated_at')::BIGINT, v_server_now), v_server_now + 60000) AS review_updated_at,
       COALESCE((elem->>'is_deleted')::BOOLEAN, FALSE) AS is_deleted
     FROM jsonb_array_elements(p_entries) AS elem
-    WHERE elem->>'id' IS NOT NULL AND elem->>'lang' IN ('en', 'fr', 'de')
+    WHERE elem->>'id' IS NOT NULL AND elem->>'lang' IN ('en', 'ja', 'fr', 'de')
   ),
   upserted AS (
     INSERT INTO public.user_vocab_entries (
@@ -544,9 +627,16 @@ CREATE OR REPLACE FUNCTION public.delete_user_account()
 RETURNS BOOLEAN AS $$
 DECLARE
   v_uid UUID := auth.uid();
+  v_status TEXT;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'Not authenticated';
+  END IF;
+
+  -- [P0-4 解決] Stripeアクティブ定期課金の残留チェック（幽霊課金防止）
+  SELECT subscription_status INTO v_status FROM public.profiles WHERE id = v_uid;
+  IF v_status IN ('active', 'trialing') THEN
+    RAISE EXCEPTION 'ACTIVE_SUBSCRIPTION: Stripe定期課金が有効な状態です。Stripeカスタマーポータルまたはdelete-account APIから解約の上、退会してください。';
   END IF;
 
   -- 関連データの抹消

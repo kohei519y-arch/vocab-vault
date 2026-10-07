@@ -53,14 +53,32 @@ serve(async (req) => {
       .single();
 
     // 3. [P0-4 解決] Stripe サブスクリプションの即時解約（幽霊課金防止）
-    if (stripeSecretKey && profile?.stripe_subscription_id) {
+    // stripe_customer_id または stripe_subscription_id から紐づく全契約を確実にキャンセル
+    if (stripeSecretKey && (profile?.stripe_customer_id || profile?.stripe_subscription_id)) {
       try {
         const stripe = new Stripe(stripeSecretKey, {
           apiVersion: "2023-10-16",
           httpClient: Stripe.createFetchHttpClient(),
         });
-        console.log(`[Account Deletion] Canceling Stripe subscription: ${profile.stripe_subscription_id}`);
-        await stripe.subscriptions.cancel(profile.stripe_subscription_id);
+
+        // 顧客IDが存在する場合は、アクティブ・トライアル中の全サブスクリプションを走査して解約
+        if (profile?.stripe_customer_id) {
+          const subs = await stripe.subscriptions.list({
+            customer: profile.stripe_customer_id,
+            status: "all",
+            limit: 10,
+          });
+          for (const sub of subs.data) {
+            if (["active", "trialing", "past_due", "unpaid"].includes(sub.status)) {
+              console.log(`[Account Deletion] Canceling active Stripe sub: ${sub.id} (status: ${sub.status})`);
+              await stripe.subscriptions.cancel(sub.id);
+            }
+          }
+        } else if (profile?.stripe_subscription_id) {
+          // customer_id が未取得の場合は subscription_id を直接解約
+          console.log(`[Account Deletion] Canceling Stripe subscription directly: ${profile.stripe_subscription_id}`);
+          await stripe.subscriptions.cancel(profile.stripe_subscription_id);
+        }
       } catch (stripeErr: any) {
         console.warn(`[Account Deletion Warning] Failed to cancel Stripe sub: ${stripeErr.message}`);
         // サブスクが既に解約済み（resource_missing）等のエラーは処理を続行

@@ -27,6 +27,26 @@ function cleanJsonString(str: string): string {
 
 const guestRateMemory = new Map<string, number>();
 
+// [P0-6 解決] 信頼性の高いIP取得（Cloudflare / リバースプロキシスプーフィング対策）
+function getClientIp(req: Request): string {
+  return (
+    req.headers.get("cf-connecting-ip") ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",").map(s => s.trim()).filter(Boolean).pop() ||
+    "unknown_guest"
+  );
+}
+
+const DUMMY_OCR_SENSES = new Set([
+  "文脈上の重要語",
+  "重要語",
+  "文脈語",
+  "重要単語",
+  "語彙",
+  "抽出語",
+  "OCR抽出",
+]);
+
 function sanitizeCard(card: any, origItem?: RequestItem) {
   const norm = (s: any) => String(s || "").normalize("NFC").trim();
   const word = norm(card?.word || origItem?.reqWord);
@@ -44,19 +64,11 @@ function sanitizeCard(card: any, origItem?: RequestItem) {
     .filter((m: any) => m.text.length > 0);
   if (meanings.length === 0) meanings.push({ pos: "N", text: word });
 
+  // [P1-2 解決] 外国語例文はプレーンテキストとして保持（<b>タグの強制埋め込みを撤廃）
   const exForeign = norm(card?.example?.foreign);
   const exJa = norm(card?.example?.ja);
   const exTrans = norm(card?.example?.trans || exJa);
   const usedForm = norm(card?.example?.used_form || word);
-
-  let fixedForeign = exForeign;
-  if (!fixedForeign.includes("<b>") && word) {
-    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const wRegex = new RegExp(`\\b(${escaped})\\b`, "gi");
-    if (wRegex.test(fixedForeign)) {
-      fixedForeign = fixedForeign.replace(wRegex, "<b>$1</b>");
-    }
-  }
 
   const derivatives = (Array.isArray(card?.derivatives) ? card.derivatives : [])
     .map((d: any) => ({
@@ -97,7 +109,7 @@ function sanitizeCard(card: any, origItem?: RequestItem) {
     core,
     meanings,
     example: {
-      foreign: fixedForeign,
+      foreign: exForeign,
       ja: exJa,
       trans: exTrans,
       used_form: usedForm,
@@ -176,6 +188,9 @@ serve(async (req) => {
     const sLang = validLangs.includes(rawSrc || "") ? (rawSrc as string) : (validLangs.includes(lang) ? lang : "en");
     const tLang = validLangs.includes(rawTgt || rawTgt2 || "") ? ((rawTgt || rawTgt2) as string) : "ja";
 
+    // [P1-3 解決] プロンプトインジェクション防壁: fName のサニタイズ（制御文字・改行排除、英数日本語記号のみ、最大40文字）
+    const safeFName = fName ? String(fName).replace(/[\r\n\x00-\x1f`]/g, " ").trim().slice(0, 40) : "";
+
     // 各単語のサニタイズ（100文字上限、空文字除外）
     const sanitizedItems = items
       .map(it => ({
@@ -213,30 +228,30 @@ Explain each English word STRICTLY IN ENGLISH with deep Indo-European roots, Gre
 Requirements:
 1. Etymology: reconstruct PIE roots (*root), Proto-Germanic/Latin pathways, and semantic shifts in English.
 2. Meanings: provide rigorous academic English definitions and core imagery.
-3. Example: provide an authentic English sentence (example.foreign) and an explanatory English paraphrase (example.ja & example.trans), enclosing the headword with <b>bold tags</b>.
+3. Example: provide an authentic English sentence (example.foreign) and an explanatory English paraphrase (example.ja & example.trans). Keep example.foreign as plain text without HTML tags.
 4. Part of speech: strictly follow ${sInfo.pos}.
-${fName ? `Subject field: ${fName}` : ""}`;
+${safeFName ? `Subject field: ${safeFName}` : ""}`;
       } else if (sLang === "fr") {
         serverSystemPrompt = `Vous êtes un dictionnaire étymologique académique et un lexique d'histoire des concepts de langue française (style Littré / Le Robert).
 Expliquez chaque mot français STRICTEMENT EN FRANÇAIS avec ses racines indo-européennes, origines gréco-latines et son évolution philosophique.
 1. Étymologie et image centrale (core) rédigées en français.
 2. Définitions rigoureuses (meanings.text) en français.
 3. Exemple en français (example.foreign) et explication/reformulation en français (example.ja & example.trans).
-${fName ? `Domaine: ${fName}` : ""}`;
+${safeFName ? `Domaine: ${safeFName}` : ""}`;
       } else if (sLang === "de") {
         serverSystemPrompt = `Sie sind ein maßgebliches deutsches Begriffsgeschichte- und etymologisches Wörterbuch (Stil Duden / Grimm).
 Erklären Sie deutsche Stichwörter AUSSCHLIESSLICH AUF DEUTSCH mit indogermanischen Wurzeln und geistesgeschichtlichen Zusammenhängen.
 1. Etymologie und semantischer Kern auf Deutsch.
 2. Präzise Definitionen (meanings.text) auf Deutsch.
 3. Deutsches Beispiel (example.foreign) und deutsche Paraphrase (example.ja & example.trans).
-${fName ? `Fachbereich: ${fName}` : ""}`;
+${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       } else {
         serverSystemPrompt = `あなたは学術的な日本語の語源・概念史・国語大辞典エンジンです。
 各日本語の見出し語について、漢字・漢語の成り立ち、仏教・東洋思想・近代西欧語翻訳史（明治期の翻訳語形成）の変遷を深く日本語で解説してください。
 1. 語源（etymology）およびコアイメージ（core）の解説。
 2. 現代および歴史的な語義の解説。
 3. 自然な用例・例文（example.foreign）とその現代語解説（example.ja & example.trans）。
-${fName ? `分野: ${fName}` : ""}`;
+${safeFName ? `分野: ${safeFName}` : ""}`;
       }
     } else {
       // 異言語ペア（英和、仏和、独和、和英、仏独、仏英、独英、和仏、和独など）
@@ -254,32 +269,32 @@ ${fName ? `分野: ${fName}` : ""}`;
 3. 【歴史的・文脈的用法の反映】:
    - 見出し語に特定の時代・歴史的出来事（例: wet＝米国禁酒法下の反禁酒派、dry＝禁酒派、dove＝冷戦期の反戦ハト派、quarantine＝ベネチアの40日検疫等）に根ざす顕著な歴史的・政治的・制度的用法がある場合、現代標準語義に加えて必ずmeaningsに歴史的語義（【歴史】や【禁酒法】等のラベル付き）を含め、history_noteに時代背景や制度的文脈を具体的に記述すること（最大70字）。特筆すべき歴史的用法がない一般的な語彙はhistory_noteを空文字""とすること。架空の歴史的事実を捏造しないこと。
 4. 自然な例文(example.foreign)と日本語訳(example.ja & example.trans):
-   - 例文には必ず見出し語を含め、日本語訳内の該当語を必ず<b>見出し語の訳</b>で囲むこと。歴史的用法を持つ語はその文脈を反映した用例を優先。
+   - 例文には必ず見出し語を含めること。外国語例文(example.foreign)はHTMLタグを付与せずプレーンテキストとすること。
 5. Unicode文字化け防止:
    - 発音記号(IPA)、ウムラウト、アクサン記号、長音記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること。
 6. 品詞(pos)は ${sInfo.pos} 等に準拠すること。
-${fName ? `分野の指定: ${fName}` : ""}`;
+${safeFName ? `分野の指定: ${safeFName}` : ""}`;
       } else if (tLang === "en") {
         serverSystemPrompt = `You are a high-level academic dictionary from ${sInfo.en} to English specializing in etymology, cognate networks, and conceptual history.
 For each ${sInfo.en} word, provide definitions, PIE root connections, and historical context STRICTLY IN ENGLISH.
 1. Etymology and core semantic concept explained in English.
 2. English translation and definition (meanings.text).
-3. Example in ${sInfo.en} (example.foreign) with accurate English translation (example.ja & example.trans), bolding the matching term.
-${fName ? `Field: ${fName}` : ""}`;
+3. Example in ${sInfo.en} (example.foreign) with accurate English translation (example.ja & example.trans). Keep example.foreign as plain text.
+${safeFName ? `Field: ${safeFName}` : ""}`;
       } else if (tLang === "fr") {
         serverSystemPrompt = `Vous êtes un dictionnaire académique de ${sInfo.fr} vers le français, spécialisé en étymologie et histoire conceptuelle.
 Expliquez les mots ${sInfo.fr} EN FRANÇAIS avec leurs racines indo-européennes et leurs équivalents français.
 1. Étymologie et concept central expliqués en français.
 2. Définition et traduction en français (meanings.text).
 3. Exemple en ${sInfo.fr} (example.foreign) avec traduction française (example.ja & example.trans).
-${fName ? `Domaine: ${fName}` : ""}`;
+${safeFName ? `Domaine: ${safeFName}` : ""}`;
       } else {
         serverSystemPrompt = `Sie sind ein akademisches Wörterbuch von ${sInfo.de} ins Deutsche, spezialisiert auf Etymologie und Begriffsgeschichte.
 Erklären Sie ${sInfo.de} Wörter AUF DEUTSCH mit indogermanischen Wurzeln und semantischen Vergleichen.
 1. Etymologie und Kernkonzept auf Deutsch erklärt.
 2. Deutsche Übersetzung und Definition (meanings.text).
 3. Beispiel auf ${sInfo.de} (example.foreign) mit deutscher Übersetzung (example.ja & example.trans).
-${fName ? `Fachbereich: ${fName}` : ""}`;
+${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       }
     }
 
@@ -372,7 +387,10 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
       const wk = makeWordKey(item.reqWord, pairCode, hIdx);
       const cached = cachedMap.get(wk);
 
-      if (cached && cached.card_data && !item.targetSenseOrMeaning) {
+      // [P0-2 解決] OCR抽出時のダミー訳語（文脈上の重要語など）はキャッシュバイパスせず共有キャッシュをヒットさせる
+      const hasRealCustomSense = item.targetSenseOrMeaning && !DUMMY_OCR_SENSES.has(item.targetSenseOrMeaning.trim());
+
+      if (cached && cached.card_data && !hasRealCustomSense) {
         cachedResults.push(sanitizeCard(cached.card_data, item));
         // hit_countをインクリメント（バックグラウンド非同期）
         supabaseAdmin
@@ -419,12 +437,38 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
 
         quotaRemaining = quotaReserve.remaining;
       } else {
-        // ゲスト（未ログイン）のデイリー生成上限チェック（1日30語まで・悪用およびDoS防止）
-        const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown_guest";
+        // [P0-6 解決] 未ログインゲストの日次クォータ判定（DBアトミックRPC優先 ＆ インメモリ保護）
+        const clientIp = getClientIp(req);
+        let guestAllowed = true;
+        let currentUsage = 0;
+
+        try {
+          const { data: gqData, error: gqErr } = await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: itemsToGenerate.length,
+            p_daily_limit: 30,
+          });
+
+          if (!gqErr && gqData) {
+            guestAllowed = Boolean(gqData.allowed);
+            currentUsage = Number(gqData.usage_count) || 0;
+            if (!guestAllowed) {
+              return new Response(
+                JSON.stringify({
+                  error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${currentUsage}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
+                  quotaRemaining: 0,
+                }),
+                { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+          }
+        } catch {
+          // RPCエラー時はインメモリフォールバック
+        }
+
         const todayStr = new Date().toISOString().slice(0, 10);
         const rateKey = `${clientIp}_${todayStr}`;
         const currentMemoryCount = guestRateMemory.get(rateKey) || 0;
-
         if (currentMemoryCount + itemsToGenerate.length > 30) {
           return new Response(
             JSON.stringify({
@@ -434,39 +478,13 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-
-        try {
-          const { data: ipRow } = await supabaseAdmin
-            .from("guest_rate_limits")
-            .select("usage_count, reset_at")
-            .eq("ip", clientIp)
-            .maybeSingle();
-
-          const nowIso = new Date().toISOString();
-          let currentDbCount = 0;
-          if (ipRow && ipRow.reset_at > nowIso) {
-            currentDbCount = Number(ipRow.usage_count) || 0;
-            guestRateMemory.set(rateKey, Math.max(currentMemoryCount, currentDbCount));
-          }
-
-          if (Math.max(currentMemoryCount, currentDbCount) + itemsToGenerate.length > 30) {
-            return new Response(
-              JSON.stringify({
-                error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${Math.max(currentMemoryCount, currentDbCount)}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
-                quotaRemaining: 0,
-              }),
-              { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-            );
-          }
-        } catch {
-          // DBテーブル未作成時はインメモリ判定を継続
-        }
+        guestRateMemory.set(rateKey, currentMemoryCount + itemsToGenerate.length);
       }
 
       // Gemini呼び出し (Google推奨の最新フラッグシップモデル gemini-3.8-flash)
       const targetModel = "gemini-3.8-flash";
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`;
-      const userContent = `対象語(${itemsToGenerate.length}件):${JSON.stringify(itemsToGenerate)}${fName ? `\n分野:${fName}` : ""}`;
+      const userContent = `<user_request>\n対象語(${itemsToGenerate.length}件):\n${JSON.stringify(itemsToGenerate)}\n${safeFName ? `分野:${safeFName}\n` : ""}</user_request>`;
 
       let aiResponse: Response;
       try {
@@ -486,11 +504,12 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
         });
       } catch (fetchErr: any) {
         if (user) {
+          // [P0-7 解決] 返金処理の堅牢化（.catch チェーンを排除し直接 await）
           await supabaseAdmin.rpc("reserve_or_refund_quota", {
             p_user_id: user.id,
             p_item_count: itemsToGenerate.length,
             p_is_refund: true,
-          }).catch(() => {});
+          });
         }
         return new Response(JSON.stringify({ error: `Gemini API fetch failed: ${fetchErr?.message || fetchErr}` }), {
           status: 502,
@@ -504,7 +523,7 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
             p_user_id: user.id,
             p_item_count: itemsToGenerate.length,
             p_is_refund: true,
-          }).catch(() => {});
+          });
         }
         const errBody = await aiResponse.text();
         return new Response(JSON.stringify({ error: `Gemini API error (${aiResponse.status}): ${errBody}` }), {
@@ -524,7 +543,7 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
             p_user_id: user.id,
             p_item_count: itemsToGenerate.length,
             p_is_refund: true,
-          }).catch(() => {});
+          });
         }
         return new Response(
           JSON.stringify({ error: "AI応答の解析に失敗しました。クォータは全額返還されました。" }),
@@ -533,7 +552,20 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
       }
 
       const rawArr = Array.isArray(parsedAi) ? parsedAi : [parsedAi];
-      generatedResults = rawArr.map((c: any, idx: number) => sanitizeCard(c, itemsToGenerate[idx]));
+
+      // [P1-1 解決] モデル出力の配列インデックスずれ防止（reqIndex および見出し語での厳密突合）
+      generatedResults = itemsToGenerate.map((origItem) => {
+        let match = rawArr.find((c: any) => c?.reqIndex === origItem.reqIndex);
+        if (!match) {
+          const origNorm = origItem.reqWord.toLowerCase().trim();
+          match = rawArr.find((c: any) => String(c?.word || "").toLowerCase().trim() === origNorm);
+        }
+        if (!match) {
+          // 残りの配列から使用されていない要素を順次割り当て
+          match = rawArr.find((c: any) => !itemsToGenerate.some(it => it !== origItem && (it.reqIndex === c?.reqIndex || it.reqWord.toLowerCase().trim() === String(c?.word || "").toLowerCase().trim())));
+        }
+        return sanitizeCard(match || {}, origItem);
+      });
       usedModel = targetModel;
 
       // 部分失敗差分の自動返還 (例: 10語中8語のみ成功した場合、未生成2語分を返還)
@@ -543,24 +575,30 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
           p_user_id: user.id,
           p_item_count: failedCount,
           p_is_refund: true,
-        }).catch(() => {});
+        });
         if (refundData?.remaining !== undefined) quotaRemaining = refundData.remaining;
       }
 
-      // 生成結果を共有キャッシュに保存（非同期）
-      const cacheRows = generatedResults.map((card) => {
-        const hIdx = card.homographIndex || 1;
-        const wk = makeWordKey(card.word, pairCode, hIdx);
-        return {
-          lang: sLang,
-          word: card.word,
-          homograph_index: hIdx,
-          word_key: wk,
-          card_data: card,
-          hit_count: 1,
-          verified: false,
-        };
-      });
+      // [P0-4 解決] 共有辞書キャッシュへの保存（汚染防止: 特殊な文脈・カスタム意味指定のない標準語彙のみを保存）
+      const cacheRows = generatedResults
+        .filter((card) => {
+          const orig = itemsToGenerate.find(it => it.reqIndex === card.reqIndex);
+          const hasCustom = orig?.targetSenseOrMeaning && !DUMMY_OCR_SENSES.has(orig.targetSenseOrMeaning.trim());
+          return !hasCustom && !orig?.contextSentence && card.word && card.meanings?.length > 0;
+        })
+        .map((card) => {
+          const hIdx = card.homographIndex || 1;
+          const wk = makeWordKey(card.word, pairCode, hIdx);
+          return {
+            lang: sLang,
+            word: card.word,
+            homograph_index: hIdx,
+            word_key: wk,
+            card_data: card,
+            hit_count: 1,
+            verified: false,
+          };
+        });
 
       if (cacheRows.length > 0) {
         supabaseAdmin
@@ -570,27 +608,17 @@ ${fName ? `Fachbereich: ${fName}` : ""}`;
           .catch(() => {});
       }
 
-      // ゲスト（未ログイン）のデイリー生成利用カウントを加算（インメモリ & DB）
-      if (!user && generatedResults.length > 0) {
-        const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown_guest";
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const rateKey = `${clientIp}_${todayStr}`;
-        const newUsage = (guestRateMemory.get(rateKey) || 0) + generatedResults.length;
-        guestRateMemory.set(rateKey, newUsage);
-
-        const tomorrow = new Date();
-        tomorrow.setHours(24, 0, 0, 0);
-
-        supabaseAdmin
-          .from("guest_rate_limits")
-          .upsert({
-            ip: clientIp,
-            usage_count: newUsage,
-            reset_at: tomorrow.toISOString(),
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "ip" })
-          .then()
-          .catch(() => {});
+      // ゲスト（未ログイン）の部分失敗時のクォータ返還調整（もし失敗があれば）
+      if (!user && failedCount > 0) {
+        const clientIp = getClientIp(req);
+        try {
+          // 失敗分をアトミックに差し戻し
+          await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: -failedCount,
+            p_daily_limit: 30,
+          });
+        } catch {}
       }
     }
 

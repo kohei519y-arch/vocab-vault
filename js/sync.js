@@ -193,18 +193,35 @@
       'Content-Type': 'application/json'
     };
 
-    const [entRes, tombRes, wmRes] = await Promise.all([
-      fetch(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&updated_at=gt.${lastSyncAt}&select=card_data,updated_at`, { headers }),
-      fetch(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`, { headers }),
+    // [P0-5 解決] PostgREST 1000件リミット回避: キーセット/ページネーションによる完全Pullループ
+    async function fetchAllPaginated(baseUrl) {
+      const PAGE_SIZE = 1000;
+      let allRows = [];
+      let offset = 0;
+      while (true) {
+        const sep = baseUrl.includes('?') ? '&' : '?';
+        const pageUrl = `${baseUrl}${sep}limit=${PAGE_SIZE}&offset=${offset}`;
+        const r = await fetch(pageUrl, { headers });
+        if (!r.ok) throw new Error(`同期Pull失敗 (HTTP ${r.status})`);
+        const rows = await r.json();
+        if (!Array.isArray(rows) || rows.length === 0) break;
+        allRows.push(...rows);
+        if (rows.length < PAGE_SIZE) break;
+        offset += PAGE_SIZE;
+      }
+      return allRows;
+    }
+
+    const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&updated_at=gt.${lastSyncAt}&select=card_data,updated_at`),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`),
       fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&select=cleared_at`, { headers })
     ]);
 
-    if (!entRes.ok || !tombRes.ok || !wmRes.ok) {
-      throw new Error(`同期Pull失敗 (HTTP ${entRes.status}/${tombRes.status}/${wmRes.status})`);
+    if (!wmRes.ok) {
+      throw new Error(`ウォーターマークPull失敗 (HTTP ${wmRes.status})`);
     }
 
-    const remoteEntryRows = await entRes.json();
-    const remoteTombRows = await tombRes.json();
     const remoteWmRows = await wmRes.json();
 
     const remoteEntries = (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).map(r => ({
@@ -236,12 +253,14 @@
 
     const pushHeaders = { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' };
 
+    // [P0-6 解決] Push処理の厳格検証（失敗時はlastSyncAtを進めず例外スロー）
     if (delta.watermarkNeedsPush) {
-      await fetch(`${cfg.url}/rest/v1/user_lang_watermarks?on_conflict=user_id,lang`, {
+      const wmPushRes = await fetch(`${cfg.url}/rest/v1/user_lang_watermarks?on_conflict=user_id,lang`, {
         method: 'POST',
         headers: pushHeaders,
         body: JSON.stringify([{ user_id: uid, lang, cleared_at: delta.mergedClearedAt }])
       });
+      if (!wmPushRes.ok) throw new Error(`ウォーターマークPush失敗 (HTTP ${wmPushRes.status})`);
     }
 
     if (delta.tombstonesToPush.length > 0) {
@@ -251,15 +270,16 @@
         tomb_key: t.key,
         deleted_at: t.deletedAt
       }));
-      await fetch(`${cfg.url}/rest/v1/user_tombstones?on_conflict=user_id,lang,tomb_key`, {
+      const tombPushRes = await fetch(`${cfg.url}/rest/v1/user_tombstones?on_conflict=user_id,lang,tomb_key`, {
         method: 'POST',
         headers: pushHeaders,
         body: JSON.stringify(tombPayload)
       });
+      if (!tombPushRes.ok) throw new Error(`削除ログPush失敗 (HTTP ${tombPushRes.status})`);
     }
 
     if (delta.entriesToPush.length > 0) {
-      // [P1-1 解決] HTTP 413防止: 50件ごとのバッチに分割して同期
+      // HTTP 413防止: 50件ごとのバッチに分割して同期
       const CHUNK_SIZE = 50;
       for (let i = 0; i < delta.entriesToPush.length; i += CHUNK_SIZE) {
         const chunk = delta.entriesToPush.slice(i, i + CHUNK_SIZE);
@@ -283,25 +303,18 @@
           is_deleted: Boolean(it.isDeleted)
         }));
 
-        try {
-          const rpcRes = await fetch(`${cfg.url}/rest/v1/rpc/sync_vocab_entries_batch`, {
-            method: 'POST',
-            headers: { ...headers, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_entries: entryPayload })
-          });
-          if (!rpcRes.ok) {
-            await fetch(`${cfg.url}/rest/v1/user_vocab_entries?on_conflict=user_id,id`, {
-              method: 'POST',
-              headers: pushHeaders,
-              body: JSON.stringify(entryPayload)
-            });
-          }
-        } catch {
-          await fetch(`${cfg.url}/rest/v1/user_vocab_entries?on_conflict=user_id,id`, {
+        const rpcRes = await fetch(`${cfg.url}/rest/v1/rpc/sync_vocab_entries_batch`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_entries: entryPayload })
+        });
+        if (!rpcRes.ok) {
+          const fallbackRes = await fetch(`${cfg.url}/rest/v1/user_vocab_entries?on_conflict=user_id,id`, {
             method: 'POST',
             headers: pushHeaders,
             body: JSON.stringify(entryPayload)
           });
+          if (!fallbackRes.ok) throw new Error(`単語データPush失敗 (HTTP ${fallbackRes.status})`);
         }
       }
     }
@@ -464,19 +477,24 @@
     });
 
     if (!r.ok) {
-      // Edge Function が未デプロイ時のフェイルセーフ: RPCフォールバック
-      const rRpc = await fetch(`${cfg.url}/rest/v1/rpc/delete_user_account`, {
-        method: 'POST',
-        headers: {
-          apikey: cfg.anonKey,
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({})
-      });
-      if (!rRpc.ok) {
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err.error || err.message || `アカウント削除に失敗しました (HTTP ${r.status})`);
+      const errData = await r.json().catch(() => ({}));
+      // 404 (Edge Function未デプロイ時) の場合のみDB直接RPCを試行（DB側でもアクティブ課金をブロック）
+      if (r.status === 404) {
+        const rRpc = await fetch(`${cfg.url}/rest/v1/rpc/delete_user_account`, {
+          method: 'POST',
+          headers: {
+            apikey: cfg.anonKey,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({})
+        });
+        if (!rRpc.ok) {
+          const rpcErr = await rRpc.json().catch(() => ({}));
+          throw new Error(rpcErr.message || rpcErr.error || `アカウント削除エラー (HTTP ${rRpc.status})`);
+        }
+      } else {
+        throw new Error(errData.error || errData.message || `アカウント削除・課金解約に失敗しました (HTTP ${r.status})。Stripeポータルより定期課金を解約の上、再度お試しください。`);
       }
     }
 
@@ -487,7 +505,7 @@
   // [GDPR対応] ユーザーの全登録単語・学習進捗の完全JSONエクスポート
   async function exportAllUserDataJson() {
     const bundle = {};
-    for (const l of ['en', 'fr', 'de']) {
+    for (const l of ['en', 'ja', 'fr', 'de']) {
       const b = await global.VocabStorage?.idbFetchLangBundle?.(l, true);
       bundle[l] = b || { words: [] };
     }

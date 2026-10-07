@@ -725,8 +725,16 @@
         wkToId.set(wk, it.id);
       } else {
         const ex = byId.get(existingId);
+        // [P0-3 解決] カード情報・メタデータは updatedAt が新しい方を採用
         const itWins = (it.updatedAt || 0) >= (ex.updatedAt || 0);
         const win = itWins ? it : ex, lose = itWins ? ex : it;
+
+        // [P0-3 解決] SM-2復習進捗（暗記データ）は reviewUpdatedAt が新しい方を独立して採用（Macでのフォルダ整理でスマホの復習が消えるのを防止）
+        const itRevTime = Number(it.reviewUpdatedAt || it.updatedAt) || 0;
+        const exRevTime = Number(ex.reviewUpdatedAt || ex.updatedAt) || 0;
+        const revWins = itRevTime >= exRevTime;
+        const revWin = revWins ? it : ex, revLose = revWins ? ex : it;
+
         const merged = {
           ...lose, ...win,
           id: ex.id || it.id,
@@ -734,7 +742,14 @@
           wiktGrounded: win.wiktGrounded || lose.wiktGrounded,
           wiktUrl: win.wiktUrl || lose.wiktUrl,
           etymologyTags: win.etymologyTags?.length ? win.etymologyTags : lose.etymologyTags,
-          updatedAt: Math.max(win.updatedAt || 1, lose.updatedAt || 1)
+          updatedAt: Math.max(win.updatedAt || 1, lose.updatedAt || 1),
+          // SRS フィールドの独立マージ
+          interval: revWin.interval !== undefined ? revWin.interval : revLose.interval,
+          repetition: revWin.repetition !== undefined ? revWin.repetition : revLose.repetition,
+          efactor: revWin.efactor !== undefined ? revWin.efactor : revLose.efactor,
+          nextReview: revWin.nextReview !== undefined ? revWin.nextReview : revLose.nextReview,
+          reviewUpdatedAt: Math.max(itRevTime, exRevTime),
+          isDeleted: Boolean(win.isDeleted !== undefined ? win.isDeleted : lose.isDeleted)
         };
         if (ex.wordKey && ex.wordKey !== merged.wordKey) wkToId.delete(ex.wordKey);
         byId.set(merged.id, merged);
@@ -1638,8 +1653,9 @@
       if (histData?.etymologyTags?.length) {
         rootKey = histData.etymologyTags[0];
       } else {
+        // [P1-3 解決] 語根ハルシネーション完全排除: startsWith/endsWith こじつけを撤廃し完全一致のみ
         for (const [rKey, rInfo] of Object.entries(BUILTIN_ETYMOLOGY_KNOWLEDGE.roots)) {
-          if (rInfo.words.includes(normW) || rInfo.words.some(w => normW.startsWith(w) || normW.endsWith(w))) {
+          if (rInfo.words && rInfo.words.includes(normW)) {
             rootKey = rKey;
             break;
           }
@@ -1665,12 +1681,12 @@
         } else if (wRef?.extract) {
           etymology = `語源資料（Wiktionary等）の記録に基づく学術語彙。古期英語・ラテン語等の語形成を経る。`;
         } else {
-          etymology = `ゲルマン祖語・印欧祖語に起源を持つ古典的語彙。`;
+          etymology = `個別語源（借用語・新造語等）。確固たるPIE語根は未確定。`;
         }
       }
 
       const etymologyTags = rootKey ? [rootKey] : (histData?.etymologyTags || []);
-      const etymologyConfidence = rootKey ? 'certain' : (histData ? 'certain' : 'probable');
+      const etymologyConfidence = rootKey ? 'certain' : (histData ? 'certain' : 'unknown');
       const core = histData?.core || (rootInfo ? `「${rootInfo.meaning}」をコアイメージとして語義が展開。` : `「${rawW}」の持つ本質的・直感的なイメージ。`);
       const history_note = (useHist && histData?.history_note) ? histData.history_note : '';
 
@@ -2255,21 +2271,64 @@
     throw lastErr || new Error('API通信エラー');
   }
 
-  function compressImage(file) {
+  async function compressImage(file) {
+    const max = 1600;
+
+    // [P2-1 解決] createImageBitmap による低メモリ高速処理
+    if (typeof createImageBitmap === 'function') {
+      try {
+        let bitmap = await createImageBitmap(file);
+        let { width: w, height: h } = bitmap;
+        if (w > max || h > max) {
+          if (w > h) { h = Math.round(h * max / w); w = max; }
+          else { w = Math.round(w * max / h); h = max; }
+          try {
+            const resizedBitmap = await createImageBitmap(file, { resizeWidth: w, resizeHeight: h, resizeQuality: 'medium' });
+            bitmap.close();
+            bitmap = resizedBitmap;
+          } catch {}
+        }
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = h;
+        const ctx = cv.getContext('2d');
+        // 透過PNGの黒化防止: 白背景を敷く
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        bitmap.close();
+        const b64 = cv.toDataURL('image/jpeg', 0.85).split(',')[1];
+        cv.width = cv.height = 0;
+        return b64;
+      } catch (bmpErr) {
+        // フォールバックへ
+      }
+    }
+
+    // フォールバック (HTMLImageElement)
     return new Promise((res, rej) => {
       const url = URL.createObjectURL(file), img = new Image();
       img.onload = () => {
         URL.revokeObjectURL(url);
-        let { width:w, height:h } = img, max = 1600;
-        if (w > max || h > max) { if (w > h) { h = Math.round(h * max / w); w = max; } else { w = Math.round(w * max / h); h = max; } }
+        let { width: w, height: h } = img;
+        if (w > max || h > max) {
+          if (w > h) { h = Math.round(h * max / w); w = max; }
+          else { w = Math.round(w * max / h); h = max; }
+        }
         const cv = document.createElement('canvas');
         cv.width = w; cv.height = h;
-        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        const ctx = cv.getContext('2d');
+        // 透過PNGの黒化防止: 白背景を敷く
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
         const b64 = cv.toDataURL('image/jpeg', 0.85).split(',')[1];
         cv.width = cv.height = 0;
         res(b64);
       };
-      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('画像の読み込みに失敗しました。')); };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        rej(new Error('画像の読み込みに失敗しました。'));
+      };
       img.src = url;
     });
   }
@@ -2759,7 +2818,7 @@
 
     if (global.VocabSRS) {
       const nextSRS = global.VocabSRS.calculateNextReview(e, r);
-      Object.assign(e, nextSRS);
+      Object.assign(e, nextSRS, { reviewUpdatedAt: Date.now() });
       if (r === 0) App.aList.push(e);
 
       // オフライン復習キューに登録（未接続時）
@@ -2782,7 +2841,7 @@
     const list = last.lang === App.lang ? App.entries : getJson(LANGS[last.lang].key);
     const e = list.find(x => x.id === last.id);
     if (!e) return;
-    Object.assign(e, last.prevProps, { updatedAt: Date.now() });
+    Object.assign(e, last.prevProps, { updatedAt: Date.now(), reviewUpdatedAt: Date.now() });
     if (last.requeued) {
       const pIdx = App.aList.findIndex(x => x.id === e.id);
       if (pIdx !== -1) App.aList.splice(pIdx, 1);
@@ -3564,7 +3623,10 @@
     const k = LANGS[tL].key, cur = getJson(k);
     const target = cur.find(i => (typeof idOrNum === 'string' && i.id === idOrNum) || (Number.isInteger(idOrNum) && i.num === idOrNum));
     if (!target) return;
-    if (global.VocabStorage) global.VocabStorage.recordTombstone(target, tL, Date.now());
+    const now = Date.now();
+    target.isDeleted = true;
+    target.updatedAt = now;
+    if (global.VocabStorage) global.VocabStorage.recordTombstone(target, tL, now);
     setJson(k, cur.filter(i => i !== target).map((it, idx) => ({ ...it, num: idx + 1 })), true, true);
     load(App.page);
   }
