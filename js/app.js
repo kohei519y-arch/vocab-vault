@@ -2644,6 +2644,8 @@
             const k = it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex);
             tombMap.delete(`id:${it.id}`);
             tombMap.delete(`wk:${k}`);
+            const normW = String(it.word || '').trim().toLowerCase();
+            if (normW) tombMap.delete(`word:${normW}`);
             const ex = curMap.get(k);
             if (!ex) added++; else if ((it.updatedAt || 0) > (ex.updatedAt || 0)) updated++; else skipped++;
           });
@@ -4020,6 +4022,8 @@ etymology:${eInst}`;
 
         tombMap.delete(`id:${a.id}`);
         tombMap.delete(`wk:${a.wordKey}`);
+        const normW = String(a.word || '').trim().toLowerCase();
+        if (normW) tombMap.delete(`word:${normW}`);
 
         const exIdx = cur.findIndex(e => (e.wordKey && e.wordKey === a.wordKey) || makeLookupKey(e.word, sLang, e.homographIndex) === makeLookupKey(a.word, sLang, homoIdx));
         if (exIdx !== -1) {

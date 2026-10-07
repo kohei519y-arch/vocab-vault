@@ -1,11 +1,12 @@
 /**
  * Vocab Vault — Service Worker (PWA Offline & Cache)
  */
-const CACHE_NAME = 'vocab-vault-v3-20261007-pwa-fix';
+const CACHE_NAME = 'vocab-vault-v4-20261007-srs-sync';
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
+  './dev.html',
   './css/app.css',
   './js/storage.js',
   './js/anki.js',
@@ -87,6 +88,10 @@ self.addEventListener('fetch', event => {
 
       // オフラインかつHTMLリクエストならトップページへフォールバック
       if (event.request.headers.get('accept')?.includes('text/html') || url.pathname.endsWith('.html') || url.pathname === '/') {
+        if (url.pathname.includes('dev.html')) {
+          const devFallback = await cache.match('./dev.html');
+          if (devFallback) return devFallback;
+        }
         const fallback = (await cache.match('./')) || (await cache.match('./index.html'));
         if (fallback) return fallback;
       }
