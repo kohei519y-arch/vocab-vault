@@ -38,7 +38,7 @@
    - 共有キャッシュテーブル (`global_dictionary_cache`) のヒット率を高める正規化キー構造に死角はないか？
 3. **データ整合性 & オフライン同期 (LWW vs Tombstone)**
    - 複数端末（Macアプリとスマホ）で同時に編集・削除・SM-2復習を行った際、Last-Write-Wins (LWW) とTombstone（削除墓石）でデータの先祖返りや消失が起きないか？
-   - LocalStorageからIndexedDBへの移行時の競合やデータ整合性の破綻リスクはないか？
+   - LocalStorageからIndexedDBへの移行時の競合やデータ整合性の破撻リスクはないか？
 4. **OCR & マルチモーダル処理**
    - クリップボードからのスクショ貼り付け（Cmd+V）やCanvasでのJPEG画像圧縮処理において、メモリリークや超大容量画像でのクラッシュリスクはないか？
 5. **法務・規約・ストア規約**
@@ -58,7 +58,6 @@
 ---
 
 ## 4. 全ソースコード (Complete Source Code)
-以下に本アプリケーションの主要コードを完全な形で添付します。
 
 
 ### 【ファイル: index.html — メインUI・PWA構造・モーダル定義】
@@ -3886,6 +3885,8 @@ serve(async (req) => {
       repetition: Number(raw.repetition) || 0,
       efactor: Number(raw.efactor) || 2.5,
       nextReview: Number(raw.nextReview) || Date.now(),
+      reviewUpdatedAt: Number(raw.reviewUpdatedAt) || Number(raw.review_updated_at) || 0,
+      isDeleted: Boolean(raw.isDeleted || raw.is_deleted),
       flags: Array.isArray(raw.flags) ? raw.flags.map(String) : [],
       gen: raw.gen && typeof raw.gen === 'object' ? { model: String(raw.gen.model || ''), pv: String(raw.gen.pv || ''), at: Number(raw.gen.at) || 0 } : undefined,
       updatedAt: Number.isFinite(parsedUpd) && parsedUpd > 0 ? parsedUpd : 1
@@ -4563,6 +4564,7 @@ serve(async (req) => {
           efactor: 2.5,
           nextReview: now,
           updatedAt: now,
+          reviewUpdatedAt: now,
           isDeleted: false
         };
         toAdd.push(card);
@@ -5917,6 +5919,7 @@ serve(async (req) => {
       const jitterMs = Math.floor(Math.random() * 3600000 * 3);
       item.nextReview = now + dayOffset * 86400000 + jitterMs;
       item.updatedAt = now;
+      item.reviewUpdatedAt = now;
     });
 
     setJson(activeCfg.key, list, true);
@@ -6923,7 +6926,7 @@ serve(async (req) => {
       const existing = lkToEntry.get(lk);
       if (existing && !spec.senseHint) {
         if (fName) existing.folder = fName;
-        existing.nextReview = existing.updatedAt = now;
+        existing.nextReview = existing.updatedAt = existing.reviewUpdatedAt = now;
         existing.num = ++maxNum;
         reorderedSet.add(existing);
       } else {
@@ -7075,10 +7078,13 @@ core:${tName}でのコアイメージ(35字以内),
 etymology:${eInst}`;
     }
 
+    const DUMMY_SENSES_LIST = ['文脈上の重要語', '重要語', '文脈語', '重要単語', '語彙', '抽出語', 'OCR抽出'];
     const payload = items.map((x, idx) => {
       const o = { reqIndex: idx, reqWord: x.word, homographIndex: x.homographIndex || 1 };
       if (x.pos) o.contextPos = x.pos;
-      if (x.meaning) o.targetSenseOrMeaning = x.meaning;
+      if (x.meaning && !DUMMY_SENSES_LIST.includes(x.meaning.trim())) {
+        o.targetSenseOrMeaning = x.meaning.trim();
+      }
       if (x.sentence) o.contextSentence = x.sentence;
       const wRef = wiktByIdx.get(idx);
       if (wRef) { o.wiktionaryRef = wRef.extract; if (wRef.ipa) o.wiktionaryIpa = wRef.ipa; }
@@ -7209,10 +7215,12 @@ etymology:${eInst}`;
             repetition: ex.repetition,
             efactor: ex.efactor,
             nextReview: ex.nextReview > now ? ex.nextReview : now,
-            updatedAt: now
+            updatedAt: now,
+            reviewUpdatedAt: ex.reviewUpdatedAt || now,
+            isDeleted: false
           });
         } else {
-          cur.push({ ...a, num: ++maxNum, folder: fName || undefined, updatedAt: now });
+          cur.push({ ...a, num: ++maxNum, folder: fName || undefined, updatedAt: now, reviewUpdatedAt: now, isDeleted: false });
         }
       });
 
