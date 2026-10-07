@@ -2,7 +2,7 @@
   "name": "Vocab Vault — 語源・概念史・単語帳",
   "short_name": "Vocab Vault",
   "description": "英・仏・独の3言語横断、語源・印欧祖語・概念史を深く学ぶ高機能単語帳",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -32,12 +32,12 @@
   "shortcuts": [
     {
       "name": "暗記復習",
-      "url": "./index.html?mode=anki",
+      "url": "./?mode=anki",
       "description": "復習期日の単語を学習"
     },
     {
       "name": "単語抽出",
-      "url": "./index.html?mode=extract",
+      "url": "./?mode=extract",
       "description": "長文や画像から単語を抽出"
     }
   ]

@@ -1,7 +1,7 @@
 /**
  * Vocab Vault — Service Worker (PWA Offline & Cache)
  */
-const CACHE_NAME = 'vocab-vault-v2-20261007-full-prod';
+const CACHE_NAME = 'vocab-vault-v3-20261007-pwa-fix';
 
 const PRECACHE_ASSETS = [
   './',
@@ -11,6 +11,7 @@ const PRECACHE_ASSETS = [
   './js/anki.js',
   './js/sync.js',
   './js/feedback.js',
+  './js/starter_pack.js',
   './js/app.js',
   './manifest.json',
   './icons/icon-192.png',
@@ -64,7 +65,7 @@ self.addEventListener('fetch', event => {
   // アプリ内静的アセット: Stale-while-revalidate 戦略
   event.respondWith(
     caches.open(CACHE_NAME).then(async cache => {
-      const cachedResponse = await cache.match(event.request);
+      const cachedResponse = await cache.match(event.request, { ignoreSearch: true });
       
       const networkPromise = fetch(event.request)
         .then(networkResponse => {
@@ -85,8 +86,8 @@ self.addEventListener('fetch', event => {
       if (netRes) return netRes;
 
       // オフラインかつHTMLリクエストならトップページへフォールバック
-      if (event.request.headers.get('accept')?.includes('text/html')) {
-        const fallback = await cache.match('./index.html');
+      if (event.request.headers.get('accept')?.includes('text/html') || url.pathname.endsWith('.html') || url.pathname === '/') {
+        const fallback = (await cache.match('./')) || (await cache.match('./index.html'));
         if (fallback) return fallback;
       }
 
