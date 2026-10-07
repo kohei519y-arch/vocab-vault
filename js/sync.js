@@ -397,7 +397,7 @@
     } catch (e) {
       alert(`決済エラー: ${e.message}`);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Proにアップグレード (¥980/月)'; }
+      if (btn) { btn.disabled = false; btn.textContent = 'Proにアップグレード (¥480/月)'; }
       if (upsellBtn) { upsellBtn.disabled = false; upsellBtn.textContent = '今すぐProにアップグレード'; }
     }
   }

@@ -91,7 +91,7 @@ serve(async (req) => {
                 name: "Vocab Vault Pro プラン",
                 description: "AI新規生成・概念史深掘り無制限、長文/画像OCR抽出無制限、複数端末リアルタイム同期",
               },
-              unit_amount: 980,
+              unit_amount: 480,
               recurring: { interval: "month" },
             },
             quantity: 1,

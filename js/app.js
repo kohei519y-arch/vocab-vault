@@ -137,7 +137,7 @@
       <h5 style="color:var(--t);margin:12px 0 4px">第3条（AI生成コンテンツに関する免責・責任制限）</h5>
       <p>生成AI（Gemini API）により出力される語源、用例、概念史解説は学術的知見および辞書データに基づき自動生成されますが、その完全性・正確性・最新性を保証するものではありません。AIによる誤認（ハルシネーション）や学説の諸説が存在する可能性があるため、学習参考情報としてご利用ください。本サービスの利用により生じた損害について、当方の故意または重過失を除き、過去1ヶ月間にユーザーから受領した利用料金を上限とします。</p>
       <h5 style="color:var(--t);margin:12px 0 4px">第4条（有料プランおよび決済・解約・返金）</h5>
-      <p>Proプランは月額980円（税込）で自動継続されます。決済処理はStripe, Inc.を通じて安全に行われます。特定商取引法上の政令指定通信販売におけるデジタルコンテンツおよびオンライン役務の性質上、決済完了後の日割り返金・キャンセルは致しかねます。解約手続きは設定画面（Stripe顧客ポータル）よりいつでも可能であり、次回更新日の前日までに解約された場合、次回以降の請求は発生せず、現在の請求期間満了まで引き続き有料機能をご利用いただけます。</p>
+      <p>Proプランは月額480円（税込）で自動継続されます。決済処理はStripe, Inc.を通じて安全に行われます。特定商取引法上の政令指定通信販売におけるデジタルコンテンツおよびオンライン役務の性質上、決済完了後の日割り返金・キャンセルは致しかねます。解約手続きは設定画面（Stripe顧客ポータル）よりいつでも可能であり、次回更新日の前日までに解約された場合、次回以降の請求は発生せず、現在の請求期間満了まで引き続き有料機能をご利用いただけます。</p>
       <h5 style="color:var(--t);margin:12px 0 4px">第5条（禁止事項）</h5>
       <p>法令違反、システムの不正リバースエンジニアリング、APIクォータの不正迂回、他者の権利侵害を禁止します。</p>
       <h5 style="color:var(--t);margin:12px 0 4px">第6条（退会および全データ抹消）</h5>
@@ -164,7 +164,7 @@
         <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">運営統括責任者</td><td style="padding:6px">請求があったら遅滞なく開示いたします</td></tr>
         <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">所在地・電話番号</td><td style="padding:6px">請求があったら遅滞なく開示いたします（サポート窓口をご利用ください）</td></tr>
         <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">メールアドレス</td><td style="padding:6px">support@vocabvault.example.com</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">販売価格</td><td style="padding:6px">Proプラン: 月額 980円（税込） / 年額 9,800円（税込）</td></tr>
+        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">販売価格</td><td style="padding:6px">Proプラン: 月額 480円（税込） / 年額 4,800円（税込）</td></tr>
         <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">支払方法・時期</td><td style="padding:6px">クレジットカード決済（Stripe）。初回登録時に即時決済、以後毎月（または毎年）同日に自動更新。</td></tr>
         <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">役務の提供時期</td><td style="padding:6px">決済完了後、直ちにご利用いただけます。</td></tr>
         <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">解約・返金について</td><td style="padding:6px">デジタルコンテンツおよびオンライン役務の性質上、決済完了後の返金・キャンセルには応じられません。解約は設定画面の「契約管理（Stripe）」よりいつでも可能です。次回更新日の前日までに解約された場合、次回以降の請求は発生せず、現在の有効期間満了まで引き続きご利用いただけます。</td></tr>
