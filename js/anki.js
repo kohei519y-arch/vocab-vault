@@ -25,7 +25,7 @@
 
     if (rating === 0) {
       nextRepetition = 0;
-      nextInterval = 1;
+      nextInterval = 0;
       nextReviewDate = now + 60000; // 1分後
     } else {
       const baseDays = predDays(e, rating);

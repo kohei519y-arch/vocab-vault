@@ -2930,6 +2930,12 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
               responseMimeType: "application/json",
               responseSchema: serverResponseSchema,
             },
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+            ],
           }),
         });
       } catch (fetchErr: any) {
@@ -2983,22 +2989,30 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
 
       const rawArr = Array.isArray(parsedAi) ? parsedAi : [parsedAi];
 
-      // [P1-1 解決] モデル出力の配列インデックスずれ防止（reqIndex および見出し語での厳密突合）
-      generatedResults = itemsToGenerate.map((origItem) => {
-        let match = rawArr.find((c: any) => c?.reqIndex === origItem.reqIndex);
+      // [P1-1 解決] モデル出力の配列インデックスずれ防止 ＆ 有効カードのみ抽出
+      const validCards: any[] = [];
+      const assignedRawItems = new Set<any>();
+
+      for (const origItem of itemsToGenerate) {
+        let match = rawArr.find((c: any) => !assignedRawItems.has(c) && c?.reqIndex === origItem.reqIndex);
         if (!match) {
           const origNorm = origItem.reqWord.toLowerCase().trim();
-          match = rawArr.find((c: any) => String(c?.word || "").toLowerCase().trim() === origNorm);
+          match = rawArr.find((c: any) => !assignedRawItems.has(c) && String(c?.word || "").toLowerCase().trim() === origNorm);
         }
         if (!match) {
-          // 残りの配列から使用されていない要素を順次割り当て
-          match = rawArr.find((c: any) => !itemsToGenerate.some(it => it !== origItem && (it.reqIndex === c?.reqIndex || it.reqWord.toLowerCase().trim() === String(c?.word || "").toLowerCase().trim())));
+          match = rawArr.find((c: any) => !assignedRawItems.has(c));
         }
-        return sanitizeCard(match || {}, origItem);
-      });
+        // AIが正しく内容（意味・語源・コア概念）を生成できた場合のみ採用
+        if (match && (Array.isArray(match.meanings) && match.meanings.length > 0 || match.etymology || match.core)) {
+          assignedRawItems.add(match);
+          validCards.push(sanitizeCard(match, origItem));
+        }
+      }
+
+      generatedResults = validCards;
       usedModel = targetModel;
 
-      // 部分失敗差分の自動返還 (例: 10語中8語のみ成功した場合、未生成2語分を返還)
+      // 部分失敗差分の自動返還 (例: 10語中8語のみ成功した場合、未生成2語分を自動返金)
       const failedCount = itemsToGenerate.length - generatedResults.length;
       if (user && failedCount > 0) {
         const { data: refundData } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
@@ -8866,7 +8880,7 @@ etymology:${eInst}`;
 
     if (rating === 0) {
       nextRepetition = 0;
-      nextInterval = 1;
+      nextInterval = 0;
       nextReviewDate = now + 60000; // 1分後
     } else {
       const baseDays = predDays(e, rating);
