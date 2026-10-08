@@ -1,7 +1,7 @@
 /**
  * Vocab Vault — Service Worker (PWA Offline & Cache)
  */
-const CACHE_NAME = 'vocab-vault-v4-20261007-srs-sync';
+const CACHE_NAME = 'vocab-vault-v5-20261008-modular-scale';
 
 const PRECACHE_ASSETS = [
   './',
@@ -11,6 +11,8 @@ const PRECACHE_ASSETS = [
   './js/storage.js',
   './js/anki.js',
   './js/sync.js',
+  './js/ocr.js',
+  './js/graph.js',
   './js/feedback.js',
   './js/starter_pack.js',
   './js/app.js',

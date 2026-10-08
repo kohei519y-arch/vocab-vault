@@ -26,6 +26,7 @@ function cleanJsonString(str: string): string {
 }
 
 const guestRateMemory = new Map<string, number>();
+const ipBurstTracker = new Map<string, { count: number; resetAt: number }>();
 
 // [P0-6 解決] 信頼性の高いIP取得（Cloudflare / リバースプロキシスプーフィング対策）
 function getClientIp(req: Request): string {
@@ -125,6 +126,24 @@ serve(async (req) => {
   }
 
   try {
+    // [インフラ保護] 秒間高頻度バースト遮断（DoS・スクリプト連打からの最速防衛）
+    const clientIp = getClientIp(req);
+    const nowMs = Date.now();
+    const burst = ipBurstTracker.get(clientIp) || { count: 0, resetAt: nowMs + 2000 };
+    if (nowMs > burst.resetAt) {
+      burst.count = 1;
+      burst.resetAt = nowMs + 2000;
+    } else {
+      burst.count++;
+      if (burst.count > 5) {
+        return new Response(
+          JSON.stringify({ error: "リクエスト頻度が高すぎます。数秒待ってから再試行してください。" }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": "3" } }
+        );
+      }
+    }
+    ipBurstTracker.set(clientIp, burst);
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
