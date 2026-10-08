@@ -38,6 +38,18 @@ function getClientIp(req: Request): string {
   );
 }
 
+// [P1-3 解決] プロンプトインジェクション防壁: タグ脱出文字や制御文字の無力化
+function sanitizePromptString(str: any, maxLen: number = 300): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/<\/?(?:user_request|passage|system|systemInstruction|instruction|prompt)[^>]*>/gi, " ")
+    .replace(/</g, "＜")
+    .replace(/>/g, "＞")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
 const DUMMY_OCR_SENSES = new Set([
   "文脈上の重要語",
   "重要語",
@@ -208,14 +220,17 @@ serve(async (req) => {
     const tLang = validLangs.includes(rawTgt || rawTgt2 || "") ? ((rawTgt || rawTgt2) as string) : "ja";
 
     // [P1-3 解決] プロンプトインジェクション防壁: fName のサニタイズ（制御文字・改行排除、英数日本語記号のみ、最大40文字）
-    const safeFName = fName ? String(fName).replace(/[\r\n\x00-\x1f`]/g, " ").trim().slice(0, 40) : "";
+    const safeFName = fName ? sanitizePromptString(fName, 40) : "";
 
-    // 各単語のサニタイズ（100文字上限、空文字除外）
+    // 各単語のサニタイズ（プロンプト脱出タグ無力化 & 上限文字数設定）
     const sanitizedItems = items
       .map(it => ({
         ...it,
-        reqWord: String(it.reqWord || "").trim().slice(0, 100),
+        reqWord: sanitizePromptString(it.reqWord, 100),
         homographIndex: Math.max(1, parseInt(String(it.homographIndex || 1), 10) || 1),
+        targetSenseOrMeaning: it.targetSenseOrMeaning ? sanitizePromptString(it.targetSenseOrMeaning, 100) : undefined,
+        contextSentence: it.contextSentence ? sanitizePromptString(it.contextSentence, 300) : undefined,
+        contextPos: it.contextPos ? sanitizePromptString(it.contextPos, 30) : undefined,
       }))
       .filter(it => it.reqWord.length > 0);
 

@@ -83,12 +83,12 @@
 <div class="workspace">
   <nav class="ribbon" aria-label="メインナビゲーション">
     <div class="rib-grp">
-      <button class="rib-btn" id="ribFoldBtn" onclick="toggleSidebar()" title="サイドバー開閉" aria-label="サイドバー開閉"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
-      <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
-      <button class="rib-btn" id="ribExtBtn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></button>
-      <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></button>
-      <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
-      <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button class="rib-btn" id="ribFoldBtn" onclick="toggleSidebar()" title="サイドバー開閉" aria-label="サイドバー開閉"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg><span class="rib-lbl">探す</span></button>
+      <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="rib-lbl">一覧</span></button>
+      <button class="rib-btn" id="ribExtBtn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg><span class="rib-lbl">抽出</span></button>
+      <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="rib-lbl">復習</span></button>
+      <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span class="rib-lbl">語根</span></button>
+      <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span class="rib-lbl">赤シート</span></button>
       <button class="rib-btn" onclick="window.print()" title="フィルタ結果の全件をA4・2段組でPDF印刷" aria-label="PDF印刷"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
     </div>
     <div class="rib-grp">
@@ -106,6 +106,7 @@
       </button>
       <button class="rib-btn" id="ribSettingsBtn" onclick="openSettings()" title="設定・データ管理" aria-label="設定・データ管理">
         <svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+        <span class="rib-lbl">設定</span>
         <span id="cfgDot" class="cfg-dot"></span>
       </button>
     </div>
@@ -938,12 +939,12 @@
 <div class="workspace">
   <nav class="ribbon" aria-label="メインナビゲーション">
     <div class="rib-grp">
-      <button class="rib-btn" id="ribFoldBtn" onclick="toggleSidebar()" title="サイドバー開閉" aria-label="サイドバー開閉"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
-      <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
-      <button class="rib-btn" id="ribExtBtn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></button>
-      <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></button>
-      <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
-      <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      <button class="rib-btn" id="ribFoldBtn" onclick="toggleSidebar()" title="サイドバー開閉" aria-label="サイドバー開閉"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg><span class="rib-lbl">探す</span></button>
+      <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="rib-lbl">一覧</span></button>
+      <button class="rib-btn" id="ribExtBtn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg><span class="rib-lbl">抽出</span></button>
+      <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="rib-lbl">復習</span></button>
+      <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span class="rib-lbl">語根</span></button>
+      <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span class="rib-lbl">赤シート</span></button>
       <button class="rib-btn" onclick="window.print()" title="フィルタ結果の全件をA4・2段組でPDF印刷" aria-label="PDF印刷"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
     </div>
     <div class="rib-grp">
@@ -961,6 +962,7 @@
       </button>
       <button class="rib-btn" id="ribSettingsBtn" onclick="openSettings()" title="設定・データ管理" aria-label="設定・データ管理">
         <svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
+        <span class="rib-lbl">設定</span>
         <span id="cfgDot" class="cfg-dot"></span>
       </button>
     </div>
@@ -2478,6 +2480,18 @@ function getClientIp(req: Request): string {
   );
 }
 
+// [P1-3 解決] プロンプトインジェクション防壁: タグ脱出文字や制御文字の無力化
+function sanitizePromptString(str: any, maxLen: number = 300): string {
+  if (!str) return "";
+  return String(str)
+    .replace(/<\/?(?:user_request|passage|system|systemInstruction|instruction|prompt)[^>]*>/gi, " ")
+    .replace(/</g, "＜")
+    .replace(/>/g, "＞")
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ")
+    .trim()
+    .slice(0, maxLen);
+}
+
 const DUMMY_OCR_SENSES = new Set([
   "文脈上の重要語",
   "重要語",
@@ -2648,14 +2662,17 @@ serve(async (req) => {
     const tLang = validLangs.includes(rawTgt || rawTgt2 || "") ? ((rawTgt || rawTgt2) as string) : "ja";
 
     // [P1-3 解決] プロンプトインジェクション防壁: fName のサニタイズ（制御文字・改行排除、英数日本語記号のみ、最大40文字）
-    const safeFName = fName ? String(fName).replace(/[\r\n\x00-\x1f`]/g, " ").trim().slice(0, 40) : "";
+    const safeFName = fName ? sanitizePromptString(fName, 40) : "";
 
-    // 各単語のサニタイズ（100文字上限、空文字除外）
+    // 各単語のサニタイズ（プロンプト脱出タグ無力化 & 上限文字数設定）
     const sanitizedItems = items
       .map(it => ({
         ...it,
-        reqWord: String(it.reqWord || "").trim().slice(0, 100),
+        reqWord: sanitizePromptString(it.reqWord, 100),
         homographIndex: Math.max(1, parseInt(String(it.homographIndex || 1), 10) || 1),
+        targetSenseOrMeaning: it.targetSenseOrMeaning ? sanitizePromptString(it.targetSenseOrMeaning, 100) : undefined,
+        contextSentence: it.contextSentence ? sanitizePromptString(it.contextSentence, 300) : undefined,
+        contextPos: it.contextPos ? sanitizePromptString(it.contextPos, 30) : undefined,
       }))
       .filter(it => it.reqWord.length > 0);
 
@@ -3386,9 +3403,11 @@ serve(async (req) => {
       <p>生成AI（Gemini API）により出力される語源、用例、概念史解説は学術的知見および辞書データに基づき自動生成されますが、その完全性・正確性・最新性を保証するものではありません。AIによる誤認（ハルシネーション）や学説の諸説が存在する可能性があるため、学習参考情報としてご利用ください。本サービスの利用により生じた損害について、当方の故意または重過失を除き、過去1ヶ月間にユーザーから受領した利用料金を上限とします。</p>
       <h5 style="color:var(--t);margin:12px 0 4px">第4条（有料プランおよび決済・解約・返金）</h5>
       <p>Proプランは月額480円（税込）で自動継続されます。決済処理はStripe, Inc.を通じて安全に行われます。特定商取引法上の政令指定通信販売におけるデジタルコンテンツおよびオンライン役務の性質上、決済完了後の日割り返金・キャンセルは致しかねます。解約手続きは設定画面（Stripe顧客ポータル）よりいつでも可能であり、次回更新日の前日までに解約された場合、次回以降の請求は発生せず、現在の請求期間満了まで引き続き有料機能をご利用いただけます。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第5条（禁止事項）</h5>
-      <p>法令違反、システムの不正リバースエンジニアリング、APIクォータの不正迂回、他者の権利侵害を禁止します。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第6条（退会および全データ抹消）</h5>
+      <h5 style="color:var(--t);margin:12px 0 4px">第5条（公正利用方針 / Fair Use Policy）</h5>
+      <p>ProプランにおけるAI語彙生成機能は無制限の個人学習を支援するものですが、サーバーインフラの健全性維持および自動スクレイピング防止のため、1アカウントあたり標準的な学習量（1日最大150語、月間最大3,000語）を目安とする公正利用方針（Fair Use Policy）を適用します。通常の人間による学習利用でこの目安に達することは実質的にありませんが、自動化プログラム等による異常な過剰リクエストが検知された場合は一時的な生成制限を行うことがあります。</p>
+      <h5 style="color:var(--t);margin:12px 0 4px">第6条（禁止事項）</h5>
+      <p>法令違反、システムの不正リバースエンジニアリング、APIクォータの不正迂回、スクレイピング、他者の権利侵害を禁止します。</p>
+      <h5 style="color:var(--t);margin:12px 0 4px">第7条（退会および全データ抹消）</h5>
       <p>ユーザーは設定画面の『アカウント完全削除』より、いつでも自身の意思により即時退会を行えます。退会時、クラウド上の全単語データ、学習履歴、API利用ログ、認証情報はサーバーから完全に抹消され、復元することはできません。</p>
     `,
     privacy: `
@@ -8422,19 +8441,27 @@ etymology:${eInst}`;
       'Content-Type': 'application/json'
     };
 
-    // [P0-5 解決] PostgREST 1000件リミット回避: キーセット/ページネーションによる完全Pullループ
-    async function fetchAllPaginated(baseUrl) {
+    // [P0-5 解決] PostgREST 1000件リミット回避: 決定論的ソート & 重複排除による完全Pullループ
+    async function fetchAllPaginated(baseUrl, idField = 'id') {
       const PAGE_SIZE = 1000;
       let allRows = [];
       let offset = 0;
+      const seenKeys = new Set();
       while (true) {
         const sep = baseUrl.includes('?') ? '&' : '?';
-        const pageUrl = `${baseUrl}${sep}limit=${PAGE_SIZE}&offset=${offset}`;
+        const sortParam = baseUrl.includes('order=') ? '' : `&order=${encodeURIComponent(idField)}.asc`;
+        const pageUrl = `${baseUrl}${sep}limit=${PAGE_SIZE}&offset=${offset}${sortParam}`;
         const r = await fetch(pageUrl, { headers });
         if (!r.ok) throw new Error(`同期Pull失敗 (HTTP ${r.status})`);
         const rows = await r.json();
         if (!Array.isArray(rows) || rows.length === 0) break;
-        allRows.push(...rows);
+        for (const row of rows) {
+          const key = (idField && row[idField] !== undefined) ? String(row[idField]) : JSON.stringify(row);
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            allRows.push(row);
+          }
+        }
         if (rows.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
@@ -8443,8 +8470,8 @@ etymology:${eInst}`;
 
     const uveCols = 'id,lang,word_key,num,word,homograph_index,folder,category,interval,repetition,efactor,next_review,updated_at,review_updated_at,is_deleted,card_data,server_updated_at';
     const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&or=(server_updated_at.gt.${lastSyncAt},updated_at.gt.${lastSyncAt},review_updated_at.gt.${lastSyncAt})&select=${uveCols}`),
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&or=(server_updated_at.gt.${lastSyncAt},updated_at.gt.${lastSyncAt},review_updated_at.gt.${lastSyncAt})&select=${uveCols}`, 'id'),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`, 'tomb_key'),
       fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&select=cleared_at`, { headers })
     ]);
 
@@ -9063,17 +9090,37 @@ etymology:${eInst}`;
     });
   }
 
+  const TOMBSTONE_TTL_MS = 90 * 86400000; // 90日間の Tombstone 保持期限（LocalStorage肥大化防止と分散同期整合性の両立）
+
+  function vacuumOldTombstones(l = 'en') {
+    const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
+    const map = getTombstones(l);
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+    let pruned = 0;
+    for (const [k, ts] of map.entries()) {
+      if (k.startsWith('fold:') || ts < cutoff) {
+        map.delete(k);
+        pruned++;
+      }
+    }
+    if (pruned > 0) {
+      saveTombstones(l, map);
+    }
+    return map;
+  }
+
   function getTombstones(l = 'en') {
     const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
     if (Storage.tombstones[id]) return Storage.tombstones[id];
     const map = new Map();
     try { absorbTombArray(map, JSON.parse(lsGet(cfg.tomb, '[]'))); } catch {}
-    return (Storage.tombstones[id] = map);
+    Storage.tombstones[id] = map;
+    return map;
   }
 
   function saveTombstones(l = 'en', map = getTombstones(l)) {
     const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
-    const cutoff = Date.now() - 180 * 86400000;
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS;
     const sorted = [...map.entries()].filter(([k, ts]) => !k.startsWith('fold:') && ts >= cutoff).sort((a, b) => b[1] - a[1]).slice(0, 2000);
     Storage.tombstones[id] = new Map(sorted);
     const arr = sorted.map(([key, deletedAt]) => ({ key, deletedAt }));
@@ -9183,6 +9230,8 @@ etymology:${eInst}`;
     absorbTombArray,
     getTombstones,
     saveTombstones,
+    vacuumOldTombstones,
+    TOMBSTONE_TTL_MS,
     recordTombstone,
     isTombstoned,
     idbPut,
@@ -9224,6 +9273,17 @@ etymology:${eInst}`;
     return !e.repetition ? 4 : iv * ef; // 簡単
   }
 
+  // [認知アンカーボーナス] 語根ネットワークが接続された単語は記憶の干渉が少なく忘却曲線が緩やかなため、復習間隔を最適化
+  function getEtymologyAnchorBonus(e) {
+    if (!e) return 1.0;
+    const tags = Array.isArray(e.etymologyTags)
+      ? e.etymologyTags
+      : (typeof e.etymologyTags === 'string' ? e.etymologyTags.split(',').map(s => s.trim()).filter(Boolean) : []);
+    if (tags.length >= 3) return 1.15; // 3語根以上の密な関連付け: 間隔15%伸長
+    if (tags.length >= 1) return 1.08; // 語根アンカーあり: 間隔8%伸長
+    return 1.0;
+  }
+
   function calculateNextReview(e, rating) {
     const now = Date.now();
     let nextInterval = 0;
@@ -9236,7 +9296,10 @@ etymology:${eInst}`;
       nextInterval = 0;
       nextReviewDate = now + 60000; // 1分後
     } else {
-      const baseDays = predDays(e, rating);
+      let baseDays = predDays(e, rating);
+      if (rating >= 2) {
+        baseDays *= getEtymologyAnchorBonus(e);
+      }
       const fuzz = baseDays >= 2 ? (0.96 + Math.random() * 0.08) : 1; // 間隔の分散
       nextInterval = Number((baseDays * fuzz).toFixed(2));
       nextEfactor = Math.max(1.3, nextEfactor + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0));
@@ -9496,6 +9559,7 @@ etymology:${eInst}`;
 
   global.VocabSRS = {
     predDays,
+    getEtymologyAnchorBonus,
     calculateNextReview,
     queueOfflineReview,
     flushOfflineReviews,

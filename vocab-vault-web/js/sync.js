@@ -210,19 +210,27 @@
       'Content-Type': 'application/json'
     };
 
-    // [P0-5 解決] PostgREST 1000件リミット回避: キーセット/ページネーションによる完全Pullループ
-    async function fetchAllPaginated(baseUrl) {
+    // [P0-5 解決] PostgREST 1000件リミット回避: 決定論的ソート & 重複排除による完全Pullループ
+    async function fetchAllPaginated(baseUrl, idField = 'id') {
       const PAGE_SIZE = 1000;
       let allRows = [];
       let offset = 0;
+      const seenKeys = new Set();
       while (true) {
         const sep = baseUrl.includes('?') ? '&' : '?';
-        const pageUrl = `${baseUrl}${sep}limit=${PAGE_SIZE}&offset=${offset}`;
+        const sortParam = baseUrl.includes('order=') ? '' : `&order=${encodeURIComponent(idField)}.asc`;
+        const pageUrl = `${baseUrl}${sep}limit=${PAGE_SIZE}&offset=${offset}${sortParam}`;
         const r = await fetch(pageUrl, { headers });
         if (!r.ok) throw new Error(`同期Pull失敗 (HTTP ${r.status})`);
         const rows = await r.json();
         if (!Array.isArray(rows) || rows.length === 0) break;
-        allRows.push(...rows);
+        for (const row of rows) {
+          const key = (idField && row[idField] !== undefined) ? String(row[idField]) : JSON.stringify(row);
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            allRows.push(row);
+          }
+        }
         if (rows.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
       }
@@ -231,8 +239,8 @@
 
     const uveCols = 'id,lang,word_key,num,word,homograph_index,folder,category,interval,repetition,efactor,next_review,updated_at,review_updated_at,is_deleted,card_data,server_updated_at';
     const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&or=(server_updated_at.gt.${lastSyncAt},updated_at.gt.${lastSyncAt},review_updated_at.gt.${lastSyncAt})&select=${uveCols}`),
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&or=(server_updated_at.gt.${lastSyncAt},updated_at.gt.${lastSyncAt},review_updated_at.gt.${lastSyncAt})&select=${uveCols}`, 'id'),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`, 'tomb_key'),
       fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&select=cleared_at`, { headers })
     ]);
 

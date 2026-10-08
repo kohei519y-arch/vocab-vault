@@ -30,6 +30,7 @@ body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","
 .rib-btn:hover, .rib-btn.active, .tree-hd:hover, .tree-item:hover, .side-foot-btn:hover { background:var(--bg-hov); color:var(--t); }
 .rib-btn.active-mask { color:var(--r); background:rgba(209,52,56,.15); }
 .rib-btn svg, .ocr-icon svg { width:17px; height:17px; stroke:currentColor; stroke-width:1.8; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+.rib-lbl { display:none; }
 .cfg-dot { display:none; position:absolute; top:5px; right:5px; width:7px; height:7px; border-radius:50%; background:var(--r); }
 .cfg-dot.warn { display:block; }
 
@@ -296,13 +297,13 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   }
   .main-pane {
     width: 100vw;
-    height: calc(100% - 48px - var(--safe-b)); /* ボトムバーの高さを除いた全画面 */
+    height: calc(100% - 52px - var(--safe-b)); /* ボトムバーの高さを除いた全画面 */
   }
 
   /* 2. 左側リボンを「下部ボトムナビゲーションバー」へ転換 */
   .ribbon {
     width: 100vw;
-    height: calc(48px + var(--safe-b));
+    height: calc(52px + var(--safe-b));
     position: fixed;
     bottom: 0;
     left: 0;
@@ -313,7 +314,7 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     flex-direction: row;
     justify-content: space-around;
     align-items: center;
-    padding: 3px 6px var(--safe-b);
+    padding: 2px 4px var(--safe-b);
     background: var(--bg-side);
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
     z-index: 40;
@@ -323,19 +324,38 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     justify-content: space-around;
     align-items: center;
     width: 100%;
-    gap: 4px;
+    gap: 2px;
   }
   .rib-btn {
-    width: 40px;
-    height: 40px;
+    flex: 1;
+    max-width: 54px;
+    height: 46px;
     border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 2px 0;
   }
   .rib-btn svg {
-    width: 19px;
-    height: 19px;
+    width: 18px;
+    height: 18px;
   }
-  /* スマホのボトムバーで不要な二次的ボタンを非表示にし、主要5〜6アクションに厳選 */
-  .ribbon .rib-btn:not(#ribFoldBtn):not(#ribAnkiBtn):not(#ribGraphBtn):not(#ribExtBtn):not(#ribMaskBtn):not([onclick*="openSettings"]) {
+  .rib-lbl {
+    display: block;
+    font-size: 9px;
+    font-weight: 500;
+    line-height: 1.1;
+    color: var(--m);
+    white-space: nowrap;
+  }
+  .rib-btn.active .rib-lbl {
+    color: var(--p);
+    font-weight: 700;
+  }
+  /* スマホのボトムバーで主要アクション（探す・一覧・復習・語根・抽出・赤シート・設定）に厳選 */
+  .ribbon .rib-btn:not(#ribFoldBtn):not(#ribListBtn):not(#ribAnkiBtn):not(#ribGraphBtn):not(#ribExtBtn):not(#ribMaskBtn):not(#ribSettingsBtn) {
     display: none;
   }
 
@@ -344,7 +364,7 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     position: fixed;
     left: 0;
     top: var(--safe-t);
-    bottom: calc(48px + var(--safe-b));
+    bottom: calc(52px + var(--safe-b));
     width: 290px;
     max-width: 85vw;
     z-index: 50;

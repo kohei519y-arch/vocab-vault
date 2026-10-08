@@ -264,17 +264,37 @@
     });
   }
 
+  const TOMBSTONE_TTL_MS = 90 * 86400000; // 90日間の Tombstone 保持期限（LocalStorage肥大化防止と分散同期整合性の両立）
+
+  function vacuumOldTombstones(l = 'en') {
+    const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
+    const map = getTombstones(l);
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS;
+    let pruned = 0;
+    for (const [k, ts] of map.entries()) {
+      if (k.startsWith('fold:') || ts < cutoff) {
+        map.delete(k);
+        pruned++;
+      }
+    }
+    if (pruned > 0) {
+      saveTombstones(l, map);
+    }
+    return map;
+  }
+
   function getTombstones(l = 'en') {
     const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
     if (Storage.tombstones[id]) return Storage.tombstones[id];
     const map = new Map();
     try { absorbTombArray(map, JSON.parse(lsGet(cfg.tomb, '[]'))); } catch {}
-    return (Storage.tombstones[id] = map);
+    Storage.tombstones[id] = map;
+    return map;
   }
 
   function saveTombstones(l = 'en', map = getTombstones(l)) {
     const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
-    const cutoff = Date.now() - 180 * 86400000;
+    const cutoff = Date.now() - TOMBSTONE_TTL_MS;
     const sorted = [...map.entries()].filter(([k, ts]) => !k.startsWith('fold:') && ts >= cutoff).sort((a, b) => b[1] - a[1]).slice(0, 2000);
     Storage.tombstones[id] = new Map(sorted);
     const arr = sorted.map(([key, deletedAt]) => ({ key, deletedAt }));
@@ -384,6 +404,8 @@
     absorbTombArray,
     getTombstones,
     saveTombstones,
+    vacuumOldTombstones,
+    TOMBSTONE_TTL_MS,
     recordTombstone,
     isTombstoned,
     idbPut,

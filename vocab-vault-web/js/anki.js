@@ -16,6 +16,17 @@
     return !e.repetition ? 4 : iv * ef; // 簡単
   }
 
+  // [認知アンカーボーナス] 語根ネットワークが接続された単語は記憶の干渉が少なく忘却曲線が緩やかなため、復習間隔を最適化
+  function getEtymologyAnchorBonus(e) {
+    if (!e) return 1.0;
+    const tags = Array.isArray(e.etymologyTags)
+      ? e.etymologyTags
+      : (typeof e.etymologyTags === 'string' ? e.etymologyTags.split(',').map(s => s.trim()).filter(Boolean) : []);
+    if (tags.length >= 3) return 1.15; // 3語根以上の密な関連付け: 間隔15%伸長
+    if (tags.length >= 1) return 1.08; // 語根アンカーあり: 間隔8%伸長
+    return 1.0;
+  }
+
   function calculateNextReview(e, rating) {
     const now = Date.now();
     let nextInterval = 0;
@@ -28,7 +39,10 @@
       nextInterval = 0;
       nextReviewDate = now + 60000; // 1分後
     } else {
-      const baseDays = predDays(e, rating);
+      let baseDays = predDays(e, rating);
+      if (rating >= 2) {
+        baseDays *= getEtymologyAnchorBonus(e);
+      }
       const fuzz = baseDays >= 2 ? (0.96 + Math.random() * 0.08) : 1; // 間隔の分散
       nextInterval = Number((baseDays * fuzz).toFixed(2));
       nextEfactor = Math.max(1.3, nextEfactor + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0));
@@ -288,6 +302,7 @@
 
   global.VocabSRS = {
     predDays,
+    getEtymologyAnchorBonus,
     calculateNextReview,
     queueOfflineReview,
     flushOfflineReviews,
