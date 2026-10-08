@@ -38,7 +38,7 @@
     try { localStorage.setItem('vv_dev_unlocked', '1'); } catch(e){}
   </script>
 </head>
-<body class="dark">
+<body class="dark side-collapsed">
 <div class="workspace">
   <nav class="ribbon" aria-label="メインナビゲーション">
     <div class="rib-grp">
@@ -74,8 +74,13 @@
   <div class="side-backdrop" onclick="toggleSidebar()"></div>
 
   <aside class="sidebar">
-    <div class="side-top">
-      <div class="flx-sb lbl-sm"><span>エクスプローラ・検索</span><span class="kbd-hint">/ または Alt+F</span></div>
+      <div class="flx-sb lbl-sm">
+        <span>エクスプローラ・検索</span>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="kbd-hint">/ または Alt+F</span>
+          <button type="button" class="side-close-btn" onclick="toggleSidebar()" aria-label="サイドバーを閉じる">×</button>
+        </div>
+      </div>
       <div class="search-wrap">
         <input type="text" id="qSearch" placeholder="複数語・語根(*sta-)・意味で検索 (スペース/カンマ可)..." autocomplete="off">
         <button type="button" id="qClear" class="search-clear" onclick="setSearch('')" aria-label="検索クリア">×</button>

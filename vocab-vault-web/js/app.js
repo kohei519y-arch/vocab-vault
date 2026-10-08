@@ -966,7 +966,15 @@
     rootBuckets.forEach((m, k) => App.rootIndexMap.set(k, [...m.values()]));
   }
 
-  const toggleSidebar = () => document.body.classList.toggle('side-collapsed');
+  const toggleSidebar = (force = null) => {
+    const isCollapsed = typeof force === 'boolean' ? !force : document.body.classList.contains('side-collapsed');
+    if (isCollapsed) {
+      document.body.classList.remove('side-collapsed');
+      if (window.innerWidth <= 760) $('qSearch')?.focus();
+    } else {
+      document.body.classList.add('side-collapsed');
+    }
+  };
   const toggleSec = id => $(id)?.classList.toggle('closed');
 
   function toggleMask() {
