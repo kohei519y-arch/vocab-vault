@@ -679,14 +679,33 @@
       <button type="button" class="modal-close" onclick="toggleModal('installGuideModal',false)" aria-label="閉じる">&times;</button>
     </div>
     <div style="flex:1;overflow-y:auto;font-size:13px;line-height:1.7;color:var(--s);padding-right:4px">
-      <p style="margin-top:0">Vocab Vault は <strong>PWA（Progressive Web App）</strong> および単独起動に対応しており、Chromeなどのブラウザ枠（URLバーやタブ）を通さず、独立した専用アプリとして起動できます。</p>
+      <p style="margin-top:0">Vocab Vault は <strong>macOS専用スタンドアロンアプリ</strong>、<strong>PWA（Progressive Web App）</strong>、および完全オフラインパッケージに対応しており、Chromeなどのブラウザ枠を通さず独立した専用アプリとして起動できます。</p>
+
+      <!-- macOS 専用アプリ ダウンロードカード -->
+      <div style="background:rgba(124,58,237,0.12);border:1px solid rgba(139,92,246,0.3);padding:14px;border-radius:10px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div style="font-weight:700;color:var(--t);font-size:14px;display:flex;align-items:center;gap:6px">
+            <span>🍎 macOS専用スタンドアロンアプリ (v2.0)</span>
+          </div>
+          <div style="font-size:12px;color:var(--m);margin-top:2px">新公式アイコン付属・URLバーなし独立ウィンドウ・完全オフライン</div>
+        </div>
+        <a href="VocabVault-Mac.zip" download="VocabVault-Mac.zip" class="btn-p" style="padding:8px 16px;text-decoration:none;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;border-radius:6px;color:#fff;background:#7c3aed">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Mac版をダウンロード (.zip)
+        </a>
+      </div>
+
+      <div style="background:var(--bg-hov);padding:10px 14px;border-radius:8px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="font-size:12px;color:var(--s)">📦 全OS・完全オフラインWebパッケージ</div>
+        <a href="vocab-vault-web.zip" download="vocab-vault-web.zip" class="btn-o btn-xs" style="text-decoration:none">ZIPダウンロード</a>
+      </div>
 
       <div style="background:var(--bg-hov);padding:12px;border-radius:8px;margin-bottom:12px">
         <h4 style="margin:0 0 6px;color:var(--t)">macOS (Mac) で単体起動する</h4>
         <ul style="margin:0;padding-left:20px;font-size:12px">
-          <li><strong>方法1（ワンクリックインストール）:</strong> 設定の「アプリをインストール」ボタンを押すか、Chromeのアドレスバー右端にある「インストール」アイコンをクリックすると、MacのDockやLaunchpadに登録され、独立アプリとして直接起動できます。</li>
-          <li><strong>方法2（SafariのDock追加）:</strong> Safariのメニュー「ファイル」→「Dockに追加」を選ぶと、専用の「Vocab Vault.app」が作成されます。</li>
-          <li><strong>方法3（付属ランチャー）:</strong> 本フォルダ内の <code>Vocab Vault.command</code> をダブルクリックすると、Chrome等のブラウザ枠なし専用ウィンドウで即座に直接開きます。</li>
+          <li><strong>方法1（Mac版アプリ）:</strong> 上記の「Mac版をダウンロード」から <code>Vocab Vault.app</code> を入手し、アプリケーションフォルダに入れるだけで即座に起動できます。</li>
+          <li><strong>方法2（Chrome / Edge PWA）:</strong> アドレスバー右端の「インストール」アイコンをクリックすると、MacのDockやLaunchpadに登録されます。</li>
+          <li><strong>方法3（SafariのDock追加）:</strong> Safariのメニュー「ファイル」→「Dockに追加」を選ぶと、専用のWebアプリが作成されます。</li>
         </ul>
       </div>
 
