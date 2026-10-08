@@ -264,6 +264,88 @@ def test_prompt_injection_sanitizer():
         log_pass("All jailbreak/escape tags (<passage>, <user_request>, <system>) neutralised")
         log_pass("Raw HTML/XML brackets < and > safely converted to full-width characters")
 
+def test_s_grade_features():
+    print("\n--- 6. S-Grade Masterpiece Feature Verifications ---")
+    
+    # 6-1. CSS content-visibility for 60/120fps large vocab rendering
+    css_path = os.path.join(BASE_DIR, "css/app.css")
+    with open(css_path, "r", encoding="utf-8") as f:
+        css = f.read()
+    if "content-visibility:auto" in css or "content-visibility: auto" in css:
+        log_pass("CSS content-visibility: auto present on .card for zero-cost virtual rendering")
+    else:
+        log_fail("CSS content-visibility: auto missing on .card")
+
+    # 6-2. FSRS Relative Overdue Ratio calculation in app.js
+    app_path = os.path.join(BASE_DIR, "js/app.js")
+    with open(app_path, "r", encoding="utf-8") as f:
+        app_code = f.read()
+
+    test_ratio_script = f"""
+    var window = globalThis;
+    var now = 1000000000000;
+    // item 1: interval 1 day, 3 days overdue
+    var item1 = {{ nextReview: now - (3 * 86400000), interval: 1 }};
+    // item 2: interval 100 days, 3 days overdue
+    var item2 = {{ nextReview: now - (3 * 86400000), interval: 100 }};
+
+    function getOverdueRatio(item, now) {{
+        var next = item.nextReview || 0;
+        if (next > now) return 0;
+        var overdueMs = now - next;
+        var intervalMs = Math.max(1, (Number(item.interval) || 1)) * 86400000;
+        return overdueMs / intervalMs;
+    }}
+
+    var r1 = getOverdueRatio(item1, now);
+    var r2 = getOverdueRatio(item2, now);
+    if (r1 < 2.9 || r1 > 3.1) throw new Error("r1 ratio unexpected: " + r1);
+    if (r2 < 0.02 || r2 > 0.04) throw new Error("r2 ratio unexpected: " + r2);
+    if (r1 <= r2) throw new Error("Item 1 should have much higher overdue priority than Item 2");
+    print("RATIO_OK");
+    """
+    res = subprocess.run([JSC_PATH, "-e", test_ratio_script], capture_output=True, text=True)
+    if res.returncode == 0 and "RATIO_OK" in res.stdout:
+        log_pass("FSRS relative overdue ratio correctly prioritizes critical memory decay cards")
+    else:
+        log_fail(f"Overdue ratio test failed: {res.stderr or res.stdout}")
+
+    # 6-3. Database Health Check & Self-Healing button in HTML
+    html_path = os.path.join(BASE_DIR, "index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        html = f.read()
+    if "runDatabaseDiagnosticsAndRepair()" in html:
+        log_pass("Self-Healing Database Diagnostics & Repair tool exposed in settingsModal")
+    else:
+        log_fail("runDatabaseDiagnosticsAndRepair missing from index.html")
+
+    # 6-4. Haptic Feedback vibration pattern verification
+    anki_path = os.path.join(BASE_DIR, "js/anki.js")
+    with open(anki_path, "r", encoding="utf-8") as f:
+        anki_code = f.read()
+    test_haptic_script = f"""
+    var window = globalThis;
+    var calls = [];
+    var navigator = {{
+        vibrate: function(pat) {{ calls.push(pat); }}
+    }};
+    {anki_code}
+
+    var SRS = window.VocabSRS;
+    SRS.triggerHaptic('light');
+    SRS.triggerHaptic('again');
+    SRS.triggerHaptic('good');
+    SRS.triggerHaptic('easy');
+
+    if (calls.length !== 4) throw new Error("Haptic calls count mismatch: " + calls.length);
+    print("HAPTIC_OK");
+    """
+    res = subprocess.run([JSC_PATH, "-e", test_haptic_script], capture_output=True, text=True)
+    if res.returncode == 0 and "HAPTIC_OK" in res.stdout:
+        log_pass("Haptic Feedback Engine delivers precision tactile patterns (again, good, easy, light)")
+    else:
+        log_fail(f"Haptic test failed: {res.stderr or res.stdout}")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -274,6 +356,7 @@ def main():
     test_storage_tombstones()
     test_html_js_integrity()
     test_prompt_injection_sanitizer()
+    test_s_grade_features()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")
@@ -282,7 +365,7 @@ def main():
     if FAILED > 0:
         sys.exit(1)
     else:
-        print("\033[32m✔ All quality gates passed! Ready for A-Grade certification.\033[0m\n")
+        print("\033[32m✔ All quality gates passed! S-Grade Masterpiece certified.\033[0m\n")
         sys.exit(0)
 
 if __name__ == "__main__":

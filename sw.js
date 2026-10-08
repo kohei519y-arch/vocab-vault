@@ -1,7 +1,7 @@
 /**
  * Vocab Vault — Service Worker (PWA Offline & Cache)
  */
-const CACHE_NAME = 'vocab-vault-v6-20261008-a-grade-perfection';
+const CACHE_NAME = 'vocab-vault-v7-20261008-s-grade-masterpiece';
 
 const PRECACHE_ASSETS = [
   './',

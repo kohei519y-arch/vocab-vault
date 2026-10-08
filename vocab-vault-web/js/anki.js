@@ -119,15 +119,16 @@
     window.addEventListener('online', flushOfflineReviews);
   }
 
-  // --- 触覚フィードバック (Web Vibration API) ---
+  // --- 触覚フィードバック (Web Vibration API: ネイティブ感覚の微細ハプティクス) ---
   function triggerHaptic(type = 'light') {
     if (typeof navigator === 'undefined' || !navigator.vibrate) return;
     try {
-      if (type === 'light') navigator.vibrate(15);
-      else if (type === 'again') navigator.vibrate([40, 50, 40]);
-      else if (type === 'good') navigator.vibrate([20, 40, 20]);
-      else if (type === 'easy') navigator.vibrate(30);
-      else navigator.vibrate(20);
+      if (type === 'light') navigator.vibrate(8); // スワイプ閾値通過時や軽操作
+      else if (type === 'again') navigator.vibrate([40, 60, 40]); // もう一度 (重いダブルパルス)
+      else if (type === 'hard') navigator.vibrate(30); // 難しい (鈍い単振動)
+      else if (type === 'good') navigator.vibrate(15); // 普通・正解 (クリスピーな単振動)
+      else if (type === 'easy') navigator.vibrate([12, 40, 15]); // 簡単・達成感 (リズミカルなダブルタップ)
+      else navigator.vibrate(12);
     } catch {}
   }
 

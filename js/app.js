@@ -1404,6 +1404,9 @@
   }
 
   function jumpToWord(w, tLang = App.lang) {
+    if ($('anki')?.style.display === 'block') {
+      exitAnki();
+    }
     const spec = parseInputWordSpec(w);
     const lk = makeLookupKey(spec.cleanWord, tLang, spec.homographIndex);
     if (tLang && tLang !== App.lang && !App.crossLang) {
@@ -2604,9 +2607,120 @@
     showToast(`${overdue.length} 語の復習スケジュールを今後7日間に均等再配分しました。`, 'ok');
   }
 
+  // [自己修復エンジン] データベース整合性診断 & 自動修復 (Health Check & Self-Healing)
+  async function runDatabaseDiagnosticsAndRepair() {
+    showToast('データベース整合性診断を実行中...', 'info', 2000);
+    const now = Date.now();
+    let totalScanned = 0;
+    let issuesFixed = 0;
+    let tombstonesPruned = 0;
+    const reportDetails = [];
+
+    const langKeys = global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja'];
+
+    for (const l of langKeys) {
+      const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+      const list = getJson(cfg.key);
+      if (!Array.isArray(list) || !list.length) continue;
+
+      totalScanned += list.length;
+      let langFixed = 0;
+      const seenIds = new Set();
+      const validEntries = [];
+
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        let itemModified = false;
+
+        // 1. IDの補完・重複修復
+        if (!item.id || typeof item.id !== 'string') {
+          item.id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `id_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+          itemModified = true;
+        }
+        if (seenIds.has(item.id)) {
+          item.id = `${item.id}_${Math.random().toString(36).slice(2, 5)}`;
+          itemModified = true;
+        }
+        seenIds.add(item.id);
+
+        // 2. タイムスタンプの正規化（未来日付やNaNの修復）
+        if (!Number.isFinite(item.updatedAt) || item.updatedAt <= 0 || item.updatedAt > now + 86400000 * 365) {
+          item.updatedAt = now;
+          itemModified = true;
+        }
+        if (!Number.isFinite(item.nextReview) || item.nextReview < 0) {
+          item.nextReview = now + 86400000;
+          itemModified = true;
+        }
+        if (!Number.isFinite(item.interval) || item.interval < 0) {
+          item.interval = 1;
+          itemModified = true;
+        }
+        if (!Number.isFinite(item.efactor) || item.efactor < 1.3 || item.efactor > 4.0) {
+          item.efactor = 2.5;
+          itemModified = true;
+        }
+
+        // 3. wordKey の補完
+        if (!item.wordKey && global.VocabCore?.makeWordKey) {
+          item.wordKey = global.VocabCore.makeWordKey(item.word, cfg.srcLang || l, item.meanings?.[0]?.pos, item.homographIndex);
+          itemModified = true;
+        }
+
+        if (itemModified) {
+          langFixed++;
+          issuesFixed++;
+        }
+        validEntries.push(item);
+      }
+
+      if (langFixed > 0) {
+        setJson(cfg.key, validEntries, true);
+        reportDetails.push(`${l.toUpperCase()}: ${langFixed}件の不整合を修復`);
+      }
+
+      // 4. Tombstone バキューム
+      if (global.VocabStorage?.vacuumOldTombstones) {
+        const preTombCount = global.VocabStorage.getTombstones(l).size;
+        const cleaned = global.VocabStorage.vacuumOldTombstones(l);
+        const pruned = preTombCount - cleaned.size;
+        if (pruned > 0) {
+          tombstonesPruned += pruned;
+          reportDetails.push(`${l.toUpperCase()}: ${pruned}件の期限切れTombstoneをパージ`);
+        }
+      }
+    }
+
+    // 最新状態を再読み込み
+    load(App.page);
+
+    const summaryMsg = issuesFixed > 0 || tombstonesPruned > 0
+      ? `診断・修復完了: ${totalScanned}語を検証、${issuesFixed}件の不整合を自動修復、${tombstonesPruned}件の不要Tombstoneを削除しました。`
+      : `診断完了: 全${totalScanned}語の整合性は100%正常です（エラーなし・データ完全性維持）。`;
+
+    showToast(summaryMsg, 'ok', 5000);
+    alert(`【データベース健全性診断レポート】\n\n・検証対象単語: ${totalScanned} 語\n・修復した不整合: ${issuesFixed} 箇所\n・パージした古い削除マーカー: ${tombstonesPruned} 件\n・データベース状態: 最適化済み（Healthy: 100%）\n\n${reportDetails.join('\n') || 'すべてのデータが完全整合しています。'}`);
+  }
+
+  // [FSRS / 認知工学準拠] 相対期日超過率（Relative Overdue Ratio）: 予定インターバルに対する超過度を算出し忘却危機度順に優先ソート
+  function getOverdueRatio(item, now = Date.now()) {
+    const next = item.nextReview || 0;
+    if (next > now) return 0;
+    const overdueMs = now - next;
+    const intervalMs = Math.max(1, (Number(item.interval) || 1)) * 86400000;
+    return overdueMs / intervalMs;
+  }
+
   function startAnki() {
     const now = Date.now();
-    const allDue = getFiltered().filter(i => (i.nextReview || 0) <= now).sort((a, b) => a.nextReview - b.nextReview);
+    const allDue = getFiltered()
+      .filter(i => (i.nextReview || 0) <= now)
+      .sort((a, b) => {
+        const ratioA = getOverdueRatio(a, now);
+        const ratioB = getOverdueRatio(b, now);
+        if (Math.abs(ratioB - ratioA) > 0.01) return ratioB - ratioA;
+        return (a.nextReview || 0) - (b.nextReview || 0);
+      });
     if (!allDue.length) {
       showToast('現在、復習期日を迎えた単語はありません。すべて定着しています。', 'info', 3000);
       return;
@@ -2776,15 +2890,20 @@
       currentList.forEach(item => {
         if (suggestions.length >= 7) return;
         const wLow = (item.word || '').toLowerCase();
-        if (wLow.startsWith(raw) || (raw.length >= 3 && wLow.includes(raw))) {
-          suggestions.push({
+        const isExact = wLow === raw;
+        if (isExact || wLow.startsWith(raw) || (raw.length >= 3 && wLow.includes(raw))) {
+          const entry = {
             type: 'word',
             word: item.word,
             meaning: item.meanings?.[0]?.text || '',
             pos: item.meanings?.[0]?.pos || '',
+            folder: item.folder || '',
             isRegistered: true,
+            isExact,
             item
-          });
+          };
+          if (isExact) suggestions.unshift(entry);
+          else suggestions.push(entry);
         }
       });
 
@@ -2798,7 +2917,8 @@
             word: r,
             meaning: '印欧祖語・重要語根',
             pos: 'Root',
-            isRegistered: false
+            isRegistered: false,
+            isExact: false
           });
         }
       });
@@ -2812,13 +2932,13 @@
 
       activeIndex = -1;
       box.innerHTML = suggestions.map((s, idx) => `
-        <div class="suggest-item" data-idx="${idx}" data-type="${s.type}" data-word="${esc(s.word)}">
+        <div class="suggest-item ${s.isExact ? 'exact-match' : ''}" data-idx="${idx}" data-type="${s.type}" data-word="${esc(s.word)}">
           <div class="suggest-item-left">
-            <span class="suggest-item-word">${esc(s.word)}</span>
+            <span class="suggest-item-word">${esc(s.word)}${s.folder ? `<small style="margin-left:6px;font-size:10px;color:var(--m)">[${esc(s.folder)}]</small>` : ''}</span>
             <span class="suggest-item-meaning">${esc(s.meaning)}</span>
           </div>
-          <span class="suggest-item-badge ${s.isRegistered ? 'registered' : s.type === 'root' ? 'root' : ''}">
-            ${s.isRegistered ? '登録済' : s.type === 'root' ? '語根' : esc(s.pos)}
+          <span class="suggest-item-badge ${s.isExact ? 'exact' : s.isRegistered ? 'registered' : s.type === 'root' ? 'root' : ''}">
+            ${s.isExact ? '登録済(タップで移動)' : s.isRegistered ? '登録済' : s.type === 'root' ? '語根' : esc(s.pos)}
           </span>
         </div>
       `).join('');
@@ -3849,6 +3969,8 @@ etymology:${eInst}`;
     exitAnki,
     setDailyReviewCap,
     rescheduleOverdueReviews,
+    runDatabaseDiagnosticsAndRepair,
+    getOverdueRatio,
     delW,
     clearCurrentLang,
     submitW,

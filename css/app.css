@@ -118,7 +118,7 @@ button:disabled { opacity:.5; cursor:not-allowed; }
 .sort-sel { padding:3px 8px; font-size:11.5px; border-radius:4px; background:var(--bg-side); color:var(--s); border:1px solid var(--b); }
 .doc-title small { font-family:var(--mono); font-size:12px; font-weight:400; color:var(--m); flex-shrink:0; }
 
-.card { border-bottom:1px solid var(--b); padding:14px 6px 16px; display:grid; grid-template-columns:205px 1fr; gap:18px; font-size:13.5px; position:relative; }
+.card { border-bottom:1px solid var(--b); padding:14px 6px 16px; display:grid; grid-template-columns:205px 1fr; gap:18px; font-size:13.5px; position:relative; content-visibility:auto; contain-intrinsic-size:0 160px; contain:layout paint style; }
 .card:hover { background:var(--bg-side); }
 .card.highlight-jump { background:var(--ac-bg); }
 .card-acts { position:absolute; top:8px; right:6px; display:flex; gap:2px; opacity:0; transition:opacity .15s; }
@@ -657,7 +657,7 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   .ribbon, .sidebar, .side-backdrop, .tab-bar, .add-bar, .doc-title, #pag, .card-acts, .due, .tag-wrap, .ety-net, .modal-ov, .loading-card, .spk-btn, .feedback-banner { display:none !important; }
   .workspace, .main-pane, .content-scroll, .content-inner, #listView { display:block !important; width:100% !important; max-width:100% !important; height:auto !important; overflow:visible !important; padding:0 !important; margin:0 !important; }
   #list { column-count:2; column-gap:4.5mm; column-rule:.5pt solid var(--b); width:100%; }
-  .card { display:block !important; background:#fff !important; border-bottom:.5pt solid var(--b); padding:2.5pt 0; margin:0; break-inside:avoid; page-break-inside:avoid; }
+  .card { display:block !important; background:#fff !important; border-bottom:.5pt solid var(--b); padding:2.5pt 0; margin:0; break-inside:avoid; page-break-inside:avoid; content-visibility:visible !important; }
   .col-left, .hw-wrap, .right, .m-line, .d-wrap > div, .sub-h, .sub-p, .ex-en, .ex-ja, .ph-line, .pos-block, .pho, .gram-line { display:inline; }
   .col-left, .ex-en, .gram-line { margin-right:4pt; } .id, .pos, .sub-h .pos-lbl, .gram-line { font-size:6.5pt; } .hw { font-size:9.5pt; font-weight:800; color:#000; } .pho, .ex-ja, .ph-line span, .core-box { font-size:7pt; }
   .pos { padding:0 3pt; margin-right:2pt; border:.5pt solid #c4b5fd; } .m-red { font-size:8pt; } .m-red .m-hist-note { font-size:7.3pt; }
@@ -746,9 +746,18 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   font-weight: 600;
   white-space: nowrap;
 }
+.suggest-item.exact-match {
+  background: rgba(109,40,217,.08);
+  border-left: 3px solid var(--ac);
+}
 .suggest-item-badge.registered {
   background: rgba(16,124,65,.15);
   color: var(--ok);
+}
+.suggest-item-badge.exact {
+  background: var(--ac-bg);
+  color: var(--ac);
+  font-weight: 700;
 }
 .suggest-item-badge.root {
   background: var(--ac-bg);

@@ -572,6 +572,13 @@
           </div>
           <button type="button" class="btn-o btn-xs" onclick="rescheduleOverdueReviews()">均等に再配分</button>
         </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
+          <div>
+            <div style="font-size:12px;font-weight:700">データベース整合性診断 & 自己修復 (Self-Healing)</div>
+            <p class="cfg-desc" style="margin:2px 0 0">全単語レコードの整合性、重複ID、無効な日付、および不要Tombstoneを自動スキャンし最適化します。</p>
+          </div>
+          <button type="button" class="btn-o btn-xs" onclick="runDatabaseDiagnosticsAndRepair()">診断 & 修復を実行</button>
+        </div>
       </div>
 
       <!-- データ主権と永久無料保証 -->
