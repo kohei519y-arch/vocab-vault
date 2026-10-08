@@ -34,6 +34,13 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/app.css">
   <script>
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      caches.keys().then(function(keys) {
+        keys.forEach(function(k) {
+          if (!k.includes('v11')) { caches.delete(k); }
+        });
+      }).catch(function(){});
+    }
     window.DEV_MASTER_MODE = true;
     try { localStorage.setItem('vv_dev_unlocked', '1'); } catch(e){}
   </script>
@@ -901,7 +908,19 @@
       }
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed:', err));
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker.postMessage('skipWaiting');
+              }
+            });
+          }
+        });
+      }).catch(err => console.warn('SW registration failed:', err));
     });
   }
 </script>

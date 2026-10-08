@@ -1,5 +1,5 @@
 :root {
-  --bg-main:#fff; --bg-side:#f6f6f6; --bg-rib:#ededed; --bg-hov:#e4e4e4; --bg-act:#dcdcdc;
+  --bg-main:#fff; --bg-side:#f6f6f6; --bg-rib:#ededed; --bg-hov:#e4e4e4; --bg-act:#dcdcdc; --bg-card:#ffffff;
   --b:#e0e0e0; --b-s:#ebebeb; --t:#222; --s:#525252; --m:#666;
   --ac:#7c3aed; --ac-bg:rgba(124,58,237,.1); --ac-b:rgba(124,58,237,.3);
   --cog:#0284c7; --cog-bg:rgba(2,132,199,.1); --cog-b:rgba(2,132,199,.32);
@@ -8,7 +8,7 @@
   --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
 }
 body.dark {
-  --bg-main:#1e1e1e; --bg-side:#252526; --bg-rib:#1b1b1c; --bg-hov:#2f2f31; --bg-act:#37373a;
+  --bg-main:#1e1e1e; --bg-side:#252526; --bg-rib:#1b1b1c; --bg-hov:#2f2f31; --bg-act:#37373a; --bg-card:#252526;
   --b:#333; --b-s:#292929; --t:#dcddde; --s:#a8a8a8; --m:#8e8e8e;
   --ac:#a78bfa; --ac-bg:rgba(167,139,250,.14); --ac-b:rgba(167,139,250,.38);
   --cog:#38bdf8; --cog-bg:rgba(56,189,248,.13); --cog-b:rgba(56,189,248,.38);
@@ -298,6 +298,8 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   }
   .main-pane {
     width: 100vw;
+    flex: 1;
+    min-height: 0;
     height: calc(100% - 52px - var(--safe-b)); /* ボトムバーの高さを除いた全画面 */
   }
 

@@ -2,6 +2,15 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <script>
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      caches.keys().then(function(keys) {
+        keys.forEach(function(k) {
+          if (!k.includes('v11')) { caches.delete(k); }
+        });
+      }).catch(function(){});
+    }
+  </script>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://*.wiktionary.org https://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="theme-color" content="#1b1b1c">
@@ -909,7 +918,19 @@
       }
     });
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed:', err));
+      navigator.serviceWorker.register('./sw.js').then(reg => {
+        if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker.postMessage('skipWaiting');
+              }
+            });
+          }
+        });
+      }).catch(err => console.warn('SW registration failed:', err));
     });
   }
 </script>
