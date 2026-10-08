@@ -187,6 +187,74 @@ def test_storage_tombstones():
     else:
         log_fail(f"Tombstone vacuum test error: {res.stderr or res.stdout}")
 
+def test_delete_word_integrity():
+    print("\n--- 3b. Word Deletion (delW) & Storage Sync Test ---")
+    scripts = ["js/storage.js", "js/anki.js", "js/sync.js", "js/ocr.js", "js/graph.js", "js/feedback.js", "js/starter_pack.js", "js/app.js"]
+    combined_code = """
+    var window = globalThis;
+    var global = globalThis;
+    globalThis.location = { pathname: '/', search: '?master=1' };
+    globalThis.URLSearchParams = function(s) { return { get: function(k) { return k === 'master' ? '1' : null; } }; };
+    var storageData = {};
+    globalThis.localStorage = {
+        getItem: function(k) { return storageData[k] || null; },
+        setItem: function(k, v) { storageData[k] = String(v); },
+        removeItem: function(k) { delete storageData[k]; }
+    };
+    globalThis.confirm = function() { return true; };
+    globalThis.requestAnimationFrame = function(cb) { cb(); };
+    globalThis.addEventListener = function() {};
+    globalThis.document = {
+        addEventListener: function() {},
+        body: { classList: { add: function(){}, remove: function(){}, contains: function(){ return false; }, toggle: function(){} } },
+        getElementById: function() { return { value: '', classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        querySelector: function() { return { value: '', classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        querySelectorAll: function() { return []; },
+        createElement: function() { return { style: {}, appendChild: function(){}, addEventListener: function(){}, remove: function(){}, dataset: {}, classList: { add: function(){} } }; },
+        createDocumentFragment: function() { return { appendChild: function(){} }; }
+    };
+    globalThis.navigator = { userAgent: 'iPhone', onLine: true };
+    globalThis.innerWidth = 390;
+    globalThis.innerHeight = 844;
+    """
+
+    for s in scripts:
+        with open(os.path.join(BASE_DIR, s), "r", encoding="utf-8") as f:
+            combined_code += f"\n// --- {s} ---\n" + f.read()
+
+    combined_code += """
+    // Setup test items
+    var item1 = { id: "item-1", num: 1, word: "alpha", lang: "en", meanings: [{ pos: "N[C]", text: "最初の文字" }] };
+    var item2 = { id: "item-2", num: 2, word: "beta", lang: "en", meanings: [{ pos: "N[C]", text: "2番目の文字" }] };
+    localStorage.setItem("distinction_entries", JSON.stringify([item1, item2]));
+    App.entries = [item1, item2];
+    if (global.VocabStorage) global.VocabStorage.state.mem["distinction_entries"] = [item1, item2];
+
+    // Delete item1
+    VocabCore.delW("item-1", "en", true);
+
+    if (App.entries.length !== 1) throw new Error("App.entries length should be 1 after delW, got " + App.entries.length);
+    if (App.entries[0].id !== "item-2") throw new Error("Remaining item should be item-2");
+    if (App.entries[0].num !== 1) throw new Error("Remaining item num should be renumbered to 1, got " + App.entries[0].num);
+
+    var stored = JSON.parse(localStorage.getItem("distinction_entries") || "[]");
+    if (stored.length !== 1 || stored[0].id !== "item-2") throw new Error("localStorage distinction_entries was not updated correctly");
+
+    // Check tombstone recorded
+    var tombstones = VocabStorage.getTombstones("en");
+    if (!tombstones.has("id:item-1")) throw new Error("Tombstone for item-1 was not recorded");
+
+    print("OK");
+    """
+
+    res = subprocess.run([JSC_PATH, "-e", combined_code], capture_output=True, text=True)
+    if res.returncode == 0 and "OK" in res.stdout:
+        log_pass("Word deletion (delW) removes target item cleanly and renumbers sequence")
+        log_pass("Storage and memory cache are synchronously purged on deletion")
+        log_pass("Tombstone audit marker is registered to prevent resurrection on cloud sync")
+    else:
+        log_fail(f"Word deletion test error: {res.stderr or res.stdout}")
+
 def test_html_js_integrity():
     print("\n--- 4. HTML-JS DOM & Ribbon Navigation Integrity ---")
     html_path = os.path.join(BASE_DIR, "index.html")
@@ -398,6 +466,7 @@ def main():
     check_jsc_syntax()
     test_srs_anchor_bonus()
     test_storage_tombstones()
+    test_delete_word_integrity()
     test_html_js_integrity()
     test_prompt_injection_sanitizer()
     test_s_grade_features()

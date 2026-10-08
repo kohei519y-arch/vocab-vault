@@ -570,21 +570,34 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   /* 右上のアクションボタンと単語本体の重なりを完全防止 */
   .col-left {
     position: relative;
-    padding-right: 58px;
+    padding-right: 76px;
   }
   .card-acts {
-    opacity: 0.85; /* スマホでも見失わないように常時表示 */
-    top: 2px;
-    right: 0px;
-    gap: 0;
+    opacity: 0.95;
+    top: 4px;
+    right: 4px;
+    gap: 4px;
   }
   .act-icon-btn {
-    padding: 6px;
-    color: var(--m);
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--bg-hov);
+    color: var(--s);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   .act-icon-btn svg {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
+  }
+  .act-icon-btn.del-btn:active, .act-icon-btn.del-btn:hover {
+    background: rgba(209, 52, 56, 0.2);
+    color: var(--r);
   }
 
   /* 見出し語（.hw）を最前面・最高コントラストで主役に */

@@ -851,12 +851,13 @@
     if (global.VocabStorage) global.VocabStorage.state.loadFailed[storageKey] = false;
 
     let lsOk = false;
-    if (!global.VocabStorage?.state?.idbOnlyMode) {
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(next));
-        lsOk = true;
-        updateStorageStatusUI('ok');
-      } catch { lsOk = false; }
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      lsOk = true;
+      updateStorageStatusUI('ok');
+    } catch {
+      lsOk = false;
+      if (global.VocabStorage) global.VocabStorage.state.idbOnlyMode = true;
     }
 
     if (global.VocabStorage) {
@@ -3057,22 +3058,91 @@
     return list.find(i => makeLookupKey(i.word, tL, i.homographIndex) === lk);
   }
 
-  function delW(idOrNum, tL = App.lang) {
-    if (!confirm('この単語を削除しますか？')) return;
-    const k = LANGS[tL].key, cur = getJson(k);
-    const target = cur.find(i => (typeof idOrNum === 'string' && i.id === idOrNum) || (Number.isInteger(idOrNum) && i.num === idOrNum));
-    if (!target) return;
+  function delW(idOrNum, tL = App.lang, skipConfirm = false) {
+    if (!skipConfirm && !confirm('この単語を削除しますか？')) return;
+
+    // 1. 対象の言語ペアとストレージキーを特定
+    const activeCfg = getActivePairConfig();
+    const curPairKey = activeCfg.key;
+    const targetKey = (tL && LANGS[tL]?.key && !App.crossLang) ? LANGS[tL].key : curPairKey;
+
+    // 2. 現在の配列を取得（メモリおよび最新ストレージから）
+    let list = [...getJson(targetKey)];
+    if (!list.length && App.entries.length) list = [...App.entries];
+
+    // 3. 対象単語を柔軟かつ確実にマッチング (id, num, word, wordKey)
+    const targetIdx = list.findIndex(i => {
+      if (typeof idOrNum === 'string' && idOrNum) {
+        if (i.id === idOrNum) return true;
+        if (i.word === idOrNum) return true;
+        if (i.wordKey === idOrNum) return true;
+      }
+      const parsedNum = Number(idOrNum);
+      if (Number.isFinite(parsedNum) && parsedNum > 0 && Number(i.num) === parsedNum) return true;
+      return false;
+    });
+
+    if (targetIdx === -1) {
+      // 現在のリストで見つからない場合、全言語ペアから検索・救済削除
+      let foundInOther = false;
+      getAllKnownPairConfigs().forEach(p => {
+        if (foundInOther) return;
+        const otherList = [...getJson(p.key)];
+        const idx = otherList.findIndex(i => {
+          if (typeof idOrNum === 'string' && idOrNum && (i.id === idOrNum || i.word === idOrNum)) return true;
+          const n = Number(idOrNum);
+          return Number.isFinite(n) && n > 0 && Number(i.num) === n;
+        });
+        if (idx !== -1) {
+          const tgt = otherList[idx];
+          tgt.isDeleted = true;
+          tgt.updatedAt = Date.now();
+          if (global.VocabStorage) global.VocabStorage.recordTombstone(tgt, p.src, tgt.updatedAt);
+          const nextOther = otherList.filter((_, i) => i !== idx).map((it, i) => ({ ...it, num: i + 1 }));
+          setJson(p.key, nextOther, true, true);
+          foundInOther = true;
+        }
+      });
+      load(App.page);
+      return;
+    }
+
+    const target = list[targetIdx];
     const now = Date.now();
     target.isDeleted = true;
     target.updatedAt = now;
-    if (global.VocabStorage) global.VocabStorage.recordTombstone(target, tL, now);
-    setJson(k, cur.filter(i => i !== target).map((it, idx) => ({ ...it, num: idx + 1 })), true, true);
+
+    // 4. 墓石 (Tombstone) を記録
+    if (global.VocabStorage) {
+      global.VocabStorage.recordTombstone(target, target.lang || tL, now);
+    }
+
+    // 5. リストから除外して番号を再付与
+    const nextList = list.filter((_, idx) => idx !== targetIdx).map((it, idx) => ({ ...it, num: idx + 1 }));
+
+    // 6. ストレージとメモリを一元更新
+    setJson(targetKey, nextList, true, true);
+    App.entries = nextList;
+    if (global.VocabStorage) {
+      global.VocabStorage.state.mem[targetKey] = nextList;
+    }
+
+    // 7. Anki 復習キュー (App.aList) からも即座に抹消
+    if (App.aList.length) {
+      App.aList = App.aList.filter(item => item.id !== target.id && item.word !== target.word);
+    }
+
+    // 8. 画面再描画とトースト通知
     load(App.page);
+    showToast(`「${target.word}」を削除しました`, 'ok');
   }
 
   function clearCurrentLang() {
-    if (!confirm(`選択中の言語（${LANGS[App.lang].label}）の全単語を削除しますか？`)) return;
-    const l = App.lang, cur = getJson(LANGS[l].key), now = Date.now();
+    const pairCfg = getActivePairConfig();
+    const l = App.srcLang;
+    const label = pairCfg.label || LANGS[l]?.label || '現在の単語帳';
+    if (!confirm(`選択中の単語帳（${label}）の全単語を削除しますか？`)) return;
+    const cur = getJson(pairCfg.key), now = Date.now();
     if (global.VocabStorage) {
       global.VocabStorage.saveClearedAt(l, now);
       const map = global.VocabStorage.getTombstones(l);
@@ -3080,14 +3150,15 @@
         if (item.id) map.set(`id:${item.id}`, now);
         const wk = item.wordKey || makeWordKey(item.word, l, item.meanings?.[0]?.pos, item.homographIndex);
         if (wk) map.set(`wk:${wk}`, now);
-        const normW = String(item.word || '').trim().toLowerCase();
-        if (normW) map.set(`word:${normW}`, now);
       });
       global.VocabStorage.saveTombstones(l, map);
     }
-    setJson(LANGS[l].key, [], true, true);
+    setJson(pairCfg.key, [], true, true);
+    App.entries = [];
+    if (global.VocabStorage) global.VocabStorage.state.mem[pairCfg.key] = [];
     load(1);
     toggleModal('settingsModal', false);
+    showToast('すべての単語を削除しました', 'ok');
   }
 
   // --- 6. 単語登録・キュー管理 ---
@@ -3694,7 +3765,13 @@ etymology:${eInst}`;
       else if (act === 'open-graph') openGraphModal(el.dataset.root);
       else if (act === 'jump') jumpToWord(el.dataset.word, el.dataset.lang);
       else if (act === 'edit') openEditModal(el.dataset.id || parseInt(el.dataset.num, 10), el.dataset.lang || App.lang);
-      else if (act === 'del') { const num = parseInt(el.dataset.num, 10); delW(el.dataset.id || (Number.isInteger(num) ? num : -1), el.dataset.lang || App.lang); }
+      else if (act === 'del') {
+        e.preventDefault();
+        e.stopPropagation();
+        const num = parseInt(el.dataset.num, 10);
+        const cardWord = el.closest('.card')?.dataset?.word;
+        delW(el.dataset.id || (Number.isInteger(num) ? num : cardWord), el.dataset.lang || App.lang);
+      }
       else if (act === 'toggle-clamp') el.classList.toggle('clamp');
       else if (act === 'page') { App.page += Number(el.dataset.dir); render(); $('mainScroll')?.scrollTo(0, 0); }
       else if (act === 'rate') procRev(Number(el.dataset.rate));

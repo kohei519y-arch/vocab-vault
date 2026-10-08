@@ -308,22 +308,17 @@
     const sLang = (typeof l === 'string' && l.length === 2) ? l : (resolveConfig(l).srcLang || 'en');
     const wk = item.wordKey || (global.VocabCore?.makeWordKey ? global.VocabCore.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
     if (wk) map.set(`wk:${wk}`, deletedAt);
-    const normW = String(item.word || '').trim().toLowerCase();
-    if (normW) map.set(`word:${normW}`, deletedAt);
     saveTombstones(l, map);
   }
 
   function isTombstoned(item, tombMap, l = 'en', clearedAt = getClearedAt(l)) {
-    // updatedAt が未設定または無効な場合は過去のデータ(0)とし、現在時刻(Date.now())にフォールバックして削除マーカーを突破させない
     const upd = (Number.isFinite(item.updatedAt) && item.updatedAt > 1) ? item.updatedAt : 0;
     if (clearedAt > 0 && (upd <= clearedAt || upd === 0)) return true;
     const delById = item.id ? (tombMap.get(`id:${item.id}`) || 0) : 0;
     const sLang = (typeof l === 'string' && l.length === 2) ? l : (resolveConfig(l).srcLang || 'en');
     const wk = item.wordKey || (global.VocabCore?.makeWordKey ? global.VocabCore.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
     const delByWk = wk ? (tombMap.get(`wk:${wk}`) || 0) : 0;
-    const normW = String(item.word || '').trim().toLowerCase();
-    const delByWord = normW ? (tombMap.get(`word:${normW}`) || 0) : 0;
-    const maxDel = Math.max(delById, delByWk, delByWord);
+    const maxDel = Math.max(delById, delByWk);
     return maxDel > 0 && (upd === 0 || maxDel >= upd);
   }
 
