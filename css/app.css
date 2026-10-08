@@ -405,7 +405,7 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     padding: 0;
   }
   .side-backdrop {
-    display: block;
+    display: none;
     position: fixed;
     inset: 0;
     z-index: 65;
@@ -417,10 +417,12 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     transition: opacity 0.25s ease;
   }
   body:not(.side-collapsed) .side-backdrop {
+    display: block !important;
     opacity: 1;
     pointer-events: auto;
   }
   body.side-collapsed .side-backdrop {
+    display: none !important;
     opacity: 0;
     pointer-events: none;
   }

@@ -227,6 +227,36 @@ def test_html_js_integrity():
     if order_ok:
         log_pass("All modular JS scripts are loaded in deterministic dependency order")
 
+    # Verify strict HTML tag nesting and zero mismatch errors
+    from html.parser import HTMLParser
+    class TagChecker(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.stack = []
+            self.void_elements = {'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr'}
+            self.errors = []
+        def handle_starttag(self, tag, attrs):
+            if tag.lower() not in self.void_elements:
+                self.stack.append((tag.lower(), self.getpos()))
+        def handle_endtag(self, tag):
+            tag = tag.lower()
+            if tag in self.void_elements:
+                return
+            if not self.stack:
+                self.errors.append(f"Unexpected </{tag}> at line {self.getpos()[0]}")
+                return
+            last, pos = self.stack.pop()
+            if last != tag:
+                self.errors.append(f"Mismatched tag: expected </{last}> (from L{pos[0]}), got </{tag}> at L{self.getpos()[0]}")
+
+    c = TagChecker()
+    c.feed(html)
+    if not c.errors and not c.stack:
+        log_pass("Strict HTML DOM tree hierarchy is 100% valid with zero mismatched tags")
+    else:
+        for err in c.errors[:3]:
+            log_fail(f"HTML nesting error: {err}")
+
 def test_prompt_injection_sanitizer():
     print("\n--- 5. Prompt Injection Defense (vocab-generate) ---")
     ts_path = os.path.join(BASE_DIR, "supabase/functions/vocab-generate/index.ts")
