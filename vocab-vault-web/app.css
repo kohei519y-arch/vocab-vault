@@ -552,6 +552,17 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     position: relative;
   }
+  .desktop-only-details {
+    display: none !important;
+  }
+  .card-details-accordion {
+    display: block !important;
+  }
+  .card-details-accordion[open] .sum-lbl::after {
+    content: " (タップで閉じる)";
+    font-size: 10px;
+    opacity: 0.8;
+  }
   /* 右上のアクションボタンと単語本体の重なりを完全防止 */
   .col-left {
     position: relative;
@@ -906,13 +917,13 @@ kbd.kbd-hint {
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
-/* シンプルモード時：語源・派生語アコーディオン */
-.simple-ety-details {
-  margin-top: 8px;
-  border-top: 1px dashed var(--b);
-  padding-top: 6px;
+/* 段階的情報開示 (Progressive Disclosure) アコーディオン */
+.card-details-accordion {
+  margin-top: 6px;
+  border-top: 1px dashed var(--b-s);
+  padding-top: 4px;
 }
-.simple-ety-sum {
+.card-details-sum {
   font-size: 11px;
   font-weight: 600;
   color: var(--ac);
@@ -921,20 +932,56 @@ kbd.kbd-hint {
   list-style: none;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--bg-hov);
-  transition: background .15s ease;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.22);
+  transition: all .2s ease;
 }
-.simple-ety-sum:hover {
-  background: var(--bg-side);
+.card-details-sum:hover, .card-details-sum:active {
+  background: rgba(124, 58, 237, 0.16);
+  border-color: var(--ac);
 }
-.simple-ety-sum::-webkit-details-marker {
+.card-details-sum::-webkit-details-marker {
   display: none;
 }
-.simple-ety-content {
-  margin-top: 6px;
+.card-details-accordion[open] .card-details-sum {
+  background: var(--bg-hov);
+  border-color: var(--b);
+  color: var(--s);
+}
+.card-details-accordion[open] .sum-arrow {
+  transform: rotate(180deg);
+}
+.sum-arrow {
+  display: inline-block;
+  transition: transform .2s ease;
+  font-size: 10px;
+}
+.card-details-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: detailsFadeIn .22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes detailsFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.card-quick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+  margin-bottom: 2px;
+}
+.desktop-only-details {
+  display: block;
+}
+.card-details-accordion:not(.is-simple-mode) {
+  display: none;
 }
 
 /* ========================================================

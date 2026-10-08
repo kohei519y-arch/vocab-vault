@@ -231,7 +231,12 @@
     indexCache: new WeakMap(),
     rootIndexMap: new Map(),
     focusedCardIndex: -1,
-    viewMode: lsGet('vv_view_mode', 'academic'),
+    viewMode: (function() {
+      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+      const saved = lsGet(isMobile ? 'vv_view_mode_mobile' : 'vv_view_mode', null);
+      if (saved) return saved;
+      return isMobile ? 'simple' : 'academic';
+    })(),
     dailyReviewCap: parseInt(lsGet('vv_daily_review_cap', '30'), 10) || 30,
     isDev: checkDevMasterMode()
   };
@@ -1350,19 +1355,25 @@
     const netHtml = (chipsHtml || sLnk || cLnk) ? `<div class="ety-net">${chipsHtml}${sLnk}${cLnk}</div>` : '';
     const flagHtml = d.flags?.length ? `<div class="ety-net"><span class="conf-pill unknown" title="${esc(d.flags.join(' / '))}">要確認 ${d.flags.length}</span><span class="ety-lbl">${esc(d.flags.join(' / '))}</span></div>` : '';
 
-    const detailHtml = `${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}${drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : ''}${coreHtml}${etyHtml}${netHtml}${flagHtml}`;
+    const fullDetailsContent = `${histHtml}${exHtml}${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}${drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : ''}${coreHtml}${etyHtml}${netHtml}${flagHtml}`;
 
-    if (App.viewMode === 'simple') {
-      const accordion = detailHtml ? `<details class="simple-ety-details"><summary class="simple-ety-sum">語源・コアイメージ・派生語を表示 ▾</summary><div class="simple-ety-content">${detailHtml}</div></details>` : '';
-      return `<div class="right"><div class="m-line">${mHtml}</div>${histHtml}${exHtml}${accordion}</div>`;
+    const isSimple = App.viewMode === 'simple';
+    const openAttr = isSimple ? '' : ' open';
+    const accordion = fullDetailsContent ? `<details class="card-details-accordion ${isSimple ? 'is-simple-mode' : ''}"${openAttr}><summary class="card-details-sum"><span class="sum-lbl">詳細（語源・例文・歴史）を見る</span><span class="sum-arrow">▾</span></summary><div class="card-details-body">${fullDetailsContent}</div></details>` : '';
+
+    const quickChips = chipsHtml ? `<div class="card-quick-chips">${chipsHtml}</div>` : '';
+
+    if (isSimple) {
+      return `<div class="right"><div class="m-line">${mHtml}</div>${quickChips}${accordion}</div>`;
     }
 
-    return `<div class="right"><div class="m-line">${mHtml}</div>${histHtml}${exHtml}${detailHtml}</div>`;
+    return `<div class="right"><div class="m-line">${mHtml}</div>${quickChips}<div class="desktop-only-details">${fullDetailsContent}</div>${accordion}</div>`;
   }
 
   function setViewMode(mode) {
     App.viewMode = (mode === 'simple') ? 'simple' : 'academic';
-    lsSet('vv_view_mode', App.viewMode);
+    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+    lsSet(isMobile ? 'vv_view_mode_mobile' : 'vv_view_mode', App.viewMode);
     $('btnModeAcademic')?.classList.toggle('active', App.viewMode === 'academic');
     $('btnModeSimple')?.classList.toggle('active', App.viewMode === 'simple');
     render();
