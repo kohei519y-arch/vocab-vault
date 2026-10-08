@@ -398,20 +398,15 @@
   function playSpeechFallback(clean, l, defTag) {
     if (!window.speechSynthesis) return;
     try {
-      const busy = speechSynthesis.speaking || speechSynthesis.pending;
-      if (busy) speechSynthesis.cancel();
       if (speechSynthesis.paused) speechSynthesis.resume();
-      speakTimer = setTimeout(() => {
-        try {
-          const v = pickBestVoice(l), u = new SpeechSynthesisUtterance(clean);
-          activeUtter = u;
-          u.onend = u.onerror = () => { if (activeUtter === u) activeUtter = null; };
-          if (v) u.voice = v;
-          u.lang = v?.lang ? String(v.lang).replace('_', '-') : defTag;
-          u.rate = parseFloat(lsGet('vv_tts_rate', '0.95')) || 0.95;
-          speechSynthesis.speak(u);
-        } catch {}
-      }, 35);
+      if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+      const v = pickBestVoice(l), u = new SpeechSynthesisUtterance(clean);
+      activeUtter = u;
+      u.onend = u.onerror = () => { if (activeUtter === u) activeUtter = null; };
+      if (v) u.voice = v;
+      u.lang = v?.lang ? String(v.lang).replace('_', '-') : defTag;
+      u.rate = parseFloat(lsGet('vv_tts_rate', '0.95')) || 0.95;
+      speechSynthesis.speak(u);
     } catch {}
   }
 
@@ -770,11 +765,18 @@
 
   function parseAnyWords(raw, defL = 'en', strict = false) {
     const out = { en:[], fr:[], de:[], ja:[] };
-    const p = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    let p;
+    try {
+      p = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch (e) {
+      if (strict) throw new Error(`JSONの構文解析に失敗しました: ${e.message}`);
+      return out;
+    }
     if (!p || typeof p !== 'object') {
       if (strict) throw new Error('JSONオブジェクトまたは配列ではありません。');
       return out;
     }
+
     let recognizedStructure = false;
     if (Array.isArray(p)) {
       recognizedStructure = true;
@@ -790,12 +792,23 @@
         }
       });
     } else {
-      const src = p.data || p;
-      LANG_KEYS.forEach(l => {
-        if (Array.isArray(src[l])) {
-          recognizedStructure = true;
-          out[l] = parseAnyWords(src[l], l, strict)[l] || [];
-        }
+      const src = (p.data && typeof p.data === 'object' && !Array.isArray(p.data)) ? p.data : p;
+      Object.keys(src).forEach(k => {
+        if (!Array.isArray(src[k])) return;
+        recognizedStructure = true;
+        const targetLang = (typeof k === 'string' && k.length === 2 && LANGS[k]) ? k : (global.VocabStorage?.keyToLang ? global.VocabStorage.keyToLang(k) : defL);
+        const parsedItems = [];
+        src[k].forEach((it, idx) => {
+          const w = it ? (it.word || it.w) : null;
+          const hasData = it ? (it.meanings || it.m || it.etymology || it.e) : null;
+          if (typeof w === 'string' && hasData) {
+            const itemLang = LANGS[it.lang] ? it.lang : targetLang;
+            const c = sanitizeItem(it, idx, itemLang);
+            if (c) parsedItems.push(c);
+          }
+        });
+        out[k] = parsedItems;
+        if (LANGS[targetLang] && !out[targetLang]) out[targetLang] = parsedItems;
       });
     }
     if (strict && !recognizedStructure) throw new Error('Vocab Vault形式の単語データが見つかりません。');
@@ -2603,13 +2616,33 @@
         const ext = parseAnyWords(e.target.result, App.lang, true);
         let added = 0, updated = 0, skipped = 0;
         const now = Date.now();
-        LANG_KEYS.forEach(l => {
-          const incoming = ext[l];
-          if (!incoming.length) return;
-          const cur = getJson(LANGS[l].key);
+        const handledStorageKeys = new Set();
+
+        Object.keys(ext).forEach(key => {
+          const incoming = ext[key];
+          if (!Array.isArray(incoming) || !incoming.length) return;
+
+          let storageKey = '';
+          let l = 'en';
+
+          if (key.startsWith('distinction_entries')) {
+            storageKey = key;
+            l = global.VocabStorage ? global.VocabStorage.keyToLang(key) : 'en';
+          } else if (LANGS[key]) {
+            storageKey = LANGS[key].key;
+            l = key;
+          } else {
+            return;
+          }
+
+          if (handledStorageKeys.has(storageKey)) return;
+          handledStorageKeys.add(storageKey);
+
+          const cur = getJson(storageKey);
           const curMap = new Map(cur.map(it => [it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex), it]));
           const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(l) : new Map();
           const clearedAt = global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0;
+
           incoming.forEach(it => {
             if (clearedAt > 0 && (it.updatedAt || 0) <= clearedAt) it.updatedAt = now;
             const k = it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex);
@@ -2618,11 +2651,20 @@
             const normW = String(it.word || '').trim().toLowerCase();
             if (normW) tombMap.delete(`word:${normW}`);
             const ex = curMap.get(k);
-            if (!ex) added++; else if ((it.updatedAt || 0) > (ex.updatedAt || 0)) updated++; else skipped++;
+            if (!ex) added++;
+            else if ((it.updatedAt || 0) > (ex.updatedAt || 0)) updated++;
+            else skipped++;
           });
+
           if (global.VocabStorage) global.VocabStorage.saveTombstones(l, tombMap);
-          setJson(LANGS[l].key, mergeWords(cur, incoming, l, true), true, true);
+          const merged = mergeWords(cur, incoming, l, true);
+          setJson(storageKey, merged, true, true);
+          if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = merged;
+          if (storageKey === getActivePairConfig().key) {
+            App.entries = merged;
+          }
         });
+
         if (!added && !updated && !skipped) throw new Error('有効な単語エントリが1件も含まれていません。');
         load(1);
         alert(`JSONインポート完了\n・新規追加: ${added} 語\n・更新: ${updated} 語\n・既存維持(スキップ): ${skipped} 語`);
@@ -2832,14 +2874,22 @@
         if (Math.abs(ratioB - ratioA) > 0.01) return ratioB - ratioA;
         return (a.nextReview || 0) - (b.nextReview || 0);
       });
-    if (!allDue.length) {
-      showToast('現在、復習期日を迎えた単語はありません。すべて定着しています。', 'info', 3000);
-      return;
+    let reviewCandidates = allDue;
+    if (!reviewCandidates.length) {
+      const allWords = getFiltered();
+      if (!allWords.length) {
+        showToast('復習対象の単語が登録されていません。', 'info', 3000);
+        return;
+      }
+      if (!confirm('現在、復習期日を迎えた単語はありません（すべて定着中）。\n登録済みの単語で事前復習・総復習セッションを開始しますか？')) {
+        return;
+      }
+      reviewCandidates = allWords;
     }
-    
+
     // 復習上限キャップ適用
     const cap = App.dailyReviewCap || 30;
-    App.aList = allDue.slice(0, cap);
+    App.aList = reviewCandidates.slice(0, cap);
     App.ankiTotalCount = App.aList.length;
     App.ankiHistory = [];
 
@@ -4184,6 +4234,7 @@ etymology:${eInst}`;
     makeLookupKey,
     sanitizeItem,
     mergeWords,
+    parseAnyWords,
     safeParseWords,
     validateEntry,
     buildRight,

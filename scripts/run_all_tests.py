@@ -333,6 +333,20 @@ def test_mobile_tabs_and_pair_sync():
     if (updatedPairList[0].repetition !== 1) throw new Error("Repetition count was not incremented in pair storage");
     if (updatedPairList[0].interval <= 0) throw new Error("Interval was not increased in pair storage");
 
+    // 3. Verify parseAnyWords correctly parses language pair keys in version 5 backups
+    var v5Backup = {
+        version: 5,
+        data: {
+            distinction_entries_en_en: [
+                { id: "pair-backup-1", word: "serendipity", lang: "en", meanings: [{ pos: "N[U]", text: "偶然の幸運" }] }
+            ]
+        }
+    };
+    var parsedV5 = (global.VocabCore?.parseAnyWords || parseAnyWords)(JSON.stringify(v5Backup), "en", true);
+    if (!parsedV5.distinction_entries_en_en || parsedV5.distinction_entries_en_en.length !== 1) {
+        throw new Error("parseAnyWords failed to recognize distinction_entries_en_en key in backup");
+    }
+
     print("OK");
     """
 
@@ -340,6 +354,7 @@ def test_mobile_tabs_and_pair_sync():
     if res.returncode == 0 and "OK" in res.stdout:
         log_pass("Mobile detail tabs generated with clean segment controls (.detail-tabs-bar)")
         log_pass("Language pair review (procRev) accurately synchronizes with pair storage keys")
+        log_pass("Multi-language pair backup and restoration (parseAnyWords) fully verified")
     else:
         log_fail(f"Mobile detail tabs and pair sync error: {res.stderr or res.stdout}")
 

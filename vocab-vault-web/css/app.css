@@ -1155,6 +1155,22 @@ kbd.kbd-hint {
   #graphCanvas {
     height: calc(94vh - 65px) !important;
   }
+
+  /* 8. モーダルダイアログの横画面最適化 (高さを抑えてスクロール確保) */
+  .modal-ov {
+    padding: 6px !important;
+  }
+  .modal:not(#graphModal .modal), .modal-box {
+    max-height: 96vh !important;
+  }
+  .modal-bd {
+    max-height: 68vh !important;
+    padding: 10px 14px !important;
+    gap: 8px !important;
+  }
+  .modal-hd {
+    padding: 7px 14px !important;
+  }
 }
 
 
