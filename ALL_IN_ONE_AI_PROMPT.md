@@ -240,6 +240,9 @@
         </div>
 
         <div id="anki">
+          <div class="anki-prog-bar-wrap" style="width:100%;height:4px;background:var(--b);border-radius:2px;overflow:hidden;margin-bottom:8px">
+            <div id="aProgFill" style="height:100%;width:0%;background:var(--ac);transition:width 0.22s ease"></div>
+          </div>
           <div class="flx-sb" style="margin-bottom:8px">
             <span id="offlineSyncBadge" class="offline-sync-badge"><span class="badge-dot"></span><span id="offlineSyncText">未同期の復習: 0件</span></span>
           </div>
@@ -387,17 +390,21 @@
         <div class="f-col" style="width:120px"><label class="lbl-sm">最大抽出数</label><select id="extMaxCnt"><option value="8">最大 8 語</option><option value="12" selected>最大 12 語</option><option value="18">最大 18 語</option><option value="24">最大 24 語</option></select></div>
         <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm">保存先タイトル（任意）</label><input type="text" id="extFolInput" placeholder="例: 2026 フランス演習" autocomplete="off"></div>
       </div>
-      <div class="ocr-dropzone flx-sb" id="ocrDropzone" onclick="$('ocrFileInput').click()">
-        <div style="display:flex;align-items:center;gap:10px">
+      <div class="ocr-dropzone flx-sb" id="ocrDropzone">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1" onclick="$('ocrFileInput').click()">
           <div class="ocr-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
           <div class="f-col" style="gap:1px">
-            <span style="font-size:12px;font-weight:700">画像からテキストを文字起こし（OCR）</span>
-            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクリーンショット貼り付け (Cmd+V)</span>
+            <span style="font-size:12px;font-weight:700">画像・写真から文字起こし（OCR）</span>
+            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクショ貼り付け (Cmd+V)</span>
           </div>
         </div>
-        <button type="button" class="btn-o btn-xs" style="pointer-events:none">画像選択</button>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrCameraInput').click()" title="カメラで本・書類を直接撮影">📸 撮影</button>
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrFileInput').click()" title="アルバムまたはファイルから選択">📁 選択</button>
+        </div>
       </div>
       <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageFile(this.files[0])">
+      <input type="file" id="ocrCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleOcrImageFile(this.files[0])">
       <div id="ocrPreviewSec" style="display:none;margin-top:6px;padding:8px 10px;background:var(--bg-hov);border:1px solid var(--b);border-radius:6px">
         <div style="display:flex;align-items:center;gap:10px">
           <img id="ocrThumbImg" src="" alt="選択画像" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--b);background:var(--bg-card)">
@@ -1104,6 +1111,9 @@
         </div>
 
         <div id="anki">
+          <div class="anki-prog-bar-wrap" style="width:100%;height:4px;background:var(--b);border-radius:2px;overflow:hidden;margin-bottom:8px">
+            <div id="aProgFill" style="height:100%;width:0%;background:var(--ac);transition:width 0.22s ease"></div>
+          </div>
           <div class="flx-sb" style="margin-bottom:8px">
             <span id="offlineSyncBadge" class="offline-sync-badge"><span class="badge-dot"></span><span id="offlineSyncText">未同期の復習: 0件</span></span>
           </div>
@@ -1251,17 +1261,21 @@
         <div class="f-col" style="width:120px"><label class="lbl-sm">最大抽出数</label><select id="extMaxCnt"><option value="8">最大 8 語</option><option value="12" selected>最大 12 語</option><option value="18">最大 18 語</option><option value="24">最大 24 語</option></select></div>
         <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm">保存先タイトル（任意）</label><input type="text" id="extFolInput" placeholder="例: 2026 フランス演習" autocomplete="off"></div>
       </div>
-      <div class="ocr-dropzone flx-sb" id="ocrDropzone" onclick="$('ocrFileInput').click()">
-        <div style="display:flex;align-items:center;gap:10px">
+      <div class="ocr-dropzone flx-sb" id="ocrDropzone">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1" onclick="$('ocrFileInput').click()">
           <div class="ocr-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
           <div class="f-col" style="gap:1px">
-            <span style="font-size:12px;font-weight:700">画像からテキストを文字起こし（OCR）</span>
-            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクリーンショット貼り付け (Cmd+V)</span>
+            <span style="font-size:12px;font-weight:700">画像・写真から文字起こし（OCR）</span>
+            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクショ貼り付け (Cmd+V)</span>
           </div>
         </div>
-        <button type="button" class="btn-o btn-xs" style="pointer-events:none">画像選択</button>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrCameraInput').click()" title="カメラで本・書類を直接撮影">📸 撮影</button>
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrFileInput').click()" title="アルバムまたはファイルから選択">📁 選択</button>
+        </div>
       </div>
       <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageFile(this.files[0])">
+      <input type="file" id="ocrCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleOcrImageFile(this.files[0])">
       <div id="ocrPreviewSec" style="display:none;margin-top:6px;padding:8px 10px;background:var(--bg-hov);border:1px solid var(--b);border-radius:6px">
         <div style="display:flex;align-items:center;gap:10px">
           <img id="ocrThumbImg" src="" alt="選択画像" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--b);background:var(--bg-card)">
@@ -6008,6 +6022,7 @@ serve(async (req) => {
     // 復習上限キャップ適用
     const cap = App.dailyReviewCap || 30;
     App.aList = allDue.slice(0, cap);
+    App.ankiTotalCount = App.aList.length;
     App.ankiHistory = [];
 
     $('listView').style.display = $('ctrlForm').style.display = 'none';
@@ -6027,7 +6042,12 @@ serve(async (req) => {
     const i = App.aList[0];
     if (!i) return exitAnki();
     $('btnUndoAnki').style.display = App.ankiHistory.length ? 'inline-flex' : 'none';
-    $('aProg').textContent = `残り: ${App.aList.length} 語`;
+    const total = App.ankiTotalCount || (App.aList.length + App.ankiHistory.length);
+    const done = Math.max(0, total - App.aList.length);
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const fillEl = $('aProgFill');
+    if (fillEl) fillEl.style.width = `${pct}%`;
+    $('aProg').textContent = `進捗: ${done}/${total}語 (${pct}%)`;
     $('aWord').textContent = i.word + (i.homographIndex > 1 ? ` #${i.homographIndex}` : '');
     $('aPho').textContent = [fmtPho(i.phonetic), i.grammar_forms].filter(Boolean).join('  ');
     $('aDiv').style.display = $('aBack').style.display = $('aRat').style.display = 'none';
@@ -7171,6 +7191,7 @@ etymology:${eInst}`;
         if ((e.code === 'KeyR' || e.key === 's') && App.aList[0]) { e.preventDefault(); speakText(App.aList[0].word, App.aList[0].lang || App.lang); }
         else if (e.code === 'KeyZ' && App.ankiHistory.length) { e.preventDefault(); undoAnkiRev(); }
         else if ((e.code === 'Space' || e.key === 'Enter') && $('btnAns')?.style.display !== 'none') { e.preventDefault(); showAns(); }
+        else if ((e.code === 'Space' || e.key === 'Enter') && $('aRat')?.style.display === 'flex') { e.preventDefault(); procRev(2); } // Anki本家仕様: 裏面でのSpaceはGood(普通)で爆速前進
         else if ($('aRat')?.style.display === 'flex' && ['1','2','3','4'].includes(e.key)) { e.preventDefault(); procRev(parseInt(e.key, 10) - 1); }
       } else if (!inInput && !anyModalOpen && !isAnkiOpen) {
         // 通常一覧画面でのキーボードファースト操作 (Linear / Vim ライク)
@@ -9453,19 +9474,36 @@ etymology:${eInst}`;
     };
   }
 
-  // --- オフライン復習キュー管理 ---
+  // --- オフライン復習キュー管理 (LocalStorage + IndexedDB 二重永続化: iOS Safari PWAパージ耐性) ---
   function getOfflineQueue() {
     try {
-      return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
-    } catch {
-      return [];
-    }
+      const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
   }
 
   function saveOfflineQueue(q) {
     try {
       localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
+      if (global.VocabStorage?.idbPut) {
+        global.VocabStorage.idbPut(OFFLINE_QUEUE_KEY, q);
+      }
       updateOfflineBadgeUI();
+    } catch {}
+  }
+
+  // iOS Safariの7日間パージ対策: IndexedDBからの復旧
+  async function recoverOfflineQueueFromIdb() {
+    try {
+      const q = getOfflineQueue();
+      if (!q.length && global.VocabStorage?.idbGet) {
+        const idbQ = await global.VocabStorage.idbGet(OFFLINE_QUEUE_KEY);
+        if (Array.isArray(idbQ) && idbQ.length > 0) {
+          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(idbQ));
+          updateOfflineBadgeUI();
+        }
+      }
     } catch {}
   }
 
@@ -9700,10 +9738,15 @@ etymology:${eInst}`;
     calculateNextReview,
     queueOfflineReview,
     flushOfflineReviews,
+    recoverOfflineQueueFromIdb,
     updateOfflineBadgeUI,
     attachSwipeGesture,
     triggerHaptic
   };
+
+  if (typeof window !== 'undefined') {
+    setTimeout(recoverOfflineQueueFromIdb, 400);
+  }
 })(typeof window !== 'undefined' ? window : globalThis);
 
 ```

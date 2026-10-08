@@ -60,19 +60,36 @@
     };
   }
 
-  // --- オフライン復習キュー管理 ---
+  // --- オフライン復習キュー管理 (LocalStorage + IndexedDB 二重永続化: iOS Safari PWAパージ耐性) ---
   function getOfflineQueue() {
     try {
-      return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
-    } catch {
-      return [];
-    }
+      const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    return [];
   }
 
   function saveOfflineQueue(q) {
     try {
       localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
+      if (global.VocabStorage?.idbPut) {
+        global.VocabStorage.idbPut(OFFLINE_QUEUE_KEY, q);
+      }
       updateOfflineBadgeUI();
+    } catch {}
+  }
+
+  // iOS Safariの7日間パージ対策: IndexedDBからの復旧
+  async function recoverOfflineQueueFromIdb() {
+    try {
+      const q = getOfflineQueue();
+      if (!q.length && global.VocabStorage?.idbGet) {
+        const idbQ = await global.VocabStorage.idbGet(OFFLINE_QUEUE_KEY);
+        if (Array.isArray(idbQ) && idbQ.length > 0) {
+          localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(idbQ));
+          updateOfflineBadgeUI();
+        }
+      }
     } catch {}
   }
 
@@ -307,8 +324,13 @@
     calculateNextReview,
     queueOfflineReview,
     flushOfflineReviews,
+    recoverOfflineQueueFromIdb,
     updateOfflineBadgeUI,
     attachSwipeGesture,
     triggerHaptic
   };
+
+  if (typeof window !== 'undefined') {
+    setTimeout(recoverOfflineQueueFromIdb, 400);
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

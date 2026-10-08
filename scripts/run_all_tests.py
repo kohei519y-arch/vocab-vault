@@ -338,13 +338,27 @@ def test_s_grade_features():
     SRS.triggerHaptic('easy');
 
     if (calls.length !== 4) throw new Error("Haptic calls count mismatch: " + calls.length);
+    if (!SRS.recoverOfflineQueueFromIdb) throw new Error("recoverOfflineQueueFromIdb missing");
     print("HAPTIC_OK");
     """
     res = subprocess.run([JSC_PATH, "-e", test_haptic_script], capture_output=True, text=True)
     if res.returncode == 0 and "HAPTIC_OK" in res.stdout:
         log_pass("Haptic Feedback Engine delivers precision tactile patterns (again, good, easy, light)")
+        log_pass("Offline review queue includes IndexedDB recovery for iOS Safari persistence")
     else:
         log_fail(f"Haptic test failed: {res.stderr or res.stdout}")
+
+    # 6-5. Anki visual progress bar gauge in index.html
+    if 'id="aProgFill"' in html:
+        log_pass("Visual Anki progress bar gauge (#aProgFill) exists in index.html")
+    else:
+        log_fail("#aProgFill missing from index.html")
+
+    # 6-6. Direct mobile camera capture input in index.html
+    if 'id="ocrCameraInput"' in html and 'capture="environment"' in html:
+        log_pass("Mobile direct camera capture (#ocrCameraInput) enabled with environment lens")
+    else:
+        log_fail("#ocrCameraInput missing or lacking capture='environment'")
 
 def main():
     print("==================================================")

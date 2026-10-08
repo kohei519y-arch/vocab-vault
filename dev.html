@@ -181,6 +181,9 @@
         </div>
 
         <div id="anki">
+          <div class="anki-prog-bar-wrap" style="width:100%;height:4px;background:var(--b);border-radius:2px;overflow:hidden;margin-bottom:8px">
+            <div id="aProgFill" style="height:100%;width:0%;background:var(--ac);transition:width 0.22s ease"></div>
+          </div>
           <div class="flx-sb" style="margin-bottom:8px">
             <span id="offlineSyncBadge" class="offline-sync-badge"><span class="badge-dot"></span><span id="offlineSyncText">未同期の復習: 0件</span></span>
           </div>
@@ -328,17 +331,21 @@
         <div class="f-col" style="width:120px"><label class="lbl-sm">最大抽出数</label><select id="extMaxCnt"><option value="8">最大 8 語</option><option value="12" selected>最大 12 語</option><option value="18">最大 18 語</option><option value="24">最大 24 語</option></select></div>
         <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm">保存先タイトル（任意）</label><input type="text" id="extFolInput" placeholder="例: 2026 フランス演習" autocomplete="off"></div>
       </div>
-      <div class="ocr-dropzone flx-sb" id="ocrDropzone" onclick="$('ocrFileInput').click()">
-        <div style="display:flex;align-items:center;gap:10px">
+      <div class="ocr-dropzone flx-sb" id="ocrDropzone">
+        <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1" onclick="$('ocrFileInput').click()">
           <div class="ocr-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
           <div class="f-col" style="gap:1px">
-            <span style="font-size:12px;font-weight:700">画像からテキストを文字起こし（OCR）</span>
-            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクリーンショット貼り付け (Cmd+V)</span>
+            <span style="font-size:12px;font-weight:700">画像・写真から文字起こし（OCR）</span>
+            <span style="font-size:10.5px;color:var(--m)">画像選択 / ドロップ / スクショ貼り付け (Cmd+V)</span>
           </div>
         </div>
-        <button type="button" class="btn-o btn-xs" style="pointer-events:none">画像選択</button>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrCameraInput').click()" title="カメラで本・書類を直接撮影">📸 撮影</button>
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrFileInput').click()" title="アルバムまたはファイルから選択">📁 選択</button>
+        </div>
       </div>
       <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageFile(this.files[0])">
+      <input type="file" id="ocrCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleOcrImageFile(this.files[0])">
       <div id="ocrPreviewSec" style="display:none;margin-top:6px;padding:8px 10px;background:var(--bg-hov);border:1px solid var(--b);border-radius:6px">
         <div style="display:flex;align-items:center;gap:10px">
           <img id="ocrThumbImg" src="" alt="選択画像" style="width:44px;height:44px;object-fit:cover;border-radius:4px;border:1px solid var(--b);background:var(--bg-card)">

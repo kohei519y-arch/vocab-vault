@@ -2729,6 +2729,7 @@
     // 復習上限キャップ適用
     const cap = App.dailyReviewCap || 30;
     App.aList = allDue.slice(0, cap);
+    App.ankiTotalCount = App.aList.length;
     App.ankiHistory = [];
 
     $('listView').style.display = $('ctrlForm').style.display = 'none';
@@ -2748,7 +2749,12 @@
     const i = App.aList[0];
     if (!i) return exitAnki();
     $('btnUndoAnki').style.display = App.ankiHistory.length ? 'inline-flex' : 'none';
-    $('aProg').textContent = `残り: ${App.aList.length} 語`;
+    const total = App.ankiTotalCount || (App.aList.length + App.ankiHistory.length);
+    const done = Math.max(0, total - App.aList.length);
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const fillEl = $('aProgFill');
+    if (fillEl) fillEl.style.width = `${pct}%`;
+    $('aProg').textContent = `進捗: ${done}/${total}語 (${pct}%)`;
     $('aWord').textContent = i.word + (i.homographIndex > 1 ? ` #${i.homographIndex}` : '');
     $('aPho').textContent = [fmtPho(i.phonetic), i.grammar_forms].filter(Boolean).join('  ');
     $('aDiv').style.display = $('aBack').style.display = $('aRat').style.display = 'none';
@@ -3892,6 +3898,7 @@ etymology:${eInst}`;
         if ((e.code === 'KeyR' || e.key === 's') && App.aList[0]) { e.preventDefault(); speakText(App.aList[0].word, App.aList[0].lang || App.lang); }
         else if (e.code === 'KeyZ' && App.ankiHistory.length) { e.preventDefault(); undoAnkiRev(); }
         else if ((e.code === 'Space' || e.key === 'Enter') && $('btnAns')?.style.display !== 'none') { e.preventDefault(); showAns(); }
+        else if ((e.code === 'Space' || e.key === 'Enter') && $('aRat')?.style.display === 'flex') { e.preventDefault(); procRev(2); } // Anki本家仕様: 裏面でのSpaceはGood(普通)で爆速前進
         else if ($('aRat')?.style.display === 'flex' && ['1','2','3','4'].includes(e.key)) { e.preventDefault(); procRev(parseInt(e.key, 10) - 1); }
       } else if (!inInput && !anyModalOpen && !isAnkiOpen) {
         // 通常一覧画面でのキーボードファースト操作 (Linear / Vim ライク)
