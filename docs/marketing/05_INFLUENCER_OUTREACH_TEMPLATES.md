@@ -19,7 +19,7 @@
 
 突然のご連絡恐縮ですが、現在「単語の丸暗記を根絶し、印欧祖語（語根）から芋づる式に語彙を脳内定着させる」個人開発のWebアプリ『VocabVault』を公開いたしました。
 
-🔗 [アプリURL（Vercel等の公開URL）]
+🔗 https://kohei519y-arch.github.io/vocab-vault/
 
 ■ 〇〇さんにご紹介したい理由
 市販の単語帳では「語根の分解・解説」が断片的ですが、本アプリは語根同士の派生関係を物理シミュレーション（Canvas力学グラフ）で可視化し、FSRS（最新の忘却曲線アルゴリズム）と連動させています。
@@ -53,7 +53,7 @@
 
 ■ アプリ概要
 ・サービス名: VocabVault（ボキャブラリー・ヴォールト）
-・URL: [アプリURL]
+・URL: https://kohei519y-arch.github.io/vocab-vault/
 ・特徴:
   1. 印欧祖語（語根）の動的グラフ可視化（Canvas 2D 力学バネモデル）
   2. 最新の適応型分散学習アルゴリズム（FSRS-4.5 / SM-2）による忘却曲線最適化
@@ -75,7 +75,7 @@
 --------------------------------------------------
 開発者: [あなたの名前 / Xアカウント]
 連絡先: [メールアドレス]
-Webサイト: [アプリURL]
+Webサイト: https://kohei519y-arch.github.io/vocab-vault/
 GitHub: [リポジトリURL（公開している場合）]
 --------------------------------------------------
 ```
@@ -93,7 +93,7 @@ Hi [Creator Name],
 
 Huge fan of your content on [mention specific topic, e.g., Indo-European roots / language learning methodology]!
 
-I'm an indie developer and recently built an open-source, local-first web app called **VocabVault** ([App URL]). 
+I'm an indie developer and recently built an open-source, local-first web app called **VocabVault** (https://kohei519y-arch.github.io/vocab-vault/). 
 
 It renders Proto-Indo-European (PIE) etymology networks in real-time using a 2D physics spring model, connecting modern English words directly to ancient roots (`*bʰer-`, `*kred-dʰē-`, etc.), combined with adaptive spaced repetition (FSRS/Anki-compatible).
 
@@ -120,7 +120,7 @@ Hi [Name],
 
 I've been following your work on [Knowledge Management / Spaced Repetition / Memory systems].
 
-Most flashcard workflows for language learning suffer from card atomization—words are memorized in isolation without structural context. To solve this, I built **VocabVault** ([App URL]), an open-source, local-first vocabulary engine.
+Most flashcard workflows for language learning suffer from card atomization—words are memorized in isolation without structural context. To solve this, I built **VocabVault** (https://kohei519y-arch.github.io/vocab-vault/), an open-source, local-first vocabulary engine.
 
 Key features that might interest your audience:
 - **Interactive Etymological Graphs**: Visualizes Proto-Indo-European roots with real-time physics simulation to reveal morphological connections across languages.
@@ -138,7 +138,7 @@ Warm regards,
 
 [Your Name]
 Indie Developer of VocabVault
-Website: [App URL]
+Website: https://kohei519y-arch.github.io/vocab-vault/
 Twitter: [Handle]
 ```
 

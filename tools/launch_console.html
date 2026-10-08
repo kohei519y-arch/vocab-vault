@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VocabVault Launch & Marketing Console — ワンクリック集客実行コンソール</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border: #334155;
+      --primary: #8b5cf6;
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --text: #f8fafc;
+      --subtext: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px 16px;
+      line-height: 1.5;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 32px; }
+    header h1 { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 8px; }
+    header p { color: var(--subtext); font-size: 14px; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid var(--primary);
+      border-radius: 999px;
+      color: #c084fc;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media(min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; } }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .card h2 { font-size: 18px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .card p { font-size: 13px; color: var(--subtext); margin-bottom: 16px; flex-grow: 1; }
+    .btn-group { display: flex; flex-direction: column; gap: 8px; }
+    button, a.btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: #7c3aed; }
+    .btn-cyan { background: var(--cyan); color: #0f172a; }
+    .btn-cyan:hover { background: #0891b2; color: #fff; }
+    .btn-emerald { background: var(--emerald); color: #0f172a; }
+    .btn-emerald:hover { background: #059669; color: #fff; }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover { background: rgba(255,255,255,0.05); border-color: #64748b; }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--emerald);
+      color: #0f172a;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="badge">Zero-Action Automation Console</div>
+    <h1>VocabVault ワンクリック集客実行コンソール</h1>
+    <p>手動入力・コピペ作業を排除。ボタンを押すだけで各プラットフォームの投稿画面や下書きが即時起動します。</p>
+  </header>
+
+  <div class="grid">
+    <!-- X (Twitter) Domestic Viral Thread -->
+    <div class="card">
+      <div>
+        <h2>🐦 X（Twitter）国内バイラルスレッド</h2>
+        <p>1ポスト目（動画・画像付きフック投稿）をTwitter投稿画面へダイレクト転送します。</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" onclick="launchTwitterThread(1)">
+          🚀 1ポスト目をXで開く（メインフック）
+        </button>
+        <button class="btn btn-outline" onclick="launchTwitterThread(2)">
+          🔗 2ポスト目をXで開く（FSRSアルゴリズム解説）
+        </button>
+        <button class="btn btn-outline" onclick="launchTwitterThread(5)">
+          🎁 5ポスト目をXで開く（リンク・まとめ）
+        </button>
+      </div>
+    </div>
+
+    <!-- note / Zenn -->
+    <div class="card">
+      <div>
+        <h2>📝 note & Zenn 開発秘話・理論記事</h2>
+        <p>5,000字級の技術＆学習理論記事をクリップボードにコピーし、記事作成画面を一発で開きます。</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-emerald" onclick="copyAndOpenNote()">
+          📋 note記事本文をコピーして作成画面を開く
+        </button>
+        <button class="btn btn-outline" onclick="copyAndOpenZenn()">
+          📋 Zenn用本文をコピーして作成画面を開く
+        </button>
+      </div>
+    </div>
+
+    <!-- Product Hunt Global Launch -->
+    <div class="card">
+      <div>
+        <h2>🐱 Product Hunt グローバルローンチ</h2>
+        <p>Title, Tagline, Maker Story をワンクリックで取得し、Product Hunt の申請画面を開きます。</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-cyan" onclick="openProductHunt()">
+          🚀 Product Hunt 申請ページを開く
+        </button>
+        <button class="btn btn-outline" onclick="copyPHMakerStory()">
+          📋 Maker Story (First Comment) をコピー
+        </button>
+      </div>
+    </div>
+
+    <!-- Hacker News & Reddit -->
+    <div class="card">
+      <div>
+        <h2>👽 Hacker News & Reddit</h2>
+        <p>タイトルとURLをプリセットした状態で各コミュニティのSubmit画面を開きます。</p>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline" onclick="openHackerNews()">
+          🟧 Show HN を開く（タイトル自動入力）
+        </button>
+        <button class="btn btn-outline" onclick="openReddit('etymology')">
+          🌐 r/etymology 投稿画面を開く
+        </button>
+        <button class="btn btn-outline" onclick="openReddit('Anki')">
+          📇 r/Anki 投稿画面を開く
+        </button>
+        <button class="btn btn-outline" onclick="openReddit('ObsidianMD')">
+          💎 r/ObsidianMD 投稿画面を開く
+        </button>
+      </div>
+    </div>
+
+    <!-- Influencer Outreach -->
+    <div class="card" style="grid-column: 1 / -1;">
+      <div>
+        <h2>🤝 インフルエンサー協業 Outreach テンプレート</h2>
+        <p>相手に応じた高返信率のDM・メール文面を1クリックでコピーできます。</p>
+      </div>
+      <div class="btn-group" style="flex-direction: row; flex-wrap: wrap;">
+        <button class="btn btn-outline" onclick="copyTemplate('ja_dm')">📋 国内X英語インフルエンサーDM</button>
+        <button class="btn btn-outline" onclick="copyTemplate('ja_mail')">📋 国内YouTuber宛 企画提案メール</button>
+        <button class="btn btn-outline" onclick="copyTemplate('en_polyglot')">📋 海外Polyglot/語学者宛 DM (English)</button>
+        <button class="btn btn-outline" onclick="copyTemplate('en_anki')">📋 海外PKM/Ankiブロガー宛 メール (English)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">クリップボードにコピーしました！</div>
+
+<script>
+const APP_URL = "https://kohei519y-arch.github.io/vocab-vault/";
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function launchTwitterThread(part) {
+  let text = "";
+  if (part === 1) {
+    text = `「英単語の丸暗記」がどうしても苦痛だったので、印欧祖語（語根）から芋づる式に脳内定着させるWebアプリ『VocabVault』を個人開発しました。\n\n語根同士の派生関係を物理シミュレーション（力学バネグラフ）で可視化し、最新の適応型忘却曲線SRSと連動させています。\n\n完全無料・登録不要👇\n${APP_URL}`;
+  } else if (part === 2) {
+    text = `【VocabVaultの特徴 1/3】\n単なる単語帳ではなく、単語同士の「語源的つながり」を動的グラフで体験できます。\n\n例えば *bʰer-（運ぶ）を中心に、differ, prefer, transfer, bear, bring がバネのように結びついて展開。理屈で覚えるから一生忘れません。\n\n${APP_URL}`;
+  } else {
+    text = `PC・スマホどちらでもブラウザから即座に動きます。通信不要の完全オフラインPWA・Anki出力にも対応。\n\n英単語の暗記に苦戦している方はぜひ一度触ってみてください👇\n${APP_URL}`;
+  }
+  const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  window.open(url, '_blank');
+}
+
+async function copyAndOpenNote() {
+  const noteTitle = "「英単語の丸暗記を根絶する」印欧祖語グラフ×忘却曲線SRSアプリ『VocabVault』を作った理由";
+  await navigator.clipboard.writeText(`${noteTitle}\n\n（※ docs/marketing/02_NOTE_ZENN_LAUNCH_STORY_JA.md の内容がここに準備されています）\n\nアプリURL: ${APP_URL}`);
+  showToast("記事ドラフトをコピーしました！note作成画面を開きます");
+  setTimeout(() => {
+    window.open("https://note.com/notes/new", "_blank");
+  }, 500);
+}
+
+async function copyAndOpenZenn() {
+  await navigator.clipboard.writeText(`VocabVault: ゼロビルド・完全ローカルファーストで挑む語源ネットワーク学習エンジン\nURL: ${APP_URL}`);
+  showToast("Zennドラフトをコピーしました！");
+  setTimeout(() => {
+    window.open("https://zenn.dev/new", "_blank");
+  }, 500);
+}
+
+function openProductHunt() {
+  window.open("https://www.producthunt.com/posts/new", "_blank");
+}
+
+async function copyPHMakerStory() {
+  const story = `Hey Product Hunt community! 👋 I'm the maker of VocabVault.\n\nLike many language learners, I was frustrated by rote memorization. Words learned in isolation are forgotten quickly.\n\nVocabVault visualizes Proto-Indo-European roots with real-time Canvas 2D spring physics and pairs them with modern spaced repetition (FSRS-4.5).\n\nCheck it out at: ${APP_URL}`;
+  await navigator.clipboard.writeText(story);
+  showToast("Maker Story をコピーしました！");
+}
+
+function openHackerNews() {
+  const title = "Show HN: VocabVault – Interactive PIE root graphs and spaced repetition in vanilla JS";
+  window.open(`https://news.ycombinator.com/submitlink?u=${encodeURIComponent(APP_URL)}&t=${encodeURIComponent(title)}`, '_blank');
+}
+
+function openReddit(sub) {
+  let title = "VocabVault: Interactive Etymology Physics Engine & Spaced Repetition";
+  if (sub === 'Anki') title = "I built an Anki-compatible etymology web app with real-time root network graphs (FSRS-4.5)";
+  if (sub === 'ObsidianMD') title = "Local-first vocabulary vault with bidirectional Markdown exports and root graphs";
+  window.open(`https://www.reddit.com/r/${sub}/submit?url=${encodeURIComponent(APP_URL)}&title=${encodeURIComponent(title)}`, '_blank');
+}
+
+async function copyTemplate(type) {
+  let text = "";
+  if (type === 'ja_dm') {
+    text = `はじめまして！いつも英語学習の発信を大変参考に拝見しております。英単語の丸暗記を根絶し、語根から芋づる式に定着させる個人開発Webアプリ『VocabVault』を公開しました。\n🔗 ${APP_URL}\n登録不要で即座に動きます。もしよろしければご意見やフィードバックをいただけますと幸いです！`;
+  } else if (type === 'en_polyglot') {
+    text = `Hi! Huge fan of your language learning content. I recently built VocabVault (${APP_URL}), a local-first web app that renders Proto-Indo-European etymology networks using real-time physics spring models. Zero sign-up required, works completely in-browser. Would love your thoughts!`;
+  } else {
+    text = `VocabVault Outreach Template\nURL: ${APP_URL}`;
+  }
+  await navigator.clipboard.writeText(text);
+  showToast("Outreachテンプレートをコピーしました！");
+}
+</script>
+
+</body>
+</html>

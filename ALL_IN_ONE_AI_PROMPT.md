@@ -76,17 +76,21 @@
   <meta name="description" content="英単語の丸暗記を終わらせる。印欧祖語（PIE）から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。Anki / Obsidian連携対応。">
   <meta name="keywords" content="語源, 英単語, 単語帳, 印欧祖語, 語根, 暗記, Anki, Obsidian, SRS, 英語学習, 忘却曲線, フランス語, ドイツ語">
   
+  <link rel="canonical" href="https://kohei519y-arch.github.io/vocab-vault/">
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kohei519y-arch.github.io/vocab-vault/">
   <meta property="og:title" content="Vocab Vault — 語源・概念史・語根ネットワーク単語帳">
   <meta property="og:description" content="印欧祖語から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。">
-  <meta property="og:image" content="icons/ogp.jpg">
+  <meta property="og:image" content="https://kohei519y-arch.github.io/vocab-vault/icons/ogp.jpg">
   
   <!-- Twitter Cards -->
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://kohei519y-arch.github.io/vocab-vault/">
   <meta name="twitter:title" content="Vocab Vault — 語源・概念史・語根ネットワーク単語帳">
   <meta name="twitter:description" content="印欧祖語から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。">
-  <meta name="twitter:image" content="icons/ogp.jpg">
+  <meta name="twitter:image" content="https://kohei519y-arch.github.io/vocab-vault/icons/ogp.jpg">
 
   <!-- Schema.org WebApplication -->
   <script type="application/ld+json">
@@ -970,17 +974,21 @@
   <meta name="description" content="英単語の丸暗記を終わらせる。印欧祖語（PIE）から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。Anki / Obsidian連携対応。">
   <meta name="keywords" content="語源, 英単語, 単語帳, 印欧祖語, 語根, 暗記, Anki, Obsidian, SRS, 英語学習, 忘却曲線, フランス語, ドイツ語">
   
+  <link rel="canonical" href="https://kohei519y-arch.github.io/vocab-vault/">
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://kohei519y-arch.github.io/vocab-vault/">
   <meta property="og:title" content="Vocab Vault — 語源・概念史・語根ネットワーク単語帳">
   <meta property="og:description" content="印欧祖語から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。">
-  <meta property="og:image" content="icons/ogp.jpg">
+  <meta property="og:image" content="https://kohei519y-arch.github.io/vocab-vault/icons/ogp.jpg">
   
   <!-- Twitter Cards -->
   <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://kohei519y-arch.github.io/vocab-vault/">
   <meta name="twitter:title" content="Vocab Vault — 語源・概念史・語根ネットワーク単語帳">
   <meta name="twitter:description" content="印欧祖語から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。">
-  <meta name="twitter:image" content="icons/ogp.jpg">
+  <meta name="twitter:image" content="https://kohei519y-arch.github.io/vocab-vault/icons/ogp.jpg">
 
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">

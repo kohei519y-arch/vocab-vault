@@ -109,7 +109,7 @@ flowchart TD
 
   全部「運ぶ」という同一の根っこから派生しています。
   この繋がりを視覚的に体験できるツールを作りました👇
-  [アプリURL]
+  https://kohei519y-arch.github.io/vocab-vault/
   ```
 
 ---
@@ -131,6 +131,6 @@ flowchart TD
 1. [x] **OGP画像**: `icons/ogp.jpg` が正しく配置され、Twitter Card Validator等で美しく表示されるか。
 2. [x] **SEOメタデータ**: `index.html` にタイトル、デスクリプション、JSON-LD構造化データが埋め込まれているか。
 3. [x] **オフラインキャッシュ**: 初回読み込み後に飛行機モードでもPWAとして単語帳や語根グラフが軽快に動くか。
-4. [ ] **公開URLの確定**: デプロイ先（例: `https://vocab-vault.vercel.app` 等）のURLを各原稿の `[アプリURL]` 箇所に置換する。
+4. [ ] **公開URLの確定**: デプロイ先（例: `https://vocab-vault.vercel.app` 等）のURLを各原稿の `https://kohei519y-arch.github.io/vocab-vault/` 箇所に置換する。
 
 このプレイブックの手順通りに実行するだけで、AIによって構築された最高の集客アセットが最大の効果を発揮します。
