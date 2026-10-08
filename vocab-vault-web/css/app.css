@@ -88,6 +88,7 @@ body.side-collapsed .sidebar { margin-left:-265px; }
 .btn-swap-compact:hover { background:var(--bg-hov); color:var(--ac); }
 
 .add-bar { padding:8px 16px; border-bottom:1px solid var(--b); background:var(--bg-side); display:flex; gap:8px; align-items:center; flex-wrap:nowrap; flex-shrink:0; }
+.btn-toggle-add-opts { display:none; }
 .in-fol-box { width:130px; flex-shrink:0; }
 .add-opts { display:inline-flex; align-items:center; gap:8px; flex-shrink:0; font-size:11px; }
 .chk-lbl.xs { font-size:11px; gap:3px; color:var(--s); cursor:pointer; user-select:none; }
@@ -281,16 +282,354 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
 .banner-badge { background:var(--ac); color:#fff; font-size:10px; font-weight:700; padding:1.5px 7px; border-radius:99px; letter-spacing:0.3px; flex-shrink:0; }
 .pro-crown-tag { background:linear-gradient(135deg, var(--ac), #9333ea); color:#fff; font-size:10.5px; font-weight:800; padding:2px 7px; border-radius:4px; letter-spacing:0.6px; box-shadow:0 1px 4px rgba(124,58,237,.3); flex-shrink:0; }
 
-@media (max-width:760px) {
-  .sidebar { position:fixed; left:42px; top:var(--safe-t); bottom:var(--safe-b); z-index:25; box-shadow:6px 0 18px rgba(0,0,0,.35); }
-  body:not(.side-collapsed) .side-backdrop { display:block; }
-  .card { grid-template-columns:1fr; gap:6px; }
-  .card-acts { opacity:.65; }
-  .content-scroll { padding:14px 16px 40px; }
-  .add-bar { padding:8px 12px; flex-wrap:wrap; }
-  .in-fol-box { width:100%; }
-  input[type="text"], input[type="password"], input[type="email"], select, textarea { font-size:16px; }
-  .search-wrap input { font-size:14px; }
+/* ==========================================================================
+   モバイル・スマートフォン最適化スタイル (画面幅 760px 以下)
+   単語最優先・圧倒的視認性・ボトムナビゲーション・スリムヘッダー
+   ========================================================================== */
+@media (max-width: 760px) {
+  /* 1. ワークスペース & 全体レイアウト (100vw 全面活用) */
+  .workspace {
+    flex-direction: column;
+    width: 100vw;
+    height: 100%;
+    overflow: hidden;
+  }
+  .main-pane {
+    width: 100vw;
+    height: calc(100% - 48px - var(--safe-b)); /* ボトムバーの高さを除いた全画面 */
+  }
+
+  /* 2. 左側リボンを「下部ボトムナビゲーションバー」へ転換 */
+  .ribbon {
+    width: 100vw;
+    height: calc(48px + var(--safe-b));
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    top: auto;
+    border-right: none;
+    border-top: 1px solid var(--b);
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    padding: 3px 6px var(--safe-b);
+    background: var(--bg-side);
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.08);
+    z-index: 40;
+  }
+  .rib-grp {
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+    gap: 4px;
+  }
+  .rib-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+  }
+  .rib-btn svg {
+    width: 19px;
+    height: 19px;
+  }
+  /* スマホのボトムバーで不要な二次的ボタンを非表示にし、主要5〜6アクションに厳選 */
+  .ribbon .rib-btn:not(#ribFoldBtn):not(#ribAnkiBtn):not(#ribGraphBtn):not(#ribExtBtn):not(#ribMaskBtn):not([onclick*="openSettings"]) {
+    display: none;
+  }
+
+  /* 3. サイドバーのモバイル全画面ドロワー化 */
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: var(--safe-t);
+    bottom: calc(48px + var(--safe-b));
+    width: 290px;
+    max-width: 85vw;
+    z-index: 50;
+    box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+  }
+  body:not(.side-collapsed) .side-backdrop {
+    display: block;
+    z-index: 45;
+  }
+
+  /* 4. 上部ヘッダー（タブバー・言語ペアバー）のスリム化 */
+  .tab-bar {
+    min-height: 28px;
+    padding: 2px 8px 0;
+    gap: 4px;
+  }
+  .tab {
+    padding: 3px 8px;
+    font-size: 11px;
+    max-width: 180px;
+  }
+  .tab-acts {
+    gap: 4px;
+  }
+  #cloudSyncBadge {
+    font-size: 9.5px;
+    padding: 1px 6px;
+    max-width: 130px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lang-pair-bar {
+    padding: 3px 8px;
+    min-height: 32px;
+    gap: 6px;
+  }
+  .pair-bar-meta {
+    display: none; /* 「単語帳」ラベルを非表示にしてファイルタブを広げる */
+  }
+  .file-tab {
+    padding: 2px 6px;
+    font-size: 11px;
+  }
+  .compact-pair-picker {
+    padding: 0 2px;
+  }
+  .compact-sel {
+    font-size: 10.5px !important;
+    padding: 1px 2px !important;
+  }
+
+  /* 5. 単語登録バー（.add-bar）の1行スマート化（縦圧迫を100px削減） */
+  .add-bar {
+    padding: 6px 8px;
+    gap: 6px;
+    flex-wrap: nowrap; /* 1行を絶対死守 */
+    background: var(--bg-side);
+  }
+  .btn-toggle-add-opts {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 4px;
+    border: 1px solid var(--b);
+    background: var(--bg-main);
+    color: var(--m);
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 0;
+  }
+  .add-bar.expanded .btn-toggle-add-opts {
+    background: var(--ac);
+    color: #fff;
+    border-color: var(--ac);
+    transform: rotate(45deg);
+  }
+  .in-fol-box {
+    display: none; /* スマホデフォルトでは分野を隠し、単語入力を最大化 */
+  }
+  .add-opts {
+    display: none; /* スマホデフォルトでは歴史・Wiktチェックを隠す */
+  }
+  .add-bar.expanded {
+    flex-wrap: wrap;
+  }
+  .add-bar.expanded .in-fol-box {
+    display: block;
+    width: 100%;
+    order: 3;
+    height: 32px;
+    font-size: 13px;
+  }
+  .add-bar.expanded .add-opts {
+    display: flex;
+    width: 100%;
+    order: 4;
+    gap: 12px;
+    padding: 2px 4px;
+  }
+  .in-word-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+  #inWord {
+    font-size: 14px;
+    padding: 6px 8px;
+    height: 34px;
+  }
+  .add-bar button[type="submit"] {
+    height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  /* 6. スクロール領域 & ドキュメントヘッダー */
+  .content-scroll {
+    padding: 8px 10px calc(60px + var(--safe-b)); /* ボトムバーの上に余裕を持たせる */
+  }
+  .doc-title {
+    font-size: 15px;
+    margin: 0 0 8px;
+    padding-bottom: 6px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .doc-title-right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .sort-sel {
+    font-size: 11px;
+    padding: 2px 4px;
+    max-width: 130px;
+  }
+  .btn-mode {
+    padding: 2px 6px;
+    font-size: 10.5px;
+  }
+
+  /* 7. 単語カード（.card）の視認性爆上げデザイン */
+  .card {
+    grid-template-columns: 1fr;
+    gap: 3px;
+    padding: 10px 4px 12px;
+    position: relative;
+    border-bottom: 1px solid var(--b);
+  }
+  /* 右上のアクションボタンと単語本体の重なりを完全防止 */
+  .col-left {
+    position: relative;
+    padding-right: 58px; /* 右上にボタンが乗るための回避スペースを100%確保 */
+  }
+  .card-acts {
+    opacity: 0.85; /* スマホでも見失わないように常時表示 */
+    top: 2px;
+    right: 0px;
+    gap: 0;
+  }
+  .act-icon-btn {
+    padding: 6px;
+    color: var(--m);
+  }
+  .act-icon-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* 見出し語（.hw）を最前面・最高コントラストで主役に */
+  .hw-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    flex-wrap: wrap;
+  }
+  .hw {
+    font-size: 18.5px;
+    font-weight: 800;
+    color: var(--t);
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  .id {
+    font-size: 10.5px;
+    opacity: 0.7;
+  }
+  .spk-btn {
+    width: 24px;
+    height: 24px;
+    margin-left: 2px;
+  }
+  .spk-btn svg {
+    width: 13px;
+    height: 13px;
+  }
+  .gram-line {
+    font-size: 11px;
+    margin-top: 1px;
+  }
+  .tag-wrap {
+    margin-top: 2px;
+    gap: 3px;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 1px 5px;
+  }
+  .pho {
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  /* 意味（.m-red）と例文の可読性向上 */
+  .m-red {
+    font-size: 14px;
+    line-height: 1.42;
+    font-weight: 700;
+  }
+  .m-red .m-hist-note {
+    font-size: 12px;
+    display: inline;
+  }
+  .ex-block {
+    margin-top: 3px;
+    padding-left: 7px;
+    border-left-width: 2px;
+    line-height: 1.4;
+  }
+  .ex-en {
+    font-size: 12.5px;
+  }
+  .ex-ja {
+    font-size: 11.5px;
+  }
+
+  /* 語源・コアイメージ */
+  .core-box {
+    font-size: 11.5px;
+    padding: 2.5px 7px;
+    margin-top: 3px;
+  }
+  .hist-box {
+    font-size: 11.5px;
+    padding: 4px 7px;
+    margin: 3px 0;
+  }
+  .ety {
+    font-size: 11.5px;
+    padding: 4px 7px;
+  }
+  .ety-net {
+    margin-top: 2px;
+    padding-top: 4px;
+    gap: 4px;
+  }
+
+  /* 入力欄のiOS自動ズーム防止 */
+  input[type="text"], input[type="password"], input[type="email"], select, textarea {
+    font-size: 16px;
+  }
+  .search-wrap input {
+    font-size: 14px;
+  }
+
+  /* 8. Anki復習画面のモバイル最適化 */
+  .anki-card {
+    padding: 16px 12px;
+    max-width: 100%;
+    margin: 0;
+    min-height: 55vh;
+  }
+  .a-hw {
+    font-size: 24px;
+  }
+  .b-rat {
+    padding: 10px 4px;
+    font-size: 12px;
+  }
 }
 @page { size:A4 portrait; margin:5mm 6mm; }
 @media print {

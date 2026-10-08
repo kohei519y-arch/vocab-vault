@@ -23,9 +23,9 @@
 <div class="workspace">
   <nav class="ribbon" aria-label="メインナビゲーション">
     <div class="rib-grp">
-      <button class="rib-btn" onclick="toggleSidebar()" title="サイドバー開閉" aria-label="サイドバー開閉"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
+      <button class="rib-btn" id="ribFoldBtn" onclick="toggleSidebar()" title="サイドバー開閉" aria-label="サイドバー開閉"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg></button>
       <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></button>
-      <button class="rib-btn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></button>
+      <button class="rib-btn" id="ribExtBtn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg></button>
       <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></button>
       <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></button>
       <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -44,7 +44,7 @@
       <button class="rib-btn" id="ribInstallBtn" onclick="promptAppInstall()" title="アプリを単体インストール（Chromeなしで独立起動）" aria-label="アプリを単体インストール">
         <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       </button>
-      <button class="rib-btn" onclick="openSettings()" title="設定・データ管理" aria-label="設定・データ管理">
+      <button class="rib-btn" id="ribSettingsBtn" onclick="openSettings()" title="設定・データ管理" aria-label="設定・データ管理">
         <svg viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>
         <span id="cfgDot" class="cfg-dot"></span>
       </button>
@@ -125,12 +125,15 @@
     </div>
 
     <form class="add-bar" id="ctrlForm" onsubmit="event.preventDefault(); submitW();">
+      <button type="button" class="btn-toggle-add-opts" id="btnToggleAddOpts" onclick="document.getElementById('ctrlForm')?.classList.toggle('expanded')" title="分野・オプションを展開" aria-label="詳細設定">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
       <input type="text" id="inFol" class="in-fol-box" placeholder="分野 (任意)" autocomplete="off">
       <div class="in-word-wrap f1" id="inWordWrap" style="position:relative;display:flex">
         <input type="text" id="inWord" class="f1" placeholder="単語・熟語を入力（カンマや改行で複数一括登録 / 例: wet blanket, look up）" autocomplete="off" style="width:100%">
         <div id="wordSuggestBox" class="word-suggest-box" style="display:none"></div>
       </div>
-      <div class="add-opts">
+      <div class="add-opts" id="addOpts">
         <label class="chk-lbl xs" title="歴史・制度・時代背景を深く解説">
           <input type="checkbox" id="chkHist" checked onchange="lsSet('vv_use_hist_mode', this.checked ? '1' : '0')">歴史
         </label>
