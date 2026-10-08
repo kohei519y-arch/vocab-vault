@@ -6047,15 +6047,34 @@ serve(async (req) => {
     App.ankiHistory.push({ lang: tL, id: e.id, prevProps: { interval: e.interval, repetition: e.repetition, efactor: e.efactor, nextReview: e.nextReview }, requeued: r === 0 });
     if (App.ankiHistory.length > 20) App.ankiHistory.shift();
 
+    const now = Date.now();
     if (global.VocabSRS) {
       const nextSRS = global.VocabSRS.calculateNextReview(e, r);
-      Object.assign(e, nextSRS, { reviewUpdatedAt: Date.now() });
+      Object.assign(e, nextSRS, { reviewUpdatedAt: now });
       if (r === 0) App.aList.push(e);
 
       // オフライン復習キューに登録（未接続時）
       if (!navigator.onLine && global.VocabSRS.queueOfflineReview) {
         global.VocabSRS.queueOfflineReview({ id: e.id, lang: tL, rating: r });
       }
+    } else {
+      // [フォールバック] VocabSRS未定義時でもSM-2計算を確実に完遂し学習履歴の喪失を防止
+      let iv = Number(e.interval) || 0, rep = Number(e.repetition) || 0, ef = Number(e.efactor) || 2.5;
+      if (r === 0) {
+        rep = 0; iv = 0;
+        e.nextReview = now + 60000;
+        App.aList.push(e);
+      } else {
+        iv = r === 1 ? Math.max(1, iv * 1.2) : (r === 2 ? (!rep ? 1 : iv * 2.5) : (!rep ? 4 : iv * ef));
+        ef = Math.max(1.3, ef + (r === 1 ? -0.15 : r === 3 ? 0.15 : 0));
+        if (r >= 2) rep++;
+        e.nextReview = now + Math.round(iv * 86400000);
+      }
+      e.interval = Number(iv.toFixed(2));
+      e.repetition = rep;
+      e.efactor = Number(ef.toFixed(2));
+      e.reviewUpdatedAt = now;
+      e.updatedAt = now;
     }
     setJson(LANGS[tL].key, list);
     if (App.aList.length) {
