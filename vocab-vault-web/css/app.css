@@ -987,6 +987,52 @@ kbd.kbd-hint {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+/* モバイル・スマート詳細セグメントタブ (Compact Segment Control) */
+.detail-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 2px 0 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--b-s);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.detail-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+.detail-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--b);
+  background: var(--bg-card);
+  color: var(--s);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: all .15s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.detail-tab-btn:hover {
+  background: var(--bg-hov);
+  color: var(--t);
+}
+.detail-tab-btn.active {
+  background: var(--ac);
+  color: #fff;
+  border-color: var(--ac);
+  box-shadow: 0 1px 4px rgba(124, 58, 237, 0.3);
+}
+.detail-panel {
+  animation: detailsFadeIn .18s cubic-bezier(0.16, 1, 0.3, 1);
+}
 .card-quick-chips {
   display: flex;
   flex-wrap: wrap;

@@ -1356,11 +1356,36 @@
     const netHtml = (chipsHtml || sLnk || cLnk) ? `<div class="ety-net">${chipsHtml}${sLnk}${cLnk}</div>` : '';
     const flagHtml = d.flags?.length ? `<div class="ety-net"><span class="conf-pill unknown" title="${esc(d.flags.join(' / '))}">要確認 ${d.flags.length}</span><span class="ety-lbl">${esc(d.flags.join(' / '))}</span></div>` : '';
 
+    const panelHist = histHtml;
+    const panelEx = `${exHtml}${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}`;
+    const panelDrv = drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : '';
+    const panelEty = `${coreHtml}${etyHtml}${netHtml}${flagHtml}`;
+
     const fullDetailsContent = `${histHtml}${exHtml}${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}${drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : ''}${coreHtml}${etyHtml}${netHtml}${flagHtml}`;
+
+    const panels = [];
+    if (panelEty) panels.push({ id: 'ety', label: '語源・語根', html: panelEty });
+    if (panelEx) panels.push({ id: 'ex', label: '例文・成句', html: panelEx });
+    if (panelHist) panels.push({ id: 'hist', label: '歴史・背景', html: panelHist });
+    if (panelDrv) panels.push({ id: 'drv', label: '派生語', html: panelDrv });
+
+    const hasMultiPanels = panels.length > 1;
+    const defaultTab = panels[0]?.id || 'all';
+
+    let accordionBodyContent = '';
+    if (hasMultiPanels) {
+      const tabBtns = panels.map(p => `<button type="button" class="detail-tab-btn ${p.id === defaultTab ? 'active' : ''}" data-act="switch-detail-tab" data-tab="${p.id}">${p.label}</button>`).join('') +
+        `<button type="button" class="detail-tab-btn" data-act="switch-detail-tab" data-tab="all">すべて</button>`;
+      const tabsBar = `<div class="detail-tabs-bar">${tabBtns}</div>`;
+      const panelDivs = panels.map(p => `<div class="detail-panel" data-panel="${p.id}" style="display:${p.id === defaultTab ? 'block' : 'none'}">${p.html}</div>`).join('');
+      accordionBodyContent = `${tabsBar}${panelDivs}`;
+    } else {
+      accordionBodyContent = fullDetailsContent;
+    }
 
     const isSimple = App.viewMode === 'simple';
     const openAttr = isSimple ? '' : ' open';
-    const accordion = fullDetailsContent ? `<details class="card-details-accordion ${isSimple ? 'is-simple-mode' : ''}"${openAttr}><summary class="card-details-sum"><span class="sum-lbl">詳細（語源・例文・歴史）を見る</span><span class="sum-arrow">▾</span></summary><div class="card-details-body">${fullDetailsContent}</div></details>` : '';
+    const accordion = fullDetailsContent ? `<details class="card-details-accordion ${isSimple ? 'is-simple-mode' : ''}"${openAttr}><summary class="card-details-sum"><span class="sum-lbl">詳細（語源・例文・歴史）を見る</span><span class="sum-arrow">▾</span></summary><div class="card-details-body">${accordionBodyContent}</div></details>` : '';
 
     const quickChips = chipsHtml ? `<div class="card-quick-chips">${chipsHtml}</div>` : '';
 
@@ -2419,10 +2444,37 @@
   }
 
   function openEditModal(idOrNum, tL = App.lang) {
-    const it = getJson(LANGS[tL].key).find(x => (typeof idOrNum === 'string' && x.id === idOrNum) || x.num === Number(idOrNum));
+    // 1. 対象の言語ペアとストレージキーを特定
+    const activeCfg = getActivePairConfig();
+    const curPairKey = activeCfg.key;
+    const preferKey = (tL && LANGS[tL]?.key && !App.crossLang) ? LANGS[tL].key : curPairKey;
+
+    let targetKey = preferKey;
+    let list = [...getJson(preferKey)];
+    if (!list.length && App.entries.length) list = [...App.entries];
+
+    let it = list.find(x => (typeof idOrNum === 'string' && x.id === idOrNum) || (x.word === idOrNum) || x.num === Number(idOrNum));
+
+    // 2. 見つからない場合は全ペアから探索
+    if (!it) {
+      const allPairs = getAllKnownPairConfigs();
+      for (const p of allPairs) {
+        const otherList = [...getJson(p.key)];
+        const found = otherList.find(x => (typeof idOrNum === 'string' && x.id === idOrNum) || (x.word === idOrNum) || x.num === Number(idOrNum));
+        if (found) {
+          it = found;
+          targetKey = p.key;
+          tL = p.src;
+          break;
+        }
+      }
+    }
+
     if (!it) return;
+
     $('editId').value = it.id;
-    $('editLang').value = tL;
+    $('editLang').value = it.lang || tL;
+    if ($('editTargetKey')) $('editTargetKey').value = targetKey;
     $('editWord').value = it.word;
     $('editHomo').value = it.homographIndex || 1;
     $('editPho').value = it.phonetic || '';
@@ -2446,9 +2498,26 @@
   }
 
   function saveEditCard() {
-    const id = $('editId').value, tL = $('editLang').value || App.lang, k = LANGS[tL].key, list = [...getJson(k)];
-    const idx = list.findIndex(x => x.id === id);
+    const id = $('editId').value;
+    const tL = $('editLang').value || App.lang;
+    const targetKey = $('editTargetKey')?.value || getActivePairConfig().key;
+    let list = [...getJson(targetKey)];
+    let idx = list.findIndex(x => x.id === id);
+
+    if (idx === -1) {
+      const allPairs = getAllKnownPairConfigs();
+      for (const p of allPairs) {
+        const otherList = [...getJson(p.key)];
+        const foundIdx = otherList.findIndex(x => x.id === id);
+        if (foundIdx !== -1) {
+          list = otherList;
+          idx = foundIdx;
+          break;
+        }
+      }
+    }
     if (idx === -1) return;
+
     const w = $('editWord').value.trim().normalize('NFC');
     if (!w) return alert('見出し語を入力してください。');
     const homoIdx = Math.max(1, parseInt($('editHomo').value, 10) || 1);
@@ -2490,17 +2559,39 @@
       if (removed?.id) tombMap.set(`id:${removed.id}`, now);
     }
     if (global.VocabStorage) global.VocabStorage.saveTombstones(tL, tombMap);
-    setJson(k, list.map((it, i) => ({ ...it, num: i + 1 })), true, true);
+
+    const nextList = list.map((it, i) => ({ ...it, num: i + 1 }));
+    setJson(targetKey, nextList, true, true);
+    if (targetKey === getActivePairConfig().key) {
+      App.entries = nextList;
+    }
+    if (global.VocabStorage) {
+      global.VocabStorage.state.mem[targetKey] = nextList;
+    }
     toggleModal('editModal', false);
     load(App.page);
+    showToast(`「${w}」を更新しました`, 'ok');
   }
 
   function exportJSON() {
-    const data = Object.fromEntries(LANG_KEYS.map(l => [l, getJson(LANGS[l].key)]));
+    const allPairs = getAllKnownPairConfigs();
+    const data = {};
+    allPairs.forEach(p => {
+      const items = getJson(p.key);
+      if (items.length > 0 || LANGS[p.src]?.key === p.key) {
+        data[p.key] = items;
+      }
+    });
+    // 互換性のため言語キー(en, fr, de, ja)もミラー確保
+    LANG_KEYS.forEach(l => {
+      const legacyKey = LANGS[l].key;
+      if (!data[legacyKey]) data[legacyKey] = getJson(legacyKey);
+      data[l] = data[legacyKey];
+    });
     const nowIso = new Date().toISOString();
     lsSet('vv_last_backup_at', nowIso.slice(0, 19).replace('T', ' '));
     updStats();
-    dlBlob([JSON.stringify({ version:4, exportedAt:nowIso, data }, null, 2)], 'application/json', `vocab_backup_${nowIso.slice(0, 10)}.json`);
+    dlBlob([JSON.stringify({ version: 5, exportedAt: nowIso, data }, null, 2)], 'application/json', `vocab_backup_${nowIso.slice(0, 10)}.json`);
   }
 
   function importJSON(ev) {
@@ -2808,15 +2899,35 @@
   function procRev(r) {
     const cur = App.aList.shift();
     if (!cur) return;
-    const tL = cur.lang || App.lang, list = tL === App.lang ? App.entries : getJson(LANGS[tL].key);
-    const e = list.find(x => (cur.id && x.id === cur.id) || x.num === cur.num);
+    const activeCfg = getActivePairConfig();
+    const curPairKey = activeCfg.key;
+    const tL = cur.lang || App.srcLang;
+
+    // 対象リストとキーを特定
+    let targetKey = curPairKey;
+    let list = [...App.entries];
+    let e = list.find(x => (cur.id && x.id === cur.id) || (cur.word && x.word === cur.word) || x.num === cur.num);
+
+    if (!e) {
+      const allPairs = getAllKnownPairConfigs();
+      for (const p of allPairs) {
+        const otherList = [...getJson(p.key)];
+        const found = otherList.find(x => (cur.id && x.id === cur.id) || (cur.word && x.word === cur.word) || x.num === cur.num);
+        if (found) {
+          e = found;
+          targetKey = p.key;
+          list = otherList;
+          break;
+        }
+      }
+    }
     if (!e) return;
 
     if (global.VocabSRS?.triggerHaptic) {
       global.VocabSRS.triggerHaptic(r === 0 ? 'again' : r === 1 ? 'light' : r === 2 ? 'good' : 'easy');
     }
 
-    App.ankiHistory.push({ lang: tL, id: e.id, prevProps: { interval: e.interval, repetition: e.repetition, efactor: e.efactor, nextReview: e.nextReview }, requeued: r === 0 });
+    App.ankiHistory.push({ lang: tL, id: e.id, targetKey, prevProps: { interval: e.interval, repetition: e.repetition, efactor: e.efactor, nextReview: e.nextReview }, requeued: r === 0 });
     if (App.ankiHistory.length > 20) App.ankiHistory.shift();
 
     const now = Date.now();
@@ -2830,7 +2941,6 @@
         global.VocabSRS.queueOfflineReview({ id: e.id, lang: tL, rating: r });
       }
     } else {
-      // [フォールバック] VocabSRS未定義時でもSM-2計算を確実に完遂し学習履歴の喪失を防止
       let iv = Number(e.interval) || 0, rep = Number(e.repetition) || 0, ef = Number(e.efactor) || 2.5;
       if (r === 0) {
         rep = 0; iv = 0;
@@ -2848,7 +2958,15 @@
       e.reviewUpdatedAt = now;
       e.updatedAt = now;
     }
-    setJson(LANGS[tL].key, list);
+
+    setJson(targetKey, list, true, true);
+    if (targetKey === curPairKey) {
+      App.entries = list;
+    }
+    if (global.VocabStorage) {
+      global.VocabStorage.state.mem[targetKey] = list;
+    }
+
     if (App.aList.length) {
       renderAnki();
     } else {
@@ -2860,7 +2978,8 @@
   function undoAnkiRev() {
     const last = App.ankiHistory.pop();
     if (!last) return;
-    const list = last.lang === App.lang ? App.entries : getJson(LANGS[last.lang].key);
+    const targetKey = last.targetKey || getActivePairConfig().key;
+    const list = (targetKey === getActivePairConfig().key) ? App.entries : getJson(targetKey);
     const e = list.find(x => x.id === last.id);
     if (!e) return;
     Object.assign(e, last.prevProps, { updatedAt: Date.now(), reviewUpdatedAt: Date.now() });
@@ -2869,7 +2988,13 @@
       if (pIdx !== -1) App.aList.splice(pIdx, 1);
     }
     App.aList.unshift(e);
-    setJson(LANGS[last.lang].key, list);
+    setJson(targetKey, list, true, true);
+    if (targetKey === getActivePairConfig().key) {
+      App.entries = list;
+    }
+    if (global.VocabStorage) {
+      global.VocabStorage.state.mem[targetKey] = list;
+    }
     renderAnki();
   }
 
@@ -3773,6 +3898,18 @@ etymology:${eInst}`;
         delW(el.dataset.id || (Number.isInteger(num) ? num : cardWord), el.dataset.lang || App.lang);
       }
       else if (act === 'toggle-clamp') el.classList.toggle('clamp');
+      else if (act === 'switch-detail-tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        const tabName = el.dataset.tab;
+        const body = el.closest('.card-details-body');
+        if (body) {
+          body.querySelectorAll('.detail-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+          body.querySelectorAll('.detail-panel').forEach(panel => {
+            panel.style.display = (tabName === 'all' || panel.dataset.panel === tabName) ? 'block' : 'none';
+          });
+        }
+      }
       else if (act === 'page') { App.page += Number(el.dataset.dir); render(); $('mainScroll')?.scrollTo(0, 0); }
       else if (act === 'rate') procRev(Number(el.dataset.rate));
       else if (act === 'retry-batch') {
@@ -4049,6 +4186,7 @@ etymology:${eInst}`;
     mergeWords,
     safeParseWords,
     validateEntry,
+    buildRight,
     toggleSidebar,
     toggleSec,
     toggleMask,

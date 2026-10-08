@@ -255,6 +255,94 @@ def test_delete_word_integrity():
     else:
         log_fail(f"Word deletion test error: {res.stderr or res.stdout}")
 
+def test_mobile_tabs_and_pair_sync():
+    print("\n--- 3c. Mobile Detail Tabs & Active Pair Sync Test ---")
+    scripts = ["js/storage.js", "js/anki.js", "js/app.js"]
+    combined_code = """
+    var global = globalThis;
+    globalThis.window = globalThis;
+    globalThis.location = { pathname: '/', search: '' };
+    globalThis.URLSearchParams = function(s) { return { get: function(k) { return null; } }; };
+    var storageData = {};
+    globalThis.localStorage = {
+        getItem: function(k) { return storageData[k] || null; },
+        setItem: function(k, v) { storageData[k] = String(v); },
+        removeItem: function(k) { delete storageData[k]; }
+    };
+    globalThis.confirm = function() { return true; };
+    globalThis.requestAnimationFrame = function(cb) { cb(); };
+    globalThis.addEventListener = function() {};
+    globalThis.document = {
+        addEventListener: function() {},
+        body: { classList: { add: function(){}, remove: function(){}, contains: function(){ return false; }, toggle: function(){} } },
+        getElementById: function() { return { value: '', classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        querySelector: function() { return { value: '', classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        querySelectorAll: function() { return []; },
+        createElement: function() { return { style: {}, appendChild: function(){}, addEventListener: function(){}, remove: function(){}, dataset: {}, classList: { add: function(){} } }; },
+        createDocumentFragment: function() { return { appendChild: function(){} }; }
+    };
+    globalThis.navigator = { userAgent: 'iPhone', onLine: true };
+    globalThis.innerWidth = 390;
+    globalThis.innerHeight = 844;
+    """
+
+    for s in scripts:
+        with open(os.path.join(BASE_DIR, s), "r", encoding="utf-8") as f:
+            combined_code += f"\n// --- {s} ---\n" + f.read()
+
+    combined_code += """
+    // 1. Verify buildRight generates detail tabs for multi-panel cards
+    var testCard = {
+        id: "tab-card-1",
+        num: 1,
+        word: "paradigm",
+        lang: "en",
+        meanings: [{ pos: "N[C]", text: "模範、パラダイム" }],
+        core: "枠組み",
+        etymology: "Greek paradeigma (pattern, example)",
+        example: { foreign: "A shift in scientific paradigm.", ja: "科学的パラダイムの転換。" },
+        history_note: "トーマス・クーンの『科学革命の構造』で広く知られる"
+    };
+
+    var renderedHtml = (global.VocabCore?.buildRight || buildRight)(testCard);
+    if (!renderedHtml.includes('detail-tabs-bar')) throw new Error('detail-tabs-bar not found in buildRight');
+    if (!renderedHtml.includes('data-act="switch-detail-tab"')) throw new Error('switch-detail-tab action not found in buildRight');
+    if (!renderedHtml.includes('detail-panel')) throw new Error('detail-panel not found in buildRight');
+
+    // 2. Verify Anki review updates correct active language pair key
+    var pairCard = {
+        id: "pair-card-1",
+        num: 1,
+        word: "epiphany",
+        lang: "en",
+        interval: 0,
+        repetition: 0,
+        efactor: 2.5,
+        meanings: [{ pos: "N[C]", text: "直感的洞察、ひらめき" }]
+    };
+    App.srcLang = "en";
+    App.tgtLang = "en";
+    var pairKey = VocabStorage.getPairKey("en", "en"); // distinction_entries_en_en
+    localStorage.setItem(pairKey, JSON.stringify([pairCard]));
+    App.entries = [pairCard];
+    App.aList = [{ ...pairCard }];
+
+    (global.VocabCore?.procRev || procRev)(2); // Rate Good (3: 普通)
+    var updatedPairList = JSON.parse(localStorage.getItem(pairKey) || "[]");
+    if (!updatedPairList.length) throw new Error("procRev failed to persist to pairKey: " + pairKey);
+    if (updatedPairList[0].repetition !== 1) throw new Error("Repetition count was not incremented in pair storage");
+    if (updatedPairList[0].interval <= 0) throw new Error("Interval was not increased in pair storage");
+
+    print("OK");
+    """
+
+    res = subprocess.run([JSC_PATH, "-e", combined_code], capture_output=True, text=True)
+    if res.returncode == 0 and "OK" in res.stdout:
+        log_pass("Mobile detail tabs generated with clean segment controls (.detail-tabs-bar)")
+        log_pass("Language pair review (procRev) accurately synchronizes with pair storage keys")
+    else:
+        log_fail(f"Mobile detail tabs and pair sync error: {res.stderr or res.stdout}")
+
 def test_html_js_integrity():
     print("\n--- 4. HTML-JS DOM & Ribbon Navigation Integrity ---")
     html_path = os.path.join(BASE_DIR, "index.html")
@@ -467,6 +555,7 @@ def main():
     test_srs_anchor_bonus()
     test_storage_tombstones()
     test_delete_word_integrity()
+    test_mobile_tabs_and_pair_sync()
     test_html_js_integrity()
     test_prompt_injection_sanitizer()
     test_s_grade_features()
