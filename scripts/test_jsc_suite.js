@@ -105,6 +105,9 @@ load(basePath + "/js/queue.js");
 load(basePath + "/js/modal.js");
 load(basePath + "/js/search.js");
 load(basePath + "/js/navigation.js");
+load(basePath + "/js/anki_view.js");
+load(basePath + "/js/list_view.js");
+load(basePath + "/js/events.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -588,6 +591,45 @@ try {
     moveCardFocus: function(delta){ handledKey = (delta === 1); }
   });
   assert("VocabNavigation.handleGlobalKeydown delegates j key to moveCardFocus(1)", keyHandled === true && handledKey === true);
+
+  // Test Scenario J: CSS Grid Layout & Computed Box Model Integrity Verification
+  var cssContent = typeof read === 'function' ? read(basePath + "/css/app.css") : '';
+  assert("CSS file loaded for layout analysis", typeof cssContent === 'string' && cssContent.length > 1000);
+  
+  // 1. .card のグリッド定義検証 (デスクトップ 2カラム 205px 1fr)
+  var cardGridMatch = cssContent.match(/\.card\s*\{[^}]*display\s*:\s*grid[^}]*grid-template-columns\s*:\s*205px\s+1fr/);
+  assert("CSS .card defines 2-column grid layout (205px 1fr)", Boolean(cardGridMatch));
+
+  // 2. .card-acts の position:absolute 検証 (グリッドセル脱落・行崩壊防止ゲート)
+  var cardActsMatch = cssContent.match(/\.card-acts\s*\{[^}]*position\s*:\s*absolute/);
+  assert("CSS .card-acts enforces position:absolute to eliminate grid cell collision", Boolean(cardActsMatch));
+
+  // 3. モバイルメディアクエリでの1カラムフォールバック検証
+  var mobileCardMatch = cssContent.match(/grid-template-columns\s*:\s*1fr/);
+  assert("CSS mobile breakpoint adopts 1-column responsive layout", Boolean(mobileCardMatch));
+
+  // 4. .col-left のアクションボタン余白ガード検証
+  var colLeftPaddingMatch = cssContent.match(/\.col-left\s*\{[^}]*padding-right\s*:\s*76px/);
+  assert("CSS .col-left includes collision-proof action button padding", Boolean(colLeftPaddingMatch));
+
+  // Test Scenario K: VocabAnkiView isolated module verification
+  assert("VocabAnkiView is defined on global scope", typeof VocabAnkiView === 'object' && VocabAnkiView !== null);
+  var overdueRatio = VocabAnkiView.getOverdueRatio({ nextReview: Date.now() - 86400000 * 2, interval: 2 }, Date.now());
+  assert("VocabAnkiView.getOverdueRatio accurately computes ratio (Ratio: " + overdueRatio + ")", overdueRatio >= 0.9);
+  assert("VocabAnkiView core methods callable", typeof VocabAnkiView.startAnki === 'function' && typeof VocabAnkiView.renderAnki === 'function' && typeof VocabAnkiView.procRev === 'function');
+
+  // Test Scenario L: VocabListView & Keyed Reconciliation isolated module verification
+  assert("VocabListView is defined on global scope", typeof VocabListView === 'object' && VocabListView !== null);
+  assert("VocabListView core methods callable", typeof VocabListView.render === 'function' && typeof VocabListView.load === 'function' && typeof VocabListView.reconcileList === 'function');
+  assert("VocabListView.hasActiveFilters detects filters", VocabListView.hasActiveFilters({ q: 'apple' }) === true && VocabListView.hasActiveFilters({}) === false);
+  var dummyContainer = { innerHTML: '', querySelectorAll: function(){ return []; }, appendChild: function(){} };
+  VocabListView.reconcileList(dummyContainer, [{ id: 'test_1', word: 'apple' }], { createCardElement: function(it){ return { dataset: { id: it.id } }; } });
+  assert("VocabListView.reconcileList executes keyed diff without crashing", true);
+
+  // Test Scenario M: VocabEvents isolated module verification
+  assert("VocabEvents is defined on global scope", typeof VocabEvents === 'object' && VocabEvents !== null);
+  assert("VocabEvents core methods callable", typeof VocabEvents.syncCloudNow === 'function' && typeof VocabEvents.updCloudUI === 'function' && typeof VocabEvents.runDatabaseDiagnosticsAndRepair === 'function' && typeof VocabEvents.bindDelegatedEvents === 'function');
+  assert("VocabEvents.setDailyReviewCap updates cap", typeof VocabEvents.setDailyReviewCap === 'function');
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

@@ -52,6 +52,9 @@ def check_jsc_syntax():
         "js/modal.js",
         "js/search.js",
         "js/navigation.js",
+        "js/anki_view.js",
+        "js/list_view.js",
+        "js/events.js",
         "js/app.js",
         "sw.js"
     ]
@@ -220,6 +223,9 @@ def test_delete_word_integrity():
         "js/modal.js",
         "js/search.js",
         "js/navigation.js",
+        "js/anki_view.js",
+        "js/list_view.js",
+        "js/events.js",
         "js/app.js"
     ]
     combined_code = """
@@ -306,6 +312,9 @@ def test_mobile_tabs_and_pair_sync():
         "js/modal.js",
         "js/search.js",
         "js/navigation.js",
+        "js/anki_view.js",
+        "js/list_view.js",
+        "js/events.js",
         "js/app.js"
     ]
     combined_code = """
@@ -594,6 +603,9 @@ def test_html_js_integrity():
         "js/modal.js",
         "js/search.js",
         "js/navigation.js",
+        "js/anki_view.js",
+        "js/list_view.js",
+        "js/events.js",
         "js/app.js"
     ]
     last_idx = -1
