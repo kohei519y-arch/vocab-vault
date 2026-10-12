@@ -91,14 +91,19 @@
     document.querySelectorAll?.('.modal-ov.open').forEach(el => {
       el.classList.remove('open');
     });
-    if (graphState?.animId) {
-      try { cancelAnimationFrame(graphState.animId); graphState.animId = null; } catch {}
-    }
+    try {
+      if (typeof graphState !== 'undefined' && graphState?.animId) {
+        cancelAnimationFrame(graphState.animId);
+        graphState.animId = null;
+      }
+    } catch {}
     const ws = document.querySelector?.('.workspace');
     if (ws) ws.inert = false;
-    if (lastFocus?.focus) {
-      try { lastFocus.focus(); } catch {}
-    }
+    try {
+      if (typeof lastFocus !== 'undefined' && lastFocus?.focus) {
+        lastFocus.focus();
+      }
+    } catch {}
   };
 
   function showToast(msg, type = 'info', duration = 4500) {
@@ -230,7 +235,24 @@
       return isMobile ? 'simple' : 'academic';
     })(),
     dailyReviewCap: parseInt(lsGet('vv_daily_review_cap', '30'), 10) || 30,
-    isDev: checkDevMasterMode()
+    isDev: checkDevMasterMode(),
+
+    /** すべての絞り込みフィルタ・検索条件・言語横断フラグを一括リセットし、UIを完全同期 */
+    resetFilters: function() {
+      App.statF = App.cat = App.posF = App.fol = 'all';
+      App.qStr = '';
+      App.qReg = null;
+      App.crossLang = false;
+      $('xLangBtn')?.classList.remove('on');
+      if ($('qSearch')) $('qSearch').value = '';
+      if ($('qClear')) $('qClear').style.display = 'none';
+      if ($('resetFiltBtn')) $('resetFiltBtn').style.display = 'none';
+    },
+
+    /** 現在有効なフィルタが存在するかどうかを判定 */
+    hasActiveFilters: function() {
+      return App.crossLang || App.statF !== 'all' || App.fol !== 'all' || App.cat !== 'all' || App.posF !== 'all' || Boolean(App.qStr);
+    }
   };
 
   const PER_PAGE = 30;
@@ -1139,12 +1161,7 @@
     lsSet('vv_active_lang', s);
 
     if (isLangChanged) {
-      App.fol = App.cat = App.posF = App.statF = 'all';
-      App.qStr = '';
-      App.qReg = null;
-      if ($('qSearch')) $('qSearch').value = '';
-      if ($('qClear')) $('qClear').style.display = 'none';
-      if ($('resetFiltBtn')) $('resetFiltBtn').style.display = 'none';
+      App.resetFilters();
     }
 
     if ($('srcLangSel') && $('srcLangSel').value !== s) $('srcLangSel').value = s;
@@ -1198,10 +1215,7 @@
   }
 
   function resetAllFilters() {
-    App.statF = App.cat = App.posF = App.fol = 'all';
-    App.crossLang = false;
-    $('xLangBtn')?.classList.remove('on');
-    setSearch('');
+    App.resetFilters();
     load(1);
   }
 
@@ -1474,22 +1488,45 @@
     showToast(`厳選スターターパック（${toAdd.length}語）を読み込みました！`, 'ok', 3500);
   }
 
-  function jumpToWord(w, tLang = App.lang) {
-    if ($('anki')?.style.display === 'block') {
-      exitAnki();
+  /**
+   * 対象カード要素を画面中央にスムーズスクロールし、発光ハイライトを付与
+   */
+  function scrollToCard(el) {
+    if (!el) return;
+    const container = $('mainScroll');
+    if (container && typeof container.getBoundingClientRect === 'function') {
+      const cRect = container.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      const targetScrollTop = container.scrollTop + (eRect.top - cRect.top) - (container.clientHeight / 2) + (el.clientHeight / 2);
+      container.scrollTo?.({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
+    } else {
+      el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
     }
-    // ソフトキーボードおよび入力フォーカスを解除し、カードを完全可視化
+    el.classList?.add?.('highlight-jump');
+    const cards = [...document.querySelectorAll('#list .card')];
+    const cIdx = cards.indexOf(el);
+    if (cIdx >= 0) App.focusedCardIndex = cIdx;
+    setTimeout(() => el.classList?.remove?.('highlight-jump'), 2000);
+  }
+
+  /**
+   * DOM上のカード一覧から指定単語の要素を特定（キー・生単語・見出し語の多重照合）
+   */
+  function findCardElement(cards, targetWord, targetLk, baseTargetLk) {
+    const cleanW = (targetWord || '').toLowerCase().trim();
+    return cards.find(c => c.dataset.word === targetLk)
+      || cards.find(c => c.dataset.word === baseTargetLk)
+      || cards.find(c => c.dataset.rawWord?.trim()?.toLowerCase() === cleanW)
+      || cards.find(c => c.querySelector('.hw')?.textContent?.trim()?.toLowerCase() === cleanW)
+      || null;
+  }
+
+  function jumpToWord(w, tLang = App.lang) {
+    if ($('anki')?.style.display === 'block') exitAnki();
     try { document.activeElement?.blur?.(); } catch {}
     if ($('wordSuggestBox')) $('wordSuggestBox').style.display = 'none';
     if (window.innerWidth <= 768) closeSidebar();
-
-    const modalIds = ['graphModal', 'extractModal', 'settingsModal', 'shortcutsModal'];
-    modalIds.forEach(m => {
-      const el = $(m);
-      if (el && (el.classList?.contains?.('open') || String(el.className || '').includes('open'))) {
-        toggleModal(m, false);
-      }
-    });
+    closeAllModals();
 
     const spec = parseInputWordSpec(w);
     const targetWord = (spec.cleanWord || '').trim();
@@ -1550,18 +1587,12 @@
     }
 
     if (!targetItem) {
-      // 登録されていない単語の場合は検索フィルターのみ実行
       setSearch(targetWord, true);
       return;
     }
 
     // 3. フィルターの全クリア（該当単語が絶対に隠れないよう全フィルタを確実にリセット）
-    App.statF = App.cat = App.posF = App.fol = 'all';
-    App.qStr = '';
-    App.qReg = null;
-    if ($('qSearch')) $('qSearch').value = '';
-    if ($('qClear')) $('qClear').style.display = 'none';
-    if ($('resetFiltBtn')) $('resetFiltBtn').style.display = 'none';
+    App.resetFilters();
 
     if (switchLang) {
       if ($('srcLangSel') && $('srcLangSel').value !== App.srcLang) $('srcLangSel').value = App.srcLang;
@@ -1584,33 +1615,15 @@
     renderPairFileTabs();
     updStats();
 
-    // 5. DOM上のカード要素を確実に発見してスクロール＆ハイライト
+    // 5. DOM上のカード要素を確実に発見してスクロール＆ハイライト（タイマー推測を廃止し即時確定）
     requestAnimationFrame(() => {
-      setTimeout(() => {
-        const cards = [...document.querySelectorAll('#list .card')];
-        const el = cards.find(c => c.dataset.word === targetLk)
-          || cards.find(c => c.dataset.word === baseTargetLk)
-          || cards.find(c => c.dataset.rawWord?.trim()?.toLowerCase() === cleanTargetWord)
-          || cards.find(c => c.querySelector('.hw')?.textContent?.trim()?.toLowerCase() === cleanTargetWord);
-
-        if (el) {
-          const container = $('mainScroll');
-          if (container && typeof container.getBoundingClientRect === 'function') {
-            const cRect = container.getBoundingClientRect();
-            const eRect = el.getBoundingClientRect();
-            const targetScrollTop = container.scrollTop + (eRect.top - cRect.top) - (container.clientHeight / 2) + (el.clientHeight / 2);
-            container.scrollTo?.({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
-          } else {
-            el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-          }
-          el.classList?.add?.('highlight-jump');
-          const cIdx = cards.indexOf(el);
-          if (cIdx >= 0) App.focusedCardIndex = cIdx;
-          setTimeout(() => el.classList?.remove?.('highlight-jump'), 2000);
-        } else {
-          $('mainScroll')?.scrollTo?.({ top: 0, behavior: 'smooth' });
-        }
-      }, 70);
+      const cards = [...document.querySelectorAll('#list .card')];
+      const el = findCardElement(cards, targetWord, targetLk, baseTargetLk);
+      if (el) {
+        scrollToCard(el);
+      } else {
+        $('mainScroll')?.scrollTo?.({ top: 0, behavior: 'smooth' });
+      }
     });
   }
 
@@ -3700,14 +3713,11 @@
       }
     });
 
-    if (fName) {
-      if (App.fol !== 'all' && App.fol !== fName) App.fol = fName;
-    } else {
-      if (App.fol !== 'all') App.fol = 'all';
-    }
-    if (App.statF !== 'all' || App.cat !== 'all' || App.posF !== 'all' || Boolean(App.qStr)) {
-      App.statF = App.cat = App.posF = 'all';
-      setSearch('');
+    if (App.hasActiveFilters()) {
+      App.resetFilters();
+      if (fName) App.fol = fName;
+    } else if (fName && App.fol !== fName) {
+      App.fol = fName;
     }
     if (reorderedSet.size) {
       setJson(k, App.entries, false, true);
