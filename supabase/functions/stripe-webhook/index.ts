@@ -134,6 +134,45 @@ serve(async (req) => {
         break;
       }
 
+      case "invoice.payment_action_required": {
+        // 3Dセキュア等の追加カード認証が必要な場合: 猶予期間を付与して一時的にPro維持
+        const invoice = event.data.object as Stripe.Invoice;
+        customerId = (invoice.customer as string) || null;
+        subscriptionId = (invoice.subscription as string) || null;
+        subStatus = "past_due";
+        plan = "pro";
+        gracePeriodUntilIso = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(); // 2日間猶予
+        break;
+      }
+
+      case "customer.subscription.trial_will_end": {
+        // トライアル終了前の通知受領（状態はactiveを維持）
+        const subscription = event.data.object as Stripe.Subscription;
+        customerId = (subscription.customer as string) || null;
+        subscriptionId = subscription.id;
+        subStatus = "trialing";
+        plan = "pro";
+        break;
+      }
+
+      case "charge.dispute.created": {
+        // チャージバック発生時: 調査のため即時警告ログと無料プラン差し戻し
+        const dispute = event.data.object as Stripe.Dispute;
+        customerId = (dispute as any).customer || null;
+        if (!customerId && dispute.charge) {
+          try {
+            const ch = await stripe.charges.retrieve(dispute.charge as string);
+            customerId = (ch.customer as string) || null;
+          } catch (e: any) {
+            console.warn(`[Stripe Dispute] Could not retrieve charge ${dispute.charge}:`, e.message);
+          }
+        }
+        console.warn(`[Stripe CRITICAL] Charge dispute created: ${dispute.id} for customer ${customerId}`);
+        subStatus = "unpaid";
+        plan = "free";
+        break;
+      }
+
       default:
         console.log(`[Stripe] Unhandled event type: ${event.type}`);
         return new Response(JSON.stringify({ received: true, ignored: true }), {

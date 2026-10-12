@@ -311,13 +311,17 @@
     saveTombstones(l, map);
   }
 
-  function isTombstoned(item, tombMap, l = 'en', clearedAt = getClearedAt(l)) {
+  function isTombstoned(item, tombMap = null, l = 'en', clearedAt = null) {
+    if (!item) return false;
+    if (item.isDeleted === true) return true;
+    const tMap = (tombMap && typeof tombMap.get === 'function') ? tombMap : getTombstones(l);
+    const cAt = (Number.isFinite(clearedAt) && clearedAt > 0) ? clearedAt : getClearedAt(l);
     const upd = (Number.isFinite(item.updatedAt) && item.updatedAt > 1) ? item.updatedAt : 0;
-    if (clearedAt > 0 && (upd <= clearedAt || upd === 0)) return true;
-    const delById = item.id ? (tombMap.get(`id:${item.id}`) || 0) : 0;
+    if (cAt > 0 && (upd <= cAt || upd === 0)) return true;
+    const delById = item.id ? (tMap.get(`id:${item.id}`) || 0) : 0;
     const sLang = (typeof l === 'string' && l.length === 2) ? l : (resolveConfig(l).srcLang || 'en');
     const wk = item.wordKey || (global.VocabCore?.makeWordKey ? global.VocabCore.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
-    const delByWk = wk ? (tombMap.get(`wk:${wk}`) || 0) : 0;
+    const delByWk = wk ? (tMap.get(`wk:${wk}`) || 0) : 0;
     const maxDel = Math.max(delById, delByWk);
     return maxDel > 0 && (upd === 0 || maxDel >= upd);
   }

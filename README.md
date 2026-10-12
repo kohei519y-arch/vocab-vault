@@ -24,8 +24,8 @@
 
 - 🧬 **Interactive PIE Root Network**:
   Visualizes ancient Proto-Indo-European root lineages (`*bʰer-`, `*kred-dʰē-`, `*sta-`) and how modern English words branched out. Powered by a high-performance 2D Canvas spring-embedder simulation with viewport culling.
-- 🧠 **Adaptive Spaced Repetition (FSRS-4.5 & SM-2)**:
-  Cognitive anchor bonuses give retention boosts to words deeply grounded in etymological roots.
+- 🧠 **Next-Gen Adaptive Spaced Repetition (FSRS-4.5 & Cognitive PIE-Anchor Engine)**:
+  True DSR (Difficulty, Stability, Retrievability) mathematical model mathematically integrated with Proto-Indo-European semantic graph centrality. Flattens forgetting curves through deep root lineages.
 - 📷 **Instant Camera OCR Vocabulary Capture**:
   Point your camera or upload book snapshots. Real-time client-side OCR (Tesseract.js) extracts terms directly into your flashcards.
 - 🔁 **Bi-directional Knowledge Sync**:
@@ -63,7 +63,7 @@ vocab-vault/
 │   └── app.css           # Modern Dark Glassmorphism Design System
 ├── js/
 │   ├── storage.js        # IndexedDB SSOT with 90-day Tombstone TTL & Vacuum
-│   ├── anki.js           # FSRS-4.5 & SM-2 Spaced Repetition Engine
+│   ├── anki.js           # FSRS-4.5 & Cognitive PIE-Anchor Spaced Repetition Engine
 │   ├── graph.js          # Canvas 2D Spring Physics Simulation & Viewport Culling
 │   ├── ocr.js            # Client-side Tesseract.js Image OCR Parser
 │   ├── sync.js           # Bidirectional Cloud Synchronization

@@ -194,9 +194,11 @@
   function enhanceA11y(root = document) {
     if (!root?.querySelectorAll) return;
     root.querySelectorAll('[data-act]').forEach(el => {
-      if (!['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'].includes(el.tagName) && !el.hasAttribute('tabindex')) {
+      if (!el) return;
+      const hasTab = typeof el.hasAttribute === 'function' ? el.hasAttribute('tabindex') : false;
+      if (!['BUTTON', 'INPUT', 'SELECT', 'TEXTAREA', 'A'].includes(el.tagName) && !hasTab) {
         el.tabIndex = 0;
-        el.setAttribute('role', 'button');
+        if (typeof el.setAttribute === 'function') el.setAttribute('role', 'button');
       }
     });
   }
@@ -1496,9 +1498,23 @@
     App.focusedCardIndex = -1;
     const list = $('list'), pag = $('pag');
     if (!list || !pag) return;
-    const loads = [...list.querySelectorAll('.loading-card')];
     list.innerHTML = '';
-    loads.forEach(c => list.appendChild(c));
+
+    // App.reqQueue の各待機中タスクカードを宣言的に再配置（連投・再描画時にも絶対に消滅させない）
+    let hasLoadingCards = false;
+    App.reqQueue.forEach(t => {
+      if (!t.isCancelled && !t.isDone) {
+        hasLoadingCards = true;
+        const hasLoadingCls = t.card && (typeof t.card.classList?.contains === 'function' ? t.card.classList.contains('loading-card') : String(t.card.className || '').includes('loading-card'));
+        if (!hasLoadingCls) {
+          const c = document.createElement('div');
+          c.className = 'card loading-card';
+          c.innerHTML = `<div class="card-acts" style="opacity:1"><button type="button" class="act-icon-btn del-btn" data-act="close-load" aria-label="キャンセル">×</button></div><div class="col-left"><span class="hw">${esc((t.items || []).map(x => x.word).join(', '))}</span></div><div class="right"><div class="load"><div class="spin"></div><span class="st-text">待機中 (${(t.items || []).length}語)...</span></div></div>`;
+          t.card = c;
+        }
+        list.appendChild(t.card);
+      }
+    });
 
     const f = getFiltered();
     const posObj = POS_GROUPS.find(g => g.id === App.posF), statObj = STAT_GROUPS.find(g => g.id === App.statF);
@@ -1515,7 +1531,7 @@
     if ($('sideCount')) $('sideCount').textContent = `${f.length} 件`;
     if ($('resetFiltBtn')) $('resetFiltBtn').style.display = parts.length ? 'inline' : 'none';
 
-    if (!f.length && !loads.length) {
+    if (!f.length && !hasLoadingCards) {
       const otherPair = getAllKnownPairConfigs().find(p => {
         const c = global.VocabStorage ? global.VocabStorage.getPairConfig(p.src, p.tgt) : (LANGS[p.src] || LANGS.en);
         return c.key !== getActivePairConfig().key && getJson(c.key).length > 0;
@@ -3473,7 +3489,8 @@
 
   function syncPersistedQueue() {
     try {
-      lsSet('vv_pending_queue', JSON.stringify(App.reqQueue.map(({ items, fName, useHist, useWikt, targetLang }) => ({ items, fName, useHist, useWikt, targetLang }))));
+      const activeQueue = App.reqQueue.filter(q => !q.isCancelled && !q.isDone).map(({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }) => ({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }));
+      lsSet('vv_pending_queue', JSON.stringify(activeQueue));
     } catch {}
   }
 
@@ -3550,16 +3567,12 @@
     }
   }
 
-  let lastSubmitTime = 0;
   function submitW() {
-    const now = Date.now();
-    if (now - lastSubmitTime < 700) return; // 700ms以内の連打防止
-    lastSubmitTime = now;
     if (!App.isDev && App.quotaRemaining === 0 && !getKey() && global.VocabSync?.isCloudReady?.()) {
       openUpsellModal('今月のクラウドAI生成無料枠（30語）を消費しました。Proプランにアップグレードするか、内部組み込みAIエンジン（完全機密保護）をご利用ください。');
       return;
     }
-    const f = $('inFol').value.trim(), raw = $('inWord').value.trim();
+    const f = $('inFol')?.value.trim() || '', raw = $('inWord')?.value.trim() || '';
     if (!raw) return;
     const uMap = new Map();
     splitInputWords(raw, App.lang).forEach(w => {
@@ -3568,17 +3581,18 @@
       const key = `${makeLookupKey(spec.cleanWord, App.lang, spec.homographIndex)}:${spec.senseHint}`;
       if (!uMap.has(key)) uMap.set(key, { word: w });
     });
-    $('inWord').value = '';
-    $('inWord').focus();
-    registerWordsList([...uMap.values()], f, $('chkHist').checked, $('chkWikt').checked);
+    if ($('inWord')) $('inWord').value = '';
+    $('inWord')?.focus();
+    registerWordsList([...uMap.values()], f, $('chkHist')?.checked, $('chkWikt')?.checked);
   }
 
   function enqueueTask(task) {
     const c = document.createElement('div');
     c.className = 'card loading-card';
     c.innerHTML = `<div class="card-acts" style="opacity:1"><button type="button" class="act-icon-btn del-btn" data-act="close-load" aria-label="キャンセル">×</button></div><div class="col-left"><span class="hw">${esc(task.items.map(x => x.word).join(', '))}</span></div><div class="right"><div class="load"><div class="spin"></div><span class="st-text">待機中 (${task.items.length}語)...</span></div></div>`;
-    $('list').prepend(c);
-    App.reqQueue.push({ ...task, card:c });
+    const list = $('list');
+    if (list) list.prepend(c);
+    App.reqQueue.push({ ...task, card: c, isCancelled: false, isDone: false });
     syncPersistedQueue();
     processQueue();
   }
@@ -3589,7 +3603,14 @@
     try {
       while (App.reqQueue.length) {
         const t = App.reqQueue[0];
-        if (document.body.contains(t.card)) await executeBatch(t);
+        if (!t.isCancelled) {
+          // もしカードがDOM内に見当たらない場合（再描画直後等）は安全に最前面に再アタッチして進捗表示を維持
+          if (t.card && !document.body.contains(t.card) && $('list')) {
+            $('list').prepend(t.card);
+          }
+          await executeBatch(t);
+        }
+        t.isDone = true;
         App.reqQueue.shift();
         syncPersistedQueue();
         if (App.reqQueue.length) await new Promise(r => setTimeout(r, 600));
@@ -4087,7 +4108,10 @@ etymology:${eInst}`;
           }
         } catch {}
       } else if (act === 'close-load') {
-        const card = el.closest('.card'), qIdx = App.reqQueue.findIndex(q => q.card === card);
+        const card = el.closest('.card');
+        const task = App.reqQueue.find(q => q.card === card);
+        if (task) task.isCancelled = true;
+        const qIdx = App.reqQueue.findIndex(q => q.card === card);
         if (qIdx > 0) App.reqQueue.splice(qIdx, 1);
         card?.remove();
         syncPersistedQueue();
@@ -4378,6 +4402,8 @@ etymology:${eInst}`;
     delW,
     clearCurrentLang,
     submitW,
+    load,
+    render,
     splitInputWords,
     openExtractModal,
     runPassageExtract,

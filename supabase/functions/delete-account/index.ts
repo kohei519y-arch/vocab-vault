@@ -79,23 +79,53 @@ serve(async (req) => {
           console.log(`[Account Deletion] Canceling Stripe subscription directly: ${profile.stripe_subscription_id}`);
           await stripe.subscriptions.cancel(profile.stripe_subscription_id);
         }
+        // [レースコンディション完全防止] Stripe解約完了をDBプロファイルに即時反映
+        // これにより delete_user_account RPCの ACTIVE_SUBSCRIPTION 例外を確実に回避
+        await supabaseAdmin
+          .from("profiles")
+          .update({
+            subscription_status: "canceled",
+            plan: "free",
+            cancel_at_period_end: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", user.id);
       } catch (stripeErr: any) {
         console.warn(`[Account Deletion Warning] Failed to cancel Stripe sub: ${stripeErr.message}`);
-        // サブスクが既に解約済み（resource_missing）等のエラーは処理を続行
+        // サブスクが既に解約済み（resource_missing）等のエラー以外でアクティブ課金が残っている恐れがある場合は安全優先でエラー
+        if (!stripeErr.message?.includes("No such subscription") && !stripeErr.message?.includes("resource_missing")) {
+          return new Response(
+            JSON.stringify({ error: `Stripe定期課金の解約処理中にエラーが発生しました (${stripeErr.message})。幽霊課金防止のため退会処理を中断しました。カスタマーポータルより解約後に再度お試しください。` }),
+            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
       }
     }
 
     // 4. Supabase DB データおよび auth.users の完全抹消
-    // トランザクション処理として関連テーブルを削除
-    await supabaseAdmin.from("user_vocab_entries").delete().eq("user_id", user.id);
-    await supabaseAdmin.from("user_tombstones").delete().eq("user_id", user.id);
-    await supabaseAdmin.from("user_lang_watermarks").delete().eq("user_id", user.id);
-    await supabaseAdmin.from("user_feedbacks").delete().eq("user_id", user.id);
-    await supabaseAdmin.from("profiles").delete().eq("id", user.id);
+    // トランザクション・整合性保護: ユーザー権限での delete_user_account または admin による完全クリーンアップ
+    let dbWiped = false;
+    try {
+      const { error: rpcErr } = await supabaseUserClient.rpc("delete_user_account");
+      if (!rpcErr) {
+        dbWiped = true;
+      }
+    } catch {}
 
-    // auth.users から物理削除
+    if (!dbWiped) {
+      // フォールバック: service_role による全テーブルの確実な抹消
+      await Promise.all([
+        supabaseAdmin.from("user_vocab_entries").delete().eq("user_id", user.id),
+        supabaseAdmin.from("user_tombstones").delete().eq("user_id", user.id),
+        supabaseAdmin.from("user_lang_watermarks").delete().eq("user_id", user.id),
+        supabaseAdmin.from("user_feedbacks").delete().eq("user_id", user.id),
+      ]);
+      await supabaseAdmin.from("profiles").delete().eq("id", user.id);
+    }
+
+    // auth.users から物理削除（カスケード削除も発火）
     const { error: deleteUserErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
-    if (deleteUserErr) {
+    if (deleteUserErr && !deleteUserErr.message.includes("User not found")) {
       console.error(`[Account Deletion Error] Failed to delete auth user: ${deleteUserErr.message}`);
       return new Response(JSON.stringify({ error: deleteUserErr.message }), {
         status: 500,

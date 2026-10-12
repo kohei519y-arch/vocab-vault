@@ -596,9 +596,13 @@ BEGIN
       folder = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.folder ELSE user_vocab_entries.folder END,
       category = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.category ELSE user_vocab_entries.category END,
       is_deleted = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.is_deleted ELSE user_vocab_entries.is_deleted END,
-      -- カード内容・フォルダ・削除状態は updated_at が新しい方を採用し、SRS復習進捗は独立して最新値を card_data JSONB にも合成
+      -- カード内容・フォルダ・削除状態は updated_at が新しい方を採用しつつ、非競合JSONBキーを欠落させない双方向マージ
       card_data = (
-        CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.card_data ELSE user_vocab_entries.card_data END
+        CASE 
+          WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at 
+          THEN user_vocab_entries.card_data || EXCLUDED.card_data 
+          ELSE EXCLUDED.card_data || user_vocab_entries.card_data 
+        END
       ) || jsonb_build_object(
         'interval', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,
         'repetition', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.repetition ELSE user_vocab_entries.repetition END,

@@ -76,23 +76,35 @@ serve(async (req) => {
         .eq("id", user.id);
     }
 
-    const envPriceId = Deno.env.get("STRIPE_PRO_PRICE_ID") ?? "";
-    const effectivePriceId = (priceId && priceId.startsWith("price_") && priceId !== "price_pro_monthly") 
-      ? priceId 
-      : (envPriceId || null);
+    const envPriceIdMonthly = Deno.env.get("STRIPE_PRO_PRICE_ID") ?? "";
+    const envPriceIdYearly = Deno.env.get("STRIPE_PRO_PRICE_ID_YEARLY") ?? "";
+    
+    // [P1-A 解決] クライアント主導のPriceID改ざん防止: 許可リスト（月額480円 / 年額4,800円）のみ許可
+    let selectedPriceId: string | null = null;
+    let isYearly = false;
 
-    const lineItems = effectivePriceId
-      ? [{ price: effectivePriceId, quantity: 1 }]
+    if (priceId === "price_pro_yearly" || (envPriceIdYearly && priceId === envPriceIdYearly)) {
+      selectedPriceId = envPriceIdYearly || null;
+      isYearly = true;
+    } else if (priceId === "price_pro_monthly" || (envPriceIdMonthly && priceId === envPriceIdMonthly)) {
+      selectedPriceId = envPriceIdMonthly || null;
+      isYearly = false;
+    } else if (envPriceIdMonthly && priceId === envPriceIdMonthly) {
+      selectedPriceId = envPriceIdMonthly;
+    }
+
+    const lineItems = selectedPriceId
+      ? [{ price: selectedPriceId, quantity: 1 }]
       : [
           {
             price_data: {
               currency: "jpy",
               product_data: {
-                name: "Vocab Vault Pro プラン",
+                name: isYearly ? "Vocab Vault Pro プラン (年額)" : "Vocab Vault Pro プラン (月額)",
                 description: "AI新規生成・概念史深掘り無制限、長文/画像OCR抽出無制限、複数端末リアルタイム同期",
               },
-              unit_amount: 480,
-              recurring: { interval: "month" },
+              unit_amount: isYearly ? 4800 : 480, // 月額480円 / 年額4,800円に完全統一
+              recurring: { interval: isYearly ? "year" : "month" },
             },
             quantity: 1,
           },

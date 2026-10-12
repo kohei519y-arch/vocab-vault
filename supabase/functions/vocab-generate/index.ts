@@ -28,26 +28,40 @@ function cleanJsonString(str: string): string {
 const guestRateMemory = new Map<string, number>();
 const ipBurstTracker = new Map<string, { count: number; resetAt: number }>();
 
-// [P0-6 解決] 信頼性の高いIP取得（Cloudflare / リバースプロキシスプーフィング対策）
+// [セキュリティ強化] 信頼性の高いクライアントIP取得（Cloudflare / リバースプロキシ対応）
 function getClientIp(req: Request): string {
-  return (
-    req.headers.get("cf-connecting-ip") ||
-    req.headers.get("x-real-ip") ||
-    req.headers.get("x-forwarded-for")?.split(",").map(s => s.trim()).filter(Boolean).pop() ||
-    "unknown_guest"
-  );
+  const cfIp = req.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+  const forwarded = req.headers.get("x-forwarded-for");
+  if (forwarded) {
+    // x-forwarded-for の先頭（クライアントオリジンIP）を取得
+    const firstIp = forwarded.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+  return "unknown_guest";
 }
 
-// [P1-3 解決] プロンプトインジェクション防壁: タグ脱出文字や制御文字の無力化
+// [ゼロトラスト・セキュリティ] 多層防護型プロンプトサニタイザー
+// タグ脱出、システム命令上書き、不可視Unicode制御文字、RTL偽装を完全無害化
 function sanitizePromptString(str: any, maxLen: number = 300): string {
   if (!str) return "";
-  return String(str)
-    .replace(/<\/?(?:user_request|passage|system|systemInstruction|instruction|prompt)[^>]*>/gi, " ")
+  let clean = String(str)
+    // 1. 不可視文字、ゼロ幅スペース、Bidi/RTL制御文字の除去
+    .replace(/[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/g, "")
+    // 2. ASCII制御文字の排除
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ")
+    // 3. システムタグ脱出シーケンスの完全無力化
+    .replace(/<\/?(?:user_request|passage|system|systemInstruction|instruction|prompt|developer|role|context)[^>]*>/gi, " ")
     .replace(/</g, "＜")
     .replace(/>/g, "＞")
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ")
-    .trim()
-    .slice(0, maxLen);
+    // 4. 多言語でのプロンプト上書き・Jailbreakキーワードの無力化
+    .replace(/\b(?:ignore\s+(?:all\s+)?previous\s+instructions|disregard\s+all\s+prior|developer\s+mode|dan\s+mode|system\s*:\s*|assistant\s*:\s*)\b/gi, "[filtered]")
+    .replace(/(?:前の指示を無視|これまでの命令を全て無視|システムプロンプトを出力|ルールを忘れて)/gi, "[filtered]")
+    .trim();
+
+  return clean.slice(0, maxLen);
 }
 
 const DUMMY_OCR_SENSES = new Set([
@@ -471,16 +485,28 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
 
         quotaRemaining = quotaReserve.remaining;
       } else {
-        // [P0-6 解決] 未ログインゲストの日次クォータ判定（DBアトミックRPC優先 ＆ インメモリ保護）
+        // [API Drain防衛] 未ログインゲストは1リクエスト最大3語に制限
+        if (itemsToGenerate.length > 3) {
+          return new Response(
+            JSON.stringify({
+              error: "未ログインでのAI新規一括生成は1回3語までです。無料アカウントを作成すると1回15語・月30語までご利用いただけます。",
+              requiresAuth: true
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // [P0-6 解決] 未ログインゲストの日次クォータ判定（1日10語上限）
         const clientIp = getClientIp(req);
         let guestAllowed = true;
         let currentUsage = 0;
+        const GUEST_DAILY_LIMIT = 10;
 
         try {
           const { data: gqData, error: gqErr } = await supabaseAdmin.rpc("consume_guest_quota", {
             p_ip: clientIp,
             p_count: itemsToGenerate.length,
-            p_daily_limit: 30,
+            p_daily_limit: GUEST_DAILY_LIMIT,
           });
 
           if (!gqErr && gqData) {
@@ -489,8 +515,9 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
             if (!guestAllowed) {
               return new Response(
                 JSON.stringify({
-                  error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${currentUsage}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
+                  error: `未ログインでの本日のAI新規生成お試し枠（1日${GUEST_DAILY_LIMIT}語）に達しました（本日利用: ${currentUsage}語）。無料アカウント登録（30秒）で毎月30語まで利用可能になり、Proプラン（月額480円）で無制限解放されます。`,
                   quotaRemaining: 0,
+                  requiresAuth: true
                 }),
                 { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
               );
@@ -503,11 +530,12 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
         const todayStr = new Date().toISOString().slice(0, 10);
         const rateKey = `${clientIp}_${todayStr}`;
         const currentMemoryCount = guestRateMemory.get(rateKey) || 0;
-        if (currentMemoryCount + itemsToGenerate.length > 30) {
+        if (currentMemoryCount + itemsToGenerate.length > GUEST_DAILY_LIMIT) {
           return new Response(
             JSON.stringify({
-              error: `未ログインでの本日のAI新規生成上限（1日30語）に達しました（本日利用: ${currentMemoryCount}語）。明日またご利用いただくか、ログインしてProプランをご検討ください。`,
+              error: `未ログインでの本日のAI新規生成お試し枠（1日${GUEST_DAILY_LIMIT}語）に達しました（本日利用: ${currentMemoryCount}語）。無料アカウント登録（30秒）で毎月30語まで利用可能になり、Proプラン（月額480円）で無制限解放されます。`,
               quotaRemaining: 0,
+              requiresAuth: true
             }),
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
@@ -515,58 +543,74 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
         guestRateMemory.set(rateKey, currentMemoryCount + itemsToGenerate.length);
       }
 
-      // Gemini呼び出し (Google推奨の最新フラッグシップモデル gemini-3.8-flash)
-      const targetModel = "gemini-3.8-flash";
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${geminiApiKey}`;
-      const userContent = `<user_request>\n対象語(${itemsToGenerate.length}件):\n${JSON.stringify(itemsToGenerate)}\n${safeFName ? `分野:${safeFName}\n` : ""}</user_request>`;
+      // Gemini呼び出し (モデル自動フォールバックチェーン: 3.8-flash -> 2.5-flash -> 2.0-flash -> 1.5-flash)
+      const candidateModels = [
+        Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+      ].filter(Boolean);
 
-      let aiResponse: Response;
-      try {
-        aiResponse = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            systemInstruction: { parts: [{ text: serverSystemPrompt }] },
-            contents: [{ role: "user", parts: [{ text: userContent }] }],
-            generationConfig: {
-              temperature: 0.1,
-              maxOutputTokens: 8192,
-              responseMimeType: "application/json",
-              responseSchema: serverResponseSchema,
-            },
-            safetySettings: [
-              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
-              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
-            ],
-          }),
-        });
-      } catch (fetchErr: any) {
-        if (user) {
-          // [P0-7 解決] 返金処理の堅牢化（.catch チェーンを排除し直接 await）
-          await supabaseAdmin.rpc("reserve_or_refund_quota", {
-            p_user_id: user.id,
-            p_item_count: itemsToGenerate.length,
-            p_is_refund: true,
+      const userContent = `<user_request>\n対象語(${itemsToGenerate.length}件):\n${JSON.stringify(itemsToGenerate)}\n${safeFName ? `分野:${safeFName}\n` : ""}</user_request>`;
+      const reqPayload = JSON.stringify({
+        systemInstruction: { parts: [{ text: serverSystemPrompt }] },
+        contents: [{ role: "user", parts: [{ text: userContent }] }],
+        generationConfig: {
+          temperature: 0.1,
+          maxOutputTokens: 8192,
+          responseMimeType: "application/json",
+          responseSchema: serverResponseSchema,
+        },
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+        ],
+      });
+
+      let aiResponse: Response | null = null;
+      let lastErrText = "";
+      let successfulModel = candidateModels[0];
+
+      for (const m of candidateModels) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiApiKey}`;
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: reqPayload,
           });
+
+          if (res.ok) {
+            aiResponse = res;
+            successfulModel = m;
+            break;
+          }
+
+          // 404 (Not Found) や 400 (Bad Request / Unsupported Model) の場合は次世代モデルへフォールバック
+          lastErrText = await res.text();
+          console.warn(`[Gemini Model Warning] Model ${m} returned HTTP ${res.status}: ${lastErrText}. Trying fallback...`);
+          if (res.status !== 404 && res.status !== 400) {
+            // 429や500等のインフラエラーの場合はフォールバック継続
+            continue;
+          }
+        } catch (fetchErr: any) {
+          lastErrText = fetchErr?.message || String(fetchErr);
+          console.warn(`[Gemini Fetch Error] Model ${m} network failed: ${lastErrText}`);
         }
-        return new Response(JSON.stringify({ error: `Gemini API fetch failed: ${fetchErr?.message || fetchErr}` }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
       }
 
-      if (!aiResponse.ok) {
+      if (!aiResponse || !aiResponse.ok) {
         if (user) {
+          // 返金処理
           await supabaseAdmin.rpc("reserve_or_refund_quota", {
             p_user_id: user.id,
             p_item_count: itemsToGenerate.length,
             p_is_refund: true,
           });
         }
-        const errBody = await aiResponse.text();
-        return new Response(JSON.stringify({ error: `Gemini API error (${aiResponse.status}): ${errBody}` }), {
+        return new Response(JSON.stringify({ error: `Gemini API呼び出しに失敗しました (${lastErrText})` }), {
           status: 502,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -614,7 +658,7 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       }
 
       generatedResults = validCards;
-      usedModel = targetModel;
+      usedModel = successfulModel;
 
       // 部分失敗差分の自動返還 (例: 10語中8語のみ成功した場合、未生成2語分を自動返金)
       const failedCount = itemsToGenerate.length - generatedResults.length;

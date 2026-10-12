@@ -280,10 +280,10 @@ def test_mobile_tabs_and_pair_sync():
     globalThis.document = {
         addEventListener: function() {},
         body: { classList: { add: function(){}, remove: function(){}, contains: function(){ return false; }, toggle: function(){} } },
-        getElementById: function() { return { value: '', focus: function(){}, blur: function(){}, classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
-        querySelector: function() { return { value: '', focus: function(){}, blur: function(){}, classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        getElementById: function() { return { value: '', focus: function(){}, blur: function(){}, classList: { add: function(){}, remove: function(){}, toggle: function(){}, contains: function(){ return false; } }, style: {}, innerHTML: '', hasAttribute: function(){ return false; }, setAttribute: function(){}, getAttribute: function(){ return null; }, addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        querySelector: function() { return { value: '', focus: function(){}, blur: function(){}, classList: { add: function(){}, remove: function(){}, toggle: function(){}, contains: function(){ return false; } }, style: {}, innerHTML: '', hasAttribute: function(){ return false; }, setAttribute: function(){}, getAttribute: function(){ return null; }, addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
         querySelectorAll: function() { return []; },
-        createElement: function() { return { style: {}, appendChild: function(){}, addEventListener: function(){}, remove: function(){}, dataset: {}, classList: { add: function(){} } }; },
+        createElement: function() { return { style: {}, appendChild: function(){}, addEventListener: function(){}, remove: function(){}, dataset: {}, hasAttribute: function(){ return false; }, setAttribute: function(){}, getAttribute: function(){ return null; }, classList: { add: function(){}, remove: function(){}, contains: function(c){ return true; }, toggle: function(){} } }; },
         createDocumentFragment: function() { return { appendChild: function(){} }; }
     };
     globalThis.navigator = { userAgent: 'iPhone', onLine: true };
@@ -422,6 +422,53 @@ def test_mobile_tabs_and_pair_sync():
         throw new Error("runPassageExtract did not extract expected key words. Got: " + JSON.stringify(extractedWords));
     }
 
+    // 5. Verify consecutive word submission (連投) does NOT drop pending tasks
+    App.reqQueue = [];
+    App.entries = [];
+    storageData = {};
+    if (globalThis.VocabStorage?.state?.mem) globalThis.VocabStorage.state.mem = {};
+    var listChildren = [];
+    var mockList = {
+        get innerHTML() { return ''; },
+        set innerHTML(v) { if (v === '') listChildren = []; },
+        prepend: function(el) { listChildren.unshift(el); },
+        appendChild: function(el) { listChildren.push(el); },
+        querySelectorAll: function(sel) { return listChildren.filter(function(x) { return x.className && x.className.indexOf('loading-card') !== -1; }); }
+    };
+    var prevGetEl = globalThis.document.getElementById;
+    var wordVal = '';
+    globalThis.document.getElementById = function(id) {
+        if (id === 'list') return mockList;
+        if (id === 'inWord') return { value: wordVal, focus: function(){} };
+        if (id === 'inFol') return { value: '' };
+        if (id === 'chkHist') return { checked: false };
+        if (id === 'chkWikt') return { checked: false };
+        if (id === 'pag') return { innerHTML: '' };
+        return prevGetEl(id);
+    };
+
+    // Submit word 1
+    wordVal = 'serendipity';
+    (global.VocabCore?.submitW || submitW)();
+
+    // Fast consecutive submit word 2 (連投)
+    wordVal = 'epiphany';
+    (global.VocabCore?.submitW || submitW)();
+
+    if (App.reqQueue.length < 2) {
+        throw new Error("Consecutive submissions failed to enqueue all words. Queue length: " + App.reqQueue.length);
+    }
+    if (!App.reqQueue.some(function(q){ return q.items.some(function(it){ return it.word === 'serendipity'; }); }) ||
+        !App.reqQueue.some(function(q){ return q.items.some(function(it){ return it.word === 'epiphany'; }); })) {
+        throw new Error("Queue missing submitted words: " + JSON.stringify(App.reqQueue.map(function(q){ return q.items.map(function(it){ return it.word; }); })));
+    }
+
+    // Trigger render() to verify loading cards are preserved and not cleared
+    (global.VocabCore?.render || render)();
+    if (listChildren.length < 2) {
+        throw new Error("Loading cards were wiped from DOM on render(). Count: " + listChildren.length);
+    }
+
     print("OK");
     """
 
@@ -432,6 +479,7 @@ def test_mobile_tabs_and_pair_sync():
         log_pass("Language pair review (procRev) accurately synchronizes with pair storage keys")
         log_pass("Multi-language pair backup and restoration (parseAnyWords) fully verified")
         log_pass("Passage word extraction & OCR communication engine safely handles extraction without error")
+        log_pass("Consecutive word submissions (連投) reliably preserve queue and loading cards")
     else:
         log_fail(f"Mobile detail tabs and pair sync error: {res.stderr or res.stdout}")
 

@@ -8,7 +8,6 @@ const CACHE_NAME = 'vocab-vault-v11-network-first';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
-  './dev.html',
   './css/app.css',
   './js/storage.js',
   './js/anki.js',
@@ -21,7 +20,9 @@ const PRECACHE_ASSETS = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './icons/icon.svg',
+  './icons/favicon-32.png'
 ];
 
 self.addEventListener('message', event => {

@@ -336,15 +336,15 @@
       </div>
       <div class="f-col">
         <label class="lbl-sm">ご意見・詳細内容</label>
-        <textarea id="fbContent" rows="4" placeholder="「語源解説が分かりやすかった」「フランス語の活用形をこう表示してほしい」「月額980円なら課金したい」など、率直なご意見をお願いします..."></textarea>
+        <textarea id="fbContent" rows="4" placeholder="「語源解説が分かりやすかった」「フランス語の活用形をこう表示してほしい」「月額480円なら課金したい」など、率直なご意見をお願いします..."></textarea>
       </div>
       <div class="f-col">
         <label class="lbl-sm">適正と感じる月額料金（任意）</label>
         <select id="fbWtp">
           <option value="">未選択</option>
           <option value="free_only">無料のみ（課金はしない）</option>
-          <option value="sub_500">〜500円 / 月</option>
-          <option value="sub_980">〜980円 / 月（おすすめ）</option>
+          <option value="sub_480">〜480円 / 月（Proプラン適正価格）</option>
+          <option value="sub_980">〜980円 / 月</option>
           <option value="sub_1500">〜1,500円 / 月</option>
           <option value="lifetime">買い切り型なら払いたい</option>
         </select>
@@ -1226,15 +1226,15 @@
       </div>
       <div class="f-col">
         <label class="lbl-sm">ご意見・詳細内容</label>
-        <textarea id="fbContent" rows="4" placeholder="「語源解説が分かりやすかった」「フランス語の活用形をこう表示してほしい」「月額980円なら課金したい」など、率直なご意見をお願いします..."></textarea>
+        <textarea id="fbContent" rows="4" placeholder="「語源解説が分かりやすかった」「フランス語の活用形をこう表示してほしい」「月額480円なら課金したい」など、率直なご意見をお願いします..."></textarea>
       </div>
       <div class="f-col">
         <label class="lbl-sm">適正と感じる月額料金（任意）</label>
         <select id="fbWtp">
           <option value="">未選択</option>
           <option value="free_only">無料のみ（課金はしない）</option>
-          <option value="sub_500">〜500円 / 月</option>
-          <option value="sub_980">〜980円 / 月（おすすめ）</option>
+          <option value="sub_480">〜480円 / 月（Proプラン適正価格）</option>
+          <option value="sub_980">〜980円 / 月</option>
           <option value="sub_1500">〜1,500円 / 月</option>
           <option value="lifetime">買い切り型なら払いたい</option>
         </select>
