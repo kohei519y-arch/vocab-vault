@@ -82,135 +82,13 @@
     try { return new RegExp(pat, 'giu'); } catch { return null; }
   }
 
-  let lastFocus = null;
-  const toggleModal = (id, open) => {
-    if (open) lastFocus = document.activeElement;
-    const el = $(id);
-    if (el) {
-      if (typeof open === 'boolean') {
-        el.classList.toggle('open', open);
-      } else {
-        el.classList.toggle('open');
-      }
-    }
-    if (id === 'graphModal' && el && !el.classList.contains('open') && graphState?.animId) {
-      try { cancelAnimationFrame(graphState.animId); graphState.animId = null; } catch {}
-    }
-    const any = Boolean(document.querySelector?.('.modal-ov.open'));
-    const ws = document.querySelector?.('.workspace');
-    if (ws) ws.inert = any;
-    if (!any && lastFocus?.focus) {
-      try { lastFocus.focus(); } catch {}
-    }
-  };
-  const closeAllModals = () => {
-    document.querySelectorAll?.('.modal-ov.open').forEach(el => {
-      el.classList.remove('open');
-    });
-    try {
-      if (typeof graphState !== 'undefined' && graphState?.animId) {
-        cancelAnimationFrame(graphState.animId);
-        graphState.animId = null;
-      }
-    } catch {}
-    const ws = document.querySelector?.('.workspace');
-    if (ws) ws.inert = false;
-    try {
-      if (typeof lastFocus !== 'undefined' && lastFocus?.focus) {
-        lastFocus.focus();
-      }
-    } catch {}
-  };
-
-  function showToast(msg, type = 'info', duration = 4500) {
-    if (typeof document === 'undefined') return;
-    let container = document.getElementById('vvToastContainer');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'vvToastContainer';
-      container.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:99999;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:92vw;width:440px;';
-      document.body.appendChild(container);
-    }
-    const t = document.createElement('div');
-    const bg = type === 'ok' ? '#107c41' : type === 'warn' ? '#d97706' : type === 'error' ? '#d13438' : '#7c3aed';
-    t.style.cssText = `background:${bg};color:#fff;padding:12px 18px;border-radius:8px;font-size:13px;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,0.28);pointer-events:auto;transition:all .3s ease;opacity:0;transform:translateY(-10px);line-height:1.45;`;
-    t.textContent = msg;
-    container.appendChild(t);
-    requestAnimationFrame(() => {
-      t.style.opacity = '1';
-      t.style.transform = 'translateY(0)';
-    });
-    setTimeout(() => {
-      t.style.opacity = '0';
-      t.style.transform = 'translateY(-10px)';
-      setTimeout(() => t.remove(), 350);
-    }, duration);
-  }
-
-  const LEGAL_TEXTS = {
-    terms: `
-      <h4 style="margin:0 0 8px;color:var(--t)">Vocab Vault 利用規約</h4>
-      <p>本規約は、Vocab Vault（以下「本サービス」）のご利用条件を定めるものです。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第1条（適用および登録）</h5>
-      <p>本規約は、本サービスを利用する全てのユーザーに適用されます。登録ユーザーは真実かつ正確な情報を登録するものとします。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第2条（サービス内容とプラン）</h5>
-      <p>本サービスは語源・概念史学習および暗記単語帳の管理機能を提供します。無料（Free）プランおよび有料（Pro）サブスクリプションが存在します。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第3条（AI生成コンテンツに関する免責・責任制限）</h5>
-      <p>生成AI（Gemini API）により出力される語源、用例、概念史解説は学術的知見および辞書データに基づき自動生成されますが、その完全性・正確性・最新性を保証するものではありません。AIによる誤認（ハルシネーション）や学説の諸説が存在する可能性があるため、学習参考情報としてご利用ください。本サービスの利用により生じた損害について、当方の故意または重過失を除き、過去1ヶ月間にユーザーから受領した利用料金を上限とします。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第4条（有料プランおよび決済・解約・返金）</h5>
-      <p>Proプランは月額480円（税込）で自動継続されます。決済処理はStripe, Inc.を通じて安全に行われます。特定商取引法上の政令指定通信販売におけるデジタルコンテンツおよびオンライン役務の性質上、決済完了後の日割り返金・キャンセルは致しかねます。解約手続きは設定画面（Stripe顧客ポータル）よりいつでも可能であり、次回更新日の前日までに解約された場合、次回以降の請求は発生せず、現在の請求期間満了まで引き続き有料機能をご利用いただけます。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第5条（公正利用方針 / Fair Use Policy）</h5>
-      <p>ProプランにおけるAI語彙生成機能は無制限の個人学習を支援するものですが、サーバーインフラの健全性維持および自動スクレイピング防止のため、1アカウントあたり標準的な学習量（1日最大150語、月間最大3,000語）を目安とする公正利用方針（Fair Use Policy）を適用します。通常の人間による学習利用でこの目安に達することは実質的にありませんが、自動化プログラム等による異常な過剰リクエストが検知された場合は一時的な生成制限を行うことがあります。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第6条（禁止事項）</h5>
-      <p>法令違反、システムの不正リバースエンジニアリング、APIクォータの不正迂回、スクレイピング、他者の権利侵害を禁止します。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">第7条（退会および全データ抹消）</h5>
-      <p>ユーザーは設定画面の『アカウント完全削除』より、いつでも自身の意思により即時退会を行えます。退会時、クラウド上の全単語データ、学習履歴、API利用ログ、認証情報はサーバーから完全に抹消され、復元することはできません。</p>
-    `,
-    privacy: `
-      <h4 style="margin:0 0 8px;color:var(--t)">プライバシーポリシー（個人情報保護方針）</h4>
-      <p>当サービスにおける利用者情報の適切な取扱い方針です。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">1. 取得する情報</h5>
-      <p>メールアドレス、登録単語・暗記復習履歴、アクセスログを取得します。クレジットカード情報は国際基準準拠のStripe社が処理し、当サービスサーバーには一切保存されません。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">2. 利用目的</h5>
-      <p>クラウド同期、Proプラン課金管理、AI解説生成、不具合調査およびサービス改善に限定して利用します。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">3. 外部AI連携時のプライバシー配慮</h5>
-      <p>AI解説生成リクエスト時、登録された英単語やクエリのみを送信し、メールアドレスや氏名等の個人識別情報は一切送信されません。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">4. 安全管理措置</h5>
-      <p>全通信の常時SSL/TLS暗号化、Supabase Row Level Security (RLS) によるデータ完全分離を実施しています。</p>
-      <h5 style="color:var(--t);margin:12px 0 4px">5. データの消去（忘れられる権利）</h5>
-      <p>ユーザーが退会を希望する場合、設定画面より自己の操作で即時にすべての保存データを完全消去できます。</p>
-    `,
-    tokusho: `
-      <h4 style="margin:0 0 8px;color:var(--t)">特定商取引法に基づく表記</h4>
-      <table style="width:100%;border-collapse:collapse;margin-top:8px">
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700;width:120px">販売事業者</td><td style="padding:6px">Vocab Vault 運営事務局</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">運営統括責任者</td><td style="padding:6px">請求があったら遅滞なく開示いたします</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">所在地・電話番号</td><td style="padding:6px">請求があったら遅滞なく開示いたします（サポート窓口をご利用ください）</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">メールアドレス</td><td style="padding:6px">support@vocabvault.example.com</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">販売価格</td><td style="padding:6px">Proプラン: 月額 480円（税込） / 年額 4,800円（税込）</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">支払方法・時期</td><td style="padding:6px">クレジットカード決済（Stripe）。初回登録時に即時決済、以後毎月（または毎年）同日に自動更新。</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">役務の提供時期</td><td style="padding:6px">決済完了後、直ちにご利用いただけます。</td></tr>
-        <tr style="border-bottom:1px solid var(--b)"><td style="padding:6px;font-weight:700">解約・返金について</td><td style="padding:6px">デジタルコンテンツおよびオンライン役務の性質上、決済完了後の返金・キャンセルには応じられません。解約は設定画面の「契約管理（Stripe）」よりいつでも可能です。次回更新日の前日までに解約された場合、次回以降の請求は発生せず、現在の有効期間満了まで引き続きご利用いただけます。</td></tr>
-      </table>
-    `
-  };
-
-  function switchLegalTab(tab = 'terms') {
-    const content = $('legalModalContent');
-    if (content) content.innerHTML = LEGAL_TEXTS[tab] || LEGAL_TEXTS.terms;
-    ['tabLegalTerms', 'tabLegalPrivacy', 'tabLegalTokusho'].forEach(id => {
-      const el = $(id);
-      if (el) {
-        const isCur = (id === `tabLegal${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
-        el.className = `btn-xs ${isCur ? '' : 'btn-o'}`;
-      }
-    });
-  }
-
-  function openLegalModal(tab = 'terms') {
-    switchLegalTab(tab);
-    toggleModal('legalModal', true);
-  }
+  // --- モーダル・トースト・法務ダイアログ制御（js/modal.js へ委譲） ---
+  const toggleModal = (id, open) => global.VocabModal ? global.VocabModal.toggleModal(id, open) : undefined;
+  const closeAllModals = () => global.VocabModal ? global.VocabModal.closeAllModals() : undefined;
+  const showToast = (msg, type = 'info', duration = 4500) => global.VocabModal ? global.VocabModal.showToast(msg, type, duration) : undefined;
+  const LEGAL_TEXTS = global.VocabModal?.LEGAL_TEXTS || {};
+  const switchLegalTab = tab => global.VocabModal ? global.VocabModal.switchLegalTab(tab) : undefined;
+  const openLegalModal = tab => global.VocabModal ? global.VocabModal.openLegalModal(tab) : undefined;
 
   function enhanceA11y(root = document) {
     if (!root?.querySelectorAll) return;
@@ -1369,13 +1247,7 @@
   const verifyWiktGrounding = (item, wRef) => global.VocabDictionary ? global.VocabDictionary.verifyWiktGrounding(item, wRef) : false;
   const parseApiJson = r => global.VocabDictionary ? global.VocabDictionary.parseApiJson(r) : r.json();
 
-  function toggleDarkMode(d) {
-    if (typeof document !== 'undefined' && document.body) {
-      document.body.classList.toggle('dark', d);
-    }
-    lsSet('vv_theme_dark', d ? '1' : '0');
-    if ($('chkDark')) $('chkDark').checked = d;
-  }
+  const toggleDarkMode = d => global.VocabModal ? global.VocabModal.toggleDarkMode(d) : undefined;
 
   async function promptAppInstall() {
     const isStandalone = (typeof window !== 'undefined') && (
@@ -1421,51 +1293,8 @@
     toggleModal('installGuideModal', true);
   }
 
-  function openUpsellModal(reason = '') {
-    if (App.isDev) {
-      showToast('開発者マスターモード: Pro機能を制限なく実行しました', 'ok', 3000);
-      return;
-    }
-    if (reason && $('upsellModalReason')) {
-      $('upsellModalReason').textContent = reason;
-    }
-    toggleModal('upsellModal', true);
-  }
-
-  function openSettings() {
-    if ($('apiKeyInput')) $('apiKeyInput').value = getKey();
-    if ($('curLangLabel')) $('curLangLabel').textContent = LANGS[App.lang].label;
-    if ($('chkDark')) $('chkDark').checked = document.body.classList.contains('dark');
-    if ($('chkAutoSpeak')) $('chkAutoSpeak').checked = lsGet('vv_tts_auto_anki', '1') !== '0';
-    if ($('ttsRateSel')) $('ttsRateSel').value = lsGet('vv_tts_rate', '0.95');
-    if ($('selDailyCap')) $('selDailyCap').value = String(App.dailyReviewCap || 30);
-    if (global.VocabSync) {
-      const cfg = global.VocabSync.getConfig();
-      if ($('sbUrlInput')) $('sbUrlInput').value = cfg.url;
-      if ($('sbAnonInput')) $('sbAnonInput').value = cfg.anonKey;
-    }
-    const isStandalone = (typeof window !== 'undefined') && (
-      window.matchMedia?.('(display-mode: standalone)').matches ||
-      window.navigator?.standalone === true
-    );
-    if ($('pwaStatusBadge')) {
-      $('pwaStatusBadge').textContent = isStandalone ? '単体アプリ起動中' : '単体起動対応 (PWA)';
-      $('pwaStatusBadge').className = 'badge ok';
-    }
-    if ($('btnPwaInstall')) {
-      if (isStandalone) {
-        $('btnPwaInstall').textContent = '単体アプリとして実行中';
-        $('btnPwaInstall').disabled = true;
-      } else {
-        $('btnPwaInstall').innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>アプリをインストール（単独起動）';
-        $('btnPwaInstall').disabled = false;
-      }
-    }
-    updStats();
-    updKeyUI();
-    updCloudUI();
-    toggleModal('settingsModal', true);
-  }
+  const openUpsellModal = reason => global.VocabModal ? global.VocabModal.openUpsellModal(reason) : undefined;
+  const openSettings = () => global.VocabModal ? global.VocabModal.openSettings() : undefined;
 
   function updKeyUI(ok = null) {
     const h = Boolean(getKey()), b = $('apiBadge');
@@ -1737,19 +1566,7 @@
     if ($('lastBackupText')) $('lastBackupText').textContent = lastBk ? `最終JSONバックアップ: ${lastBk}` : '最終JSONバックアップ: 未実行（定期的なJSON保存を推奨）';
   }
 
-  async function saveKeyFromModal() {
-    const k = $('apiKeyInput').value.trim();
-    lsSet('vv_gemini_api_key', k);
-    App.cachedModels = null;
-    updKeyUI();
-    updCloudUI();
-    if (!k) return alert('ローカルAPIキーを消去しました。');
-    try {
-      const m = await fetchModels(k);
-      updKeyUI(true);
-      alert(`接続確認完了 (${m.length}モデル)`);
-    } catch (e) { updKeyUI(false); alert(e.message); }
-  }
+  const saveKeyFromModal = () => global.VocabModal ? global.VocabModal.saveKeyFromModal() : undefined;
 
   const fetchModels = async key => {
     if (App.cachedModels?.length) return App.cachedModels;
@@ -1784,16 +1601,7 @@
   const saveOcrKeyAndExecute = () => global.VocabOCR?.saveOcrKeyAndExecute();
   const runOcrCurrentFile = () => global.VocabOCR?.runOcrCurrentFile();
 
-  function openExtractModal() {
-    const cfg = LANGS[App.lang], sel = $('extLevelSel'), saved = lsGet('vv_ext_level', 'b2');
-    $('extLangBadge').textContent = cfg.badge;
-    sel.innerHTML = '';
-    cfg.levels.forEach(o => { const el = new Option(o.label, o.id); if (o.id === saved) el.selected = true; sel.add(el); });
-    if ($('inFol').value.trim() && !$('extFolInput').value.trim()) $('extFolInput').value = $('inFol').value.trim();
-    if ($('ocrInlineApiKey') && getKey()) $('ocrInlineApiKey').value = getKey();
-    toggleModal('extractModal', true);
-    requestAnimationFrame(() => $('extTextarea')?.focus());
-  }
+  const openExtractModal = () => global.VocabModal ? global.VocabModal.openExtractModal() : undefined;
 
   async function runPassageExtract() {
     const rawText = $('extTextarea')?.value.trim() || '';
@@ -1939,170 +1747,13 @@
     finally { $('btnRunExtract').disabled = false; $('extLoadBox').style.display = 'none'; }
   }
 
-  function updateExtCounts() {
-    const n = App.extCandidates.filter(c => c.checked).length;
-    $('extResCount').textContent = `抽出候補: ${App.extCandidates.length} 語 （選択: ${n} 語）`;
-    $('btnCommitExt').disabled = !n;
-    $('btnCommitExt').textContent = `選択した ${n} 語を一括登録`;
-  }
-
-  function renderExtCandidates() {
-    updateExtCounts();
-    $('extCandidateGrid').innerHTML = App.extCandidates.map((c, i) => `<label class="ext-item ${c.checked ? 'checked' : ''} ${c.already ? 'already' : ''}"><input type="checkbox" data-ext-idx="${i}" ${c.checked ? 'checked' : ''}><div class="ext-info"><div class="ext-w"><span>${esc(c.word)}</span>${c.pos ? `<span class="ext-p">${esc(c.pos)}</span>` : ''}${c.already ? `<span class="ext-alr-badge">登録済</span>` : ''}${mkSpkBtn(c.word, App.lang, true)}</div><div class="ext-m" title="${esc(c.sentence || c.meaning)}">${esc(c.meaning)}</div></div></label>`).join('');
-  }
-
-  function toggleAllExtChecks(f) {
-    App.extCandidates.forEach(c => { c.checked = f ? !c.already : false; });
-    renderExtCandidates();
-  }
-
-  function commitExtractedWords() {
-    const sel = App.extCandidates.filter(c => c.checked).map(({ word, pos, meaning, sentence }) => ({ word, pos, meaning, sentence }));
-    if (!sel.length) return;
-    if (App.quotaRemaining === 0 && !getKey()) {
-      toggleModal('extractModal', false);
-      openUpsellModal('今月の無料枠（30語）をすべて消費しました。抽出した単語を一括登録するにはProプランをご利用ください。');
-      return;
-    }
-    const f = $('extFolInput').value.trim() || $('inFol').value.trim();
-    if (f) $('inFol').value = f;
-    toggleModal('extractModal', false);
-    registerWordsList(sel, f, $('chkHist').checked, $('chkWikt').checked);
-  }
-
-  function parsePipeLines(text, mapFn) {
-    return String(text ?? '').split('\n').map(l => l.trim()).filter(Boolean).map(l => mapFn(l.split('|').map(s => s.trim()))).filter(Boolean);
-  }
-
-  function openEditModal(idOrNum, tL = App.lang) {
-    // 1. 対象の言語ペアとストレージキーを特定
-    const activeCfg = getActivePairConfig();
-    const curPairKey = activeCfg.key;
-    const preferKey = (tL && LANGS[tL]?.key && !App.crossLang) ? LANGS[tL].key : curPairKey;
-
-    let targetKey = preferKey;
-    let list = [...getJson(preferKey)];
-    if (!list.length && App.entries.length) list = [...App.entries];
-
-    let it = list.find(x => (typeof idOrNum === 'string' && x.id === idOrNum) || (x.word === idOrNum) || x.num === Number(idOrNum));
-
-    // 2. 見つからない場合は全ペアから探索
-    if (!it) {
-      const allPairs = getAllKnownPairConfigs();
-      for (const p of allPairs) {
-        const otherList = [...getJson(p.key)];
-        const found = otherList.find(x => (typeof idOrNum === 'string' && x.id === idOrNum) || (x.word === idOrNum) || x.num === Number(idOrNum));
-        if (found) {
-          it = found;
-          targetKey = p.key;
-          tL = p.src;
-          break;
-        }
-      }
-    }
-
-    if (!it) return;
-
-    $('editId').value = it.id;
-    $('editLang').value = it.lang || tL;
-    if ($('editTargetKey')) $('editTargetKey').value = targetKey;
-    $('editWord').value = it.word;
-    $('editHomo').value = it.homographIndex || 1;
-    $('editPho').value = it.phonetic || '';
-    $('editGram').value = it.grammar_forms || '';
-    $('editCat').innerHTML = CATS.map(c => `<option value="${esc(c)}" ${c === it.category ? 'selected' : ''}>${esc(c)}</option>`).join('');
-    $('editFol').value = it.folder || '';
-    $('editMeanings').value = (it.meanings || []).map(m => `${m.pos} | ${m.text}`).join('\n');
-    $('editHistNote').value = it.history_note || '';
-    $('editCore').value = it.core || '';
-    $('editConf').value = it.etymologyConfidence || '';
-    $('editEty').value = it.etymology || '';
-    $('editEtyTags').value = (it.etymologyTags || []).join(', ');
-    $('editExForeign').value = it.example?.foreign || '';
-    $('editExUsed').value = it.example?.used_form || '';
-    $('editExJa').value = it.example?.ja || '';
-    $('editPhrases').value = (it.phrases || []).map(p => `${p.foreign} | ${p.ja}`).join('\n');
-    $('editDerivatives').value = (it.derivatives || []).map(d => [d.word, d.phonetic || '', d.pos || 'N[C]', d.meaning || '', d.sub_phrase || '', d.sub_trans || ''].join(' | ')).join('\n');
-    $('editGenMeta').textContent = it.gen?.model ? `Generated by ${it.gen.model} (pv: ${it.gen.pv})` : '手動または旧版データ';
-    toggleModal('editModal', true);
-    requestAnimationFrame(() => $('editWord')?.focus());
-  }
-
-  function saveEditCard() {
-    const id = $('editId').value;
-    const tL = $('editLang').value || App.lang;
-    const targetKey = $('editTargetKey')?.value || getActivePairConfig().key;
-    let list = [...getJson(targetKey)];
-    let idx = list.findIndex(x => x.id === id);
-
-    if (idx === -1) {
-      const allPairs = getAllKnownPairConfigs();
-      for (const p of allPairs) {
-        const otherList = [...getJson(p.key)];
-        const foundIdx = otherList.findIndex(x => x.id === id);
-        if (foundIdx !== -1) {
-          list = otherList;
-          idx = foundIdx;
-          break;
-        }
-      }
-    }
-    if (idx === -1) return;
-
-    const w = $('editWord').value.trim().normalize('NFC');
-    if (!w) return alert('見出し語を入力してください。');
-    const homoIdx = Math.max(1, parseInt($('editHomo').value, 10) || 1);
-
-    const meanings = parsePipeLines($('editMeanings').value, p => p.length === 1 ? { pos:'N[C]', text:p[0] } : { pos:p[0] || 'N[C]', text:p.slice(1).join(' | ') });
-    const prev = list[idx], finalMeanings = meanings.length ? meanings : prev.meanings;
-    const newWk = makeWordKey(w, tL, finalMeanings[0]?.pos, homoIdx);
-
-    const conflictIdx = list.findIndex((x, i) => i !== idx && (x.wordKey || makeWordKey(x.word, tL, x.meanings?.[0]?.pos, x.homographIndex)) === newWk);
-    if (conflictIdx !== -1 && !confirm(`既に同じ見出し語・同形番号のカード「${w} (#${homoIdx})」が存在します。\n別カードとして残す場合は「キャンセル」を押して「同形#」を 2 などに変更してください。\n既存カードを上書き統合してもよろしいですか？`)) return;
-
-    const phrases = parsePipeLines($('editPhrases').value, p => p[0] ? { foreign:p[0], ja:p[1] || '' } : null);
-    const derivatives = parsePipeLines($('editDerivatives').value, p => p[0] ? { word:p[0], phonetic:cleanPho(p[1] || ''), pos:p[2] || 'N[C]', meaning:p[3] || '', sub_phrase:p[4] || '', sub_trans:p[5] || '' } : null);
-
-    const confVal = $('editConf').value, rawTags = $('editEtyTags').value.split(/[,、]+/).map(s => s.trim()).filter(Boolean);
-    const exF = $('editExForeign').value.trim(), exJ = $('editExJa').value.trim(), exU = $('editExUsed').value.trim(), now = Date.now();
-
-    const oldWk = prev.wordKey || makeWordKey(prev.word, tL, prev.meanings?.[0]?.pos, prev.homographIndex);
-    const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(tL) : new Map();
-    if (oldWk && oldWk !== newWk) tombMap.set(`wk:${oldWk}`, now);
-    tombMap.delete(`wk:${newWk}`);
-    tombMap.delete(`id:${prev.id}`);
-
-    const updated = sanitizeItem({
-      ...prev, word: w, homographIndex: homoIdx, wordKey: newWk,
-      phonetic: cleanPho($('editPho').value), grammar_forms: $('editGram').value.trim() || undefined,
-      category: $('editCat').value, folder: $('editFol').value.trim() || undefined,
-      meanings: finalMeanings, history_note: $('editHistNote').value.trim() || undefined, core: $('editCore').value.trim(),
-      etymologyConfidence: ETY_CONF_ENUM.includes(confVal) ? confVal : undefined,
-      etymology: $('editEty').value.trim(), etymologyTags: confVal === 'unknown' ? [] : rawTags,
-      example: (exF || exJ) ? { foreign: exF, ja: exJ, used_form: exU || undefined } : null,
-      phrases, derivatives, updatedAt: now
-    }, idx, tL);
-
-    updated.flags = validateEntry(updated);
-    list[idx] = updated;
-    if (conflictIdx !== -1) {
-      const [removed] = list.splice(conflictIdx, 1);
-      if (removed?.id) tombMap.set(`id:${removed.id}`, now);
-    }
-    if (global.VocabStorage) global.VocabStorage.saveTombstones(tL, tombMap);
-
-    const nextList = list.map((it, i) => ({ ...it, num: i + 1 }));
-    setJson(targetKey, nextList, true, true);
-    if (targetKey === getActivePairConfig().key) {
-      App.entries = nextList;
-    }
-    if (global.VocabStorage) {
-      global.VocabStorage.state.mem[targetKey] = nextList;
-    }
-    toggleModal('editModal', false);
-    load(App.page);
-    showToast(`「${w}」を更新しました`, 'ok');
-  }
+  const updateExtCounts = () => global.VocabModal ? global.VocabModal.updateExtCounts() : undefined;
+  const renderExtCandidates = () => global.VocabModal ? global.VocabModal.renderExtCandidates() : undefined;
+  const toggleAllExtChecks = f => global.VocabModal ? global.VocabModal.toggleAllExtChecks(f) : undefined;
+  const commitExtractedWords = () => global.VocabModal ? global.VocabModal.commitExtractedWords() : undefined;
+  const parsePipeLines = (text, mapFn) => global.VocabModal ? global.VocabModal.parsePipeLines(text, mapFn) : [];
+  const openEditModal = (idOrNum, tL = App.lang) => global.VocabModal ? global.VocabModal.openEditModal(idOrNum, tL) : undefined;
+  const saveEditCard = () => global.VocabModal ? global.VocabModal.saveEditCard() : undefined;
 
   function exportJSON() {
     const allPairs = getAllKnownPairConfigs();

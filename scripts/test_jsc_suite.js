@@ -102,6 +102,7 @@ load(basePath + "/js/export.js");
 load(basePath + "/js/speech.js");
 load(basePath + "/js/card_view.js");
 load(basePath + "/js/queue.js");
+load(basePath + "/js/modal.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -544,6 +545,15 @@ try {
   assert("VocabQueue.splitInputWords correctly splits comma-delimited words", splitDelim.length === 3 && splitDelim[1] === 'banana');
   assert("VocabQueue.syncPersistedQueue and restorePersistedQueue callable", typeof VocabQueue.syncPersistedQueue === 'function' && typeof VocabQueue.restorePersistedQueue === 'function');
   assert("VocabQueue.submitW and enqueueTask callable", typeof VocabQueue.submitW === 'function' && typeof VocabQueue.enqueueTask === 'function');
+
+  // Test Scenario G: VocabModal isolated module verification
+  assert("VocabModal is defined on global scope", typeof VocabModal === 'object' && VocabModal !== null);
+  assert("VocabModal lifecycle methods callable", typeof VocabModal.toggleModal === 'function' && typeof VocabModal.closeAllModals === 'function');
+  assert("VocabModal.showToast is callable", typeof VocabModal.showToast === 'function');
+  assert("VocabModal.toggleDarkMode is callable", typeof VocabModal.toggleDarkMode === 'function');
+  assert("VocabModal legal methods & texts defined", typeof VocabModal.openLegalModal === 'function' && Boolean(VocabModal.LEGAL_TEXTS?.terms));
+  assert("VocabModal parsePipeLines parses delimiter lines", VocabModal.parsePipeLines("adj | word\nnoun | meaning", function(p){ return { pos: p[0], text: p[1] }; }).length === 2);
+  assert("VocabModal editor and extract methods callable", typeof VocabModal.openEditModal === 'function' && typeof VocabModal.saveEditCard === 'function' && typeof VocabModal.openExtractModal === 'function' && typeof VocabModal.commitExtractedWords === 'function');
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

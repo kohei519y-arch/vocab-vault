@@ -49,6 +49,7 @@ def check_jsc_syntax():
         "js/speech.js",
         "js/card_view.js",
         "js/queue.js",
+        "js/modal.js",
         "js/app.js",
         "sw.js"
     ]
@@ -582,6 +583,7 @@ def test_html_js_integrity():
         "js/speech.js",
         "js/card_view.js",
         "js/queue.js",
+        "js/modal.js",
         "js/app.js"
     ]
     last_idx = -1
