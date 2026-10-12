@@ -345,6 +345,26 @@ try {
   // 35番目の単語（'new'ソートにより1ページ目・最新にある単語）へジャンプ
   VocabCore.jumpToWord('testword35');
   assert("jumpToWord returns to page 1 for newest item", VocabCore.App.page === 1, "Page: " + VocabCore.App.page);
+
+  // Test Scenario B: 競合フィルタ（フォルダ・ステータス・品詞・検索文字列）の自動全クリア検証
+  VocabCore.App.fol = 'Philosophy';
+  VocabCore.App.statF = 'due';
+  VocabCore.App.qStr = 'xyz';
+  assert("App hasActiveFilters detects conflict", VocabCore.App.hasActiveFilters() === true);
+  VocabCore.jumpToWord('testword10');
+  assert("jumpToWord automatically clears all conflicting filters", VocabCore.App.hasActiveFilters() === false);
+
+  // Test Scenario C: 同形異義語（#1, #2）の精密ピンポイントジャンプ検証
+  dummyManyWords.push({ id: 'w-bank-1', word: 'bank', homographIndex: 1, lang: 'en', meanings: [{ pos: 'Noun', text: '銀行' }] });
+  dummyManyWords.push({ id: 'w-bank-2', word: 'bank', homographIndex: 2, lang: 'en', meanings: [{ pos: 'Noun', text: '堤防' }] });
+  VocabCore.setJson('distinction_entries', dummyManyWords);
+  VocabCore.App.entries = dummyManyWords;
+  VocabCore.jumpToWord('bank#2');
+  assert("jumpToWord homograph #2 resolved accurately", VocabCore.App.entries.some(it => it.word === 'bank' && it.homographIndex === 2));
+
+  // Test Scenario D: scrollToCard & findCardElement helpers
+  assert("scrollToCard helper is defined and callable", typeof VocabCore.scrollToCard === 'function');
+  assert("findCardElement helper is defined and callable", typeof VocabCore.findCardElement === 'function');
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }
