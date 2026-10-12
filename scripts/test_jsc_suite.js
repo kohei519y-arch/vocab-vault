@@ -103,6 +103,7 @@ load(basePath + "/js/speech.js");
 load(basePath + "/js/card_view.js");
 load(basePath + "/js/queue.js");
 load(basePath + "/js/modal.js");
+load(basePath + "/js/search.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -554,6 +555,19 @@ try {
   assert("VocabModal legal methods & texts defined", typeof VocabModal.openLegalModal === 'function' && Boolean(VocabModal.LEGAL_TEXTS?.terms));
   assert("VocabModal parsePipeLines parses delimiter lines", VocabModal.parsePipeLines("adj | word\nnoun | meaning", function(p){ return { pos: p[0], text: p[1] }; }).length === 2);
   assert("VocabModal editor and extract methods callable", typeof VocabModal.openEditModal === 'function' && typeof VocabModal.saveEditCard === 'function' && typeof VocabModal.openExtractModal === 'function' && typeof VocabModal.commitExtractedWords === 'function');
+
+  // Test Scenario H: VocabSearch isolated module verification
+  assert("VocabSearch is defined on global scope", typeof VocabSearch === 'object' && VocabSearch !== null);
+  var qTokens = VocabSearch.extractQueryTokens("apple, banana | cherry");
+  assert("VocabSearch.extractQueryTokens parses multi-tokens", qTokens.length === 3 && qTokens[1] === 'banana');
+  assert("VocabSearch.tokenToFoldPattern expands folding characters", VocabSearch.tokenToFoldPattern("cafe").includes('[eèéêëēĕėęě]'));
+  assert("VocabSearch.buildFoldRegex generates valid RegExp", VocabSearch.buildFoldRegex("test") instanceof RegExp);
+  var tags = VocabSearch.extractEtyTags({ etymology: "From PIE *sta-." });
+  assert("VocabSearch.extractEtyTags extracts PIE root tag", tags.length === 1 && tags[0].includes('*sta-'));
+  assert("VocabSearch.matchPos matches noun category", VocabSearch.matchPos({ meanings: [{ pos: 'Noun' }] }, 'N') === true && VocabSearch.matchPos({ meanings: [{ pos: 'Verb' }] }, 'N') === false);
+  assert("VocabSearch.matchStat detects overdue review", VocabSearch.matchStat({ nextReview: Date.now() - 5000 }, 'due') === true);
+  assert("VocabSearch.getPairShortLabel formats pair short codes", VocabSearch.getPairShortLabel('en', 'ja') === '英和' && VocabSearch.getPairShortLabel('ja', 'en') === '和英');
+  assert("VocabSearch engine core methods callable", typeof VocabSearch.getFiltered === 'function' && typeof VocabSearch.buildEtyIndex === 'function' && typeof VocabSearch.renderSidebarTree === 'function');
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

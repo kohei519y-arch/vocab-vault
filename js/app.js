@@ -30,57 +30,11 @@
   const fmtPho = p => { const c = cleanPho(p); return c ? `[ ${c} ]` : ''; };
   const foldAscii = s => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/œ/g, 'oe').replace(/æ/g, 'ae').replace(/ß/g, 'ss');
 
-  const FOLD_CHAR_MAP = {
-    a: '[aàáâãäåāăąǎ]', c: '[cçćĉċč]', d: '[dďđ]', e: '[eèéêëēĕėęě]',
-    g: '[gĝğġģ]', h: '[hĥħ]', i: '[iìíîïĩīĭįı]', j: '[jĵ]', k: '[kķ]',
-    l: '[lĺļľŀł]', n: '[nñńņňŉŋ]', o: '[oòóôõöøōŏőǒ]', r: '[rŕŗř]',
-    s: '[sśŝşš]', t: '[tţťŧ]', u: '[uùúûüũūŭůűųǔ]', w: '[wŵ]', y: '[yýÿŷ]', z: '[zźżž]'
-  };
-  const FOLD_DIGRAPH_MAP = {
-    oe: '(?:[oòóôõöøōŏőǒ]\\p{M}*[eèéêëēĕėęě]\\p{M}*|œ\\p{M}*)',
-    ae: '(?:[aàáâãäåāăąǎ]\\p{M}*[eèéêëēĕėęě]\\p{M}*|æ\\p{M}*)',
-    ss: '(?:[sśŝşš]\\p{M}*[sśŝşš]\\p{M}*|ß\\p{M}*)'
-  };
-
-  function tokenToFoldPattern(token) {
-    const chars = [...String(token ?? '').trim()];
-    let out = '';
-    for (let i = 0; i < chars.length; i++) {
-      const ch = chars[i];
-      const low = foldAscii(ch);
-      if (low.length === 2 && FOLD_DIGRAPH_MAP[low]) {
-        out += FOLD_DIGRAPH_MAP[low];
-        continue;
-      }
-      if (i + 1 < chars.length) {
-        const pair = low + foldAscii(chars[i + 1]);
-        if (FOLD_DIGRAPH_MAP[pair]) {
-          out += FOLD_DIGRAPH_MAP[pair];
-          i++;
-          continue;
-        }
-      }
-      if (FOLD_CHAR_MAP[low]) out += `${FOLD_CHAR_MAP[low]}\\p{M}*`;
-      else out += ch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\p{M}*';
-    }
-    return out;
-  }
-
-  function extractQueryTokens(q) {
-    const raw = String(q ?? '').trim();
-    if (!raw) return [];
-    const tokens = raw.split(/[\s,、，|｜/／;；]+/).map(s => s.trim()).filter(Boolean);
-    return [...new Set(tokens.length ? tokens : [raw])];
-  }
-
-  function buildFoldRegex(q) {
-    const tokens = extractQueryTokens(q);
-    if (!tokens.length) return null;
-    const sorted = [...tokens].sort((a, b) => b.length - a.length);
-    const pat = sorted.map(tokenToFoldPattern).filter(Boolean).join('|');
-    if (!pat) return null;
-    try { return new RegExp(pat, 'giu'); } catch { return null; }
-  }
+  const FOLD_CHAR_MAP = global.VocabSearch?.FOLD_CHAR_MAP || {};
+  const FOLD_DIGRAPH_MAP = global.VocabSearch?.FOLD_DIGRAPH_MAP || {};
+  const tokenToFoldPattern = token => global.VocabSearch ? global.VocabSearch.tokenToFoldPattern(token) : token;
+  const extractQueryTokens = q => global.VocabSearch ? global.VocabSearch.extractQueryTokens(q) : [];
+  const buildFoldRegex = q => global.VocabSearch ? global.VocabSearch.buildFoldRegex(q) : null;
 
   // --- モーダル・トースト・法務ダイアログ制御（js/modal.js へ委譲） ---
   const toggleModal = (id, open) => global.VocabModal ? global.VocabModal.toggleModal(id, open) : undefined;
@@ -541,96 +495,14 @@
     if (dot) dot.classList.toggle('warn', App.storageError || !canGenerateWords());
   }
 
-  // --- 4. 語源インデックス・ハイブリッド検索・ソート ---
-  function extractEtyTags(it) {
-    if (Array.isArray(it?.etymologyTags) && it.etymologyTags.length) return it.etymologyTags.map(String).filter(Boolean);
-    const ety = String(it?.etymology || '');
-    const pieMatches = ety.match(/\*[a-zA-Z0-9_äöüßÄÖÜ₁₂₃₄ḱǵʷʰ-]+-?/g);
-    return pieMatches ? [...new Set(pieMatches)].slice(0, 4).map(m => `印欧祖語: ${m}`) : [];
-  }
-
-  function getMeta(it) {
-    let meta = App.indexCache.get(it);
-    if (!meta) {
-      const tags = extractEtyTags(it), roots = new Set();
-      if (!['unknown', 'disputed'].includes(it.etymologyConfidence)) {
-        tags.forEach(t => {
-          const k = normRootKey(t);
-          if (k && isValidRootForEntry(k, it)) roots.add(k);
-        });
-      }
-      const rawBlob = [
-        it.word,
-        it.homographIndex > 1 ? `${it.word}#${it.homographIndex}` : '',
-        `#${it.num}`,
-        it.phonetic,
-        it.grammar_forms,
-        it.category,
-        it.folder,
-        it.etymology,
-        it.history_note,
-        it.core,
-        it.contextSentence,
-        ...(it.meanings || []).flatMap(m => [m.pos, m.text]),
-        ...tags,
-        ...(it.phrases || []).flatMap(p => [p.foreign, p.ja]),
-        ...(it.derivatives || []).flatMap(d => [d.word, d.meaning, d.sub_phrase, d.sub_trans]),
-        it.example?.foreign,
-        it.example?.ja
-      ].filter(Boolean).join('\n');
-      meta = {
-        tags,
-        roots,
-        wordFold: foldAscii(it.word),
-        blob: rawBlob.toLowerCase(),
-        foldedBlob: foldAscii(rawBlob)
-      };
-      App.indexCache.set(it, meta);
-    }
-    return meta;
-  }
-
-  function buildEtyIndex() {
-    App.rootIndexMap.clear();
-    const rootBuckets = new Map();
-    LANG_KEYS.forEach(l => (l === App.lang ? App.entries : getJson(LANGS[l].key)).forEach(it => {
-      if (!it?.word) return;
-      it.lang = it.lang || l;
-      const uKey = `${l}:${it.id || it.num}`, ref = { word:it.word, lang:l, num:it.num, id:it.id, homographIndex:it.homographIndex };
-      getMeta(it).roots.forEach(k => {
-        let rm = rootBuckets.get(k);
-        if (!rm) rootBuckets.set(k, rm = new Map());
-        rm.set(uKey, ref);
-      });
-    }));
-    rootBuckets.forEach((m, k) => App.rootIndexMap.set(k, [...m.values()]));
-  }
-
-  const closeSidebar = () => {
-    document.body.classList.add('side-collapsed');
-    document.body.classList.remove('side-open-lock');
-  };
-
-  const toggleSidebar = (force = null) => {
-    const shouldOpen = typeof force === 'boolean' ? force : document.body.classList.contains('side-collapsed');
-    if (shouldOpen) {
-      document.body.classList.remove('side-collapsed');
-      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-        document.body.classList.add('side-open-lock');
-        $('qSearch')?.focus?.();
-      }
-    } else {
-      closeSidebar();
-    }
-  };
-  const toggleSec = id => $(id)?.classList.toggle('closed');
-
-  function toggleMask() {
-    const m = document.body.classList.toggle('mask');
-    if (!m) document.querySelectorAll('.revealed').forEach(el => el.classList.remove('revealed'));
-    $('ribMaskBtn')?.classList.toggle('active-mask', m);
-    if ($('topMaskBtn')) $('topMaskBtn').style.borderColor = $('topMaskBtn').style.color = m ? 'var(--r)' : '';
-  }
+  // --- 4. 語源インデックス・ハイブリッド検索・ソート (js/search.js へ委譲) ---
+  const extractEtyTags = it => global.VocabSearch ? global.VocabSearch.extractEtyTags(it) : [];
+  const getMeta = it => global.VocabSearch ? global.VocabSearch.getMeta(it, App) : { tags: [], roots: new Set(), wordFold: '', blob: '', foldedBlob: '' };
+  const buildEtyIndex = () => global.VocabSearch ? global.VocabSearch.buildEtyIndex(App) : undefined;
+  const closeSidebar = () => global.VocabSearch ? global.VocabSearch.closeSidebar() : undefined;
+  const toggleSidebar = force => global.VocabSearch ? global.VocabSearch.toggleSidebar(force) : undefined;
+  const toggleSec = id => global.VocabSearch ? global.VocabSearch.toggleSec(id) : undefined;
+  const toggleMask = () => global.VocabSearch ? global.VocabSearch.toggleMask() : undefined;
 
   function toggleCrossLang(v = null) {
     App.crossLang = typeof v === 'boolean' ? v : !App.crossLang;
@@ -646,113 +518,13 @@
     render();
   }
 
-  function matchPos(it, targetGroup) {
-    if (targetGroup === 'all') return true;
-    return (it.meanings || []).some(m => {
-      const p = String(m.pos || '');
-      return targetGroup === 'Other' ? !['N', 'V', 'Adj', 'Adv'].some(pre => p.startsWith(pre)) : p.startsWith(targetGroup);
-    });
-  }
-
-  function matchStat(it, targetStat, now = Date.now()) {
-    if (targetStat === 'due') return (it.nextReview || 0) <= now;
-    if (targetStat === 'flag') return Array.isArray(it.flags) && it.flags.length > 0;
-    if (targetStat === 'wikt') return Boolean(it.wiktGrounded);
-    return true;
-  }
-
-  function getPairShortLabel(src, tgt) {
-    const sMap = { en: '英', ja: '日', fr: '仏', de: '独' };
-    const s = sMap[src] || src.toUpperCase();
-    const t = sMap[tgt] || tgt.toUpperCase();
-    if (src === 'en' && tgt === 'ja') return '英和';
-    if (src === 'ja' && tgt === 'en') return '和英';
-    if (src === tgt) {
-      if (src === 'en') return '英英';
-      if (src === 'fr') return '仏仏';
-      if (src === 'de') return '独独';
-      if (src === 'ja') return '日日';
-    }
-    return `${s}${t}`;
-  }
-
-  function getPairFullLabel(src, tgt) {
-    const sName = LANGS[src]?.ja || LANGS[src]?.label || src.toUpperCase();
-    const tName = LANGS[tgt]?.ja || LANGS[tgt]?.label || tgt.toUpperCase();
-    const short = getPairShortLabel(src, tgt);
-    if (src === tgt) {
-      return `${sName} (${short}辞典)`;
-    }
-    return `${sName} → ${tName} (${short})`;
-  }
-
-  function getActivePairFiles() {
-    const pairMap = new Map();
-
-    const scanKeys = new Set();
-    if (typeof localStorage !== 'undefined') {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith('distinction_entries')) scanKeys.add(k);
-      }
-    }
-    if (global.VocabStorage?.state?.mem) {
-      Object.keys(global.VocabStorage.state.mem).forEach(k => {
-        if (k && k.startsWith('distinction_entries')) scanKeys.add(k);
-      });
-    }
-
-    scanKeys.forEach(k => {
-      const words = getJson(k);
-      if (Array.isArray(words) && words.length > 0) {
-        const p = global.VocabStorage ? global.VocabStorage.keyToPair(k) : { srcLang: 'en', tgtLang: 'ja' };
-        const id = `${p.srcLang}_${p.tgtLang}`;
-        pairMap.set(id, {
-          src: p.srcLang,
-          tgt: p.tgtLang,
-          key: k,
-          count: words.length
-        });
-      }
-    });
-
-    if (!pairMap.size) {
-      pairMap.set('en_ja', { src: 'en', tgt: 'ja', key: LANGS.en.key, count: 0 });
-    }
-
-    const curId = `${App.srcLang}_${App.tgtLang}`;
-    if (!pairMap.has(curId)) {
-      const cfg = getActivePairConfig();
-      pairMap.set(curId, {
-        src: App.srcLang,
-        tgt: App.tgtLang,
-        key: cfg.key,
-        count: getJson(cfg.key).length
-      });
-    }
-
-    return Array.from(pairMap.values()).map(p => ({
-      ...p,
-      short: getPairShortLabel(p.src, p.tgt),
-      label: getPairFullLabel(p.src, p.tgt),
-      isCur: (p.src === App.srcLang && p.tgt === App.tgtLang)
-    }));
-  }
-
-  function renderPairFileTabs() {
-    const container = $('pairFileTabs');
-    if (!container) return;
-    const files = getActivePairFiles();
-    container.innerHTML = files.map(p => {
-      const countLabel = p.count > 0 ? p.count : '新規';
-      const countClass = p.count > 0 ? 'tab-count' : 'tab-count empty';
-      return `<button type="button" class="file-tab ${p.isCur ? 'active' : ''}" onclick="setLanguagePair('${p.src}','${p.tgt}')" title="${esc(p.label)}"><span class="tab-label">${esc(p.short)}</span><span class="${countClass}">${countLabel}</span></button>`;
-    }).join('');
-  }
-
-  function getAllKnownPairConfigs() {
-    return getActivePairFiles();
-  }
+  const matchPos = (it, targetGroup) => global.VocabSearch ? global.VocabSearch.matchPos(it, targetGroup) : true;
+  const matchStat = (it, targetStat, now = Date.now()) => global.VocabSearch ? global.VocabSearch.matchStat(it, targetStat, now) : true;
+  const getPairShortLabel = (src, tgt) => global.VocabSearch ? global.VocabSearch.getPairShortLabel(src, tgt) : `${src}${tgt}`;
+  const getPairFullLabel = (src, tgt) => global.VocabSearch ? global.VocabSearch.getPairFullLabel(src, tgt) : `${src} → ${tgt}`;
+  const getActivePairFiles = () => global.VocabSearch ? global.VocabSearch.getActivePairFiles(App) : [];
+  const renderPairFileTabs = () => global.VocabSearch ? global.VocabSearch.renderPairFileTabs(App) : undefined;
+  const getAllKnownPairConfigs = () => global.VocabSearch ? global.VocabSearch.getAllKnownPairConfigs(App) : [];
 
   function setLanguagePair(src, tgt) {
     const s = String(src || 'en').toLowerCase();
@@ -826,105 +598,10 @@
     load(1);
   }
 
-  const mkTreeItem = (t, id, l, c, cur) =>
-    `<div class="tree-item ${cur === id ? 'active' : ''}" data-act="filter" data-type="${esc(t)}" data-val="${esc(id)}"><span>${esc(l)}</span><span class="tree-cnt">${c}</span></div>`;
-
-  function renderSidebarTree() {
-    if (!$('vaultLabel')) return;
-    const pairBadge = App.srcLang === App.tgtLang
-      ? `${App.srcLang.toUpperCase()} (${getPairShortLabel(App.srcLang, App.tgtLang)})`
-      : `${App.srcLang.toUpperCase()} → ${App.tgtLang.toUpperCase()}`;
-    $('vaultLabel').textContent = `Vocab Vault (${pairBadge})`;
-
-    const pairs = getAllKnownPairConfigs();
-    $('treeLang').innerHTML = pairs.map(p => {
-      const isCur = (p.src === App.srcLang && p.tgt === App.tgtLang);
-      return `<div class="tree-item ${isCur ? 'active' : ''}" data-act="set-pair" data-src="${esc(p.src)}" data-tgt="${esc(p.tgt)}"><span>${esc(p.label)}</span><span class="tree-cnt">${p.count}</span></div>`;
-    }).join('');
-
-    const now = Date.now(), sC = { all:App.entries.length, due:0, flag:0, wikt:0 };
-    const fM = new Map(), cM = new Map(), pC = { all:App.entries.length, N:0, V:0, Adj:0, Adv:0, Other:0 };
-    App.entries.forEach(e => {
-      if ((e.nextReview || 0) <= now) sC.due++;
-      if (e.flags?.length) sC.flag++;
-      if (e.wiktGrounded) sC.wikt++;
-      if (e.folder) fM.set(e.folder, (fM.get(e.folder) ?? 0) + 1);
-      if (e.category) cM.set(e.category, (cM.get(e.category) ?? 0) + 1);
-      POS_GROUPS.slice(1).forEach(g => { if (matchPos(e, g.id)) pC[g.id]++; });
-    });
-
-    $('treeStat').innerHTML = STAT_GROUPS.map(g => mkTreeItem('stat', g.id, g.label, sC[g.id], App.statF)).join('');
-    $('treeFol').innerHTML = mkTreeItem('fol', 'all', 'すべてのタイトル', App.entries.length, App.fol) + [...fM.entries()].map(([f, c]) => mkTreeItem('fol', f, f, c, App.fol)).join('');
-    $('treePos').innerHTML = POS_GROUPS.map(g => mkTreeItem('pos', g.id, g.label, pC[g.id], App.posF)).join('');
-    $('treeCat').innerHTML = mkTreeItem('cat', 'all', 'すべてのカテゴリ', App.entries.length, App.cat)
-      + [...CATS].sort((a, b) => (cM.get(b) ?? 0) - (cM.get(a) ?? 0)).filter(c => (cM.get(c) ?? 0) > 0 || App.cat === c).map(c => mkTreeItem('cat', c, c, cM.get(c) ?? 0, App.cat)).join('');
-    enhanceA11y($('secLang')?.parentElement || document);
-  }
-
-  function matchSingleQueryToken(meta, tokObj) {
-    return meta.blob.includes(tokObj.low)
-      || (tokObj.fold && meta.foldedBlob.includes(tokObj.fold))
-      || (tokObj.root && meta.roots.has(tokObj.root))
-      || meta.roots.has(tokObj.low);
-  }
-
-  function getFiltered() {
-    const rawQ = App.qStr.trim(), now = Date.now();
-    const curPairKey = getActivePairConfig().key;
-    const pool = App.crossLang ? getAllKnownPairConfigs().flatMap(p => {
-      const cfg = global.VocabStorage ? global.VocabStorage.getPairConfig(p.src, p.tgt) : (LANGS[p.src] || LANGS.en);
-      return (cfg.key === curPairKey) ? App.entries : getJson(cfg.key);
-    }) : App.entries;
-
-    const baseFiltered = pool.filter(i => {
-      if (!i?.word || !matchStat(i, App.statF, now)) return false;
-      if (App.cat !== 'all' && i.category !== App.cat) return false;
-      if (App.fol !== 'all' && i.folder !== App.fol) return false;
-      if (!matchPos(i, App.posF)) return false;
-      return true;
-    });
-
-    let matched = baseFiltered;
-    if (rawQ) {
-      const hasExplicitOr = /[,、，|｜/／;；]/.test(rawQ);
-      const rawTokens = extractQueryTokens(rawQ);
-      const tokObjs = rawTokens.map(t => ({
-        low: t.toLowerCase(),
-        fold: foldAscii(t),
-        root: normRootKey(t)
-      }));
-
-      if (hasExplicitOr) {
-        matched = baseFiltered.filter(i => {
-          const meta = getMeta(i);
-          return tokObjs.some(tok => matchSingleQueryToken(meta, tok));
-        });
-      } else if (tokObjs.length <= 1) {
-        const tok = tokObjs[0];
-        matched = baseFiltered.filter(i => matchSingleQueryToken(getMeta(i), tok));
-      } else {
-        const andMatches = baseFiltered.filter(i => {
-          const meta = getMeta(i);
-          return tokObjs.every(tok => matchSingleQueryToken(meta, tok));
-        });
-        if (andMatches.length > 0) {
-          matched = andMatches;
-        } else {
-          matched = baseFiltered.filter(i => {
-            const meta = getMeta(i);
-            return tokObjs.some(tok => matchSingleQueryToken(meta, tok));
-          });
-        }
-      }
-    }
-
-    const sorted = [...matched];
-    if (App.sortBy === 'old') sorted.sort((a, b) => (a.num || 0) - (b.num || 0));
-    else if (App.sortBy === 'due') sorted.sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
-    else if (App.sortBy === 'alpha') sorted.sort((a, b) => foldAscii(a.word).localeCompare(foldAscii(b.word)));
-    else sorted.reverse();
-    return sorted;
-  }
+  const mkTreeItem = (t, id, l, c, cur) => global.VocabSearch ? global.VocabSearch.mkTreeItem(t, id, l, c, cur) : '';
+  const renderSidebarTree = () => global.VocabSearch ? global.VocabSearch.renderSidebarTree(App) : undefined;
+  const matchSingleQueryToken = (meta, tokObj) => global.VocabSearch ? global.VocabSearch.matchSingleQueryToken(meta, tokObj) : false;
+  const getFiltered = () => global.VocabSearch ? global.VocabSearch.getFiltered(App) : (App.entries || []);
 
   // --- カード表示・DOM生成 (js/card_view.js へ委譲) ---
   function highlightPlain(raw, reg) {
