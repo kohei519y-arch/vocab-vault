@@ -612,6 +612,35 @@
     if (setListFn) setListFn([]);
   }
 
+  /**
+   * IndexedDBの'vaults'ストア内に存在するすべてのストレージキーを列挙
+   */
+  function idbGetAllVaultKeys() {
+    if (!Storage.dbInst) return Promise.resolve([]);
+    return new Promise(res => {
+      try {
+        const tx = Storage.dbInst.transaction('vaults', 'readonly');
+        const st = tx.objectStore('vaults');
+        if (typeof st.getAllKeys === 'function') {
+          const req = st.getAllKeys();
+          req.onsuccess = () => res(req.result || []);
+          req.onerror = () => res([]);
+        } else {
+          const keys = [];
+          const req = st.openKeyCursor ? st.openKeyCursor() : st.openCursor();
+          req.onsuccess = e => {
+            const cursor = e.target.result;
+            if (cursor) {
+              keys.push(cursor.key);
+              cursor.continue();
+            } else res(keys);
+          };
+          req.onerror = () => res(keys);
+        }
+      } catch { res([]); }
+    });
+  }
+
   // --- 起動時同期・サルベージ・他タブ同期 (app.js から移管) ---
   /**
    * ctx: { getJson, setJson, getActivePairKey, getSrcLang, switchSrcLang(l), setEntries(list),
@@ -620,13 +649,18 @@
   function initStorageAndSync(manualSalvage, ctx) {
     const confirmFn = ctx.confirm || (typeof confirm === 'function' ? confirm : () => true);
     const notifyFn = ctx.notify || (typeof alert === 'function' ? alert : () => {});
-    if (manualSalvage && !confirmFn('退避スナップショットおよび全ストレージを走査して、過去に削除した単語も含めて救出・統合しますか？')) return;
+    if (manualSalvage && !confirmFn('退避スナップショットおよび全ストレージを走査して、過去に削除した単語も含めて救出・統合しますか？')) return Promise.resolve({ ok: false });
     if (typeof navigator !== 'undefined' && navigator.storage?.persist) navigator.storage.persist().catch(() => {});
     if (!Storage.bc && typeof BroadcastChannel !== 'undefined') {
       try {
         Storage.bc = new BroadcastChannel('vocab_vault_sync');
         Storage.bc.onmessage = ev => {
-          if (ev.data?.type === 'vault-updated' && LANGS[ev.data.lang]) ctx.syncFromIdb(ev.data.lang);
+          if (ev.data?.type === 'vault-updated') {
+            const rawKey = ev.data.key || ev.data.lang;
+            if (rawKey && typeof ctx.syncFromIdb === 'function') {
+              ctx.syncFromIdb(rawKey);
+            }
+          }
         };
       } catch {}
     }
@@ -653,7 +687,7 @@
           const l = keyToLang(k);
           const parsed = safeParseWords(val, l)[l];
           if (!parsed || !parsed.length) continue;
-          const targetK = LANGS[l].key;
+          const targetK = resolveConfig(k).key;
           const cur = ctx.getJson(targetK);
           const rec = mergeWords(cur, parsed, l, true);
           if (rec.length > cur.length) {
@@ -680,28 +714,42 @@
     };
     syncActiveLang();
 
-    // IndexedDB の初期化完了を待機して全データを完全同期・復元
-    initDatabase().then(async () => {
+    // IndexedDB の初期化完了を待機して全ペアデータを完全同期・復元
+    return initDatabase().then(async () => {
       try {
-        await Promise.all(LANG_KEYS.map(async l => {
-          const k = LANGS[l].key;
-          const b = await idbFetchLangBundle(l, manualSalvage);
+        // デフォルト4キーに加え、IndexedDBおよびlocalStorageに存在するすべてのペアキー（en_en, ja_en等）を完全走査
+        const idbKeys = await idbGetAllVaultKeys();
+        const allKeySet = new Set(LANG_KEYS.map(l => LANGS[l].key));
+        idbKeys.forEach(k => {
+          if (typeof k === 'string' && k.startsWith('distinction_entries')) allKeySet.add(k);
+        });
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (typeof k === 'string' && k.startsWith('distinction_entries')) allKeySet.add(k);
+          }
+        } catch {}
+
+        await Promise.all(Array.from(allKeySet).map(async k => {
+          const cfg = resolveConfig(k);
+          const srcL = cfg.srcLang || keyToLang(k);
+          const b = await idbFetchLangBundle(srcL, manualSalvage);
           if (!b) return;
-          if (b.clearAt > getClearedAt(l)) Storage.clearedAt[l] = b.clearAt;
-          if (b.tombs) absorbTombArray(getTombstones(l), b.tombs);
+          if (b.clearAt > getClearedAt(srcL)) Storage.clearedAt[srcL] = b.clearAt;
+          if (b.tombs) absorbTombArray(getTombstones(srcL), b.tombs);
 
           let idbWords = Array.isArray(b.words) ? b.words : [];
           if (manualSalvage && b.snaps && b.snaps.length) {
             b.snaps.forEach(arr => {
-              const sWords = safeParseWords(arr, l)[l];
-              if (sWords && sWords.length) idbWords = mergeWords(idbWords, sWords, l, true);
+              const sWords = safeParseWords(arr, srcL)[srcL];
+              if (sWords && sWords.length) idbWords = mergeWords(idbWords, sWords, srcL, true);
             });
           }
           // 通常起動時は墓石を尊重 (ignoreTombstones = manualSalvage)
-          const merged = mergeWords(ctx.getJson(k), idbWords, l, manualSalvage);
+          const merged = mergeWords(ctx.getJson(k), idbWords, srcL, manualSalvage);
           if (merged.length > 0 || manualSalvage) {
             Storage.mem[k] = merged;
-            Storage.mem[l] = merged;
+            if (srcL === 'en' && k === LANGS.en.key) Storage.mem.en = merged;
             try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
             await idbPut(k, merged);
           }
@@ -711,27 +759,30 @@
         if (ctx.flushOffline) ctx.flushOffline();
         if (ctx.syncCloud) ctx.syncCloud();
         if (manualSalvage) {
-          const tot = LANG_KEYS.reduce((s, l) => s + ctx.getJson(LANGS[l].key).length, 0);
+          const tot = Array.from(allKeySet).reduce((s, k) => s + ctx.getJson(k).length, 0);
           notifyFn(tot ? `合計 ${tot} 語を検出・復元しました。` : '復元可能なデータは見つかりませんでした。');
         }
       } catch (err) {
         _warn('[Sync Init Error]', err);
       }
+      return { ok: true };
     });
   }
 
-  /** 他タブの更新通知を受けて IndexedDB から該当言語を再同期 */
+  /** 他タブの更新通知を受けて IndexedDB から該当言語・ペアを再同期 */
   async function syncFromIdbForLang(l, ctx) {
-    const b = await idbFetchLangBundle(l, false);
+    const cfg = resolveConfig(l);
+    const k = cfg.key;
+    const srcLang = cfg.srcLang || keyToLang(k);
+    const b = await idbFetchLangBundle(srcLang, false);
     if (!b) return;
-    if (b.clearAt > getClearedAt(l)) Storage.clearedAt[l] = b.clearAt;
-    absorbTombArray(getTombstones(l), b.tombs);
-    const k = LANGS[l].key;
-    const merged = mergeWords(ctx.getJson(k), b.words, l, false);
-    Storage.mem[l] = merged;
+    if (b.clearAt > getClearedAt(srcLang)) Storage.clearedAt[srcLang] = b.clearAt;
+    absorbTombArray(getTombstones(srcLang), b.tombs);
+    const merged = mergeWords(ctx.getJson(k), b.words, srcLang, false);
+    Storage.mem[srcLang] = merged;
     Storage.mem[k] = merged;
     try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
-    ctx.applyMerged(l, merged);
+    ctx.applyMerged(k, merged);
   }
 
   global.VocabStorage = {

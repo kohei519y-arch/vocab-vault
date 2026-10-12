@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v18-network-first';
+const CACHE_NAME = 'vocab-vault-v19-network-first';
 
 const PRECACHE_ASSETS = [
   './',

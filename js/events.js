@@ -507,6 +507,9 @@
         try {
           const retryItems = JSON.parse(card.dataset.retryItems || '[]');
           const { fName = '', useHist, useWikt, srcLang, tgtLang, pairKey } = card.dataset;
+          const reqQueue = appState?.reqQueue || [];
+          const qIdx = reqQueue.findIndex(q => q.card === card);
+          if (qIdx !== -1) reqQueue.splice(qIdx, 1);
           card.remove();
           if (retryItems.length && typeof ctx.enqueueTask === 'function') {
             ctx.enqueueTask({
@@ -527,7 +530,7 @@
         const task = reqQueue.find(q => q.card === card);
         if (task) task.isCancelled = true;
         const qIdx = reqQueue.findIndex(q => q.card === card);
-        if (qIdx > 0) reqQueue.splice(qIdx, 1);
+        if (qIdx !== -1) reqQueue.splice(qIdx, 1);
         card?.remove();
         if (global.VocabQueue && typeof global.VocabQueue.syncPersistedQueue === 'function') global.VocabQueue.syncPersistedQueue(appState);
         if (typeof ctx.render === 'function') ctx.render();

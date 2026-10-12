@@ -243,12 +243,31 @@
     try {
       while (App.reqQueue.length) {
         const t = App.reqQueue[0];
-        if (!t.isCancelled) {
-          // もしカードがDOM内に見当たらない場合（再描画直後等）は安全に最前面に再アタッチして進捗表示を維持
-          if (t.card && typeof document !== 'undefined' && !document.body.contains(t.card) && $('list')) {
-            $('list').prepend(t.card);
-          }
-          await executeBatch(t);
+        if (t.isCancelled) {
+          t.card?.remove?.();
+          App.reqQueue.shift();
+          syncPersistedQueue();
+          continue;
+        }
+        if (t.isFailed) {
+          // 失敗したタスクは破棄せずキューに留め、ユーザーの再試行・削除操作を待機
+          break;
+        }
+        // もしカードがDOM内に見当たらない場合（再描画直後等）は安全に最前面に再アタッチして進捗表示を維持
+        if (t.card && typeof document !== 'undefined' && !document.body.contains(t.card) && $('list')) {
+          $('list').prepend(t.card);
+        }
+        let ok = false;
+        try {
+          ok = await executeBatch(t);
+        } catch {
+          ok = false;
+        }
+        if (!ok) {
+          t.isFailed = true;
+          t.isDone = false;
+          syncPersistedQueue();
+          break;
         }
         t.isDone = true;
         if (t.card && !t.card.classList?.contains('gen-err') && !t.card.querySelector?.('[data-act="retry-batch"]')) {
@@ -452,7 +471,7 @@ etymology:${eInst}`;
               card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(proxyErr.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
             }
             syncPersistedQueue();
-            return;
+            return false;
           }
         }
       } else if (genInternalFn) {
@@ -461,6 +480,22 @@ etymology:${eInst}`;
         const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
         returnedList = internalRes.items;
         usedModel = internalRes.usedModel || 'builtin-ai-internal';
+      }
+
+      if (!returnedList || !returnedList.length) {
+        if (card) {
+          card.className = 'card gen-err';
+          card.dataset.retryItems = JSON.stringify(items);
+          card.dataset.fName = fName || '';
+          card.dataset.useHist = useHist ? '1' : '0';
+          card.dataset.useWikt = useWikt ? '1' : '0';
+          card.dataset.srcLang = sLang;
+          card.dataset.tgtLang = tLang;
+          card.dataset.pairKey = saveKey;
+          card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">エントリの取得に失敗しました</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
+        }
+        syncPersistedQueue();
+        return false;
       }
 
       if (useWikt && fetchWiktFn) {
@@ -539,9 +574,49 @@ etymology:${eInst}`;
       const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
       const missingItems = items.filter((_, i) => !matchedIndices.has(i));
       if (missingItems.length > 0) {
-        if (card?.dataset) {
+        if (card) {
+          card.className = 'card gen-err';
+          if (card.dataset) {
+            Object.assign(card.dataset, {
+              retryItems: JSON.stringify(missingItems),
+              fName: fName || '',
+              useHist: useHist ? '1' : '0',
+              useWikt: useWikt ? '1' : '0',
+              srcLang: sLang,
+              tgtLang: tLang,
+              pairKey: saveKey
+            });
+          }
+          const loadEl = card.querySelector ? card.querySelector('.load') : null;
+          if (loadEl) loadEl.innerHTML = `<span style="color:var(--warn)">未取得の語があります (${missingItems.map(x => esc(x.word)).join(', ')})</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">失敗分を再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
+        }
+        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
+        return false;
+      } else {
+        if (task) task.isDone = true;
+        if (card) card.remove?.();
+        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
+        return true;
+      }
+    } catch (err) {
+      if (err.isQuotaExceeded || err.status === 429 || (err.message && (err.message.includes('上限') || err.message.includes('クォータ')))) {
+        card?.remove?.();
+        if (global.openUpsellModal) global.openUpsellModal(err.message || '今月のAI新規生成無料枠（30語）に達しました。');
+        if (task) task.isDone = true;
+        return true;
+      }
+      if (err.code === 'MAX_TOKENS' && items.length > 1) {
+        const h = Math.ceil(items.length / 2);
+        card?.remove?.();
+        if (task) task.isDone = true;
+        [items.slice(0, h), items.slice(h)].forEach(part => enqueueTask({ items: part, fName, useHist, useWikt, targetLang: sLang, srcLang: sLang, tgtLang: tLang, pairKey: saveKey }));
+        return true;
+      }
+      if (card) {
+        card.className = 'card gen-err';
+        if (card.dataset) {
           Object.assign(card.dataset, {
-            retryItems: JSON.stringify(missingItems),
+            retryItems: JSON.stringify(items),
             fName: fName || '',
             useHist: useHist ? '1' : '0',
             useWikt: useWikt ? '1' : '0',
@@ -549,40 +624,10 @@ etymology:${eInst}`;
             tgtLang: tLang,
             pairKey: saveKey
           });
-          const loadEl = card.querySelector ? card.querySelector('.load') : null;
-          if (loadEl) loadEl.innerHTML = `<span style="color:var(--warn)">未取得の語があります (${missingItems.map(x => esc(x.word)).join(', ')})</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">失敗分を再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
         }
-        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
-      } else {
-        if (task) task.isDone = true;
-        if (card) card.remove?.();
-        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
+        card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(err.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
       }
-    } catch (err) {
-      if (err.isQuotaExceeded || err.status === 429 || (err.message && (err.message.includes('上限') || err.message.includes('クォータ')))) {
-        card?.remove?.();
-        if (global.openUpsellModal) global.openUpsellModal(err.message || '今月のAI新規生成無料枠（30語）に達しました。');
-        return;
-      }
-      if (err.code === 'MAX_TOKENS' && items.length > 1) {
-        const h = Math.ceil(items.length / 2);
-        card?.remove?.();
-        [items.slice(0, h), items.slice(h)].forEach(part => enqueueTask({ items: part, fName, useHist, useWikt, targetLang: sLang, srcLang: sLang, tgtLang: tLang, pairKey: saveKey }));
-        return;
-      }
-      if (card?.dataset) {
-        Object.assign(card.dataset, {
-          retryItems: JSON.stringify(items),
-          fName: fName || '',
-          useHist: useHist ? '1' : '0',
-          useWikt: useWikt ? '1' : '0',
-          srcLang: sLang,
-          tgtLang: tLang,
-          pairKey: saveKey
-        });
-        const loadEl = card.querySelector ? card.querySelector('.load') : null;
-        if (loadEl) loadEl.innerHTML = `<span style="color:var(--r)">${esc(err.message)}</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
-      }
+      return false;
     }
   }
 

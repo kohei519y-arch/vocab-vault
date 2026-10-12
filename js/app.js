@@ -225,7 +225,14 @@
 
   function notifyOtherTabs(keyOrLang) {
     if (global.VocabStorage?.state?.bc) {
-      try { global.VocabStorage.state.bc.postMessage({ type: 'vault-updated', lang: keyOrLang, ts: Date.now() }); } catch {}
+      try {
+        global.VocabStorage.state.bc.postMessage({
+          type: 'vault-updated',
+          key: keyOrLang,
+          lang: keyOrLang,
+          ts: Date.now()
+        });
+      } catch {}
     }
   }
 
@@ -1032,10 +1039,13 @@
     flushOffline: () => global.VocabSRS?.flushOfflineReviews?.(),
     syncCloud: () => { if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false); },
     syncFromIdb: l => syncFromIdbForLang(l),
-    applyMerged: (l, merged) => {
-      if (l === App.lang) App.entries = merged;
-      syncAnkiReferences(l, merged);
-      if (l === App.lang && $('anki')?.style.display !== 'block') load(App.page);
+    applyMerged: (keyOrLang, merged) => {
+      const activePair = getActivePairConfig();
+      const cfg = global.VocabStorage ? global.VocabStorage.resolveConfig(keyOrLang) : { key: keyOrLang, srcLang: keyOrLang };
+      const isCurrentActive = (cfg.key === activePair.key) || (cfg.srcLang === App.lang && cfg.key === (LANGS[App.lang]?.key || 'distinction_entries'));
+      if (isCurrentActive) App.entries = merged;
+      syncAnkiReferences(cfg.srcLang, merged);
+      if (isCurrentActive && $('anki')?.style.display !== 'block') load(App.page || 1);
       else renderSidebarTree();
     }
   });
@@ -1060,7 +1070,7 @@
     if (global.VocabEvents) return global.VocabEvents.bindWindowEvents(eventsCtx());
   }
 
-  function initApp() {
+  async function initApp() {
     if (App._initialized) return;
     App._initialized = true;
 
@@ -1086,7 +1096,7 @@
     initWordSuggest();
     bindDelegatedEvents();
     bindWindowEvents();
-    initStorageAndSync(false);
+    await initStorageAndSync(false);
     updKeyUI();
     updCloudUI();
     restorePersistedQueue();

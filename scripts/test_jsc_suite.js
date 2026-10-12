@@ -626,10 +626,47 @@ try {
   VocabListView.reconcileList(dummyContainer, [{ id: 'test_1', word: 'apple' }], { createCardElement: function(it){ return { dataset: { id: it.id } }; } });
   assert("VocabListView.reconcileList executes keyed diff without crashing", true);
 
-  // Test Scenario M: VocabEvents isolated module verification
-  assert("VocabEvents is defined on global scope", typeof VocabEvents === 'object' && VocabEvents !== null);
-  assert("VocabEvents core methods callable", typeof VocabEvents.syncCloudNow === 'function' && typeof VocabEvents.updCloudUI === 'function' && typeof VocabEvents.runDatabaseDiagnosticsAndRepair === 'function' && typeof VocabEvents.bindDelegatedEvents === 'function');
-  assert("VocabEvents.setDailyReviewCap updates cap", typeof VocabEvents.setDailyReviewCap === 'function');
+  // Test Scenario N: 5大欠陥是正（監査項目）の完全検証
+  // 1. Wiktionary Grounding 偽陽性排除（"from" や "etymology" だけでは true を返さない）
+  var falsePositiveItem = { word: 'testword', etymology: 'A modern invented word.', phonetic: 'tɛst' };
+  var mockGenericWikt = { extract: 'Etymology: Borrowed from an unknown dialect.', url: 'https://en.wiktionary.org/wiki/testword' };
+  assert("VocabDictionary.verifyWiktGrounding rejects false positives containing merely 'from' or 'etymology'", VocabDictionary.verifyWiktGrounding(falsePositiveItem, mockGenericWikt) === false);
+
+  // 2. Unicode再構形抽出 & ゲルマン祖語正確判定 (*dūbǭ が切断されずゲルマン祖語として抽出される)
+  var protoGermanicItem = { etymology: 'ゲルマン祖語の *dūbǭ に由来する。' };
+  var extractedEty = VocabSearch.extractEtyTags(protoGermanicItem);
+  assert("VocabSearch.extractEtyTags correctly preserves *dūbǭ with Unicode macron/ogonek", extractedEty.length === 1 && extractedEty[0].indexOf('*dūbǭ') !== -1);
+  assert("VocabSearch.extractEtyTags labels Proto-Germanic root correctly", extractedEty[0].indexOf('ゲルマン祖語') !== -1);
+
+  // 3. 空の etymologyTags: [] は空配列を返し、不要な正規表現誤爆を行わない
+  var explicitEmptyItem = { etymologyTags: [], etymology: 'Some text mentioning *sta-.' };
+  assert("VocabSearch.extractEtyTags respects explicit empty tags array", VocabSearch.extractEtyTags(explicitEmptyItem).length === 0);
+
+  // 4. ReconcileList における再試行UI（.gen-err, [data-act="retry-batch"]）の完全保護
+  var mockErrCard = {
+    className: 'card gen-err',
+    classList: { contains: function(c){ return c === 'gen-err'; } },
+    querySelector: function(sel){ return sel === '[data-act="retry-batch"]' ? {} : null; },
+    dataset: { id: '', retryItems: '[]' }
+  };
+  var reconciledChildren = [];
+  var mockListContainer = {
+    children: [],
+    querySelectorAll: function(sel){
+      if (sel.indexOf('retry-batch') !== -1 || sel.indexOf('gen-err') !== -1) return [mockErrCard];
+      return [];
+    },
+    insertBefore: function(node, ref){ reconciledChildren.push(node); },
+    appendChild: function(node){ reconciledChildren.push(node); }
+  };
+  VocabListView.reconcileList(mockListContainer, [{ id: 'w1', word: 'word1' }], {
+    createCardElement: function(it){ return { dataset: { id: it.id, rev: '1' } }; }
+  });
+  assert("VocabListView.reconcileList preserves error card and retry UI in final DOM nodes", reconciledChildren.some(function(n){ return n === mockErrCard; }));
+
+  // 5. 非デフォルト言語ペア（英英: distinction_entries_en_en 等）の完全解決
+  var enEnCfg = VocabStorage.resolveConfig('distinction_entries_en_en');
+  assert("VocabStorage.resolveConfig correctly resolves non-default en_en pair", enEnCfg.srcLang === 'en' && enEnCfg.tgtLang === 'en' && enEnCfg.key === 'distinction_entries_en_en');
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

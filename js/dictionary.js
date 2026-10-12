@@ -253,8 +253,37 @@
     if (!wRef?.extract || !wRef?.url) return false;
     const extFold = foldAscii(wRef.extract);
     if (extFold.length < 20) return false;
-    if ((item.etymologyTags || []).some(t => matchRootInText(t, extFold))) return true;
-    return /etymology|etymologie|herkunft|from |latin|greek|proto-/.test(extFold) || Boolean(wRef.ipa && item.phonetic && cleanPho(item.phonetic) === wRef.ipa);
+
+    // 1. 語根タグ（*sta-, *bher- 等）がWiktionary本文に実在するか照合
+    if (Array.isArray(item.etymologyTags) && item.etymologyTags.length > 0) {
+      if (item.etymologyTags.some(t => matchRootInText(t, extFold))) return true;
+    }
+
+    // 2. 語源解説（etymology）内に登場する再構形・借用語・原義語根がWiktionary本文と一致するか照合
+    const etyText = foldAscii(item.etymology || '');
+    if (etyText.length > 5) {
+      // 再構形（*...）の照合
+      const reconstructedStems = etyText.match(/\*[\p{L}\p{M}0-9₁₂₃₄ḱǵʷʰ-]+/gu);
+      if (reconstructedStems && reconstructedStems.some(stem => extFold.includes(stem.toLowerCase()))) {
+        return true;
+      }
+      // 単語の見出し語自身と異なる具体的祖語・借用元語（例: epiphaneia, stationem など）の照合
+      const foreignTokens = etyText.match(/[a-z]{4,}/g);
+      const headwordFold = foldAscii(item.word || '').toLowerCase();
+      if (foreignTokens) {
+        const significant = foreignTokens.filter(tok => tok !== headwordFold && !['from', 'with', 'that', 'this', 'into', 'have', 'been', 'word', 'root', 'term', 'etymology'].includes(tok));
+        if (significant.some(tok => extFold.includes(tok))) {
+          return true;
+        }
+      }
+    }
+
+    // 3. 発音（IPA）がWiktionaryの公式発音と一致するか照合
+    if (wRef.ipa && item.phonetic && cleanPho(item.phonetic) === wRef.ipa) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

@@ -73,13 +73,32 @@
   }
 
   /**
-   * 単語エントリから印欧祖語・語源タグを抽出
+   * 単語エントリから語根・祖語再構形タグを抽出
    */
   function extractEtyTags(it) {
-    if (Array.isArray(it?.etymologyTags) && it.etymologyTags.length) return it.etymologyTags.map(String).filter(Boolean);
+    if (Array.isArray(it?.etymologyTags)) {
+      return it.etymologyTags.map(String).filter(Boolean);
+    }
     const ety = String(it?.etymology || '');
-    const pieMatches = ety.match(/\*[a-zA-Z0-9_äöüßÄÖÜ₁₂₃₄ḱǵʷʰ-]+-?/g);
-    return pieMatches ? [...new Set(pieMatches)].slice(0, 4).map(m => `印欧祖語: ${m}`) : [];
+    // Unicode letters (\p{L}) and marks (\p{M}) support for reconstructed languages (e.g. *dūbǭ, *h₂nḗr)
+    const matches = ety.match(/\*[\p{L}\p{M}0-9₁₂₃₄ḱǵʷʰ-]+-?/gu);
+    if (!matches) return [];
+
+    const unique = [...new Set(matches)].slice(0, 4);
+    const etyFold = ety.toLowerCase();
+    return unique.map(m => {
+      // 祖言語の文脈判定（ゲルマン祖語、印欧祖語など）
+      if (etyFold.includes('ゲルマン祖語') || etyFold.includes('proto-germanic')) {
+        return `ゲルマン祖語: ${m}`;
+      }
+      if (etyFold.includes('印欧祖語') || etyFold.includes('pie') || etyFold.includes('proto-indo-european')) {
+        return `印欧祖語: ${m}`;
+      }
+      if (etyFold.includes('イタリック祖語') || etyFold.includes('proto-italic')) {
+        return `イタリック祖語: ${m}`;
+      }
+      return `再構語: ${m}`;
+    });
   }
 
   /**

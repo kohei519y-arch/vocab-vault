@@ -43,11 +43,11 @@
   function reconcileList(listContainer, pageItems = [], options = {}) {
     if (!listContainer) return;
 
-    // 1. 待機中タスクカード（.loading-card）を特定・維持（DOM & reqQueue 両面走査で完全保護）
+    // 1. 待機中タスクカード・失敗カード（.loading-card, .gen-err, [data-act="retry-batch"]）を特定・維持
     const loadingCards = [];
     const seenCards = new Set();
     if (typeof listContainer.querySelectorAll === 'function') {
-      const qCards = [...listContainer.querySelectorAll('.loading-card')];
+      const qCards = [...listContainer.querySelectorAll('.loading-card, .gen-err, [data-act="retry-batch"]')];
       qCards.forEach(c => {
         if (c && !seenCards.has(c)) { seenCards.add(c); loadingCards.push(c); }
       });
@@ -62,7 +62,9 @@
 
     // 2. 既存の通常カード要素をマップ化 (キー: data-id または data-word)
     const existingCardMap = new Map();
-    const existingCards = typeof listContainer.querySelectorAll === 'function' ? [...listContainer.querySelectorAll('.card:not(.loading-card)')] : [];
+    const existingCards = typeof listContainer.querySelectorAll === 'function'
+      ? [...listContainer.querySelectorAll('.card')].filter(c => !seenCards.has(c) && !c.classList?.contains('loading-card') && !c.classList?.contains('gen-err') && !c.querySelector?.('[data-act="retry-batch"]'))
+      : [];
     existingCards.forEach(c => {
       const key = (c.dataset && (c.dataset.id || c.dataset.word)) || null;
       if (key) existingCardMap.set(key, c);
@@ -77,9 +79,14 @@
       const itemKey = item.id || (global.VocabMorphology ? global.VocabMorphology.makeWordKey(item.word, item.lang, item.meanings?.[0]?.pos, item.homographIndex) : item.word);
       activeKeys.add(itemKey);
 
+      // キャッシュリビジョンシグネチャ（編集時刻、復習期日、表示モード、検索ハイライトクエリ、フォルダ等）
+      const qStr = options.queryReg ? String(options.queryReg.source || '') : '';
+      const vMode = options.viewMode || (options.appState?.viewMode) || 'academic';
+      const rev = `${item.updatedAt || 0}:${item.interval || 0}:${item.nextReview || 0}:${vMode}:${qStr}:${item.folder || ''}:${options.crossLang ? '1' : '0'}`;
+
       let cardEl = existingCardMap.get(itemKey);
-      if (cardEl) {
-        // [再利用] 期日バッジ等の動的属性のみ軽量パッチ
+      if (cardEl && cardEl.dataset?.rev === rev) {
+        // [完全一致で再利用] 期日バッジ等の動的属性のみ軽量パッチ
         const dueEl = typeof cardEl.querySelector === 'function' ? cardEl.querySelector('.due') : null;
         if (dueEl && global.VocabCardView) {
           const isDue = (item.nextReview || 0) <= Date.now();
@@ -88,32 +95,60 @@
         }
         finalNodes.push(cardEl);
       } else {
-        // [新規作成] 差分ノードのみを生成
+        // [新規作成 または 内容変更時の再生成]
         if (typeof createCardFn === 'function') {
           const newCard = createCardFn(item, options);
           if (newCard) {
-            if (newCard.dataset) newCard.dataset.id = item.id || '';
+            if (newCard.dataset) {
+              newCard.dataset.id = item.id || '';
+              newCard.dataset.rev = rev;
+            }
+            if (cardEl && typeof cardEl.replaceWith === 'function') {
+              cardEl.replaceWith(newCard);
+            }
             finalNodes.push(newCard);
           }
+        } else if (cardEl) {
+          finalNodes.push(cardEl);
         }
       }
     });
 
     // 4. 今回のページから外れた不要カードのみを安全に除去 (GC負荷最小化)
     existingCards.forEach(c => {
+      if (seenCards.has(c)) return;
       const key = (c.dataset && (c.dataset.id || c.dataset.word)) || null;
       if (key && !activeKeys.has(key)) {
         if (typeof c.remove === 'function') c.remove();
       }
     });
 
-    // 5. 確定したノードを一括アタッチ (Reflow 最小化 & モックDOM完全両立)
-    listContainer.innerHTML = '';
-    finalNodes.forEach(node => {
-      if (node && typeof listContainer.appendChild === 'function') {
-        listContainer.appendChild(node);
+    // 5. In-place DOM alignment: innerHTML = '' を撤廃し、最小限の insertBefore で位置調整
+    // フォーカス（document.activeElement）、テキスト選択、スクロール位置を完全保持
+    if (typeof listContainer.insertBefore === 'function' && listContainer.children !== undefined) {
+      finalNodes.forEach((node, idx) => {
+        if (!node) return;
+        const currentAtIdx = (listContainer.children && idx < listContainer.children.length) ? listContainer.children[idx] : null;
+        if (currentAtIdx !== node) {
+          listContainer.insertBefore(node, currentAtIdx || null);
+        }
+      });
+      if (listContainer.children && listContainer.children.length > finalNodes.length) {
+        const finalSet = new Set(finalNodes);
+        const toRemove = [];
+        for (let i = 0; i < listContainer.children.length; i++) {
+          const ch = listContainer.children[i];
+          if (!finalSet.has(ch)) toRemove.push(ch);
+        }
+        toRemove.forEach(ch => ch.remove?.());
       }
-    });
+    } else {
+      // モックDOM環境のフォールバック
+      listContainer.innerHTML = '';
+      finalNodes.forEach(node => {
+        if (node && typeof listContainer.appendChild === 'function') listContainer.appendChild(node);
+      });
+    }
 
     // 6. アクセシビリティ属性の補強
     if (typeof options.enhanceA11y === 'function') {
@@ -163,24 +198,26 @@
       (appState.statF && appState.statF !== 'all') ? (statObj ? statObj.label || statObj.name : appState.statF) : null
     ].filter(Boolean);
 
+    const headingText = parts.length ? parts.join(' › ') : 'すべての単語';
+    const docHeading = $('docHeading');
+    if (docHeading) docHeading.textContent = headingText;
+
+    const docSubCount = $('docSubCount');
+    if (docSubCount) docSubCount.textContent = `${f.length} 件`;
+
+    const sortSel = $('sortSel');
+    if (sortSel) sortSel.value = appState.sortBy || appState.sort || 'new';
+
+    const btnModeAcademic = $('btnModeAcademic');
+    if (btnModeAcademic) btnModeAcademic.classList.toggle('active', (appState.viewMode || 'academic') === 'academic');
+
+    const btnModeSimple = $('btnModeSimple');
+    if (btnModeSimple) btnModeSimple.classList.toggle('active', appState.viewMode === 'simple');
+
+    // 後方互換性フォールバック（#docHeading がなく #docTitle が存在する場合）
     const titleEl = $('docTitle');
-    if (titleEl) {
-      const modeSwitchHtml = `
-        <div class="doc-title-right">
-          <div class="view-mode-toggle" title="表示モード切替">
-            <button type="button" class="btn-mode ${appState.viewMode === 'full' ? 'active' : ''}" data-act="set-view-mode" data-mode="full">学術・詳細</button>
-            <button type="button" class="btn-mode ${appState.viewMode === 'simple' ? 'active' : ''}" data-act="set-view-mode" data-mode="simple">シンプル</button>
-          </div>
-          <select class="sort-sel" data-act="sort" title="並び順を変更">
-            <option value="new" ${appState.sort === 'new' ? 'selected' : ''}>並び順: 新しい順</option>
-            <option value="old" ${appState.sort === 'old' ? 'selected' : ''}>並び順: 古い順</option>
-            <option value="alpha" ${appState.sort === 'alpha' ? 'selected' : ''}>並び順: アルファベット順</option>
-            <option value="due" ${appState.sort === 'due' ? 'selected' : ''}>並び順: 復習期日順</option>
-          </select>
-          <small>${f.length} 件</small>
-        </div>
-      `;
-      titleEl.innerHTML = `<span>${esc(parts.length ? parts.join(' › ') : 'すべての単語')}</span>${modeSwitchHtml}`;
+    if (titleEl && !docHeading) {
+      titleEl.innerHTML = `<span>${esc(headingText)}</span><small style="margin-left:8px;font-size:12px;color:var(--s)">${f.length} 件</small>`;
     }
 
     if ($('sideCount')) $('sideCount').textContent = `${f.length} 件`;
