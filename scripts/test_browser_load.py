@@ -5,9 +5,21 @@ scripts = [
     'js/anki.js',
     'js/sync.js',
     'js/ocr.js',
+    'js/morphology.js',
     'js/graph.js',
     'js/feedback.js',
+    'js/dictionary.js',
     'js/starter_pack.js',
+    'js/export.js',
+    'js/speech.js',
+    'js/card_view.js',
+    'js/queue.js',
+    'js/modal.js',
+    'js/search.js',
+    'js/navigation.js',
+    'js/anki_view.js',
+    'js/list_view.js',
+    'js/events.js',
     'js/app.js'
 ]
 

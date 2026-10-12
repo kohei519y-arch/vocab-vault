@@ -3,13 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <script>
-    if (typeof window !== 'undefined' && 'caches' in window) {
-      caches.keys().then(function(keys) {
-        keys.forEach(function(k) {
-          if (!k.includes('v11')) { caches.delete(k); }
-        });
-      }).catch(function(){});
-    }
     // [ゼロ障害保証] 自己修復型ウォッチドッグ & エラーバウンダリ
     window.addEventListener('error', function(e) {
       console.warn('[VocabVault Watchdog] Handled error:', e.message);
@@ -566,13 +559,13 @@
           <span id="apiBadge" class="badge ok">内蔵AI稼働中 (完全機密保護)</span>
         </div>
         <p class="cfg-desc" style="line-height:1.6;color:var(--t)">
-          <strong>完全機密保護・内部AIアーキテクチャ:</strong> 本アプリは内部にAIエンジンが埋め込まれており、個人のAPIキーを入力することなく安全にご利用いただけます。データは暗号化され、プライバシーは厳格に保護されます。
+          <strong>完全機密保護・内部AIアーキテクチャ:</strong> 本アプリは内部にAIエンジンが埋め込まれており、個人のAPIキーを入力することなく安全にご利用いただけます。すべての通信はTLS/SSL暗号化され、プライバシーは厳格に保護されます。
         </p>
 
         <!-- 上級者向けカスタムAPIキー (BYOK) アコーディオン -->
         <details class="byok-details" style="margin-top:10px;border:1px solid var(--b);border-radius:6px;padding:8px 12px;background:var(--bg-card)">
           <summary style="font-size:12px;font-weight:600;color:var(--s);cursor:pointer;user-select:none">
-            上級者向け設定: カスタムGemini APIキー (BYOK: 直接暗号化通信)
+            上級者向け設定: カスタムGemini APIキー (BYOK: HTTPS直接通信)
           </summary>
           <div style="margin-top:10px">
             <div style="display:flex;gap:6px">
@@ -580,7 +573,7 @@
               <button type="button" class="btn-o btn-xs" onclick="const i=$('apiKeyInput'),p=i.type==='password';i.type=p?'text':'password';this.textContent=p?'隠す':'表示'">表示</button>
               <button type="button" onclick="saveKeyFromModal()">保存・確認</button>
             </div>
-            <p class="cfg-desc" style="margin-top:6px;font-size:11px">※ご自身のGoogle AI Studio発行キーで直接通信したい場合のみ設定してください。キーはローカルブラウザ内にのみ厳重に保持され、外部サーバーには一切送信・共有されません。</p>
+            <p class="cfg-desc" style="margin-top:6px;font-size:11px">※ご自身のGoogle AI Studio発行キーで直接通信したい場合のみ設定してください。キーはローカルブラウザ内にのみ保持され、Google Gemini APIとのHTTPS通信にのみ使用されます。</p>
             <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
               <span style="font-size:11.5px;color:var(--s);font-weight:600">使用AIモデル:</span>
               <select id="modelSel" class="f1" onchange="lsSet('vv_gemini_model', this.value)" style="font-size:12px"><option value="auto">自動（モード別最適モデル）</option></select>
@@ -950,6 +943,9 @@
     </div>
   </div>
 </div>
+
+<!-- スクリーンリーダー用不可視ライブリージョン (WCAG 2.1 AA 準拠) -->
+<div id="a11yAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
 <!-- スクリプトの読み込み（モジュール順序） -->
 <script src="js/storage.js"></script>

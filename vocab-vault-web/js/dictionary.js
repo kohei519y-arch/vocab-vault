@@ -77,10 +77,10 @@
       '*skreybh-': { label: '*skreybh-', meaning: '引っ掻く、記す、書く', words: ['write', 'script', 'describe', 'prescribe', 'subscribe', 'inscribe', 'manuscript', 'transcribe', 'ascribe'] },
       '*blew-': { label: '*blew-', meaning: '流れる、湧き出る、溢れる', words: ['flow', 'fluent', 'fluid', 'influence', 'fluctuate', 'flood', 'affluent', 'superfluous', 'influx'] },
       '*tag-': { label: '*tag-', meaning: '触れる、手にとる、達する', words: ['touch', 'contact', 'tangible', 'attain', 'tactile', 'intact', 'contingent', 'contagious'] },
-      '*port-': { label: '*port-', meaning: '運ぶ、通す、出入口', words: ['port', 'export', 'import', 'transport', 'report', 'support', 'portal', 'deport', 'opportunity'] },
-      '*tragh-': { label: '*tragh-', meaning: '引く、引っ張る、進む', words: ['drag', 'draw', 'tractor', 'attract', 'contract', 'extract', 'distract', 'retract', 'treat', 'trait', 'trace'] },
-      '*sent-': { label: '*sent-', meaning: '感じる、知覚する、向かう', words: ['sense', 'scent', 'sentiment', 'consent', 'resent', 'assent', 'dissent', 'sentence', 'sensitive'] },
-      '*vert-': { label: '*vert-', meaning: '回る、向きを変える、転換する', words: ['convert', 'revert', 'divert', 'advertise', 'universe', 'version', 'vertical', 'reverse', 'controversy', 'introvert', 'extrovert'] }
+      '*port-': { label: '*port-', meaning: '運ぶ、通す、出入口', words: ['port', 'export', 'import', 'transport', 'report', 'support', 'portal', 'deport', 'opportunity', 'porter', 'transporter', 'pforte', 'transportieren'] },
+      '*tragh-': { label: '*tragh-', meaning: '引く、引っ張る、進む', words: ['drag', 'draw', 'tractor', 'attract', 'contract', 'extract', 'distract', 'retract', 'treat', 'trait', 'trace', 'traiter', 'attirer', 'trecken', 'vertrag'] },
+      '*sent-': { label: '*sent-', meaning: '感じる、知覚する、向かう', words: ['sense', 'scent', 'sentiment', 'consent', 'resent', 'assent', 'dissent', 'sentence', 'sensitive', 'sentir', 'sentiment', 'sinn', 'sinne', 'senden'] },
+      '*vert-': { label: '*vert-', meaning: '回る、向きを変える、転換する', words: ['convert', 'revert', 'divert', 'advertise', 'universe', 'version', 'vertical', 'reverse', 'controversy', 'introvert', 'extrovert', 'convertir', 'verser', 'werden', 'antwort'] }
     },
     historical: {
       'wet': {
@@ -155,6 +155,34 @@
           foreign: 'The doves in the administration urged a diplomatic resolution instead of arms buildup.',
           ja: '政権内の<b>ハト派（穏健派）</b>は軍備増強ではなく外交的解決を強く促した。',
           used_form: 'doves'
+        }
+      },
+      'laïcité': {
+        etymology: 'ギリシャ語 laikos (民衆・世俗) ➔ ラテン語 laicus ➔ フランス語 laïque 由来。',
+        etymologyTags: [],
+        core: '宗教的権威から分離された公的市民社会の原理。',
+        history_note: '1905年フランス政教分離法（Loi de séparation）によって確立された共和国の根本原理。',
+        meanings: [
+          { pos: 'N[f]', text: '世俗主義、政教分離原則、ライシテ' }
+        ],
+        example: {
+          foreign: 'La laïcité garantit la liberté de conscience de tous les citoyens.',
+          ja: '<b>ライシテ（政教分離）</b>はすべての市民の信教・良心の自由を保障する。',
+          used_form: 'laïcité'
+        }
+      },
+      'zeitgeist': {
+        etymology: 'ドイツ語 Zeit (時代: 印欧祖語 *da- 分割) + Geist (精神: 印欧祖語 *gʰeizd- 驚く) の複合語。',
+        etymologyTags: [],
+        core: '特定の時代を特徴づける知的・道徳的・文化的思潮。',
+        history_note: 'ヘルダーやヘーゲル哲学を通じて広まり、英語圏へも借用語として定着した概念。',
+        meanings: [
+          { pos: 'N[m]', text: '時代精神、時代の思潮、ツァイトガイスト' }
+        ],
+        example: {
+          foreign: 'Das Werk spiegelt den Zeitgeist der Romantik wider.',
+          ja: 'その作品はロマン主義の<b>時代精神</b>を如実に反映している。',
+          used_form: 'Zeitgeist'
         }
       }
     }

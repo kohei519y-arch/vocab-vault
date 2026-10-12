@@ -60,10 +60,25 @@
   }
 
   /**
+   * スクリーンリーダー向け動的ライブリージョン通知 (WCAG 2.1 AA 準拠)
+   */
+  function announceA11y(msg) {
+    if (typeof document === 'undefined' || !msg) return;
+    const el = document.getElementById('a11yAnnouncer');
+    if (el) {
+      el.textContent = '';
+      setTimeout(() => {
+        if (el) el.textContent = String(msg);
+      }, 50);
+    }
+  }
+
+  /**
    * フローティングトースト通知
    */
   function showToast(msg, type = 'info', duration = 4500) {
     if (typeof document === 'undefined') return;
+    announceA11y(msg);
     let container = document.getElementById('vvToastContainer');
     if (!container) {
       container = document.createElement('div');
@@ -469,6 +484,7 @@
     toggleModal,
     closeAllModals,
     showToast,
+    announceA11y,
     toggleDarkMode,
     LEGAL_TEXTS,
     switchLegalTab,
