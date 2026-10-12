@@ -1183,7 +1183,7 @@
     App.qReg = buildFoldRegex(App.qStr);
     App.page = 1;
     render();
-    if (scroll) $('mainScroll')?.scrollTo({ top:0, behavior:'smooth' });
+    if (scroll) $('mainScroll')?.scrollTo?.({ top:0, behavior:'smooth' });
   }
 
   function resetAllFilters() {
@@ -1482,7 +1482,7 @@
     const cards = [...document.querySelectorAll('#list .card')];
     const el = cards.find(c => c.dataset.word === lk && (!tLang || c.dataset.lang === tLang)) || cards.find(c => c.dataset.word === lk);
     if (el) {
-      el.scrollIntoView({ behavior:'smooth', block:'center' });
+      el.scrollIntoView?.({ behavior:'smooth', block:'center' });
       el.classList.add('highlight-jump');
       setTimeout(() => el.classList.remove('highlight-jump'), 1700);
     } else {
@@ -3283,10 +3283,18 @@
         e.preventDefault();
         activeIndex = (activeIndex - 1 + items.length) % items.length;
         updateActiveSuggestion(items);
-      } else if (e.key === 'Enter' && activeIndex >= 0) {
-        e.preventDefault();
-        const selItem = items[activeIndex];
-        applySuggestion(selItem);
+      } else if (e.key === 'Enter') {
+        if (activeIndex >= 0) {
+          e.preventDefault();
+          const selItem = items[activeIndex];
+          applySuggestion(selItem);
+        } else {
+          const firstExact = box.querySelector('.suggest-item.exact-match');
+          if (firstExact) {
+            e.preventDefault();
+            applySuggestion(firstExact);
+          }
+        }
       } else if (e.key === 'Escape') {
         box.style.display = 'none';
       }
@@ -3519,7 +3527,8 @@
     const sLang = App.srcLang;
     const tLang = App.tgtLang;
     const k = pairCfg.key;
-    App.entries = getJson(k);
+    const saved = getJson(k);
+    App.entries = (Array.isArray(saved) && saved.length) ? saved : (Array.isArray(App.entries) && App.entries.length ? App.entries : []);
     const qSet = new Set(App.reqQueue.filter(q => (q.srcLang || q.targetLang) === sLang && (q.tgtLang || 'ja') === tLang).flatMap(q => q.items.map(x => `${makeLookupKey(x.word, sLang, x.homographIndex)}:${x.meaning || ''}`)));
 
     const lkToEntry = new Map(), baseMaxHomo = new Map();
@@ -3533,6 +3542,7 @@
     });
 
     const newItems = [], reorderedSet = new Set(), now = Date.now();
+    const existingMatches = [];
 
     rawItems.forEach(raw => {
       const obj = typeof raw === 'string' ? { word: raw } : raw;
@@ -3545,10 +3555,12 @@
 
       const existing = lkToEntry.get(lk);
       if (existing && !spec.senseHint) {
-        if (fName) existing.folder = fName;
-        existing.nextReview = existing.updatedAt = existing.reviewUpdatedAt = now;
-        existing.num = ++maxNum;
-        reorderedSet.add(existing);
+        existingMatches.push(existing);
+        if (fName && existing.folder !== fName) {
+          existing.folder = fName;
+          existing.updatedAt = now;
+          reorderedSet.add(existing);
+        }
       } else {
         let finalHomo = homoIdx;
         const baseLk = makeLookupKey(w, sLang, 1);
@@ -3567,10 +3579,21 @@
       setSearch('');
     }
     if (reorderedSet.size) {
-      App.entries = [...App.entries.filter(x => !reorderedSet.has(x)), ...reorderedSet].map((it, idx) => ({ ...it, num: idx + 1 }));
       setJson(k, App.entries, false, true);
       load(1);
     }
+
+    if (rawItems.length === 1 && existingMatches.length === 1 && !newItems.length) {
+      // 単一の既登録語を入力した場合: 重複AI通信や二重登録を抑止し、該当カードへ瞬時にスクロール・ハイライト
+      jumpToWord(existingMatches[0].word, sLang);
+      showToast(`「${existingMatches[0].word}」はすでに登録されています（カードに移動しました）`, 'info');
+      return;
+    }
+
+    if (existingMatches.length > 0 && newItems.length > 0) {
+      showToast(`「${existingMatches.map(x => x.word).join(', ')}」はすでに登録済みのためスキップしました`, 'info');
+    }
+
     const bLim = useHist ? 6 : 10;
     for (let i = 0; i < newItems.length; i += bLim) {
       enqueueTask({ items: newItems.slice(i, i + bLim), fName, useHist, useWikt, targetLang: sLang, srcLang: sLang, tgtLang: tLang, pairKey: k });
@@ -3578,12 +3601,22 @@
   }
 
   function submitW() {
+    if (App.isComposing) return;
     if (!App.isDev && App.quotaRemaining === 0 && !getKey() && global.VocabSync?.isCloudReady?.()) {
       openUpsellModal('今月のクラウドAI生成無料枠（30語）を消費しました。Proプランにアップグレードするか、内部組み込みAIエンジン（完全機密保護）をご利用ください。');
       return;
     }
     const f = $('inFol')?.value.trim() || '', raw = $('inWord')?.value.trim() || '';
     if (!raw) return;
+
+    // 現在キューで待機・処理中の同一単語があるか重複チェック
+    const isAlreadyQueued = App.reqQueue.some(q => !q.isDone && !q.isCancelled && q.items.some(it => makeLookupKey(it.word, App.srcLang, 1) === makeLookupKey(raw, App.srcLang, 1)));
+    if (isAlreadyQueued) {
+      showToast(`「${raw}」は現在処理中です`, 'info');
+      if ($('wordSuggestBox')) $('wordSuggestBox').style.display = 'none';
+      return;
+    }
+
     const uMap = new Map();
     splitInputWords(raw, App.lang).forEach(w => {
       const spec = parseInputWordSpec(w);
@@ -3592,6 +3625,7 @@
       if (!uMap.has(key)) uMap.set(key, { word: w });
     });
     if ($('inWord')) $('inWord').value = '';
+    if ($('wordSuggestBox')) $('wordSuggestBox').style.display = 'none';
     $('inWord')?.focus();
     registerWordsList([...uMap.values()], f, $('chkHist')?.checked, $('chkWikt')?.checked);
   }
@@ -3621,14 +3655,23 @@
           await executeBatch(t);
         }
         t.isDone = true;
+        if (t.card && !t.card.classList?.contains('gen-err') && !t.card.querySelector?.('[data-act="retry-batch"]')) {
+          t.card.remove();
+        }
         App.reqQueue.shift();
         syncPersistedQueue();
         if (App.reqQueue.length) await new Promise(r => setTimeout(r, 600));
       }
+      if (!App.reqQueue.length && $('list')) {
+        $('list').querySelectorAll('.loading-card').forEach(c => {
+          if (!c.classList.contains('gen-err') && !c.querySelector('[data-act="retry-batch"]')) c.remove();
+        });
+      }
     } finally { App.isProcessing = false; }
   }
 
-  async function executeBatch({ items, fName, card, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }) {
+  async function executeBatch(task) {
+    const { items, fName, card, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey } = task;
     const sLang = srcLang || targetLang || App.srcLang || 'en';
     const tLang = tgtLang || App.tgtLang || 'ja';
     const pairCfg = global.VocabStorage ? global.VocabStorage.getPairConfig(sLang, tLang) : (LANGS[sLang] || LANGS.en);
@@ -3871,7 +3914,8 @@ etymology:${eInst}`;
         card.querySelector('.load').innerHTML = `<span style="color:var(--warn)">未取得の語があります (${missingItems.map(x => esc(x.word)).join(', ')})</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">失敗分を再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
         if ($('anki').style.display !== 'block') load(1);
       } else {
-        card.remove();
+        if (task) task.isDone = true;
+        if (card) card.remove();
         if ($('anki').style.display !== 'block') load(1);
       }
     } catch (err) {
@@ -4095,7 +4139,7 @@ etymology:${eInst}`;
           }
         }
       }
-      else if (act === 'page') { App.page += Number(el.dataset.dir); render(); $('mainScroll')?.scrollTo(0, 0); }
+      else if (act === 'page') { App.page += Number(el.dataset.dir); render(); $('mainScroll')?.scrollTo?.(0, 0); }
       else if (act === 'rate') procRev(Number(el.dataset.rate));
       else if (act === 'retry-batch') {
         const card = el.closest('.card');
@@ -4397,6 +4441,8 @@ etymology:${eInst}`;
     saveEditCard,
     exportJSON,
     importJSON,
+    getJson,
+    setJson,
     exportAnkiTSV,
     exportObsidianMarkdown,
     startAnki,

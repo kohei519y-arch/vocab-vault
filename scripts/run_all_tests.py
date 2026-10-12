@@ -468,6 +468,31 @@ def test_mobile_tabs_and_pair_sync():
     if (listChildren.length < 2) {
         throw new Error("Loading cards were wiped from DOM on render(). Count: " + listChildren.length);
     }
+    // Test duplicate search and existing word suppression
+    const curPairKey = (global.VocabCore?.getActivePairConfig ? VocabCore.getActivePairConfig().key : 'distinction_entries');
+    const testOccasion = {
+        id: 'occ-1',
+        word: 'occasion',
+        lang: 'en',
+        num: 246,
+        homographIndex: 1,
+        meanings: [{ pos: 'N[C]', text: '機会' }]
+    };
+    if (global.VocabCore?.setJson) global.VocabCore.setJson(curPairKey, [testOccasion], false, true);
+    App.entries = [testOccasion];
+    var qLenBefore = App.reqQueue.length;
+    wordVal = 'occasion';
+    (global.VocabCore?.submitW || submitW)();
+    if (App.reqQueue.length !== qLenBefore) {
+        throw new Error("Duplicate submission of existing word was queued to AI. Queue length: " + App.reqQueue.length);
+    }
+
+    // In-flight queue duplicate suppression
+    wordVal = 'serendipity'; // already in queue
+    (global.VocabCore?.submitW || submitW)();
+    if (App.reqQueue.filter(function(q){ return q.items.some(function(it){ return it.word === 'serendipity'; }); }).length > 1) {
+        throw new Error("In-flight word was queued twice!");
+    }
 
     print("OK");
     """
@@ -480,6 +505,7 @@ def test_mobile_tabs_and_pair_sync():
         log_pass("Multi-language pair backup and restoration (parseAnyWords) fully verified")
         log_pass("Passage word extraction & OCR communication engine safely handles extraction without error")
         log_pass("Consecutive word submissions (連投) reliably preserve queue and loading cards")
+        log_pass("Existing word lookup and in-flight duplicate submission suppression fully verified")
     else:
         log_fail(f"Mobile detail tabs and pair sync error: {res.stderr or res.stdout}")
 
