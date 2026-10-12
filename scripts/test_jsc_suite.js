@@ -96,6 +96,7 @@ load(basePath + "/js/sync.js");
 load(basePath + "/js/morphology.js");
 load(basePath + "/js/graph.js");
 load(basePath + "/js/feedback.js");
+load(basePath + "/js/dictionary.js");
 load(basePath + "/js/starter_pack.js");
 load(basePath + "/js/export.js");
 load(basePath + "/js/speech.js");
@@ -339,6 +340,42 @@ try {
   assert("makeWordKey formats canonical key with homograph", wk === 'en:bank#2');
 } catch (e) {
   assert("VocabMorphology test suite", false, String(e));
+}
+
+// -------------------------------------------------------------
+// TEST 4a2: VocabDictionary (AI & Wiktionary Lexical Engine)
+// -------------------------------------------------------------
+try {
+  assert("VocabDictionary loaded", typeof VocabDictionary === 'object');
+  assert("VocabAI alias loaded", typeof VocabAI === 'object' && VocabAI === VocabDictionary);
+  assert("VocabDictionary contains BUILTIN_ETYMOLOGY_KNOWLEDGE", typeof VocabDictionary.BUILTIN_ETYMOLOGY_KNOWLEDGE === 'object');
+  assert("VocabDictionary contains extractCleanIpa", typeof VocabDictionary.extractCleanIpa === 'function');
+  assert("VocabDictionary contains extractWiktLangSection", typeof VocabDictionary.extractWiktLangSection === 'function');
+  assert("VocabDictionary contains fetchWiktOne", typeof VocabDictionary.fetchWiktOne === 'function');
+  assert("VocabDictionary contains verifyWiktGrounding", typeof VocabDictionary.verifyWiktGrounding === 'function');
+  assert("VocabDictionary contains generateWithInternalAI", typeof VocabDictionary.generateWithInternalAI === 'function');
+  assert("VocabDictionary contains callGemini", typeof VocabDictionary.callGemini === 'function');
+
+  // Test extractCleanIpa
+  const sampleWiktSection = "===Pronunciation===\n* IPA(key): /ˌɛpɪˈfæni/\n===Noun===";
+  const ipa = VocabDictionary.extractCleanIpa(sampleWiktSection);
+  assert("extractCleanIpa extracts phonetics from Wiktionary markup", ipa === "ˌɛpɪˈfæni", "IPA: " + ipa);
+
+  // Test extractWiktLangSection
+  const sampleFullWikt = "==English==\n===Etymology===\nFrom Ancient Greek.\n===Noun===\nA manifestation.";
+  const langSec = VocabDictionary.extractWiktLangSection(sampleFullWikt, 'en', 'en');
+  assert("extractWiktLangSection parses target language extract", langSec && langSec.extract.includes("Ancient Greek"));
+
+  // Test verifyWiktGrounding
+  const groundedItem = { word: 'station', etymologyTags: ['*sta-'], phonetic: 'ˈsteɪʃən' };
+  const wRefMock = { extract: 'Derived from Proto-Indo-European *sta- (to stand).', url: 'https://en.wiktionary.org/wiki/station' };
+  assert("verifyWiktGrounding validates authentic etymology link", VocabDictionary.verifyWiktGrounding(groundedItem, wRefMock) === true);
+
+  // Test BUILTIN_ETYMOLOGY_KNOWLEDGE
+  assert("BUILTIN_ETYMOLOGY_KNOWLEDGE has *sta- root", Boolean(VocabDictionary.BUILTIN_ETYMOLOGY_KNOWLEDGE.roots['*sta-']));
+  assert("BUILTIN_ETYMOLOGY_KNOWLEDGE has historical 'wet'", Boolean(VocabDictionary.BUILTIN_ETYMOLOGY_KNOWLEDGE.historical['wet']));
+} catch (e) {
+  assert("VocabDictionary test suite", false, String(e));
 }
 
 // -------------------------------------------------------------
