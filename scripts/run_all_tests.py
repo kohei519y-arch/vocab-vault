@@ -523,6 +523,14 @@ def test_html_js_integrity():
         else:
             log_fail(f"Missing navigation element #{btn} in index.html")
 
+    # Verify Graph View UI elements exist
+    graph_elements = ["graphCanvas", "graphZoomVal", "graphFilterInput", "graphModal"]
+    for gel in graph_elements:
+        if f'id="{gel}"' in html:
+            log_pass(f"Graph View UI element #{gel} exists in index.html")
+        else:
+            log_fail(f"Missing Graph View UI element #{gel} in index.html")
+
     # Verify script loading order in index.html
     expected_order = [
         "js/storage.js",

@@ -262,6 +262,8 @@ try {
   ]));
 
   const graphData = VocabGraph.buildGraphData('', false, 'all');
+  VocabGraph.graphState.nodes = graphData.nodes;
+  VocabGraph.graphState.edges = graphData.edges;
   const rootNode = graphData.nodes.find(n => n.type === 'root' && n.label.includes('sta'));
   assert("buildGraphData generates connected root node", !!rootNode, "Root: " + (rootNode ? rootNode.label : 'none'));
   assert("Root node connects to cognates", rootNode && rootNode.connectedWords.length >= 2, "Children: " + (rootNode ? rootNode.connectedWords.length : 0));
@@ -275,6 +277,23 @@ try {
   VocabGraph.toggleColorMode();
   assert("toggleColorMode switches colorMode", VocabGraph.graphState.colorMode !== prevMode);
   VocabGraph.toggleColorMode();
+
+  // Test Zoom In / Zoom Out and Minimum Fit Scale Guarantee
+  assert("VocabGraph contains zoomIn/zoomOut helpers", typeof VocabGraph.zoomIn === 'function' && typeof VocabGraph.zoomOut === 'function');
+  const baseZoom = VocabGraph.graphState.zoom;
+  VocabGraph.zoomIn();
+  assert("zoomIn increases zoom level", VocabGraph.graphState.zoom > baseZoom, "New Zoom: " + VocabGraph.graphState.zoom);
+  VocabGraph.zoomOut();
+  assert("zoomOut reduces zoom level back", Math.abs(VocabGraph.graphState.zoom - baseZoom) < 0.05);
+
+  // Test fitGraphToView bottom floor (prevents unreadable 0.12x shrinking)
+  VocabGraph.fitGraphToView();
+  assert("fitGraphToView enforces >= 0.50x scale floor", VocabGraph.graphState.zoom >= 0.50, "Fit Zoom: " + VocabGraph.graphState.zoom);
+
+  // Test node radius enlargement (Root >= 10px, Word >= 6px)
+  const sampleWord = graphData.nodes.find(n => n.type === 'word');
+  assert("Word node radius is substantially enlarged (>= 6px)", sampleWord && sampleWord.radius >= 6.0, "Word Radius: " + (sampleWord ? sampleWord.radius : 0));
+  assert("Root node radius is substantially enlarged (>= 10px)", rootNode && rootNode.radius >= 10.0, "Root Radius: " + (rootNode ? rootNode.radius : 0));
 } catch (e) {
   assert("VocabGraph test suite", false, String(e));
 }

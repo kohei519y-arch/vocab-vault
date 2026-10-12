@@ -861,9 +861,14 @@
         <button type="button" class="btn-o btn-xs" id="graphColorModeBtn" onclick="VocabGraph.toggleColorMode()" title="言語別色分け / 記憶定着度(SRS)色分け を切替">言語色</button>
         <button type="button" class="btn-o btn-xs" id="graphClusterFilterBtn" onclick="VocabGraph.toggleGraphClusterOnly()" title="2単語以上つながる重要語根クラスタのみ表示">星団のみ</button>
         <button type="button" class="btn-o btn-xs" id="graphPhysicsBtn" onclick="VocabGraph.togglePhysics()" title="力学シミュレーションの固定/稼働を切替">停止</button>
-        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.fitGraphToView()" title="全ノードが画面に収まるよう自動調整">全体表示</button>
+        <div style="display:inline-flex;align-items:center;border:1px solid var(--b);border-radius:4px;overflow:hidden;background:var(--bg-card);height:26px">
+          <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomOut()" title="縮小 (または - キー)" style="border:none;border-radius:0;padding:2px 7px;font-weight:700;height:100%">－</button>
+          <span id="graphZoomVal" style="font-size:11px;padding:0 6px;color:var(--t);font-family:var(--mono);min-width:38px;text-align:center;user-select:none">100%</span>
+          <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomIn()" title="拡大 (または + キー)" style="border:none;border-radius:0;padding:2px 7px;font-weight:700;height:100%">＋</button>
+        </div>
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.fitGraphToView()" title="全ノードが画面に収まるよう自動調整 (Fキー)">全体表示</button>
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.resetGraphZoom()" title="等倍(1.0x)・中心に戻す (0キー)">100%</button>
         <button type="button" class="btn-o btn-xs" onclick="VocabGraph.exportGraphImage()" title="高解像度PNG画像として保存">画像保存</button>
-        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.resetGraphZoom()" title="等倍(1.0x)・中心に戻す">1.0×</button>
         <button type="button" class="modal-close" onclick="toggleModal('graphModal',false)" aria-label="閉じる" title="閉じる">&times;</button>
       </div>
     </div>
@@ -891,6 +896,13 @@
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#06b6d4"></span>仏語</span>
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></span>独語</span>
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#10b981"></span>日本語</span>
+      </div>
+
+      <!-- キャンバス上フローティングズーム操作 (Floating Zoom FAB) -->
+      <div style="position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:5px;z-index:30">
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomIn()" title="拡大 (+)" style="width:32px;height:32px;padding:0;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;background:var(--bg-side);box-shadow:0 2px 8px rgba(0,0,0,0.15);border-radius:6px">＋</button>
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomOut()" title="縮小 (-)" style="width:32px;height:32px;padding:0;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;background:var(--bg-side);box-shadow:0 2px 8px rgba(0,0,0,0.15);border-radius:6px">－</button>
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.fitGraphToView()" title="全体表示 (F)" style="width:32px;height:32px;padding:0;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;background:var(--bg-side);box-shadow:0 2px 8px rgba(0,0,0,0.15);border-radius:6px">FIT</button>
       </div>
     </div>
   </div>
@@ -926,6 +938,11 @@
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">s</kbd> / <kbd class="kbd-hint">r</kbd></td><td style="padding:6px 10px">音声を再発音</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">z</kbd></td><td style="padding:6px 10px">直前の回答を取り消し (Undo)</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Esc</kbd></td><td style="padding:6px 10px">復習モードを終了して一覧へ戻る</td></tr>
+        <tr style="border-top:2px solid var(--b);border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">機能（語根ネットワーク Graph View）</th></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">+</kbd> / <kbd class="kbd-hint">-</kbd></td><td style="padding:6px 10px">グラフの拡大 / 縮小</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">0</kbd></td><td style="padding:6px 10px">等倍(100%)表示・中央配置</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">f</kbd> / <kbd class="kbd-hint">ダブルクリック</kbd></td><td style="padding:6px 10px">全ノードが画面に収まるよう自動調整 (Fit)</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">ドラッグ</kbd></td><td style="padding:6px 10px">キャンバスのパン移動 / ノードの牽引移動</td></tr>
       </table>
     </div>
     <div style="display:flex;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--b);background:var(--bg-rib)">

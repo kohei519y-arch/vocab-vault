@@ -122,7 +122,7 @@
             lang: srcL,
             meaning: item.meanings?.[0]?.text || '',
             pos: item.meanings?.[0]?.pos || '',
-            radius: 3.4,
+            radius: 6.5,
             x: 0,
             y: 0,
             vx: 0,
@@ -143,7 +143,7 @@
               id: `root:${rKey}`,
               label: rKey,
               type: 'root',
-              radius: 4.8,
+              radius: 12.0,
               x: 0,
               y: 0,
               vx: 0,
@@ -175,7 +175,7 @@
     const validWordIds = new Set();
     const finalEdges = [];
     finalRoots.forEach(rNode => {
-      rNode.radius = rNode.childCount >= 5 ? 7.2 : (rNode.childCount >= 3 ? 5.8 : (rNode.childCount >= 2 ? 4.8 : 3.8));
+      rNode.radius = rNode.childCount >= 5 ? 18.0 : (rNode.childCount >= 3 ? 15.0 : (rNode.childCount >= 2 ? 12.5 : 10.0));
       nodes.push(rNode);
       rNode.connectedWords.forEach(wNode => {
         validWordIds.add(wNode.id);
@@ -192,13 +192,13 @@
     // 星系（Star Systems）アイランド初期配置
     const totalRoots = finalRoots.length;
     const cols = Math.max(1, Math.ceil(Math.sqrt(totalRoots * 1.55)));
-    const spacing = 86;
+    const spacing = 180;
 
     finalRoots.forEach((rNode, idx) => {
       const row = Math.floor(idx / cols);
       const col = idx % cols;
-      const jitterX = (Math.random() - 0.5) * 32;
-      const jitterY = (Math.random() - 0.5) * 32;
+      const jitterX = (Math.random() - 0.5) * 40;
+      const jitterY = (Math.random() - 0.5) * 40;
       rNode.x = (col - cols / 2) * spacing + jitterX;
       rNode.y = (row - Math.ceil(totalRoots / cols) / 2) * spacing + jitterY;
       rNode.vx = 0;
@@ -212,7 +212,7 @@
         if (!placedWords.has(wNode.id)) {
           placedWords.add(wNode.id);
           const angle = (cIdx / Math.max(1, cCount)) * Math.PI * 2;
-          const dist = 24 + (cIdx % 3) * 6;
+          const dist = 52 + (cIdx % 4) * 14;
           wNode.x = rNode.x + Math.cos(angle) * dist;
           wNode.y = rNode.y + Math.sin(angle) * dist;
           wNode.vx = 0;
@@ -307,36 +307,65 @@
     wakeGraphSimulation();
   }
 
+  function updateZoomDisplay() {
+    const el = document.getElementById('graphZoomVal');
+    if (el) el.textContent = `${Math.round(graphState.zoom * 100)}%`;
+  }
+
+  function setZoomLevel(newZoom) {
+    newZoom = Math.min(3.5, Math.max(0.35, newZoom));
+    const cx = (graphState.width || 800) / 2;
+    const cy = (graphState.height || 600) / 2;
+    const oldZoom = graphState.zoom || 1;
+    graphState.panX = cx - (cx - graphState.panX) * (newZoom / oldZoom);
+    graphState.panY = cy - (cy - graphState.panY) * (newZoom / oldZoom);
+    graphState.zoom = newZoom;
+    updateZoomDisplay();
+    drawGraph();
+  }
+
+  function zoomIn() {
+    setZoomLevel(graphState.zoom * 1.30);
+  }
+
+  function zoomOut() {
+    setZoomLevel(graphState.zoom / 1.30);
+  }
+
   function fitGraphToView() {
     if (!graphState.nodes || !graphState.nodes.length) return;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < graphState.nodes.length; i++) {
-      const n = graphState.nodes[i];
-      if (n.x < minX) minX = n.x;
-      if (n.x > maxX) maxX = n.x;
-      if (n.y < minY) minY = n.y;
-      if (n.y > maxY) maxY = n.y;
-    }
-    const pad = 65;
-    const w = Math.max(80, maxX - minX);
-    const h = Math.max(80, maxY - minY);
+
+    // 異常値・極端な外れ値ノードに引っ張られて極小化するのを防ぐため、外れ値を除外した堅牢なバウンディングボックスを算出
+    const xs = graphState.nodes.map(n => n.x).sort((a, b) => a - b);
+    const ys = graphState.nodes.map(n => n.y).sort((a, b) => a - b);
+    const pLow = Math.floor(xs.length * 0.03);
+    const pHigh = Math.max(0, Math.ceil(xs.length * 0.97) - 1);
+    const minX = xs[pLow], maxX = xs[pHigh];
+    const minY = ys[pLow], maxY = ys[pHigh];
+
+    const pad = 55;
+    const w = Math.max(120, maxX - minX);
+    const h = Math.max(120, maxY - minY);
     const scaleX = (graphState.width - pad * 2) / w;
     const scaleY = (graphState.height - pad * 2) / h;
-    const targetZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.12), 1.35);
+    // 最小ズーム下限を0.50に底上げ（0.12などの極小縮小を完全に防止）
+    const targetZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.50), 1.35);
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
     graphState.zoom = targetZoom;
     graphState.panX = graphState.width / 2 - centerX * targetZoom;
     graphState.panY = graphState.height / 2 - centerY * targetZoom;
+    updateZoomDisplay();
     drawGraph();
   }
 
-  function centerOnNode(node, zoomLevel = 1.15) {
+  function centerOnNode(node, zoomLevel = 1.25) {
     if (!node) return;
     graphState.zoom = zoomLevel;
     graphState.panX = graphState.width / 2 - node.x * zoomLevel;
     graphState.panY = graphState.height / 2 - node.y * zoomLevel;
+    updateZoomDisplay();
     drawGraph();
   }
 
@@ -358,13 +387,14 @@
     const h = Math.max(70, maxY - minY);
     const scaleX = (graphState.width - pad * 2) / w;
     const scaleY = (graphState.height - pad * 2) / h;
-    const targetZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.4), 1.8);
+    const targetZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.65), 1.8);
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
     graphState.zoom = targetZoom;
     graphState.panX = graphState.width / 2 - centerX * targetZoom;
     graphState.panY = graphState.height / 2 - centerY * targetZoom;
+    updateZoomDisplay();
     drawGraph();
   }
 
@@ -444,6 +474,7 @@
     const countEl = document.getElementById('graphMetaCount');
     if (countEl) countEl.textContent = `${nodes.filter(n => n.type === 'root').length} 語根 / ${nodes.filter(n => n.type === 'word').length} 単語`;
     deselectNode();
+    updateZoomDisplay();
     drawGraph();
   }
 
@@ -694,14 +725,14 @@
       const edges = graphState.edges;
       const totalNodes = nodes.length;
 
-      const kRepulsion = totalNodes > 200 ? 110 : 150;
-      const maxRepulseDist = totalNodes > 200 ? 60 : 80;
+      const kRepulsion = totalNodes > 200 ? 220 : 300;
+      const maxRepulseDist = totalNodes > 200 ? 95 : 125;
       const maxRepulseDistSq = maxRepulseDist * maxRepulseDist;
-      const kSpring = 0.08;
-      const springLength = 24;
-      const damping = 0.80;
+      const kSpring = 0.07;
+      const springLength = 52;
+      const damping = 0.82;
       const maxSpeed = 3.5;
-      const kGravity = 0.00035;
+      const kGravity = 0.0022;
 
       // 1. 反発力 (O(N^2)の距離カットオフ早期スキップ)
       for (let i = 0; i < totalNodes; i++) {
@@ -715,7 +746,7 @@
 
           const dist = Math.sqrt(distSq);
           let force = (kRepulsion / distSq) * (1 - dist / maxRepulseDist);
-          if (force > 2.2) force = 2.2;
+          if (force > 3.2) force = 3.2;
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
 
@@ -732,8 +763,8 @@
         const dy = t.y - s.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
         let force = (dist - springLength) * kSpring;
-        if (force > 2.5) force = 2.5;
-        if (force < -2.5) force = -2.5;
+        if (force > 3.0) force = 3.0;
+        if (force < -3.0) force = -3.0;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
 
@@ -879,60 +910,80 @@
         }
       }
 
+      // 画面上で点にならないよう最小スクリーン半径を保証
+      const minScreenR = n.type === 'root' ? 8.5 : 4.5;
+      const baseR = Math.max(n.radius, minScreenR / Math.max(0.35, graphState.zoom));
+      const drawRadius = n.type === 'root'
+        ? baseR * (isSelected ? 1.35 : (isHover ? 1.25 : 1))
+        : baseR * (isSelected ? 1.5 : (isHover ? 1.4 : 1));
+
       if (n.type === 'root') {
-        const glowRadius = n.radius * (isSelected ? 3.2 : (isHover ? 2.8 : 2.2));
+        const glowRadius = drawRadius * (isSelected ? 2.6 : (isHover ? 2.3 : 1.9));
         ctx.beginPath();
         ctx.arc(n.x, n.y, glowRadius, 0, Math.PI * 2);
         ctx.fillStyle = isDark ? 'rgba(167,139,250,0.22)' : 'rgba(124,58,237,0.14)';
         ctx.fill();
 
         ctx.beginPath();
-        ctx.arc(n.x, n.y, n.radius * (isSelected ? 1.35 : (isHover ? 1.25 : 1)), 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
         ctx.fillStyle = nodeColor;
         ctx.fill();
 
         if (isSelected) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius * 1.7, 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, drawRadius * 1.55, 0, Math.PI * 2);
           ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 2.2;
+          ctx.lineWidth = 2.4;
           ctx.stroke();
         } else if (isHover || isConnectedToFocus) {
           ctx.strokeStyle = isDark ? '#ffffff' : '#0f172a';
-          ctx.lineWidth = 1.6;
+          ctx.lineWidth = 1.8;
           ctx.stroke();
         }
       } else {
         ctx.beginPath();
-        ctx.arc(n.x, n.y, n.radius * (isSelected ? 1.5 : (isHover ? 1.4 : 1)), 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
         ctx.fillStyle = nodeColor;
         ctx.fill();
 
         if (isSelected) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius * 2.2, 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, drawRadius * 1.6, 0, Math.PI * 2);
           ctx.strokeStyle = '#38bdf8';
           ctx.lineWidth = 2.0;
           ctx.stroke();
         } else if (isHover || isConnectedToFocus) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius * 2.2, 0, Math.PI * 2);
-          ctx.fillStyle = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.08)';
+          ctx.arc(n.x, n.y, drawRadius * 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.10)';
           ctx.fill();
         }
       }
 
-      // ラベル描画
-      const showLabel = isSelected || isHover || isConnectedToFocus || isMatch ||
-        (n.type === 'root' && n.childCount >= 3 && graphState.zoom >= 0.45) ||
-        (n.type === 'root' && graphState.zoom >= 0.70) ||
-        (n.type === 'word' && graphState.zoom >= 0.88);
+      // ラベル描画: 語根ラベルは常時表示！単語ラベルも選択・フォーカス・検索マッチまたは zoom >= 0.38 で明瞭表示
+      const showLabel = (n.type === 'root') ||
+        isSelected || isHover || isConnectedToFocus || isMatch ||
+        (n.type === 'word' && graphState.zoom >= 0.38);
 
       if (showLabel) {
-        ctx.font = `${n.type === 'root' ? '600 11px' : '9.5px'} -apple-system, sans-serif`;
-        ctx.fillStyle = textColor;
+        // ズームに応じたフォントスケール補正（縮小時でも文字が極小化せずクッキリ読める）
+        const fontScale = Math.max(0.85, Math.min(1.5, 1 / Math.sqrt(graphState.zoom)));
+        const baseFontSize = n.type === 'root' ? 12 : 9.5;
+        const fontSize = Math.round(baseFontSize * fontScale);
+        ctx.font = `${n.type === 'root' ? '700 ' : '600 '}${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+
+        const labelY = n.y + drawRadius + fontSize + 2;
+
+        // 背景アウトラインで視認性を飛躍的に高める（エッジや暗背景・明背景を問わず読みやすい）
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+        ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)';
+        ctx.lineWidth = Math.max(2.5, 3.5 * fontScale);
         ctx.textAlign = 'center';
-        ctx.fillText(n.label, n.x, n.y + n.radius + 11);
+        ctx.strokeText(n.label, n.x, labelY);
+
+        ctx.fillStyle = textColor;
+        ctx.fillText(n.label, n.x, labelY);
       }
       ctx.restore();
     }
@@ -1070,7 +1121,7 @@
           e.touches[0].clientY - e.touches[1].clientY
         );
         const factor = newDist / graphState.touchDist;
-        const newZoom = Math.min(3.5, Math.max(0.12, graphState.zoom * factor));
+        const newZoom = Math.min(3.5, Math.max(0.35, graphState.zoom * factor));
         const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
         const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
         const rect = wrap.getBoundingClientRect();
@@ -1081,6 +1132,7 @@
         graphState.panY = ry - (ry - graphState.panY) * (newZoom / graphState.zoom);
         graphState.zoom = newZoom;
         graphState.touchDist = newDist;
+        updateZoomDisplay();
         drawGraph();
       }
     }, { passive: true });
@@ -1093,7 +1145,7 @@
     wrap.addEventListener('wheel', e => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
-      const newZoom = Math.min(3.5, Math.max(0.12, graphState.zoom * zoomFactor));
+      const newZoom = Math.min(3.5, Math.max(0.35, graphState.zoom * zoomFactor));
 
       const rect = wrap.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -1102,6 +1154,7 @@
       graphState.panX = mouseX - (mouseX - graphState.panX) * (newZoom / graphState.zoom);
       graphState.panY = mouseY - (mouseY - graphState.panY) * (newZoom / graphState.zoom);
       graphState.zoom = newZoom;
+      updateZoomDisplay();
       drawGraph();
     }, { passive: false });
 
@@ -1149,15 +1202,35 @@
       }
     });
 
-    // Escキーでインスペクターまたはモーダルを閉じる
+    // Escキーでインスペクターまたはモーダルを閉じる & キーボードショートカット (+, -, 0, f)
     window.addEventListener('keydown', e => {
+      const modal = document.getElementById('graphModal');
+      if (!modal || !modal.classList.contains('open')) return;
+
       if (e.key === 'Escape') {
-        const modal = document.getElementById('graphModal');
-        if (!modal || !modal.classList.contains('open')) return;
         if (graphState.selectedNode) {
           e.stopPropagation();
           deselectNode();
         }
+        return;
+      }
+
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT')) {
+        return;
+      }
+
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        zoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        zoomOut();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        resetGraphZoom();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        fitGraphToView();
       }
     });
 
@@ -1203,7 +1276,11 @@
     drawGraph,
     startGraphSimulation,
     wakeGraphSimulation,
-    initGraphEvents
+    initGraphEvents,
+    zoomIn,
+    zoomOut,
+    setZoomLevel,
+    updateZoomDisplay
   };
 
   // 既存ハンドラ互換のためにグローバルへ展開
