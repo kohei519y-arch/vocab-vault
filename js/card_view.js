@@ -178,6 +178,10 @@
     const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
 
     c.className = 'card';
+    if (typeof c.setAttribute === 'function') {
+      c.setAttribute('role', 'article');
+      c.setAttribute('aria-label', `${i.word} の単語カード`);
+    }
     c.dataset.word = makeLkFn(i.word, iL, i.homographIndex);
     c.dataset.rawWord = i.word;
     c.dataset.lang = iL;

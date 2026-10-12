@@ -739,6 +739,36 @@ try {
     createCardElement: function(it) { return it.id === 'a' ? nA : nB; }
   });
   assert("VocabListView.reconcileList aligns items in correct deterministic order", dummyContainer2.children.length === 2);
+
+  // 13. FSRS NaN 耐性（不正データ時の NaN 伝播防止）
+  var nanCard = { stability: NaN, interval: 'invalid', nextReview: NaN, difficulty: null };
+  var nanR = VocabSRS.getRetrievability(nanCard);
+  assert("VocabSRS.getRetrievability handles NaN stability gracefully without returning NaN", typeof nanR === 'number' && !isNaN(nanR));
+
+  var nextReviewObj = VocabSRS.calculateNextReview(nanCard, 2);
+  assert("VocabSRS.calculateNextReview does not produce NaN intervals or review dates", typeof nextReviewObj.interval === 'number' && !isNaN(nextReviewObj.interval) && !isNaN(nextReviewObj.nextReview));
+
+  // 14. VocabStorage キャッシュ無効化 (invalidateCache)
+  VocabStorage.state.mem['test_k'] = [{ word: 'test' }];
+  VocabStorage.invalidateCache('test_k');
+  assert("VocabStorage.invalidateCache removes key from memory cache", VocabStorage.state.mem['test_k'] === undefined);
+
+  // 15. VocabSearch ReDoS 防護（最大8トークン、各40文字切り詰め）
+  var giantQuery = 'word1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11';
+  var tokens = VocabSearch.extractQueryTokens(giantQuery);
+  assert("VocabSearch.extractQueryTokens clips tokens to prevent ReDoS (max 8 tokens)", tokens.length === 8);
+
+  // 16. VocabSearch インデックスキャッシュ無効化 (invalidateMeta)
+  var dummyEntry = { word: 'testWord' };
+  VocabSearch.getMeta(dummyEntry, App);
+  assert("VocabSearch.getMeta populates App.indexCache", App.indexCache.has(dummyEntry));
+  VocabSearch.invalidateMeta(dummyEntry, App);
+  assert("VocabSearch.invalidateMeta clears indexCache WeakMap entry", !App.indexCache.has(dummyEntry));
+
+  // 17. VocabNavigation ショートカットの修飾キーガード (Cmd+S / Cmd+D との衝突防止)
+  var mockNavCtx = { moveCardFocusCalled: false, moveCardFocus: function() { this.moveCardFocusCalled = true; } };
+  var handledWithCmd = VocabNavigation.handleGlobalKeydown({ key: 'j', metaKey: true }, mockNavCtx);
+  assert("VocabNavigation.handleGlobalKeydown rejects modifier combinations like Cmd+J", handledWithCmd === false && !mockNavCtx.moveCardFocusCalled);
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

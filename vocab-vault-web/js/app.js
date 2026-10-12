@@ -217,184 +217,22 @@
 
   const sanitizeWiktUrl = url => (typeof url === 'string' && WIKT_URL_RE.test(url.trim())) ? url.trim() : undefined;
 
-  function sanitizeItem(raw, idx, defLang = 'en') {
-    if (!raw || typeof raw !== 'object') return null;
-    const w = String(raw.word || raw.w || '').trim().normalize('NFC');
-    if (!w) return null;
-    const l = LANGS[raw.lang] ? raw.lang : defLang;
-    const rawMeanings = raw.meanings || raw.m;
-    const meanings = (Array.isArray(rawMeanings) ? rawMeanings : []).filter(Boolean).map(m => ({
-      pos: String(m.pos || m.p || ''),
-      text: String(m.text || m.t || '')
-    }));
-    const homoIdx = Math.max(1, parseInt(raw.homographIndex, 10) || 1);
-    const cRaw = raw.category ?? raw.c;
-    const parsedNum = Number(raw.num), parsedUpd = Number(raw.updatedAt);
-    const safeWiktUrl = sanitizeWiktUrl(raw.wiktUrl || raw.wu);
-    const ex = raw.example || raw.ex;
-    const etyConf = raw.etymologyConfidence || raw.ec;
-    const rawTags = raw.etymologyTags || raw.et;
-    const rawPhrases = raw.phrases || raw.ph;
-    const rawDerivs = raw.derivatives || raw.d;
-
-    return {
-      id: typeof raw.id === 'string' && raw.id ? raw.id : genId(),
-      homographIndex: homoIdx > 1 ? homoIdx : undefined,
-      wordKey: typeof raw.wordKey === 'string' && raw.wordKey ? raw.wordKey : makeWordKey(w, l, meanings[0]?.pos || '', homoIdx),
-      num: Number.isInteger(parsedNum) && parsedNum > 0 ? parsedNum : idx + 1,
-      word: w,
-      lang: l,
-      category: CATS.includes(cRaw) ? cRaw : (CATS[parseInt(cRaw, 10)] || 'その他'),
-      folder: raw.folder ? String(raw.folder).trim() : undefined,
-      phonetic: cleanPho(raw.phonetic || raw.p),
-      grammar_forms: (raw.grammar_forms || raw.gf) ? String(raw.grammar_forms || raw.gf).trim() : undefined,
-      etymologyConfidence: ETY_CONF_ENUM.includes(etyConf) ? etyConf : undefined,
-      wiktGrounded: Boolean((raw.wiktGrounded ?? raw.wg) && safeWiktUrl),
-      wiktUrl: safeWiktUrl,
-      etymology: String(raw.etymology || raw.e || ''),
-      etymologyTags: (Array.isArray(rawTags) ? rawTags : [])
-        .map(normRootKey)
-        .filter(r => r && isValidRootForEntry(r, { word: w, etymology: raw.etymology || raw.e, example: ex })),
-      history_note: (raw.history_note || raw.hn) ? String(raw.history_note || raw.hn).trim() : undefined,
-      core: String(raw.core || raw.co || ''),
-      meanings,
-      example: ex ? {
-        foreign: String(ex.foreign || ex.en || ex.f || ''),
-        ja: String(ex.ja || ex.j || ''),
-        used_form: (ex.used_form || ex.uf) ? String(ex.used_form || ex.uf).trim() : undefined
-      } : null,
-      phrases: (Array.isArray(rawPhrases) ? rawPhrases : []).filter(Boolean).map(x => ({
-        foreign: String(x.foreign || x.en || x.f || ''),
-        ja: String(x.ja || x.j || '')
-      })),
-      derivatives: (Array.isArray(rawDerivs) ? rawDerivs : []).filter(Boolean).map(x => ({
-        word: String(x.word || x.w || ''),
-        phonetic: cleanPho(x.phonetic || x.p),
-        pos: String(x.pos || x.ps || ''),
-        meaning: String(x.meaning || x.m || ''),
-        sub_phrase: String(x.sub_phrase || x.sp || ''),
-        sub_trans: String(x.sub_trans || x.st || '')
-      })),
-      contextSentence: raw.contextSentence ? String(raw.contextSentence) : undefined,
-      interval: Number(raw.interval) || 0,
-      repetition: Number(raw.repetition) || 0,
-      efactor: Number(raw.efactor) || 2.5,
-      nextReview: Number(raw.nextReview) || Date.now(),
-      reviewUpdatedAt: Number(raw.reviewUpdatedAt) || Number(raw.review_updated_at) || 0,
-      isDeleted: Boolean(raw.isDeleted || raw.is_deleted),
-      flags: Array.isArray(raw.flags) ? raw.flags.map(String) : [],
-      gen: raw.gen && typeof raw.gen === 'object' ? { model: String(raw.gen.model || ''), pv: String(raw.gen.pv || ''), at: Number(raw.gen.at) || 0 } : undefined,
-      updatedAt: Number.isFinite(parsedUpd) && parsedUpd > 0 ? parsedUpd : 1
-    };
-  }
-
-  function mergeWords(arrA, arrB, l = 'en', ignoreTombstones = false, customTombMap = null, customClearedAt = null) {
-    const tombMap = ignoreTombstones ? new Map() : (customTombMap || (global.VocabStorage ? global.VocabStorage.getTombstones(l) : new Map()));
-    const clearedAt = ignoreTombstones ? 0 : (customClearedAt !== null ? customClearedAt : (global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0));
-    const byId = new Map(), wkToId = new Map();
-
-    [arrA, arrB].forEach(list => (Array.isArray(list) ? list : []).forEach((raw, idx) => {
-      const it = sanitizeItem(raw, idx, l);
-      if (!it || (!ignoreTombstones && global.VocabStorage?.isTombstoned(it, tombMap, l, clearedAt))) return;
-      const wk = it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex);
-      it.wordKey = wk;
-      const existingId = byId.has(it.id) ? it.id : wkToId.get(wk);
-      if (!existingId) {
-        byId.set(it.id, it);
-        wkToId.set(wk, it.id);
-      } else {
-        const ex = byId.get(existingId);
-        // [P0-3 解決] カード情報・メタデータは updatedAt が新しい方を採用
-        const itWins = (it.updatedAt || 0) >= (ex.updatedAt || 0);
-        const win = itWins ? it : ex, lose = itWins ? ex : it;
-
-        // [P0-3 解決] SM-2復習進捗（暗記データ）は reviewUpdatedAt が新しい方を独立して採用（Macでのフォルダ整理でスマホの復習が消えるのを防止）
-        const itRevTime = Number(it.reviewUpdatedAt || it.updatedAt) || 0;
-        const exRevTime = Number(ex.reviewUpdatedAt || ex.updatedAt) || 0;
-        const revWins = itRevTime >= exRevTime;
-        const revWin = revWins ? it : ex, revLose = revWins ? ex : it;
-
-        const merged = {
-          ...lose, ...win,
-          id: ex.id || it.id,
-          folder: win.folder || lose.folder,
-          wiktGrounded: win.wiktGrounded || lose.wiktGrounded,
-          wiktUrl: win.wiktUrl || lose.wiktUrl,
-          etymologyTags: win.etymologyTags?.length ? win.etymologyTags : lose.etymologyTags,
-          updatedAt: Math.max(win.updatedAt || 1, lose.updatedAt || 1),
-          // SRS フィールドの独立マージ
-          interval: revWin.interval !== undefined ? revWin.interval : revLose.interval,
-          repetition: revWin.repetition !== undefined ? revWin.repetition : revLose.repetition,
-          efactor: revWin.efactor !== undefined ? revWin.efactor : revLose.efactor,
-          nextReview: revWin.nextReview !== undefined ? revWin.nextReview : revLose.nextReview,
-          reviewUpdatedAt: Math.max(itRevTime, exRevTime),
-          isDeleted: Boolean(win.isDeleted !== undefined ? win.isDeleted : lose.isDeleted)
-        };
-        if (ex.wordKey && ex.wordKey !== merged.wordKey) wkToId.delete(ex.wordKey);
-        byId.set(merged.id, merged);
-        wkToId.set(merged.wordKey, merged.id);
-      }
-    }));
-    return [...byId.values()].map((it, i) => ({ ...it, num: i + 1 }));
-  }
-
-  function parseAnyWords(raw, defL = 'en', strict = false) {
-    const out = { en:[], fr:[], de:[], ja:[] };
-    let p;
-    try {
-      p = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch (e) {
-      if (strict) throw new Error(`JSONの構文解析に失敗しました: ${e.message}`);
-      return out;
-    }
-    if (!p || typeof p !== 'object') {
-      if (strict) throw new Error('JSONオブジェクトまたは配列ではありません。');
-      return out;
-    }
-
-    let recognizedStructure = false;
-    if (Array.isArray(p)) {
-      recognizedStructure = true;
-      p.forEach((it, i) => {
-        const w = it ? (it.word || it.w) : null;
-        const hasData = it ? (it.meanings || it.m || it.etymology || it.e) : null;
-        if (typeof w === 'string' && hasData) {
-          const l = LANGS[it.lang] ? it.lang : defL, c = sanitizeItem(it, i, l);
-          if (c) {
-            if (!out[l]) out[l] = [];
-            out[l].push(c);
-          }
-        }
-      });
-    } else {
-      const src = (p.data && typeof p.data === 'object' && !Array.isArray(p.data)) ? p.data : p;
-      Object.keys(src).forEach(k => {
-        if (!Array.isArray(src[k])) return;
-        recognizedStructure = true;
-        const targetLang = (typeof k === 'string' && k.length === 2 && LANGS[k]) ? k : (global.VocabStorage?.keyToLang ? global.VocabStorage.keyToLang(k) : defL);
-        const parsedItems = [];
-        src[k].forEach((it, idx) => {
-          const w = it ? (it.word || it.w) : null;
-          const hasData = it ? (it.meanings || it.m || it.etymology || it.e) : null;
-          if (typeof w === 'string' && hasData) {
-            const itemLang = LANGS[it.lang] ? it.lang : targetLang;
-            const c = sanitizeItem(it, idx, itemLang);
-            if (c) parsedItems.push(c);
-          }
-        });
-        out[k] = parsedItems;
-        if (LANGS[targetLang] && !out[targetLang]) out[targetLang] = parsedItems;
-      });
-    }
-    if (strict && !recognizedStructure) throw new Error('Vocab Vault形式の単語データが見つかりません。');
-    return out;
-  }
-
-  const safeParseWords = (raw, defL = 'en') => { try { return parseAnyWords(raw, defL, false); } catch { return { en:[], fr:[], de:[], ja:[] }; } };
+  // --- データモデル・サニタイズ・マージ（js/storage.js へ委譲） ---
+  const sanitizeItem = (raw, idx, defLang = 'en') => global.VocabStorage ? global.VocabStorage.sanitizeItem(raw, idx, defLang) : raw;
+  const mergeWords = (arrA, arrB, l = 'en', ignoreTombstones = false, customTombMap = null, customClearedAt = null) => global.VocabStorage ? global.VocabStorage.mergeWords(arrA, arrB, l, ignoreTombstones, customTombMap, customClearedAt) : (Array.isArray(arrA) ? arrA : []);
+  const parseAnyWords = (raw, defL = 'en', strict = false) => global.VocabStorage ? global.VocabStorage.parseAnyWords(raw, defL, strict) : { en:[], fr:[], de:[], ja:[] };
+  const safeParseWords = (raw, defL = 'en') => global.VocabStorage ? global.VocabStorage.safeParseWords(raw, defL) : { en:[], fr:[], de:[], ja:[] };
 
   function notifyOtherTabs(keyOrLang) {
     if (global.VocabStorage?.state?.bc) {
-      try { global.VocabStorage.state.bc.postMessage({ type: 'vault-updated', lang: keyOrLang, ts: Date.now() }); } catch {}
+      try {
+        global.VocabStorage.state.bc.postMessage({
+          type: 'vault-updated',
+          key: keyOrLang,
+          lang: keyOrLang,
+          ts: Date.now()
+        });
+      } catch {}
     }
   }
 
@@ -470,6 +308,11 @@
         }
       });
     }
+  }
+
+  if (global.VocabStorage) {
+    global.VocabStorage.getJson = getJson;
+    global.VocabStorage.setJson = setJson;
   }
 
   function updateStorageStatusUI(state = 'ok', msg = '') {
@@ -604,56 +447,23 @@
   const getFiltered = () => global.VocabSearch ? global.VocabSearch.getFiltered(App) : (App.entries || []);
 
   // --- カード表示・DOM生成 (js/card_view.js へ委譲) ---
-  function highlightPlain(raw, reg) {
-    return global.VocabCardView ? global.VocabCardView.highlightPlain(raw, reg) : esc(String(raw ?? ''));
-  }
-
-  function hlText(str, allowBold = false) {
-    return global.VocabCardView ? global.VocabCardView.hlText(str, allowBold, App.qReg) : esc(String(str ?? ''));
-  }
-
-  function formatMeaningAndEty(d) {
-    return global.VocabCardView ? global.VocabCardView.formatMeaningAndEty(d) : { meanings: d.meanings || [], histDigest: '', compactEty: '', isLongEty: false };
-  }
-
-  function collectEtyPeers(d) {
-    return global.VocabCardView ? global.VocabCardView.collectEtyPeers(d, App.rootIndexMap) : { chipItems: [], sameList: [], crossList: [] };
-  }
-
-  function buildRight(d) {
-    return global.VocabCardView
-      ? global.VocabCardView.buildRight(d, {
-          rootIndexMap: App.rootIndexMap,
-          queryReg: App.qReg,
-          viewMode: App.viewMode,
-          lang: App.lang
-        })
-      : '';
-  }
+  const highlightPlain = (raw, reg) => global.VocabCardView ? global.VocabCardView.highlightPlain(raw, reg) : esc(String(raw ?? ''));
+  const hlText = (str, allowBold = false) => global.VocabCardView ? global.VocabCardView.hlText(str, allowBold, App.qReg) : esc(String(str ?? ''));
+  const formatMeaningAndEty = d => global.VocabCardView ? global.VocabCardView.formatMeaningAndEty(d) : { meanings: d.meanings || [], histDigest: '', compactEty: '', isLongEty: false };
+  const collectEtyPeers = d => global.VocabCardView ? global.VocabCardView.collectEtyPeers(d, App.rootIndexMap) : { chipItems: [], sameList: [], crossList: [] };
+  const buildRight = d => global.VocabCardView ? global.VocabCardView.buildRight(d, { rootIndexMap: App.rootIndexMap, queryReg: App.qReg, viewMode: App.viewMode, lang: App.lang }) : '';
 
   function createCardElement(i, opts = {}) {
-    if (global.VocabCardView?.createCardElement) {
-      return global.VocabCardView.createCardElement(i, {
-        queryReg: App.qReg,
-        lang: App.lang,
-        crossLang: App.crossLang,
-        rootIndexMap: App.rootIndexMap,
-        viewMode: App.viewMode,
-        ...opts
-      });
-    }
-    // フェイルセーフ・フォールバック (モジュール未ロード時や環境エラー時にも単語を絶対表示)
-    const iL = i.lang || opts.lang || App.lang || 'en';
-    const c = document.createElement('div'), due = (i.nextReview || 0) <= Date.now();
-    const lk = makeLookupKey(i.word, iL, i.homographIndex);
-    c.className = 'card';
-    c.dataset.word = lk;
-    c.dataset.rawWord = i.word;
-    c.dataset.lang = iL;
-    const homoHtml = i.homographIndex > 1 ? `<span class="homo-badge">#${i.homographIndex}</span>` : '';
-    const mText = (i.meanings || []).map(m => `<div class="pos-block"><span class="pos">${esc(m.pos)}</span><span>${esc(m.text)}</span></div>`).join('');
-    c.innerHTML = `<div class="col-left"><div class="hw-wrap"><span class="id">#${i.num}</span>${homoHtml}<span class="hw">${esc(i.word)}</span></div></div><div class="right"><div class="m-line">${mText}</div></div>`;
-    return c;
+    return global.VocabCardView?.createCardElement
+      ? global.VocabCardView.createCardElement(i, {
+          queryReg: App.qReg,
+          lang: App.lang,
+          crossLang: App.crossLang,
+          rootIndexMap: App.rootIndexMap,
+          viewMode: App.viewMode,
+          ...opts
+        })
+      : document.createElement('div');
   }
 
   function setViewMode(mode) {
@@ -666,46 +476,17 @@
   }
 
   function loadStarterPack() {
-    const starterItems = global.VocabStarterPack?.getStarterPack ? global.VocabStarterPack.getStarterPack(App.lang) : [];
-    if (!starterItems.length) return;
+    if (!global.VocabStarterPack?.populateStarterPack) return;
     const pairCfg = getActivePairConfig();
     const cur = getJson(pairCfg.key);
-    const existingWords = new Set(cur.map(x => makeLookupKey(x.word, x.lang || App.lang, x.homographIndex)));
-    const toAdd = [];
-    const now = Date.now();
-    let maxNum = cur.reduce((m, x) => Math.max(m, Number(x.num) || 0), 0);
-
-    starterItems.forEach(item => {
-      const k = makeLookupKey(item.word, item.lang || App.lang, item.homographIndex || 1);
-      if (!existingWords.has(k)) {
-        maxNum++;
-        const card = {
-          ...item,
-          num: maxNum,
-          lang: item.lang || App.lang,
-          folder: item.folder || 'スターターパック',
-          interval: 0,
-          repetition: 0,
-          efactor: 2.5,
-          nextReview: now,
-          updatedAt: now,
-          reviewUpdatedAt: now,
-          isDeleted: false
-        };
-        toAdd.push(card);
-        existingWords.add(k);
-      }
-    });
-
-    if (!toAdd.length) {
+    const { added, merged } = global.VocabStarterPack.populateStarterPack(cur, App.lang);
+    if (!added.length) {
       showToast('スターターパックの単語はすべて登録済みです。', 'info', 3000);
       return;
     }
-
-    const merged = [...cur, ...toAdd];
     setJson(pairCfg.key, merged);
     load(1);
-    showToast(`厳選スターターパック（${toAdd.length}語）を読み込みました！`, 'ok', 3500);
+    showToast(`厳選スターターパック（${added.length}語）を読み込みました！`, 'ok', 3500);
   }
 
   /**
@@ -886,6 +667,7 @@
     getJson,
     setJson,
     getActivePairConfig,
+    getAllKnownPairConfigs,
     enqueueTask,
     getAppSyncHooks,
     syncFromIdbForLang,
@@ -920,18 +702,31 @@
 
   function getAppSyncHooks() {
     return {
-      getLocalEntries: l => getJson(LANGS[l].key),
-      getLocalTombMap: l => global.VocabStorage ? global.VocabStorage.getTombstones(l) : new Map(),
-      getLocalClearedAt: l => global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0,
+      getLocalEntries: l => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return getJson(cfg.key);
+      },
+      getLocalTombMap: l => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return global.VocabStorage ? global.VocabStorage.getTombstones(cfg.key) : new Map();
+      },
+      getLocalClearedAt: l => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return global.VocabStorage ? global.VocabStorage.getClearedAt(cfg.key) : 0;
+      },
       mergeWords,
-      isTombstoned: (it, m, l, c) => global.VocabStorage ? global.VocabStorage.isTombstoned(it, m, l, c) : false,
+      isTombstoned: (it, m, l, c) => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return global.VocabStorage ? global.VocabStorage.isTombstoned(it, m, cfg.key, c) : false;
+      },
       makeWordKey,
       applyMergedLangState: (l, mergedEntries, mergedTombMap, mergedClearedAt) => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
         if (global.VocabStorage) {
-          if (mergedClearedAt > global.VocabStorage.getClearedAt(l)) global.VocabStorage.saveClearedAt(l, mergedClearedAt);
-          global.VocabStorage.saveTombstones(l, mergedTombMap);
+          if (mergedClearedAt > global.VocabStorage.getClearedAt(cfg.key)) global.VocabStorage.saveClearedAt(cfg.key, mergedClearedAt);
+          global.VocabStorage.saveTombstones(cfg.key, mergedTombMap);
         }
-        setJson(LANGS[l].key, mergedEntries, true, true, true);
+        setJson(cfg.key, mergedEntries, true, true, true);
       }
     };
   }
@@ -1029,77 +824,20 @@
     const nowIso = new Date().toISOString();
     lsSet('vv_last_backup_at', nowIso.slice(0, 19).replace('T', ' '));
     updStats();
-    if (global.VocabExport && typeof global.VocabExport.exportFullJSON === 'function') {
-      return global.VocabExport.exportFullJSON(data);
-    }
-    dlBlob([JSON.stringify({ version: 5, exportedAt: nowIso, data }, null, 2)], 'application/json', `vocab_backup_${nowIso.slice(0, 10)}.json`);
+    return global.VocabExport ? global.VocabExport.exportFullJSON(data) : undefined;
   }
 
   function importJSON(ev) {
-    const f = ev.target?.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = e => {
-      try {
-        const ext = parseAnyWords(e.target.result, App.lang, true);
-        let added = 0, updated = 0, skipped = 0;
-        const now = Date.now();
-        const handledStorageKeys = new Set();
-
-        Object.keys(ext).forEach(key => {
-          const incoming = ext[key];
-          if (!Array.isArray(incoming) || !incoming.length) return;
-
-          let storageKey = '';
-          let l = 'en';
-
-          if (key.startsWith('distinction_entries')) {
-            storageKey = key;
-            l = global.VocabStorage ? global.VocabStorage.keyToLang(key) : 'en';
-          } else if (LANGS[key]) {
-            storageKey = LANGS[key].key;
-            l = key;
-          } else {
-            return;
-          }
-
-          if (handledStorageKeys.has(storageKey)) return;
-          handledStorageKeys.add(storageKey);
-
-          const cur = getJson(storageKey);
-          const curMap = new Map(cur.map(it => [it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex), it]));
-          const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(l) : new Map();
-          const clearedAt = global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0;
-
-          incoming.forEach(it => {
-            if (clearedAt > 0 && (it.updatedAt || 0) <= clearedAt) it.updatedAt = now;
-            const k = it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex);
-            tombMap.delete(`id:${it.id}`);
-            tombMap.delete(`wk:${k}`);
-            const normW = String(it.word || '').trim().toLowerCase();
-            if (normW) tombMap.delete(`word:${normW}`);
-            const ex = curMap.get(k);
-            if (!ex) added++;
-            else if ((it.updatedAt || 0) > (ex.updatedAt || 0)) updated++;
-            else skipped++;
-          });
-
-          if (global.VocabStorage) global.VocabStorage.saveTombstones(l, tombMap);
-          const merged = mergeWords(cur, incoming, l, true);
-          setJson(storageKey, merged, true, true);
-          if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = merged;
-          if (storageKey === getActivePairConfig().key) {
-            App.entries = merged;
-          }
-        });
-
-        if (!added && !updated && !skipped) throw new Error('有効な単語エントリが1件も含まれていません。');
-        load(1);
-        alert(`JSONインポート完了\n・新規追加: ${added} 語\n・更新: ${updated} 語\n・既存維持(スキップ): ${skipped} 語`);
-      } catch (err) { alert(`JSON読込失敗: ${err.message}`); }
-      finally { ev.target.value = ''; }
-    };
-    r.readAsText(f);
+    if (global.VocabExport?.importJSON) {
+      return global.VocabExport.importJSON(ev, {
+        defaultLang: App.lang,
+        getJson,
+        setJson,
+        activePairKey: getActivePairConfig().key,
+        setActiveEntries: m => { App.entries = m; },
+        onComplete: () => load(1)
+      });
+    }
   }
 
   function exportAnkiTSV() {
@@ -1142,7 +880,7 @@
     getActivePairKey: () => getActivePairConfig().key,
     getList: key => (key === getActivePairConfig().key ? App.entries : getJson(key)),
     saveList: (key, list) => {
-      setJson(key, list, true, true);
+      setJson(key, list, true, false);
       if (global.VocabStorage) global.VocabStorage.state.mem[key] = list;
     },
     findAcrossAllPairs: cur => {
@@ -1193,22 +931,14 @@
 
   // --- キーボードファースト: カード選択・ナビゲーション (js/navigation.js へ分離・委譲) ---
   function updateCardFocus(newIdx) {
-    if (global.VocabNavigation && typeof global.VocabNavigation.clampAndFocusCard === 'function') {
+    if (global.VocabNavigation?.clampAndFocusCard) {
       const cards = $$('#list .card');
-      if (!cards.length) return;
-      App.focusedCardIndex = global.VocabNavigation.clampAndFocusCard(newIdx, cards);
-      return;
+      if (cards.length) App.focusedCardIndex = global.VocabNavigation.clampAndFocusCard(newIdx, cards);
     }
-    const cards = $$('#list .card');
-    if (!cards.length) return;
-    newIdx = Math.max(0, Math.min(newIdx, cards.length - 1));
-    App.focusedCardIndex = newIdx;
-    cards.forEach((c, i) => c.classList.toggle('card-focused', i === newIdx));
-    cards[newIdx]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function getFocusedCardItem() {
-    if (global.VocabNavigation && typeof global.VocabNavigation.getFocusedCardItem === 'function') {
+    if (global.VocabNavigation?.getFocusedCardItem) {
       const cards = $$('#list .card');
       return global.VocabNavigation.getFocusedCardItem(
         App.focusedCardIndex,
@@ -1218,90 +948,39 @@
         makeLookupKey
       );
     }
-    const cards = $$('#list .card');
-    const targetCard = cards[App.focusedCardIndex];
-    if (!targetCard) return null;
-    const lk = targetCard.dataset.word;
-    const tL = targetCard.dataset.lang || App.lang;
-    const list = getJson(LANGS[tL].key);
-    return list.find(i => makeLookupKey(i.word, tL, i.homographIndex) === lk);
+    return null;
   }
 
   function delW(idOrNum, tL = App.lang, skipConfirm = false) {
     if (!skipConfirm && !confirm('この単語を削除しますか？')) return;
 
-    // 1. 対象の言語ペアとストレージキーを特定
-    const activeCfg = getActivePairConfig();
-    const curPairKey = activeCfg.key;
-    const targetKey = (tL && LANGS[tL]?.key && !App.crossLang) ? LANGS[tL].key : curPairKey;
-
-    // 2. 現在の配列を取得（メモリおよび最新ストレージから）
-    let list = [...getJson(targetKey)];
-    if (!list.length && App.entries.length) list = [...App.entries];
-
-    // 3. 対象単語を柔軟かつ確実にマッチング (id, num, word, wordKey)
-    const targetIdx = list.findIndex(i => {
-      if (typeof idOrNum === 'string' && idOrNum) {
-        if (i.id === idOrNum) return true;
-        if (i.word === idOrNum) return true;
-        if (i.wordKey === idOrNum) return true;
-      }
-      const parsedNum = Number(idOrNum);
-      if (Number.isFinite(parsedNum) && parsedNum > 0 && Number(i.num) === parsedNum) return true;
-      return false;
-    });
-
-    if (targetIdx === -1) {
-      // 現在のリストで見つからない場合、全言語ペアから検索・救済削除
-      let foundInOther = false;
-      getAllKnownPairConfigs().forEach(p => {
-        if (foundInOther) return;
-        const otherList = [...getJson(p.key)];
-        const idx = otherList.findIndex(i => {
-          if (typeof idOrNum === 'string' && idOrNum && (i.id === idOrNum || i.word === idOrNum)) return true;
-          const n = Number(idOrNum);
-          return Number.isFinite(n) && n > 0 && Number(i.num) === n;
-        });
+    const targetKey = (tL && LANGS[tL]?.key && !App.crossLang) ? LANGS[tL].key : getActivePairConfig().key;
+    const getList = () => {
+      const l = getJson(targetKey);
+      return (!l.length && App.entries.length) ? App.entries : l;
+    };
+    const rescueOtherPairs = id => {
+      for (const p of getAllKnownPairConfigs()) {
+        const other = getJson(p.key);
+        const n = Number(id);
+        const idx = other.findIndex(i => (typeof id === 'string' && id && (i.id === id || i.word === id)) || (Number.isFinite(n) && n > 0 && Number(i.num) === n));
         if (idx !== -1) {
-          const tgt = otherList[idx];
-          tgt.isDeleted = true;
-          tgt.updatedAt = Date.now();
-          if (global.VocabStorage) global.VocabStorage.recordTombstone(tgt, p.src, tgt.updatedAt);
-          const nextOther = otherList.filter((_, i) => i !== idx).map((it, i) => ({ ...it, num: i + 1 }));
-          setJson(p.key, nextOther, true, true);
-          foundInOther = true;
+          const tgt = { ...other[idx], isDeleted: true, updatedAt: Date.now() };
+          global.VocabStorage?.recordTombstone(tgt, p.src, tgt.updatedAt);
+          setJson(p.key, other.filter((_, i) => i !== idx).map((it, i) => ({ ...it, num: i + 1 })), true, true);
+          break;
         }
-      });
+      }
       load(App.page);
-      return;
-    }
-
-    const target = list[targetIdx];
-    const now = Date.now();
-    target.isDeleted = true;
-    target.updatedAt = now;
-
-    // 4. 墓石 (Tombstone) を記録
-    if (global.VocabStorage) {
-      global.VocabStorage.recordTombstone(target, target.lang || tL, now);
-    }
-
-    // 5. リストから除外して番号を再付与
-    const nextList = list.filter((_, idx) => idx !== targetIdx).map((it, idx) => ({ ...it, num: idx + 1 }));
-
-    // 6. ストレージとメモリを一元更新
-    setJson(targetKey, nextList, true, true);
-    App.entries = nextList;
-    if (global.VocabStorage) {
-      global.VocabStorage.state.mem[targetKey] = nextList;
-    }
-
-    // 7. Anki 復習キュー (App.aList) からも即座に抹消
-    if (App.aList.length) {
-      App.aList = App.aList.filter(item => item.id !== target.id && item.word !== target.word);
-    }
-
-    // 8. 画面再描画とトースト通知
+      return null;
+    };
+    const target = global.VocabStorage?.deleteWord(idOrNum, tL, getList, nextList => {
+      setJson(targetKey, nextList, true, true);
+      App.entries = nextList;
+      if (global.VocabStorage) global.VocabStorage.state.mem[targetKey] = nextList;
+    }, rescueOtherPairs);
+    if (!target) return;
+    if (App.aList.length) App.aList = App.aList.filter(item => item.id !== target.id && item.word !== target.word);
     load(App.page);
     showToast(`「${target.word}」を削除しました`, 'ok');
   }
@@ -1311,20 +990,11 @@
     const l = App.srcLang;
     const label = pairCfg.label || LANGS[l]?.label || '現在の単語帳';
     if (!confirm(`選択中の単語帳（${label}）の全単語を削除しますか？`)) return;
-    const cur = getJson(pairCfg.key), now = Date.now();
-    if (global.VocabStorage) {
-      global.VocabStorage.saveClearedAt(l, now);
-      const map = global.VocabStorage.getTombstones(l);
-      cur.forEach(item => {
-        if (item.id) map.set(`id:${item.id}`, now);
-        const wk = item.wordKey || makeWordKey(item.word, l, item.meanings?.[0]?.pos, item.homographIndex);
-        if (wk) map.set(`wk:${wk}`, now);
-      });
-      global.VocabStorage.saveTombstones(l, map);
-    }
-    setJson(pairCfg.key, [], true, true);
-    App.entries = [];
-    if (global.VocabStorage) global.VocabStorage.state.mem[pairCfg.key] = [];
+    global.VocabStorage?.clearAllWords(pairCfg.key, getJson(pairCfg.key), () => {
+      setJson(pairCfg.key, [], true, true);
+      App.entries = [];
+      global.VocabStorage.state.mem[pairCfg.key] = [];
+    });
     load(1);
     toggleModal('settingsModal', false);
     showToast('すべての単語を削除しました', 'ok');
@@ -1365,156 +1035,41 @@
     if (global.VocabQueue) return global.VocabQueue.executeBatch(task);
   }
 
+  const syncCtx = () => ({
+    getJson,
+    setJson,
+    getActivePairKey: () => getActivePairConfig().key,
+    getSrcLang: () => App.srcLang,
+    setEntries: list => { App.entries = list; },
+    switchSrcLang: l => {
+      App.srcLang = l;
+      App.lang = l;
+      lsSet('vv_src_lang', l);
+      lsSet('vv_active_lang', l);
+      if ($('srcLangSel')) $('srcLangSel').value = l;
+      renderPairFileTabs();
+    },
+    reload: () => load(App.page || 1),
+    flushOffline: () => global.VocabSRS?.flushOfflineReviews?.(),
+    syncCloud: () => { if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false); },
+    syncFromIdb: l => syncFromIdbForLang(l),
+    applyMerged: (keyOrLang, merged) => {
+      const activePair = getActivePairConfig();
+      const cfg = global.VocabStorage ? global.VocabStorage.resolveConfig(keyOrLang) : { key: keyOrLang, srcLang: keyOrLang };
+      const isCurrentActive = (cfg.key === activePair.key) || (cfg.srcLang === App.lang && cfg.key === (LANGS[App.lang]?.key || 'distinction_entries'));
+      if (isCurrentActive) App.entries = merged;
+      syncAnkiReferences(cfg.srcLang, merged);
+      if (isCurrentActive && $('anki')?.style.display !== 'block') load(App.page || 1);
+      else renderSidebarTree();
+    }
+  });
+
   function initStorageAndSync(manualSalvage = false) {
-    if (manualSalvage && !confirm('退避スナップショットおよび全ストレージを走査して、過去に削除した単語も含めて救出・統合しますか？')) return;
-    if (typeof navigator !== 'undefined' && navigator.storage?.persist) navigator.storage.persist().catch(() => {});
-    if (global.VocabStorage && !global.VocabStorage.state.bc && typeof BroadcastChannel !== 'undefined') {
-      try {
-        global.VocabStorage.state.bc = new BroadcastChannel('vocab_vault_sync');
-        global.VocabStorage.state.bc.onmessage = ev => {
-          if (ev.data?.type === 'vault-updated' && LANGS[ev.data.lang]) {
-            syncFromIdbForLang(ev.data.lang);
-          }
-        };
-      } catch {}
-    }
-
-    if (manualSalvage && global.VocabStorage) {
-      global.VocabStorage.state.mem.en = global.VocabStorage.state.mem.fr = global.VocabStorage.state.mem.de = null;
-      LANG_KEYS.forEach(l => { global.VocabStorage.saveClearedAt(l, 0); global.VocabStorage.saveTombstones(l, new Map()); });
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k) {
-            const ext = safeParseWords(lsGet(k), keyToLang(k));
-            LANG_KEYS.forEach(l => { if (ext[l].length) setJson(LANGS[l].key, mergeWords(getJson(LANGS[l].key), ext[l], l, true), true, true); });
-          }
-        }
-      } catch {}
-    }
-
-    // 手動サルベージ時のみ: LocalStorage の全キーから過去の単語（スナップショットや旧キー含む）を事前救出
-    if (manualSalvage) {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && (k.includes('distinction_entries') || k.includes('vocab_snapshot') || k.startsWith('vv_'))) {
-              const val = localStorage.getItem(k);
-              if (val && val !== '[]' && val.length > 5) {
-                const l = keyToLang(k);
-                const parsed = safeParseWords(val, l)[l];
-                if (parsed && parsed.length > 0) {
-                  const targetK = LANGS[l].key;
-                  const cur = getJson(targetK);
-                  const rec = mergeWords(cur, parsed, l, true);
-                  if (rec.length > cur.length) {
-                    console.log(`[Manual Salvage] Rescued ${rec.length - cur.length} words for ${l} from key "${k}"`);
-                    if (global.VocabStorage) {
-                      global.VocabStorage.state.mem[targetK] = rec;
-                      global.VocabStorage.state.mem[l] = rec;
-                    }
-                    try { localStorage.setItem(targetK, JSON.stringify(rec)); } catch {}
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch {}
-    }
-
-    const syncActiveLang = () => {
-      const curPairKey = getActivePairConfig().key;
-      App.entries = getJson(curPairKey);
-      if (!App.entries.length) {
-        // もし現在のペアが空なら、単語が存在する言語に自動フォールバック
-        const foundLang = LANG_KEYS.find(l => getJson(LANGS[l].key).length > 0);
-        if (foundLang && foundLang !== App.srcLang) {
-          App.srcLang = foundLang;
-          App.lang = foundLang;
-          App.entries = getJson(LANGS[foundLang].key);
-          lsSet('vv_src_lang', foundLang);
-          lsSet('vv_active_lang', foundLang);
-          if ($('srcLangSel')) $('srcLangSel').value = foundLang;
-          renderPairFileTabs();
-        }
-      }
-      load(App.page || 1);
-    };
-    syncActiveLang();
-
-    // IndexedDB の初期化完了を待機して全データを完全同期・復元
-    if (global.VocabStorage?.initDatabase) {
-      global.VocabStorage.initDatabase().then(async () => {
-        try {
-          let totalRestored = 0;
-          await Promise.all(LANG_KEYS.map(async l => {
-            const k = LANGS[l].key;
-            // 通常起動時は過去スナップショットを読まない (includeSnaps = manualSalvage)
-            const b = await global.VocabStorage.idbFetchLangBundle(l, manualSalvage);
-            if (!b) return;
-
-            if (b.clearAt > global.VocabStorage.getClearedAt(l)) {
-              global.VocabStorage.state.clearedAt[l] = b.clearAt;
-            }
-            if (b.tombs) {
-              global.VocabStorage.absorbTombArray(global.VocabStorage.getTombstones(l), b.tombs);
-            }
-
-            let idbWords = Array.isArray(b.words) ? b.words : [];
-            // 手動サルベージ時のみ過去スナップショットからも救出
-            if (manualSalvage && b.snaps && b.snaps.length) {
-              b.snaps.forEach(arr => {
-                const sWords = safeParseWords(arr, l)[l];
-                if (sWords && sWords.length) {
-                  idbWords = mergeWords(idbWords, sWords, l, true);
-                }
-              });
-            }
-
-            // LocalStorage 内のデータともマージ (通常起動時は絶対に墓石を尊重し ignoreTombstones = false)
-            const curWords = getJson(k);
-            const merged = mergeWords(curWords, idbWords, l, manualSalvage);
-
-            if (merged.length > 0 || manualSalvage) {
-              totalRestored += merged.length;
-              global.VocabStorage.state.mem[k] = merged;
-              global.VocabStorage.state.mem[l] = merged;
-              try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
-              await global.VocabStorage.idbPut(k, merged);
-            }
-          }));
-
-          syncActiveLang();
-          if (global.VocabSRS?.flushOfflineReviews) global.VocabSRS.flushOfflineReviews();
-          if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false);
-          if (manualSalvage) {
-            const tot = LANG_KEYS.reduce((s, l) => s + getJson(LANGS[l].key).length, 0);
-            alert(tot ? `合計 ${tot} 語を検出・復元しました。` : '復元可能なデータは見つかりませんでした。');
-          }
-        } catch (err) {
-          console.warn('[Sync Init Error]', err);
-        }
-      });
-    }
+    return global.VocabStorage?.initStorageAndSync(manualSalvage, syncCtx());
   }
 
   async function syncFromIdbForLang(l) {
-    if (!global.VocabStorage) return;
-    const b = await global.VocabStorage.idbFetchLangBundle(l, false);
-    if (!b) return;
-    if (b.clearAt > global.VocabStorage.getClearedAt(l)) global.VocabStorage.state.clearedAt[l] = b.clearAt;
-    global.VocabStorage.absorbTombArray(global.VocabStorage.getTombstones(l), b.tombs);
-    const k = LANGS[l].key;
-    const merged = mergeWords(getJson(k), b.words, l, false);
-    global.VocabStorage.state.mem[l] = merged;
-    global.VocabStorage.state.mem[k] = merged;
-    try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
-    if (l === App.lang) App.entries = merged;
-    syncAnkiReferences(l, merged);
-    if (l === App.lang && $('anki')?.style.display !== 'block') load(App.page);
-    else renderSidebarTree();
+    return global.VocabStorage?.syncFromIdbForLang(l, syncCtx());
   }
 
   const salvageAll = (manual = false) => initStorageAndSync(manual);
@@ -1529,7 +1084,7 @@
     if (global.VocabEvents) return global.VocabEvents.bindWindowEvents(eventsCtx());
   }
 
-  function initApp() {
+  async function initApp() {
     if (App._initialized) return;
     App._initialized = true;
 
@@ -1555,7 +1110,7 @@
     initWordSuggest();
     bindDelegatedEvents();
     bindWindowEvents();
-    initStorageAndSync(false);
+    await initStorageAndSync(false);
     updKeyUI();
     updCloudUI();
     restorePersistedQueue();
@@ -1650,6 +1205,7 @@
     getActivePairConfig,
     getActivePairFiles,
     getAllKnownPairConfigs,
+    getAppSyncHooks,
     getPairShortLabel,
     renderPairFileTabs,
     openGraphModal,
@@ -1684,13 +1240,10 @@
     loadStarterPack,
     toggleDevMasterMode,
     checkDevMasterMode,
-    handleOcrImageFile,
     clearOcrPreview,
     runOcrCurrentFile,
     saveOcrKeyAndExecute,
     getFiltered,
-    scrollToCard,
-    findCardElement,
     initApp
   };
 

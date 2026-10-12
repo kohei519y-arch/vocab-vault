@@ -319,14 +319,22 @@
     const rawText = (cand.content?.parts || []).map(p => p.text || '').join('').trim();
     if (!rawText) throw new Error(`AI応答が空でした (finishReason: ${reason || 'UNKNOWN'})`);
     const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    const repairJson = str => str
+      .replace(/,\s*([\]\}])/g, '$1') // 末尾カンマ修復
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ''); // 制御文字除去
+
     try { return JSON.parse(cleaned); } catch {
+      try { return JSON.parse(repairJson(cleaned)); } catch {}
       const arrM = cleaned.match(/\[[\s\S]*\]/);
       if (arrM) {
         try { return JSON.parse(arrM[0]); } catch {}
+        try { return JSON.parse(repairJson(arrM[0])); } catch {}
       }
       const objM = cleaned.match(/\{[\s\S]*\}/);
       if (objM) {
         try { return JSON.parse(objM[0]); } catch {}
+        try { return JSON.parse(repairJson(objM[0])); } catch {}
       }
       throw new Error('AI応答のJSON解析に失敗しました。');
     }

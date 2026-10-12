@@ -641,6 +641,18 @@
     });
   }
 
+  function invalidateCache(k) {
+    if (!k) {
+      Storage.mem = {};
+      return;
+    }
+    const cfg = resolveConfig(k);
+    delete Storage.mem[k];
+    if (cfg?.key) delete Storage.mem[cfg.key];
+    if (cfg?.pairId) delete Storage.mem[cfg.pairId];
+    if (cfg?.srcLang) delete Storage.mem[cfg.srcLang];
+  }
+
   // --- 起動時同期・サルベージ・他タブ同期 (app.js から移管) ---
   /**
    * ctx: { getJson, setJson, getActivePairKey, getSrcLang, switchSrcLang(l), setEntries(list),
@@ -657,8 +669,11 @@
         Storage.bc.onmessage = ev => {
           if (ev.data?.type === 'vault-updated') {
             const rawKey = ev.data.key || ev.data.lang;
-            if (rawKey && typeof ctx.syncFromIdb === 'function') {
-              ctx.syncFromIdb(rawKey);
+            if (rawKey) {
+              invalidateCache(rawKey);
+              if (typeof ctx.syncFromIdb === 'function') {
+                ctx.syncFromIdb(rawKey);
+              }
             }
           }
         };
@@ -815,6 +830,7 @@
     safeParseWords,
     deleteWord,
     clearAllWords,
+    invalidateCache,
     initStorageAndSync,
     syncFromIdbForLang,
     idbPut,

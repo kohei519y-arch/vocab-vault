@@ -56,8 +56,14 @@
     try {
       const hooks = typeof ctx.getAppSyncHooks === 'function' ? ctx.getAppSyncHooks() : (global.VocabCore?.getAppSyncHooks?.());
       let totalPulled = 0, totalPushed = 0;
-      const langKeys = global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja'];
-      for (const l of langKeys) {
+      const getPairsFn = ctx.getAllKnownPairConfigs || global.VocabCore?.getAllKnownPairConfigs || (() => []);
+      const allKnown = getPairsFn();
+      const syncTargets = new Set(global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja']);
+      allKnown.forEach(p => {
+        const id = p.pairId || p.key;
+        if (id) syncTargets.add(id);
+      });
+      for (const l of syncTargets) {
         const res = await global.VocabSync.syncLangWithSupabase(l, hooks);
         totalPulled += res.pulled;
         totalPushed += res.pushed;
@@ -507,6 +513,9 @@
         try {
           const retryItems = JSON.parse(card.dataset.retryItems || '[]');
           const { fName = '', useHist, useWikt, srcLang, tgtLang, pairKey } = card.dataset;
+          const reqQueue = appState?.reqQueue || [];
+          const qIdx = reqQueue.findIndex(q => q.card === card);
+          if (qIdx !== -1) reqQueue.splice(qIdx, 1);
           card.remove();
           if (retryItems.length && typeof ctx.enqueueTask === 'function') {
             ctx.enqueueTask({
@@ -527,7 +536,7 @@
         const task = reqQueue.find(q => q.card === card);
         if (task) task.isCancelled = true;
         const qIdx = reqQueue.findIndex(q => q.card === card);
-        if (qIdx > 0) reqQueue.splice(qIdx, 1);
+        if (qIdx !== -1) reqQueue.splice(qIdx, 1);
         card?.remove();
         if (global.VocabQueue && typeof global.VocabQueue.syncPersistedQueue === 'function') global.VocabQueue.syncPersistedQueue(appState);
         if (typeof ctx.render === 'function') ctx.render();
@@ -584,6 +593,32 @@
           e.preventDefault();
           const val = e.target.value.trim();
           if (val && typeof ctx.jumpToWord === 'function') ctx.jumpToWord(val);
+        }
+      });
+    }
+
+    const inWordEl = $('inWord');
+    if (inWordEl) {
+      inWordEl.addEventListener('compositionstart', () => { if (appState) appState.isComposing = true; });
+      inWordEl.addEventListener('compositionend', () => {
+        setTimeout(() => { if (appState) appState.isComposing = false; }, 50);
+      });
+      inWordEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (appState?.isComposing || e.isComposing || e.keyCode === 229)) {
+          e.preventDefault();
+        }
+      });
+    }
+
+    const inFolEl = $('inFol');
+    if (inFolEl) {
+      inFolEl.addEventListener('compositionstart', () => { if (appState) appState.isComposing = true; });
+      inFolEl.addEventListener('compositionend', () => {
+        setTimeout(() => { if (appState) appState.isComposing = false; }, 50);
+      });
+      inFolEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (appState?.isComposing || e.isComposing || e.keyCode === 229)) {
+          e.preventDefault();
         }
       });
     }

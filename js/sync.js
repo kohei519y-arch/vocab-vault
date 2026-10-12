@@ -140,6 +140,8 @@
     return getConfig().configured;
   }
 
+  let _refreshPromise = null;
+
   async function ensureValidToken() {
     const cfg = getConfig();
     let sess = getSession();
@@ -149,22 +151,33 @@
       return sess.access_token;
     }
     if (!sess.refresh_token) return sess.access_token;
-    try {
-      const r = await fetch(`${cfg.url}/auth/v1/token?grant_type=refresh_token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey },
-        body: JSON.stringify({ refresh_token: sess.refresh_token })
-      });
-      if (!r.ok) {
-        if (r.status === 400 || r.status === 401) setSession(null);
-        return null;
-      }
-      const next = await r.json();
-      setSession(next);
-      return next.access_token;
-    } catch {
-      return sess.access_token;
+
+    if (_refreshPromise) {
+      return _refreshPromise;
     }
+
+    _refreshPromise = (async () => {
+      try {
+        const r = await fetch(`${cfg.url}/auth/v1/token?grant_type=refresh_token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey },
+          body: JSON.stringify({ refresh_token: sess.refresh_token })
+        });
+        if (!r.ok) {
+          if (r.status === 400 || r.status === 401) setSession(null);
+          return null;
+        }
+        const next = await r.json();
+        setSession(next);
+        return next.access_token;
+      } catch {
+        return sess.access_token;
+      } finally {
+        _refreshPromise = null;
+      }
+    })();
+
+    return _refreshPromise;
   }
 
   async function signInOrSignUp(email, password, isSignUp = false) {

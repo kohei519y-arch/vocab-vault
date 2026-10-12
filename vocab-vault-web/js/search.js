@@ -51,13 +51,26 @@
   }
 
   /**
-   * クエリ文字列から複合トークンを抽出
+   * クエリ文字列から複合トークンを抽出（ReDoS 防護: 最大8トークン、各トークン最大40文字）
    */
   function extractQueryTokens(q) {
     const raw = String(q ?? '').trim();
     if (!raw) return [];
-    const tokens = raw.split(/[\s,、，|｜/／;；]+/).map(s => s.trim()).filter(Boolean);
-    return [...new Set(tokens.length ? tokens : [raw])];
+    const tokens = raw.split(/[\s,、，|｜/／;；]+/)
+      .map(s => s.trim().slice(0, 40))
+      .filter(Boolean);
+    const unique = [...new Set(tokens.length ? tokens : [raw.slice(0, 40)])];
+    return unique.slice(0, 8);
+  }
+
+  /**
+   * 単語エントリのインデックスキャッシュ無効化
+   */
+  function invalidateMeta(it, appInstance = global.App) {
+    const App = appInstance || global.App;
+    if (App?.indexCache && it && typeof it === 'object') {
+      try { App.indexCache.delete(it); } catch {}
+    }
   }
 
   /**
@@ -73,13 +86,32 @@
   }
 
   /**
-   * 単語エントリから印欧祖語・語源タグを抽出
+   * 単語エントリから語根・祖語再構形タグを抽出
    */
   function extractEtyTags(it) {
-    if (Array.isArray(it?.etymologyTags) && it.etymologyTags.length) return it.etymologyTags.map(String).filter(Boolean);
+    if (Array.isArray(it?.etymologyTags)) {
+      return it.etymologyTags.map(String).filter(Boolean);
+    }
     const ety = String(it?.etymology || '');
-    const pieMatches = ety.match(/\*[a-zA-Z0-9_äöüßÄÖÜ₁₂₃₄ḱǵʷʰ-]+-?/g);
-    return pieMatches ? [...new Set(pieMatches)].slice(0, 4).map(m => `印欧祖語: ${m}`) : [];
+    // Unicode letters (\p{L}) and marks (\p{M}) support for reconstructed languages (e.g. *dūbǭ, *h₂nḗr)
+    const matches = ety.match(/\*[\p{L}\p{M}0-9₁₂₃₄ḱǵʷʰ-]+-?/gu);
+    if (!matches) return [];
+
+    const unique = [...new Set(matches)].slice(0, 4);
+    const etyFold = ety.toLowerCase();
+    return unique.map(m => {
+      // 祖言語の文脈判定（ゲルマン祖語、印欧祖語など）
+      if (etyFold.includes('ゲルマン祖語') || etyFold.includes('proto-germanic')) {
+        return `ゲルマン祖語: ${m}`;
+      }
+      if (etyFold.includes('印欧祖語') || etyFold.includes('pie') || etyFold.includes('proto-indo-european')) {
+        return `印欧祖語: ${m}`;
+      }
+      if (etyFold.includes('イタリック祖語') || etyFold.includes('proto-italic')) {
+        return `イタリック祖語: ${m}`;
+      }
+      return `再構語: ${m}`;
+    });
   }
 
   /**
@@ -473,6 +505,7 @@
     buildFoldRegex,
     extractEtyTags,
     getMeta,
+    invalidateMeta,
     buildEtyIndex,
     matchPos,
     matchStat,

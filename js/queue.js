@@ -73,7 +73,14 @@
       if (Array.isArray(saved) && saved.length) {
         if (global.lsSet) global.lsSet('vv_pending_queue', '[]');
         else if (typeof localStorage !== 'undefined') localStorage.setItem('vv_pending_queue', '[]');
-        saved.forEach(t => { if (Array.isArray(t?.items) && t.items.length) enqueueTask(t); });
+        saved.forEach(t => {
+          if (t && typeof t === 'object' && Array.isArray(t.items) && t.items.length) {
+            const validItems = t.items.filter(it => it && typeof it === 'object' && it.word);
+            if (validItems.length) {
+              enqueueTask({ ...t, items: validItems });
+            }
+          }
+        });
       }
     } catch {}
   }
@@ -174,6 +181,19 @@
   function submitW() {
     const App = global.App || {};
     if (App.isComposing) return;
+
+    const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
+    let raw = $('inWord')?.value?.trim() || '';
+    if (!raw) return;
+
+    // 同一単語の連続連打（Rapid identical submission）による多重登録レースコンディション防止
+    const now = Date.now();
+    if (App._lastSubmitWord === raw && App._lastSubmitTs && (now - App._lastSubmitTs < 400)) {
+      return;
+    }
+    App._lastSubmitWord = raw;
+    App._lastSubmitTs = now;
+
     const getKeyFn = global.getKey || (() => '');
     if (!App.isDev && App.quotaRemaining === 0 && !getKeyFn() && global.VocabSync?.isCloudReady?.()) {
       if (global.openUpsellModal) {
@@ -182,9 +202,12 @@
       return;
     }
 
-    const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
-    const f = $('inFol')?.value?.trim() || '', raw = $('inWord')?.value?.trim() || '';
-    if (!raw) return;
+    // 長大文字列（誤貼付など）のDoS防護
+    if (raw.length > 2000) {
+      if (global.showToast) global.showToast('入力文字数が上限(2000文字)を超えているため、先頭部分のみ処理します', 'info');
+      raw = raw.slice(0, 2000).trim();
+    }
+    const f = $('inFol')?.value?.trim() || '';
 
     const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
     const parseSpecFn = global.VocabMorphology?.parseInputWordSpec || global.parseInputWordSpec || (w => ({ cleanWord: w, homographIndex: 1, senseHint: '' }));

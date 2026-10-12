@@ -603,14 +603,47 @@
   ];
 
   function getStarterPack(lang = 'en') {
-    if (lang === 'en') {
-      return JSON.parse(JSON.stringify(EN_JA_STARTER));
-    }
     return JSON.parse(JSON.stringify(EN_JA_STARTER));
   }
 
+  function populateStarterPack(currentEntries, lang = 'en') {
+    const starterItems = getStarterPack(lang);
+    if (!starterItems.length) return { added: [], merged: currentEntries };
+    const cur = Array.isArray(currentEntries) ? currentEntries : [];
+    const makeLookupKey = global.VocabMorphology?.makeLookupKey || ((w, l, h) => w);
+    const existingWords = new Set(cur.map(x => makeLookupKey(x.word, x.lang || lang, x.homographIndex)));
+    const toAdd = [];
+    const now = Date.now();
+    let maxNum = cur.reduce((m, x) => Math.max(m, Number(x.num) || 0), 0);
+
+    starterItems.forEach(item => {
+      const k = makeLookupKey(item.word, item.lang || lang, item.homographIndex || 1);
+      if (!existingWords.has(k)) {
+        maxNum++;
+        const card = {
+          ...item,
+          num: maxNum,
+          lang: item.lang || lang,
+          folder: item.folder || 'スターターパック',
+          interval: 0,
+          repetition: 0,
+          efactor: 2.5,
+          nextReview: now,
+          updatedAt: now,
+          reviewUpdatedAt: now,
+          isDeleted: false
+        };
+        toAdd.push(card);
+        existingWords.add(k);
+      }
+    });
+
+    return { added: toAdd, merged: [...cur, ...toAdd] };
+  }
+
   global.VocabStarterPack = {
-    getStarterPack
+    getStarterPack,
+    populateStarterPack
   };
 
 })(typeof window !== 'undefined' ? window : globalThis);

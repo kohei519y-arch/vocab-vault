@@ -288,7 +288,8 @@
   function handleGlobalKeydown(e, ctx = {}) {
     if (!e || e.isComposing) return false;
     const doc = typeof document !== 'undefined' ? document : null;
-    const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(doc?.activeElement?.tagName);
+    const activeEl = doc?.activeElement;
+    const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl?.tagName) || Boolean(activeEl?.isContentEditable);
     const isAnkiOpen = typeof ctx.isAnkiOpen === 'function' ? ctx.isAnkiOpen() : Boolean(ctx.isAnkiOpen);
     const anyModalOpen = typeof ctx.anyModalOpen === 'function' ? ctx.anyModalOpen() : Boolean(ctx.anyModalOpen);
 
@@ -324,6 +325,7 @@
       if (typeof ctx.toggleMask === 'function') ctx.toggleMask();
       return true;
     } else if (isAnkiOpen && !inInput) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
       if (e.code === 'KeyR' || e.key === 's') {
         e.preventDefault();
         if (typeof ctx.ankiSpeak === 'function') ctx.ankiSpeak();
@@ -342,6 +344,8 @@
         return true;
       }
     } else if (!inInput && !anyModalOpen && !isAnkiOpen) {
+      // OS標準ショートカット（Cmd+S, Cmd+D, Ctrl+R等）との衝突防止
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
       if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
         if (typeof ctx.moveCardFocus === 'function') ctx.moveCardFocus(1);

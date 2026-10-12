@@ -140,6 +140,8 @@
     return getConfig().configured;
   }
 
+  let _refreshPromise = null;
+
   async function ensureValidToken() {
     const cfg = getConfig();
     let sess = getSession();
@@ -149,22 +151,33 @@
       return sess.access_token;
     }
     if (!sess.refresh_token) return sess.access_token;
-    try {
-      const r = await fetch(`${cfg.url}/auth/v1/token?grant_type=refresh_token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey },
-        body: JSON.stringify({ refresh_token: sess.refresh_token })
-      });
-      if (!r.ok) {
-        if (r.status === 400 || r.status === 401) setSession(null);
-        return null;
-      }
-      const next = await r.json();
-      setSession(next);
-      return next.access_token;
-    } catch {
-      return sess.access_token;
+
+    if (_refreshPromise) {
+      return _refreshPromise;
     }
+
+    _refreshPromise = (async () => {
+      try {
+        const r = await fetch(`${cfg.url}/auth/v1/token?grant_type=refresh_token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: cfg.anonKey },
+          body: JSON.stringify({ refresh_token: sess.refresh_token })
+        });
+        if (!r.ok) {
+          if (r.status === 400 || r.status === 401) setSession(null);
+          return null;
+        }
+        const next = await r.json();
+        setSession(next);
+        return next.access_token;
+      } catch {
+        return sess.access_token;
+      } finally {
+        _refreshPromise = null;
+      }
+    })();
+
+    return _refreshPromise;
   }
 
   async function signInOrSignUp(email, password, isSignUp = false) {
@@ -372,13 +385,15 @@
     };
   }
 
-  async function callVocabGenerateProxy({ lang, srcLang, tgtLang, useHist, fName, items }) {
+  async function callVocabGenerateProxy({ lang, srcLang, tgtLang, useHist, fName, folder, items, words }) {
     const cfg = getConfig();
     if (!cfg.configured) throw new Error('Supabase設定が未構成です。');
     const token = await ensureValidToken().catch(() => null);
 
     const sLang = srcLang || lang || 'en';
     const tLang = tgtLang || 'ja';
+    const finalItems = Array.isArray(items) ? items : (Array.isArray(words) ? words : []);
+    const safeFName = fName || folder || '';
 
     const headers = {
       apikey: cfg.anonKey,
@@ -394,9 +409,9 @@
         lang: sLang,
         srcLang: sLang,
         tgtLang: tLang,
-        useHist,
-        fName,
-        items
+        useHist: Boolean(useHist),
+        fName: safeFName,
+        items: finalItems
       })
     });
 
@@ -550,9 +565,17 @@
   // [GDPR対応] ユーザーの全登録単語・学習進捗の完全JSONエクスポート
   async function exportAllUserDataJson() {
     const bundle = {};
-    for (const l of ['en', 'ja', 'fr', 'de']) {
+    const allPairs = (global.VocabCore?.getAllKnownPairConfigs || global.getAllKnownPairConfigs)?.() || [];
+    const keysToExport = new Set(['en', 'ja', 'fr', 'de']);
+    allPairs.forEach(p => {
+      const id = p.pairId || p.key;
+      if (id) keysToExport.add(id);
+    });
+    for (const l of keysToExport) {
       const b = await global.VocabStorage?.idbFetchLangBundle?.(l, true);
-      bundle[l] = b || { words: [] };
+      if (b && (b.words?.length || b.clearAt || (b.tombs && b.tombs.length) || (b.snaps && b.snaps.length))) {
+        bundle[l] = b;
+      }
     }
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

@@ -81,19 +81,20 @@
       return null;
     }
     const nowIso = new Date().toISOString();
+    const safeYamlStr = s => String(s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ');
 
     const docs = list.map(item => {
       const { meanings, histDigest, compactEty } = formatMeaningAndEty(item);
-      const tags = ['vocab', item.lang || lang, item.category, item.folder].filter(Boolean).map(t => String(t).replace(/[\s\/\\]+/g, '_'));
-      const roots = (item.etymologyTags || []).map(r => `"[[*${normRootKey(r).replace(/^\*/, '')}]]"`);
+      const tags = ['vocab', item.lang || lang, item.category, item.folder].filter(Boolean).map(t => safeYamlStr(String(t).replace(/[\s\/\\]+/g, '_')));
+      const roots = (item.etymologyTags || []).map(r => `"[[*${safeYamlStr(normRootKey(r).replace(/^\*/, ''))}]]"`);
 
       const frontmatter = [
         '---',
-        `word: "${(item.word || '').replace(/"/g, '\\"')}"`,
-        `lang: "${item.lang || lang}"`,
-        item.phonetic ? `phonetic: "${cleanPho(item.phonetic)}"` : null,
-        item.grammar_forms ? `grammar: "${(item.grammar_forms || '').replace(/"/g, '\\"')}"` : null,
-        `level: "${item.level || 'B2'}"`,
+        `word: "${safeYamlStr(item.word)}"`,
+        `lang: "${safeYamlStr(item.lang || lang)}"`,
+        item.phonetic ? `phonetic: "${safeYamlStr(cleanPho(item.phonetic))}"` : null,
+        item.grammar_forms ? `grammar: "${safeYamlStr(item.grammar_forms)}"` : null,
+        `level: "${safeYamlStr(item.level || 'B2')}"`,
         tags.length ? `tags: [${tags.join(', ')}]` : null,
         roots.length ? `roots: [${roots.join(', ')}]` : null,
         `created: "${item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 10) : nowIso.slice(0, 10)}"`,

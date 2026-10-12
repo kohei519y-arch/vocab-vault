@@ -51,13 +51,26 @@
   }
 
   /**
-   * クエリ文字列から複合トークンを抽出
+   * クエリ文字列から複合トークンを抽出（ReDoS 防護: 最大8トークン、各トークン最大40文字）
    */
   function extractQueryTokens(q) {
     const raw = String(q ?? '').trim();
     if (!raw) return [];
-    const tokens = raw.split(/[\s,、，|｜/／;；]+/).map(s => s.trim()).filter(Boolean);
-    return [...new Set(tokens.length ? tokens : [raw])];
+    const tokens = raw.split(/[\s,、，|｜/／;；]+/)
+      .map(s => s.trim().slice(0, 40))
+      .filter(Boolean);
+    const unique = [...new Set(tokens.length ? tokens : [raw.slice(0, 40)])];
+    return unique.slice(0, 8);
+  }
+
+  /**
+   * 単語エントリのインデックスキャッシュ無効化
+   */
+  function invalidateMeta(it, appInstance = global.App) {
+    const App = appInstance || global.App;
+    if (App?.indexCache && it && typeof it === 'object') {
+      try { App.indexCache.delete(it); } catch {}
+    }
   }
 
   /**
@@ -492,6 +505,7 @@
     buildFoldRegex,
     extractEtyTags,
     getMeta,
+    invalidateMeta,
     buildEtyIndex,
     matchPos,
     matchStat,

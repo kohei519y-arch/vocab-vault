@@ -81,19 +81,20 @@
       return null;
     }
     const nowIso = new Date().toISOString();
+    const safeYamlStr = s => String(s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ');
 
     const docs = list.map(item => {
       const { meanings, histDigest, compactEty } = formatMeaningAndEty(item);
-      const tags = ['vocab', item.lang || lang, item.category, item.folder].filter(Boolean).map(t => String(t).replace(/[\s\/\\]+/g, '_'));
-      const roots = (item.etymologyTags || []).map(r => `"[[*${normRootKey(r).replace(/^\*/, '')}]]"`);
+      const tags = ['vocab', item.lang || lang, item.category, item.folder].filter(Boolean).map(t => safeYamlStr(String(t).replace(/[\s\/\\]+/g, '_')));
+      const roots = (item.etymologyTags || []).map(r => `"[[*${safeYamlStr(normRootKey(r).replace(/^\*/, ''))}]]"`);
 
       const frontmatter = [
         '---',
-        `word: "${(item.word || '').replace(/"/g, '\\"')}"`,
-        `lang: "${item.lang || lang}"`,
-        item.phonetic ? `phonetic: "${cleanPho(item.phonetic)}"` : null,
-        item.grammar_forms ? `grammar: "${(item.grammar_forms || '').replace(/"/g, '\\"')}"` : null,
-        `level: "${item.level || 'B2'}"`,
+        `word: "${safeYamlStr(item.word)}"`,
+        `lang: "${safeYamlStr(item.lang || lang)}"`,
+        item.phonetic ? `phonetic: "${safeYamlStr(cleanPho(item.phonetic))}"` : null,
+        item.grammar_forms ? `grammar: "${safeYamlStr(item.grammar_forms)}"` : null,
+        `level: "${safeYamlStr(item.level || 'B2')}"`,
         tags.length ? `tags: [${tags.join(', ')}]` : null,
         roots.length ? `roots: [${roots.join(', ')}]` : null,
         `created: "${item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 10) : nowIso.slice(0, 10)}"`,
@@ -139,12 +140,91 @@
     return fileName;
   }
 
+  /**
+   * JSONバックアップファイルの復元 & スマートマージ
+   */
+  function importJSON(ev, ctx = {}) {
+    const f = ev.target?.files?.[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        const defLang = ctx.defaultLang || 'en';
+        const parseFn = global.VocabStorage?.parseAnyWords || global.parseAnyWords;
+        const ext = parseFn ? parseFn(e.target.result, defLang, true) : JSON.parse(e.target.result);
+        let added = 0, updated = 0, skipped = 0;
+        const now = Date.now();
+        const handledStorageKeys = new Set();
+        const langs = global.VocabStorage?.LANGS || { en: { key: 'distinction_entries' } };
+
+        Object.keys(ext).forEach(key => {
+          const incoming = ext[key];
+          if (!Array.isArray(incoming) || !incoming.length) return;
+
+          let storageKey = '';
+          let l = 'en';
+
+          if (key.startsWith('distinction_entries')) {
+            storageKey = key;
+            l = global.VocabStorage ? global.VocabStorage.keyToLang(key) : 'en';
+          } else if (langs[key]) {
+            storageKey = langs[key].key;
+            l = key;
+          } else {
+            return;
+          }
+
+          if (handledStorageKeys.has(storageKey)) return;
+          handledStorageKeys.add(storageKey);
+
+          const cur = ctx.getJson ? ctx.getJson(storageKey) : [];
+          const makeWordKey = global.VocabMorphology?.makeWordKey || ((word, lang, pos, hIdx) => `${lang}:${word}`);
+          const curMap = new Map(cur.map(it => [it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex), it]));
+          const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(l) : new Map();
+          const clearedAt = global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0;
+
+          incoming.forEach(it => {
+            if (clearedAt > 0 && (it.updatedAt || 0) <= clearedAt) it.updatedAt = now;
+            const k = it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex);
+            tombMap.delete(`id:${it.id}`);
+            tombMap.delete(`wk:${k}`);
+            const normW = String(it.word || '').trim().toLowerCase();
+            if (normW) tombMap.delete(`word:${normW}`);
+            const ex = curMap.get(k);
+            if (!ex) added++;
+            else if ((it.updatedAt || 0) > (ex.updatedAt || 0)) updated++;
+            else skipped++;
+          });
+
+          if (global.VocabStorage) global.VocabStorage.saveTombstones(l, tombMap);
+          const mergeFn = global.VocabStorage?.mergeWords || global.mergeWords;
+          const merged = mergeFn ? mergeFn(cur, incoming, l, true) : incoming;
+          if (ctx.setJson) ctx.setJson(storageKey, merged, true, true);
+          if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = merged;
+          if (storageKey === ctx.activePairKey && typeof ctx.setActiveEntries === 'function') {
+            ctx.setActiveEntries(merged);
+          }
+        });
+
+        if (!added && !updated && !skipped) throw new Error('有効な単語エントリが1件も含まれていません。');
+        if (typeof ctx.onComplete === 'function') ctx.onComplete({ added, updated, skipped });
+        if (typeof alert === 'function') alert(`JSONインポート完了\n・新規追加: ${added} 語\n・更新: ${updated} 語\n・既存維持(スキップ): ${skipped} 語`);
+      } catch (err) {
+        if (typeof alert === 'function') alert(`JSON読込失敗: ${err.message}`);
+      } finally {
+        if (ev.target) ev.target.value = '';
+      }
+    };
+    r.readAsText(f);
+  }
+
   // --- グローバルエクスポート ---
   global.VocabExport = {
     dlBlob,
     formatMeaningAndEty,
     exportAnkiTSV,
     exportObsidianMarkdown,
-    exportFullJSON
+    exportFullJSON,
+    importJSON
   };
 })(typeof window !== 'undefined' ? window : globalThis);

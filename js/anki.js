@@ -34,19 +34,25 @@
    */
   function getRetrievability(e, now = Date.now()) {
     if (!e || !e.nextReview || !e.interval) return 1.0;
-    const lastReview = Number(e.reviewUpdatedAt || (e.nextReview - e.interval * 86400000));
-    const elapsedDays = Math.max(0, (now - lastReview) / 86400000);
-    const s = Math.max(0.1, Number(e.stability) || Number(e.interval) || 1.0);
-    return Math.pow(1 + FACTOR * (elapsedDays / s), DECAY);
+    const nowTs = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+    const rawLast = Number(e.reviewUpdatedAt || (e.nextReview - e.interval * 86400000));
+    const lastReview = Number.isFinite(rawLast) ? rawLast : nowTs;
+    const elapsedDays = Math.max(0, (nowTs - lastReview) / 86400000);
+    const rawS = Number(e.stability) || Number(e.interval) || 1.0;
+    const s = Number.isFinite(rawS) && rawS > 0 ? Math.max(0.1, rawS) : 1.0;
+    const r = Math.pow(1 + FACTOR * (elapsedDays / s), DECAY);
+    return Number.isFinite(r) ? Math.max(0.0, Math.min(1.0, r)) : 1.0;
   }
 
   /**
    * FSRS-4.5 & SM-2 ハイブリッド復習間隔予測
    */
   function predDays(e, rating) {
-    const s = Math.max(0.1, Number(e.stability) || Number(e.interval) || 1.0);
-    const d = Math.max(1, Math.min(10, Number(e.difficulty) || 5.0));
-    const anchorBonus = getEtymologyAnchorBonus(e);
+    const rawS = Number(e?.stability) || Number(e?.interval) || 1.0;
+    const s = Number.isFinite(rawS) && rawS > 0 ? Math.max(0.1, rawS) : 1.0;
+    const rawD = Number(e?.difficulty);
+    const d = Number.isFinite(rawD) ? Math.max(1.0, Math.min(10.0, rawD)) : 5.0;
+    const anchorBonus = Number.isFinite(getEtymologyAnchorBonus(e)) ? getEtymologyAnchorBonus(e) : 1.0;
 
     if (rating === 0) { // Again (もう一度)
       return 0; // 即時・1分後
@@ -56,22 +62,25 @@
     if (rating === 1) { // Hard (難しい)
       nextS = s * Math.max(1.1, (1.2 - 0.05 * d)) * anchorBonus;
     } else if (rating === 2) { // Good (普通)
-      if (!e.repetition) {
+      if (!e?.repetition) {
         nextS = 2.5 * anchorBonus;
       } else {
         nextS = s * (1 + Math.exp(1.5) * Math.pow(d, -0.4) * Math.pow(s, -0.1)) * anchorBonus;
       }
     } else { // Easy (簡単)
-      if (!e.repetition) {
+      if (!e?.repetition) {
         nextS = 5.0 * anchorBonus;
       } else {
         nextS = s * (1 + Math.exp(2.0) * Math.pow(d, -0.4) * Math.pow(s, -0.1) * 1.3) * anchorBonus;
       }
     }
 
+    if (!Number.isFinite(nextS) || nextS <= 0) nextS = 1.0;
+
     // 目標定着率 90% に基づくインターバル計算
     const intervalDays = (nextS / FACTOR) * (Math.pow(REQUEST_RETENTION, 1 / DECAY) - 1);
-    return Math.max(1, Math.min(MAX_INTERVAL_DAYS, intervalDays));
+    const finalDays = Number.isFinite(intervalDays) ? intervalDays : 1.0;
+    return Math.max(1, Math.min(MAX_INTERVAL_DAYS, finalDays));
   }
 
   /**
@@ -94,13 +103,12 @@
   function calculateNextReview(e, rating) {
     const now = Date.now();
     let nextInterval = 0;
-    let nextRepetition = Number(e.repetition) || 0;
-    let nextEfactor = Number(e.efactor) || 2.5;
-    let curDifficulty = Number(e.difficulty) || 5.0;
-    let curStability = Number(e.stability) || Number(e.interval) || 1.0;
+    let nextRepetition = (Number.isFinite(Number(e?.repetition)) && Number(e.repetition) >= 0) ? Number(e.repetition) : 0;
+    let nextEfactor = (Number.isFinite(Number(e?.efactor)) && Number(e.efactor) >= 1.3) ? Number(e.efactor) : 2.5;
+    let curDifficulty = (Number.isFinite(Number(e?.difficulty)) && Number(e.difficulty) >= 1.0) ? Number(e.difficulty) : 5.0;
+    const rawS = Number(e?.stability) || Number(e?.interval) || 1.0;
+    let curStability = (Number.isFinite(rawS) && rawS > 0) ? rawS : 1.0;
     let nextReviewDate = now;
-
-    const anchorBonus = getEtymologyAnchorBonus(e);
 
     // Difficulty D 更新 (1〜10)
     const diffDelta = rating === 0 ? 1.2 : rating === 1 ? 0.6 : rating === 2 ? -0.2 : -0.8;
@@ -115,7 +123,8 @@
     } else {
       const baseDays = predDays(e, rating);
       const fuzz = baseDays >= 2 ? (0.97 + Math.random() * 0.06) : 1; // 間隔の適度な分散
-      nextInterval = Number(Math.min(MAX_INTERVAL_DAYS, Math.max(1.0, baseDays * fuzz)).toFixed(2));
+      const computedInterval = Number.isFinite(baseDays * fuzz) ? baseDays * fuzz : 1.0;
+      nextInterval = Number(Math.min(MAX_INTERVAL_DAYS, Math.max(1.0, computedInterval)).toFixed(2));
       curStability = Number(nextInterval.toFixed(2));
 
       // SM-2 互換パラメータの同期
@@ -123,6 +132,8 @@
       if (rating >= 2) nextRepetition++;
       nextReviewDate = now + Math.round(nextInterval * 86400000);
     }
+
+    if (!Number.isFinite(nextReviewDate)) nextReviewDate = now + 86400000;
 
     const currentR = getRetrievability({ ...e, stability: curStability, interval: nextInterval, nextReview: nextReviewDate }, now);
 
@@ -132,7 +143,7 @@
       efactor: nextEfactor,
       stability: curStability,
       difficulty: nextDifficulty,
-      retrievability: Number(currentR.toFixed(3)),
+      retrievability: Number((Number.isFinite(currentR) ? currentR : 1.0).toFixed(3)),
       nextReview: nextReviewDate,
       updatedAt: now,
       reviewUpdatedAt: now
@@ -172,13 +183,20 @@
     } catch {}
   }
 
+  const MAX_OFFLINE_QUEUE_LEN = 500;
+
   function queueOfflineReview(record) {
+    if (!record || typeof record !== 'object') return;
     const q = getOfflineQueue();
-    q.push({
+    // 同一単語の連続復習は最新を優先
+    const filtered = q.filter(r => !(r.id && record.id && r.id === record.id));
+    filtered.push({
       ...record,
       queuedAt: Date.now()
     });
-    saveOfflineQueue(q);
+    // 最大 500 件にクリッピングしてストレージのパンクを防止 (FIFO)
+    const capped = filtered.length > MAX_OFFLINE_QUEUE_LEN ? filtered.slice(-MAX_OFFLINE_QUEUE_LEN) : filtered;
+    saveOfflineQueue(capped);
   }
 
   function updateOfflineBadgeUI() {
@@ -372,6 +390,10 @@
 
     cardEl.addEventListener('touchend', onEnd, { passive: true });
     cardEl.addEventListener('touchcancel', resetCardState, { passive: true });
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('blur', resetCardState, { passive: true });
+    }
 
     // マウスドラッグ対応 (動的リスナー登録でリーク防止)
     const onDocMouseMove = e => {

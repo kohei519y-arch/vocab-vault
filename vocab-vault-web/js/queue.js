@@ -57,7 +57,7 @@
   function syncPersistedQueue() {
     try {
       const qList = global.App?.reqQueue || [];
-      const activeQueue = qList.filter(q => !q.isCancelled && !q.isDone).map(({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }) => ({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }));
+      const activeQueue = qList.filter(q => !q.isCancelled && !q.isDone && !q.isFailed).map(({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }) => ({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }));
       if (global.lsSet) global.lsSet('vv_pending_queue', JSON.stringify(activeQueue));
       else if (typeof localStorage !== 'undefined') localStorage.setItem('vv_pending_queue', JSON.stringify(activeQueue));
     } catch {}
@@ -73,7 +73,14 @@
       if (Array.isArray(saved) && saved.length) {
         if (global.lsSet) global.lsSet('vv_pending_queue', '[]');
         else if (typeof localStorage !== 'undefined') localStorage.setItem('vv_pending_queue', '[]');
-        saved.forEach(t => { if (Array.isArray(t?.items) && t.items.length) enqueueTask(t); });
+        saved.forEach(t => {
+          if (t && typeof t === 'object' && Array.isArray(t.items) && t.items.length) {
+            const validItems = t.items.filter(it => it && typeof it === 'object' && it.word);
+            if (validItems.length) {
+              enqueueTask({ ...t, items: validItems });
+            }
+          }
+        });
       }
     } catch {}
   }
@@ -174,6 +181,19 @@
   function submitW() {
     const App = global.App || {};
     if (App.isComposing) return;
+
+    const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
+    let raw = $('inWord')?.value?.trim() || '';
+    if (!raw) return;
+
+    // 同一単語の連続連打（Rapid identical submission）による多重登録レースコンディション防止
+    const now = Date.now();
+    if (App._lastSubmitWord === raw && App._lastSubmitTs && (now - App._lastSubmitTs < 400)) {
+      return;
+    }
+    App._lastSubmitWord = raw;
+    App._lastSubmitTs = now;
+
     const getKeyFn = global.getKey || (() => '');
     if (!App.isDev && App.quotaRemaining === 0 && !getKeyFn() && global.VocabSync?.isCloudReady?.()) {
       if (global.openUpsellModal) {
@@ -182,9 +202,12 @@
       return;
     }
 
-    const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
-    const f = $('inFol')?.value?.trim() || '', raw = $('inWord')?.value?.trim() || '';
-    if (!raw) return;
+    // 長大文字列（誤貼付など）のDoS防護
+    if (raw.length > 2000) {
+      if (global.showToast) global.showToast('入力文字数が上限(2000文字)を超えているため、先頭部分のみ処理します', 'info');
+      raw = raw.slice(0, 2000).trim();
+    }
+    const f = $('inFol')?.value?.trim() || '';
 
     const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
     const parseSpecFn = global.VocabMorphology?.parseInputWordSpec || global.parseInputWordSpec || (w => ({ cleanWord: w, homographIndex: 1, senseHint: '' }));
@@ -241,24 +264,57 @@
     const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
 
     try {
-      while (App.reqQueue.length) {
-        const t = App.reqQueue[0];
-        if (!t.isCancelled) {
-          // もしカードがDOM内に見当たらない場合（再描画直後等）は安全に最前面に再アタッチして進捗表示を維持
-          if (t.card && typeof document !== 'undefined' && !document.body.contains(t.card) && $('list')) {
-            $('list').prepend(t.card);
+      while (true) {
+        // キャンセルされたタスクのカード除去とキュー掃除
+        App.reqQueue = (App.reqQueue || []).filter(q => {
+          if (q.isCancelled) {
+            q.card?.remove?.();
+            return false;
           }
-          await executeBatch(t);
+          return true;
+        });
+
+        // 次に処理可能なタスク（未キャンセル・未完了・未失敗）を検索
+        const nextIdx = App.reqQueue.findIndex(q => !q.isCancelled && !q.isDone && !q.isFailed);
+        if (nextIdx === -1) {
+          // 実行可能なタスクがない場合は終了
+          break;
         }
+
+        const t = App.reqQueue[nextIdx];
+        // もしカードがDOM内に見当たらない場合（再描画直後等）は安全に最前面に再アタッチして進捗表示を維持
+        if (t.card && typeof document !== 'undefined' && !document.body.contains(t.card) && $('list')) {
+          $('list').prepend(t.card);
+        }
+
+        let ok = false;
+        try {
+          ok = await executeBatch(t);
+        } catch {
+          ok = false;
+        }
+
+        if (!ok) {
+          t.isFailed = true;
+          t.isDone = false;
+          syncPersistedQueue();
+          // 先頭詰まり(Head-of-Line Blocking)を回避: 失敗タスクは保留にし、後続タスクを継続処理
+          continue;
+        }
+
         t.isDone = true;
         if (t.card && !t.card.classList?.contains('gen-err') && !t.card.querySelector?.('[data-act="retry-batch"]')) {
           t.card.remove?.();
         }
-        App.reqQueue.shift();
+        const doneIdx = App.reqQueue.indexOf(t);
+        if (doneIdx !== -1) App.reqQueue.splice(doneIdx, 1);
         syncPersistedQueue();
-        if (App.reqQueue.length) await new Promise(r => setTimeout(r, 600));
+
+        if (App.reqQueue.some(q => !q.isCancelled && !q.isDone && !q.isFailed)) {
+          await new Promise(r => setTimeout(r, 600));
+        }
       }
-      if (!App.reqQueue.length && $('list')) {
+      if (!App.reqQueue.some(q => !q.isDone) && $('list')) {
         $('list').querySelectorAll('.loading-card').forEach(c => {
           if (!c.classList.contains('gen-err') && !c.querySelector('[data-act="retry-batch"]')) c.remove();
         });
@@ -373,16 +429,36 @@ etymology:${eInst}`;
 
     const getKeyFn = global.getKey || (() => '');
     const callGeminiFn = global.VocabDictionary?.callGemini || global.callGemini;
-    const parseApiJsonFn = global.parseApiJson || (async res => typeof res === 'string' ? JSON.parse(res) : res?.candidates?.[0]?.content?.parts?.[0]?.text ? JSON.parse(res.candidates[0].content.parts[0].text) : res);
+    const parseApiJsonFn = global.VocabDictionary?.parseApiJson || global.parseApiJson || (async res => {
+      if (typeof res === 'string') {
+        try { return JSON.parse(res); } catch {}
+      }
+      if (res && typeof res.text === 'function') {
+        try {
+          const txt = await res.text();
+          const json = JSON.parse(txt);
+          const cand = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (cand) return JSON.parse(cand.replace(/^```json/i, '').replace(/```$/i, '').trim());
+          return json;
+        } catch {}
+      }
+      if (res?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        try {
+          return JSON.parse(res.candidates[0].content.parts[0].text.replace(/^```json/i, '').replace(/```$/i, '').trim());
+        } catch {}
+      }
+      return Array.isArray(res) ? res : [];
+    });
     const genInternalFn = global.VocabDictionary?.generateWithInternalAI || global.generateWithInternalAI;
     const builtinKnowledge = global.VocabDictionary?.BUILTIN_ETYMOLOGY_KNOWLEDGE || global.BUILTIN_ETYMOLOGY_KNOWLEDGE || { roots: {}, historical: {} };
+    const schema = global.VocabDictionary?.RESPONSE_SCHEMA || global.RESPONSE_SCHEMA;
 
     try {
       let returnedList = [], usedModel = '';
       const customKey = getKeyFn();
       if (customKey && callGeminiFn) {
         if (stEl) stEl.textContent = 'カスタムBYOKキーでAI生成中...';
-        const res = await callGeminiFn(sys, `対象語(${items.length}件):${JSON.stringify(payload)}${fName ? `\n分野:${fName}` : ''}`, customKey, stEl, global.RESPONSE_SCHEMA, useHist);
+        const res = await callGeminiFn(sys, `対象語(${items.length}件):${JSON.stringify(payload)}${fName ? `\n分野:${fName}` : ''}`, customKey, stEl, schema, useHist);
         const rawArr = await parseApiJsonFn(res);
         returnedList = Array.isArray(rawArr) ? rawArr : [rawArr];
         usedModel = res.usedModel || 'gemini-custom';
@@ -404,28 +480,22 @@ etymology:${eInst}`;
             if (global.updCloudUI) global.updCloudUI();
           }
         } catch (proxyErr) {
-          console.warn('[Proxy Fallback]', proxyErr);
+          console.warn('[Proxy Fallback] Switching to built-in knowledge engine:', proxyErr?.message || proxyErr);
           if (proxyErr.isQuotaExceeded || proxyErr.status === 429) {
-            if (global.openUpsellModal) global.openUpsellModal(proxyErr.message || '本日のAI新規生成無料枠に達しました。');
-            card?.remove?.();
-            syncPersistedQueue();
-            return;
+            if (global.showToast) global.showToast('クラウドAI枠上限のため、内蔵AIエンジン(完全機密・オフライン)で自動生成します', 'info', 4000);
           }
 
-          // 内蔵ナレッジベースに真の語根情報が存在するか判定
-          const hasBuiltinRoots = payload.some(it => {
-            const w = String(it.reqWord || it.word || '').toLowerCase();
-            return builtinKnowledge.historical?.[w] || Object.values(builtinKnowledge.roots || {}).some(r => r.words?.includes(w));
-          });
-
-          if (hasBuiltinRoots && genInternalFn) {
-            if (stEl) stEl.textContent = '内蔵ナレッジベースで生成中...';
+          // クラウドプロキシ未稼働時・オフライン時・クォータ到達時は内蔵エンジン (Wiktionary & 組み込み語源ナレッジ & 形態素合成) へシームレスにフォールバック
+          if (genInternalFn) {
+            if (stEl) stEl.textContent = '内蔵AIエンジン (完全機密保護) で生成中...';
             const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
-            returnedList = internalRes.items;
-            usedModel = internalRes.usedModel || 'builtin-ai-internal';
-          } else {
-            // 未知語は無意味なダミーカードを保存せず、明快なエラーUIと再試行ボタンを提示
-            if (global.showToast) global.showToast(proxyErr.message || 'AIサーバー接続エラーが発生しました。「再試行」をお試しください。', 'err', 5000);
+            returnedList = Array.isArray(internalRes?.items) ? internalRes.items : [];
+            usedModel = internalRes?.usedModel || 'builtin-ai-internal';
+          }
+
+          if (!returnedList.length) {
+            // 万一内蔵エンジンでも1件も生成できなかった場合のみエラーUIを提示
+            if (global.showToast) global.showToast(proxyErr.message || 'AI生成エラーが発生しました。「再試行」をお試しください。', 'err', 5000);
             if (card) {
               card.className = 'card gen-err';
               card.dataset.retryItems = JSON.stringify(items);
@@ -438,7 +508,7 @@ etymology:${eInst}`;
               card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(proxyErr.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
             }
             syncPersistedQueue();
-            return;
+            return false;
           }
         }
       } else if (genInternalFn) {
@@ -447,6 +517,22 @@ etymology:${eInst}`;
         const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
         returnedList = internalRes.items;
         usedModel = internalRes.usedModel || 'builtin-ai-internal';
+      }
+
+      if (!returnedList || !returnedList.length) {
+        if (card) {
+          card.className = 'card gen-err';
+          card.dataset.retryItems = JSON.stringify(items);
+          card.dataset.fName = fName || '';
+          card.dataset.useHist = useHist ? '1' : '0';
+          card.dataset.useWikt = useWikt ? '1' : '0';
+          card.dataset.srcLang = sLang;
+          card.dataset.tgtLang = tLang;
+          card.dataset.pairKey = saveKey;
+          card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">エントリの取得に失敗しました</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
+        }
+        syncPersistedQueue();
+        return false;
       }
 
       if (useWikt && fetchWiktFn) {
@@ -460,13 +546,16 @@ etymology:${eInst}`;
         }));
       }
 
-      const cur = [...(global.getJson ? global.getJson(saveKey) : [])], tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(saveKey) : new Map();
+      const getJsonFn = global.VocabCore?.getJson || global.getJson || global.VocabStorage?.getJson;
+      const cur = [...(getJsonFn ? getJsonFn(saveKey) : [])], tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(saveKey) : new Map();
       let maxNum = cur.reduce((m, i) => Math.max(m, i.num || 0), 0);
       const now = Date.now(), gen = { model: usedModel, pv: global.PROMPT_VERSION || 1, at: now }, matchedIndices = new Set();
-      const sanitizeItemFn = global.sanitizeItem || (x => x);
+      const sanitizeItemFn = global.VocabStorage?.sanitizeItem || global.sanitizeItem || (x => x);
       const verifyWiktFn = global.VocabDictionary?.verifyWiktGrounding || global.verifyWiktGrounding;
-      const validateEntryFn = global.validateEntry || (() => []);
+      const validateEntryFn = global.VocabMorphology?.validateEntry || global.validateEntry || (() => []);
       const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
+      const setJsonFn = global.VocabCore?.setJson || global.setJson || global.VocabStorage?.setJson;
+      const loadFn = global.VocabCore?.load || global.load || global.VocabListView?.load;
 
       returnedList.forEach((raw, rIdx) => {
         if (!raw) return;
@@ -517,14 +606,54 @@ etymology:${eInst}`;
       });
 
       if (global.VocabStorage) global.VocabStorage.saveTombstones(saveKey, tombMap);
-      if (global.setJson) global.setJson(saveKey, cur.map((it, i) => ({ ...it, num: i + 1 })), false, true);
+      if (setJsonFn) setJsonFn(saveKey, cur.map((it, i) => ({ ...it, num: i + 1 })), false, true);
 
       const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
       const missingItems = items.filter((_, i) => !matchedIndices.has(i));
       if (missingItems.length > 0) {
-        if (card?.dataset) {
+        if (card) {
+          card.className = 'card gen-err';
+          if (card.dataset) {
+            Object.assign(card.dataset, {
+              retryItems: JSON.stringify(missingItems),
+              fName: fName || '',
+              useHist: useHist ? '1' : '0',
+              useWikt: useWikt ? '1' : '0',
+              srcLang: sLang,
+              tgtLang: tLang,
+              pairKey: saveKey
+            });
+          }
+          const loadEl = card.querySelector ? card.querySelector('.load') : null;
+          if (loadEl) loadEl.innerHTML = `<span style="color:var(--warn)">未取得の語があります (${missingItems.map(x => esc(x.word)).join(', ')})</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">失敗分を再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
+        }
+        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
+        return false;
+      } else {
+        if (task) task.isDone = true;
+        if (card) card.remove?.();
+        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
+        return true;
+      }
+    } catch (err) {
+      if (err.isQuotaExceeded || err.status === 429 || (err.message && (err.message.includes('上限') || err.message.includes('クォータ')))) {
+        card?.remove?.();
+        if (global.openUpsellModal) global.openUpsellModal(err.message || '今月のAI新規生成無料枠（30語）に達しました。');
+        if (task) task.isDone = true;
+        return true;
+      }
+      if (err.code === 'MAX_TOKENS' && items.length > 1) {
+        const h = Math.ceil(items.length / 2);
+        card?.remove?.();
+        if (task) task.isDone = true;
+        [items.slice(0, h), items.slice(h)].forEach(part => enqueueTask({ items: part, fName, useHist, useWikt, targetLang: sLang, srcLang: sLang, tgtLang: tLang, pairKey: saveKey }));
+        return true;
+      }
+      if (card) {
+        card.className = 'card gen-err';
+        if (card.dataset) {
           Object.assign(card.dataset, {
-            retryItems: JSON.stringify(missingItems),
+            retryItems: JSON.stringify(items),
             fName: fName || '',
             useHist: useHist ? '1' : '0',
             useWikt: useWikt ? '1' : '0',
@@ -532,40 +661,10 @@ etymology:${eInst}`;
             tgtLang: tLang,
             pairKey: saveKey
           });
-          const loadEl = card.querySelector ? card.querySelector('.load') : null;
-          if (loadEl) loadEl.innerHTML = `<span style="color:var(--warn)">未取得の語があります (${missingItems.map(x => esc(x.word)).join(', ')})</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">失敗分を再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
         }
-        if ($('anki')?.style.display !== 'block' && global.load) global.load(1);
-      } else {
-        if (task) task.isDone = true;
-        if (card) card.remove?.();
-        if ($('anki')?.style.display !== 'block' && global.load) global.load(1);
+        card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(err.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
       }
-    } catch (err) {
-      if (err.isQuotaExceeded || err.status === 429 || (err.message && (err.message.includes('上限') || err.message.includes('クォータ')))) {
-        card?.remove?.();
-        if (global.openUpsellModal) global.openUpsellModal(err.message || '今月のAI新規生成無料枠（30語）に達しました。');
-        return;
-      }
-      if (err.code === 'MAX_TOKENS' && items.length > 1) {
-        const h = Math.ceil(items.length / 2);
-        card?.remove?.();
-        [items.slice(0, h), items.slice(h)].forEach(part => enqueueTask({ items: part, fName, useHist, useWikt, targetLang: sLang, srcLang: sLang, tgtLang: tLang, pairKey: saveKey }));
-        return;
-      }
-      if (card?.dataset) {
-        Object.assign(card.dataset, {
-          retryItems: JSON.stringify(items),
-          fName: fName || '',
-          useHist: useHist ? '1' : '0',
-          useWikt: useWikt ? '1' : '0',
-          srcLang: sLang,
-          tgtLang: tLang,
-          pairKey: saveKey
-        });
-        const loadEl = card.querySelector ? card.querySelector('.load') : null;
-        if (loadEl) loadEl.innerHTML = `<span style="color:var(--r)">${esc(err.message)}</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
-      }
+      return false;
     }
   }
 

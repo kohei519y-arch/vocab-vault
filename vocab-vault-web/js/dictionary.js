@@ -253,16 +253,64 @@
     if (!wRef?.extract || !wRef?.url) return false;
     const extFold = foldAscii(wRef.extract);
     if (extFold.length < 20) return false;
-    if ((item.etymologyTags || []).some(t => matchRootInText(t, extFold))) return true;
-    return /etymology|etymologie|herkunft|from |latin|greek|proto-/.test(extFold) || Boolean(wRef.ipa && item.phonetic && cleanPho(item.phonetic) === wRef.ipa);
+
+    // 1. 語根タグ（*sta-, *bher- 等）がWiktionary本文に実在するか照合
+    if (Array.isArray(item.etymologyTags) && item.etymologyTags.length > 0) {
+      if (item.etymologyTags.some(t => matchRootInText(t, extFold))) return true;
+    }
+
+    // 2. 語源解説（etymology）内に登場する再構形・借用語・原義語根がWiktionary本文と一致するか照合
+    const etyText = foldAscii(item.etymology || '');
+    if (etyText.length > 5) {
+      // 再構形（*...）の照合
+      const reconstructedStems = etyText.match(/\*[\p{L}\p{M}0-9₁₂₃₄ḱǵʷʰ-]+/gu);
+      if (reconstructedStems && reconstructedStems.some(stem => extFold.includes(stem.toLowerCase()))) {
+        return true;
+      }
+      // 単語の見出し語自身と異なる具体的祖語・借用元語（例: epiphaneia, stationem など）の照合
+      const foreignTokens = etyText.match(/[a-z]{4,}/g);
+      const headwordFold = foldAscii(item.word || '').toLowerCase();
+      if (foreignTokens) {
+        const significant = foreignTokens.filter(tok => tok !== headwordFold && !['from', 'with', 'that', 'this', 'into', 'have', 'been', 'word', 'root', 'term', 'etymology'].includes(tok));
+        if (significant.some(tok => extFold.includes(tok))) {
+          return true;
+        }
+      }
+    }
+
+    // 3. 発音（IPA）がWiktionaryの公式発音と一致するか照合
+    if (wRef.ipa && item.phonetic && cleanPho(item.phonetic) === wRef.ipa) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
    * AI APIレスポンスJSONの厳密なサニタイズ＆パース
    */
   async function parseApiJson(r) {
-    const data = await r.json(), cand = data.candidates?.[0];
-    if (!cand) throw new Error(data.promptFeedback?.blockReason ? `入力がブロックされました (${data.promptFeedback.blockReason})` : 'AIから有効な候補が返されませんでした。');
+    if (!r) return [];
+    let data;
+    if (typeof r === 'string') {
+      try {
+        const direct = JSON.parse(r);
+        if (Array.isArray(direct)) return direct;
+        data = direct;
+      } catch {
+        data = { candidates: [{ content: { parts: [{ text: r }] } }] };
+      }
+    } else if (r && typeof r.json === 'function') {
+      data = await r.json();
+    } else if (r && typeof r.text === 'function') {
+      data = JSON.parse(await r.text());
+    } else {
+      data = r;
+    }
+    if (Array.isArray(data)) return data;
+
+    const cand = data?.candidates?.[0];
+    if (!cand) throw new Error(data?.promptFeedback?.blockReason ? `入力がブロックされました (${data.promptFeedback.blockReason})` : 'AIから有効な候補が返されませんでした。');
     const reason = cand.finishReason;
     if (reason && reason !== 'STOP') {
       if (reason === 'MAX_TOKENS') { const er = new Error('AI応答が最大トークン数に達し途中で切れました。'); er.code = 'MAX_TOKENS'; throw er; }
@@ -271,14 +319,22 @@
     const rawText = (cand.content?.parts || []).map(p => p.text || '').join('').trim();
     if (!rawText) throw new Error(`AI応答が空でした (finishReason: ${reason || 'UNKNOWN'})`);
     const cleaned = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+    const repairJson = str => str
+      .replace(/,\s*([\]\}])/g, '$1') // 末尾カンマ修復
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, ''); // 制御文字除去
+
     try { return JSON.parse(cleaned); } catch {
+      try { return JSON.parse(repairJson(cleaned)); } catch {}
       const arrM = cleaned.match(/\[[\s\S]*\]/);
       if (arrM) {
         try { return JSON.parse(arrM[0]); } catch {}
+        try { return JSON.parse(repairJson(arrM[0])); } catch {}
       }
       const objM = cleaned.match(/\{[\s\S]*\}/);
       if (objM) {
         try { return JSON.parse(objM[0]); } catch {}
+        try { return JSON.parse(repairJson(objM[0])); } catch {}
       }
       throw new Error('AI応答のJSON解析に失敗しました。');
     }
@@ -405,25 +461,61 @@
   }
 
   /**
-   * Gemini API 利用可能モデル一覧の取得
+   * Gemini API 利用可能モデル一覧の取得 (1時間TTLキャッシュ)
    */
   const EXCLUDE_MODELS = ['tts', 'image', 'vision', 'embedding', 'aqa', 'audio', 'learnlm', 'robotics'];
+  let _cachedModels = null;
+  let _cachedModelsTs = 0;
+  const MODELS_CACHE_TTL = 3600000; // 1時間
+
   async function fetchModels(key) {
     if (!key) return [];
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': key } });
-    if (!res.ok) throw new Error(`APIキーが無効か通信エラーです (HTTP ${res.status})。`);
-    const valid = ((await res.json()).models || [])
-      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map(m => m.name.replace(/^models\//, ''))
-      .filter(n => { const low = n.toLowerCase(); return low.startsWith('gemini') && !EXCLUDE_MODELS.some(t => low.includes(t)); });
+    const now = Date.now();
+    if (_cachedModels && (now - _cachedModelsTs < MODELS_CACHE_TTL)) {
+      return _cachedModels;
+    }
+    try {
+      const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem('vv_cached_gemini_models') : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.models) && (now - parsed.ts < MODELS_CACHE_TTL)) {
+          _cachedModels = parsed.models;
+          _cachedModelsTs = parsed.ts;
+          return _cachedModels;
+        }
+      }
+    } catch {}
 
-    const scoreModel = n => {
-      const isFlashStd = n.includes('flash') && !n.includes('lite') && !n.includes('8b');
-      const ver = parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || '0');
-      return (isFlashStd ? 400 : n.includes('lite') ? 300 : 100) + ver * 10 - (/preview|-exp/.test(n) ? 60 : 0);
-    };
-    valid.sort((a, b) => scoreModel(b) - scoreModel(a));
-    return valid;
+    try {
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': key } });
+      if (res.ok) {
+        const json = await res.json();
+        const valid = (json.models || [])
+          .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+          .map(m => m.name.replace(/^models\//, ''))
+          .filter(n => { const low = n.toLowerCase(); return low.startsWith('gemini') && !EXCLUDE_MODELS.some(t => low.includes(t)); });
+
+        const scoreModel = n => {
+          const isFlashStd = n.includes('flash') && !n.includes('lite') && !n.includes('8b');
+          const ver = parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || '0');
+          return (isFlashStd ? 400 : n.includes('lite') ? 300 : 100) + ver * 10 - (/preview|-exp/.test(n) ? 60 : 0);
+        };
+        valid.sort((a, b) => scoreModel(b) - scoreModel(a));
+        if (valid.length) {
+          _cachedModels = valid;
+          _cachedModelsTs = now;
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('vv_cached_gemini_models', JSON.stringify({ ts: now, models: valid }));
+            }
+          } catch {}
+          return valid;
+        }
+      }
+    } catch (e) {
+      console.warn('[fetchModels fallback]', e?.message || e);
+    }
+    return ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
   }
 
   /**
@@ -490,6 +582,10 @@
   }
 
   // --- グローバルエクスポート ---
+  global.RESPONSE_SCHEMA = RESPONSE_SCHEMA;
+  global.parseApiJson = parseApiJson;
+  global.PROMPT_VERSION = '2026-10-f';
+
   global.VocabDictionary = {
     BUILTIN_ETYMOLOGY_KNOWLEDGE,
     RESPONSE_SCHEMA,
