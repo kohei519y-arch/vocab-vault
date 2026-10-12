@@ -372,13 +372,15 @@
     };
   }
 
-  async function callVocabGenerateProxy({ lang, srcLang, tgtLang, useHist, fName, items }) {
+  async function callVocabGenerateProxy({ lang, srcLang, tgtLang, useHist, fName, folder, items, words }) {
     const cfg = getConfig();
     if (!cfg.configured) throw new Error('Supabase設定が未構成です。');
     const token = await ensureValidToken().catch(() => null);
 
     const sLang = srcLang || lang || 'en';
     const tLang = tgtLang || 'ja';
+    const finalItems = Array.isArray(items) ? items : (Array.isArray(words) ? words : []);
+    const safeFName = fName || folder || '';
 
     const headers = {
       apikey: cfg.anonKey,
@@ -394,9 +396,9 @@
         lang: sLang,
         srcLang: sLang,
         tgtLang: tLang,
-        useHist,
-        fName,
-        items
+        useHist: Boolean(useHist),
+        fName: safeFName,
+        items: finalItems
       })
     });
 

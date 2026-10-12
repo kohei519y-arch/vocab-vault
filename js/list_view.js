@@ -157,10 +157,10 @@
     const statObj = statGroups.find(g => g.id === appState.statF);
 
     const parts = [
-      appState.posF ? (posObj ? posObj.name : appState.posF) : null,
-      appState.catF || null,
-      appState.folF ? `フォルダ: ${appState.folF}` : null,
-      appState.statF ? (statObj ? statObj.name : appState.statF) : null
+      (appState.posF && appState.posF !== 'all') ? (posObj ? posObj.label || posObj.name : appState.posF) : null,
+      (appState.cat && appState.cat !== 'all') ? appState.cat : ((appState.catF && appState.catF !== 'all') ? appState.catF : null),
+      (appState.fol && appState.fol !== 'all') ? `フォルダ: ${appState.fol}` : ((appState.folF && appState.folF !== 'all') ? `フォルダ: ${appState.folF}` : null),
+      (appState.statF && appState.statF !== 'all') ? (statObj ? statObj.label || statObj.name : appState.statF) : null
     ].filter(Boolean);
 
     const titleEl = $('docTitle');

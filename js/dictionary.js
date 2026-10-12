@@ -261,8 +261,27 @@
    * AI APIレスポンスJSONの厳密なサニタイズ＆パース
    */
   async function parseApiJson(r) {
-    const data = await r.json(), cand = data.candidates?.[0];
-    if (!cand) throw new Error(data.promptFeedback?.blockReason ? `入力がブロックされました (${data.promptFeedback.blockReason})` : 'AIから有効な候補が返されませんでした。');
+    if (!r) return [];
+    let data;
+    if (typeof r === 'string') {
+      try {
+        const direct = JSON.parse(r);
+        if (Array.isArray(direct)) return direct;
+        data = direct;
+      } catch {
+        data = { candidates: [{ content: { parts: [{ text: r }] } }] };
+      }
+    } else if (r && typeof r.json === 'function') {
+      data = await r.json();
+    } else if (r && typeof r.text === 'function') {
+      data = JSON.parse(await r.text());
+    } else {
+      data = r;
+    }
+    if (Array.isArray(data)) return data;
+
+    const cand = data?.candidates?.[0];
+    if (!cand) throw new Error(data?.promptFeedback?.blockReason ? `入力がブロックされました (${data.promptFeedback.blockReason})` : 'AIから有効な候補が返されませんでした。');
     const reason = cand.finishReason;
     if (reason && reason !== 'STOP') {
       if (reason === 'MAX_TOKENS') { const er = new Error('AI応答が最大トークン数に達し途中で切れました。'); er.code = 'MAX_TOKENS'; throw er; }
@@ -410,20 +429,27 @@
   const EXCLUDE_MODELS = ['tts', 'image', 'vision', 'embedding', 'aqa', 'audio', 'learnlm', 'robotics'];
   async function fetchModels(key) {
     if (!key) return [];
-    const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': key } });
-    if (!res.ok) throw new Error(`APIキーが無効か通信エラーです (HTTP ${res.status})。`);
-    const valid = ((await res.json()).models || [])
-      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map(m => m.name.replace(/^models\//, ''))
-      .filter(n => { const low = n.toLowerCase(); return low.startsWith('gemini') && !EXCLUDE_MODELS.some(t => low.includes(t)); });
+    try {
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': key } });
+      if (res.ok) {
+        const json = await res.json();
+        const valid = (json.models || [])
+          .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+          .map(m => m.name.replace(/^models\//, ''))
+          .filter(n => { const low = n.toLowerCase(); return low.startsWith('gemini') && !EXCLUDE_MODELS.some(t => low.includes(t)); });
 
-    const scoreModel = n => {
-      const isFlashStd = n.includes('flash') && !n.includes('lite') && !n.includes('8b');
-      const ver = parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || '0');
-      return (isFlashStd ? 400 : n.includes('lite') ? 300 : 100) + ver * 10 - (/preview|-exp/.test(n) ? 60 : 0);
-    };
-    valid.sort((a, b) => scoreModel(b) - scoreModel(a));
-    return valid;
+        const scoreModel = n => {
+          const isFlashStd = n.includes('flash') && !n.includes('lite') && !n.includes('8b');
+          const ver = parseFloat(n.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] || '0');
+          return (isFlashStd ? 400 : n.includes('lite') ? 300 : 100) + ver * 10 - (/preview|-exp/.test(n) ? 60 : 0);
+        };
+        valid.sort((a, b) => scoreModel(b) - scoreModel(a));
+        if (valid.length) return valid;
+      }
+    } catch (e) {
+      console.warn('[fetchModels fallback]', e?.message || e);
+    }
+    return ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
   }
 
   /**
@@ -490,6 +516,10 @@
   }
 
   // --- グローバルエクスポート ---
+  global.RESPONSE_SCHEMA = RESPONSE_SCHEMA;
+  global.parseApiJson = parseApiJson;
+  global.PROMPT_VERSION = '2026-10-f';
+
   global.VocabDictionary = {
     BUILTIN_ETYMOLOGY_KNOWLEDGE,
     RESPONSE_SCHEMA,

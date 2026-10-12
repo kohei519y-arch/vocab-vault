@@ -303,6 +303,11 @@
     }
   }
 
+  if (global.VocabStorage) {
+    global.VocabStorage.getJson = getJson;
+    global.VocabStorage.setJson = setJson;
+  }
+
   function updateStorageStatusUI(state = 'ok', msg = '') {
     const banner = $('storageWarnBanner'), badge = $('storageBadge'), dot = $('cfgDot');
     App.storageError = (state === 'error');

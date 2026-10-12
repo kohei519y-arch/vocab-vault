@@ -373,16 +373,36 @@ etymology:${eInst}`;
 
     const getKeyFn = global.getKey || (() => '');
     const callGeminiFn = global.VocabDictionary?.callGemini || global.callGemini;
-    const parseApiJsonFn = global.parseApiJson || (async res => typeof res === 'string' ? JSON.parse(res) : res?.candidates?.[0]?.content?.parts?.[0]?.text ? JSON.parse(res.candidates[0].content.parts[0].text) : res);
+    const parseApiJsonFn = global.VocabDictionary?.parseApiJson || global.parseApiJson || (async res => {
+      if (typeof res === 'string') {
+        try { return JSON.parse(res); } catch {}
+      }
+      if (res && typeof res.text === 'function') {
+        try {
+          const txt = await res.text();
+          const json = JSON.parse(txt);
+          const cand = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (cand) return JSON.parse(cand.replace(/^```json/i, '').replace(/```$/i, '').trim());
+          return json;
+        } catch {}
+      }
+      if (res?.candidates?.[0]?.content?.parts?.[0]?.text) {
+        try {
+          return JSON.parse(res.candidates[0].content.parts[0].text.replace(/^```json/i, '').replace(/```$/i, '').trim());
+        } catch {}
+      }
+      return Array.isArray(res) ? res : [];
+    });
     const genInternalFn = global.VocabDictionary?.generateWithInternalAI || global.generateWithInternalAI;
     const builtinKnowledge = global.VocabDictionary?.BUILTIN_ETYMOLOGY_KNOWLEDGE || global.BUILTIN_ETYMOLOGY_KNOWLEDGE || { roots: {}, historical: {} };
+    const schema = global.VocabDictionary?.RESPONSE_SCHEMA || global.RESPONSE_SCHEMA;
 
     try {
       let returnedList = [], usedModel = '';
       const customKey = getKeyFn();
       if (customKey && callGeminiFn) {
         if (stEl) stEl.textContent = 'カスタムBYOKキーでAI生成中...';
-        const res = await callGeminiFn(sys, `対象語(${items.length}件):${JSON.stringify(payload)}${fName ? `\n分野:${fName}` : ''}`, customKey, stEl, global.RESPONSE_SCHEMA, useHist);
+        const res = await callGeminiFn(sys, `対象語(${items.length}件):${JSON.stringify(payload)}${fName ? `\n分野:${fName}` : ''}`, customKey, stEl, schema, useHist);
         const rawArr = await parseApiJsonFn(res);
         returnedList = Array.isArray(rawArr) ? rawArr : [rawArr];
         usedModel = res.usedModel || 'gemini-custom';
@@ -404,28 +424,22 @@ etymology:${eInst}`;
             if (global.updCloudUI) global.updCloudUI();
           }
         } catch (proxyErr) {
-          console.warn('[Proxy Fallback]', proxyErr);
+          console.warn('[Proxy Fallback] Switching to built-in knowledge engine:', proxyErr?.message || proxyErr);
           if (proxyErr.isQuotaExceeded || proxyErr.status === 429) {
-            if (global.openUpsellModal) global.openUpsellModal(proxyErr.message || '本日のAI新規生成無料枠に達しました。');
-            card?.remove?.();
-            syncPersistedQueue();
-            return;
+            if (global.showToast) global.showToast('クラウドAI枠上限のため、内蔵AIエンジン(完全機密・オフライン)で自動生成します', 'info', 4000);
           }
 
-          // 内蔵ナレッジベースに真の語根情報が存在するか判定
-          const hasBuiltinRoots = payload.some(it => {
-            const w = String(it.reqWord || it.word || '').toLowerCase();
-            return builtinKnowledge.historical?.[w] || Object.values(builtinKnowledge.roots || {}).some(r => r.words?.includes(w));
-          });
-
-          if (hasBuiltinRoots && genInternalFn) {
-            if (stEl) stEl.textContent = '内蔵ナレッジベースで生成中...';
+          // クラウドプロキシ未稼働時・オフライン時・クォータ到達時は内蔵エンジン (Wiktionary & 組み込み語源ナレッジ & 形態素合成) へシームレスにフォールバック
+          if (genInternalFn) {
+            if (stEl) stEl.textContent = '内蔵AIエンジン (完全機密保護) で生成中...';
             const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
-            returnedList = internalRes.items;
-            usedModel = internalRes.usedModel || 'builtin-ai-internal';
-          } else {
-            // 未知語は無意味なダミーカードを保存せず、明快なエラーUIと再試行ボタンを提示
-            if (global.showToast) global.showToast(proxyErr.message || 'AIサーバー接続エラーが発生しました。「再試行」をお試しください。', 'err', 5000);
+            returnedList = Array.isArray(internalRes?.items) ? internalRes.items : [];
+            usedModel = internalRes?.usedModel || 'builtin-ai-internal';
+          }
+
+          if (!returnedList.length) {
+            // 万一内蔵エンジンでも1件も生成できなかった場合のみエラーUIを提示
+            if (global.showToast) global.showToast(proxyErr.message || 'AI生成エラーが発生しました。「再試行」をお試しください。', 'err', 5000);
             if (card) {
               card.className = 'card gen-err';
               card.dataset.retryItems = JSON.stringify(items);
@@ -460,13 +474,16 @@ etymology:${eInst}`;
         }));
       }
 
-      const cur = [...(global.getJson ? global.getJson(saveKey) : [])], tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(saveKey) : new Map();
+      const getJsonFn = global.VocabCore?.getJson || global.getJson || global.VocabStorage?.getJson;
+      const cur = [...(getJsonFn ? getJsonFn(saveKey) : [])], tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(saveKey) : new Map();
       let maxNum = cur.reduce((m, i) => Math.max(m, i.num || 0), 0);
       const now = Date.now(), gen = { model: usedModel, pv: global.PROMPT_VERSION || 1, at: now }, matchedIndices = new Set();
-      const sanitizeItemFn = global.sanitizeItem || (x => x);
+      const sanitizeItemFn = global.VocabStorage?.sanitizeItem || global.sanitizeItem || (x => x);
       const verifyWiktFn = global.VocabDictionary?.verifyWiktGrounding || global.verifyWiktGrounding;
-      const validateEntryFn = global.validateEntry || (() => []);
+      const validateEntryFn = global.VocabMorphology?.validateEntry || global.validateEntry || (() => []);
       const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
+      const setJsonFn = global.VocabCore?.setJson || global.setJson || global.VocabStorage?.setJson;
+      const loadFn = global.VocabCore?.load || global.load || global.VocabListView?.load;
 
       returnedList.forEach((raw, rIdx) => {
         if (!raw) return;
@@ -517,7 +534,7 @@ etymology:${eInst}`;
       });
 
       if (global.VocabStorage) global.VocabStorage.saveTombstones(saveKey, tombMap);
-      if (global.setJson) global.setJson(saveKey, cur.map((it, i) => ({ ...it, num: i + 1 })), false, true);
+      if (setJsonFn) setJsonFn(saveKey, cur.map((it, i) => ({ ...it, num: i + 1 })), false, true);
 
       const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
       const missingItems = items.filter((_, i) => !matchedIndices.has(i));
@@ -535,11 +552,11 @@ etymology:${eInst}`;
           const loadEl = card.querySelector ? card.querySelector('.load') : null;
           if (loadEl) loadEl.innerHTML = `<span style="color:var(--warn)">未取得の語があります (${missingItems.map(x => esc(x.word)).join(', ')})</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">失敗分を再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
         }
-        if ($('anki')?.style.display !== 'block' && global.load) global.load(1);
+        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
       } else {
         if (task) task.isDone = true;
         if (card) card.remove?.();
-        if ($('anki')?.style.display !== 'block' && global.load) global.load(1);
+        if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
       }
     } catch (err) {
       if (err.isQuotaExceeded || err.status === 429 || (err.message && (err.message.includes('上限') || err.message.includes('クォータ')))) {
