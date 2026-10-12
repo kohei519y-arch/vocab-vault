@@ -342,333 +342,46 @@
   function lsSet(k, v) { return global.VocabStorage ? global.VocabStorage.lsSet(k, v) : (localStorage.setItem(k, v), true); }
 
   function dlBlob(parts, type, name) {
+    if (global.VocabExport && typeof global.VocabExport.dlBlob === 'function') {
+      return global.VocabExport.dlBlob(parts, type, name);
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(parts, { type }));
     a.download = name;
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    setTimeout(() => {
+      try { URL.revokeObjectURL(a.href); } catch {}
+    }, 1000);
   }
 
-  // --- 2. ネイティブ音声合成 ---
-  const SPK_SVG = `<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
-  const mkSpkBtn = (txt, l, sm = false) => txt ? `<button type="button" class="spk-btn ${sm ? 'sm' : ''}" data-act="speak" data-text="${esc(txt)}" data-lang="${esc(l)}" title="ネイティブ発音" aria-label="発音">${SPK_SVG}</button>` : '';
-
-  const JP_VOICE_TOKENS = ['ja-', 'ja_', 'jpn', 'japan', 'kyoko', 'otoya', 'haruka', 'ayumi', 'ichiro', 'sayaka', 'nanami', 'keita', 'daichi', 'mizuki', 'takumi', '日本', '日本語'];
-  const QUALITY_TOKENS = ['natural', 'online', 'neural', 'premium', 'enhanced', 'siri'];
-  const PREF_VOICE_NAMES = ['samantha', 'ava', 'allison', 'alex', 'victoria', 'daniel', 'karen', 'moira', 'serena', 'thomas', 'amelie', 'audrey', 'aurelie', 'anna', 'petra', 'marlene', 'viktor', 'google us english', 'google uk english', 'google français', 'google deutsch', 'microsoft aria', 'microsoft jenny', 'microsoft guy', 'microsoft ryan', 'microsoft sonia', 'microsoft denise', 'microsoft henri', 'microsoft katja', 'microsoft conrad'];
-
-  let voicesCache = [], bestVoiceMap = {}, speakTimer = null, activeUtter = null;
-  function loadVoices() {
-    try {
-      const vs = window.speechSynthesis?.getVoices() || [];
-      if (vs.length) { voicesCache = vs; bestVoiceMap = {}; }
-    } catch {}
-  }
-  if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+  // --- 2. ネイティブ音声合成 (js/speech.js へ分離・委譲) ---
+  const SPK_SVG = global.VocabSpeech?.SPK_SVG || `<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>`;
+  const mkSpkBtn = (txt, l, sm = false) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l, sm) : (txt ? `<button type="button" class="spk-btn ${sm ? 'sm' : ''}" data-act="speak" data-text="${esc(txt)}" data-lang="${esc(l)}" title="ネイティブ発音" aria-label="発音">${SPK_SVG}</button>` : '');
 
   function pickBestVoice(tLang) {
-    if (bestVoiceMap[tLang]) return bestVoiceMap[tLang];
-    if (!voicesCache.length) loadVoices();
-    const pref = tLang === 'fr' ? ['fr-fr', 'fr-ca'] : tLang === 'de' ? ['de-de', 'de-at'] : tLang === 'ja' ? ['ja-jp'] : ['en-us', 'en-gb'];
-    const cands = voicesCache.filter(v => {
-      const l = String(v.lang || '').replace('_', '-').toLowerCase();
-      const full = `${v.name} ${v.voiceURI} ${l}`.toLowerCase();
-      if (tLang === 'ja') return l.startsWith('ja') || JP_VOICE_TOKENS.some(tok => full.includes(tok));
-      return l.startsWith(tLang) && !JP_VOICE_TOKENS.some(tok => full.includes(tok));
-    });
-    if (!cands.length) return null;
-    const scoreVoice = v => {
-      const n = `${v.name} ${v.voiceURI}`.toLowerCase(), l = String(v.lang || '').replace('_', '-').toLowerCase();
-      let pt = l === pref[0] ? 100 : l === pref[1] ? 85 : l.startsWith(tLang + '-') ? 70 : 40;
-      if (QUALITY_TOKENS.some(tok => n.includes(tok))) pt += 50;
-      if (PREF_VOICE_NAMES.some(tok => n.includes(tok))) pt += 40;
-      if (n.includes('compact') || n.includes('espeak')) pt -= 30;
-      return pt;
-    };
-    cands.sort((a, b) => scoreVoice(b) - scoreVoice(a));
-    return (bestVoiceMap[tLang] = cands[0]);
+    if (global.VocabSpeech && typeof global.VocabSpeech.pickBestVoice === 'function') {
+      return global.VocabSpeech.pickBestVoice(tLang);
+    }
+    return null;
   }
-
-  const audioCache = new Map();
-  let currentAudioEl = null;
 
   function speakText(text, tLang = App.lang) {
-    if (!text) return;
-    const clean = String(text).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-    if (!clean) return;
-    const l = LANGS[tLang] ? tLang : App.lang;
-    const defTag = l === 'fr' ? 'fr-FR' : l === 'de' ? 'de-DE' : l === 'ja' ? 'ja-JP' : 'en-US';
-
-    if (global.VocabSRS?.triggerHaptic) {
-      global.VocabSRS.triggerHaptic('light');
+    if (global.VocabSpeech && typeof global.VocabSpeech.speakText === 'function') {
+      const rate = parseFloat(lsGet('vv_tts_rate', '0.95')) || 0.95;
+      return global.VocabSpeech.speakText(text, tLang, rate);
     }
-
-    // 停止処理
-    if (currentAudioEl) {
-      try { currentAudioEl.pause(); currentAudioEl.currentTime = 0; } catch {}
-      currentAudioEl = null;
-    }
-    clearTimeout(speakTimer);
-
-    // 短い単語（1〜2語）かつアルファベット語彙の場合、キャッシュ済みのネイティブ実録音声があれば最優先再生
-    const cacheKey = `${l}:${clean.toLowerCase()}`;
-    const cachedUrl = audioCache.get(cacheKey);
-    if (cachedUrl) {
-      try {
-        const audio = new Audio(cachedUrl);
-        currentAudioEl = audio;
-        audio.play().catch(() => playSpeechFallback(clean, l, defTag));
-        return;
-      } catch {}
-    }
-
-    playSpeechFallback(clean, l, defTag);
   }
 
-  function playSpeechFallback(clean, l, defTag) {
-    if (!window.speechSynthesis) return;
-    try {
-      if (speechSynthesis.paused) speechSynthesis.resume();
-      if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
-      const v = pickBestVoice(l), u = new SpeechSynthesisUtterance(clean);
-      activeUtter = u;
-      u.onend = u.onerror = () => { if (activeUtter === u) activeUtter = null; };
-      if (v) u.voice = v;
-      u.lang = v?.lang ? String(v.lang).replace('_', '-') : defTag;
-      u.rate = parseFloat(lsGet('vv_tts_rate', '0.95')) || 0.95;
-      speechSynthesis.speak(u);
-    } catch {}
-  }
-
-  // --- 3. 語根正規化・形態素検証 ---
-  const ROOT_PREFIXES = ['語根', '語幹', '印欧祖語', 'pie', 'ゲルマン祖語', '古高ドイツ語', '中高ドイツ語', '古フランス語', '接頭辞', '前綴り', '接尾辞', 'ラテン語', 'ギリシャ語', '古英語', '同族語', '由来', '借用', '語源'];
-  function normRootKey(s) {
-    const raw = String(s ?? '').trim();
-    if (!raw) return '';
-
-    // 1. 文字列内にアスタリスク (*) が存在する場合、その *語根 トークンを最優先抽出
-    // 例: "station (*sta-)" -> "*sta", "印欧祖語: *sta- (立つ)" -> "*sta", "arbor (*er-)" -> "*er"
-    const starMatch = raw.match(/\*([a-zA-Z0-9_äöüßÄÖÜ₁₂₃₄ḱǵʷʰ-]+)/);
-    if (starMatch) {
-      let root = '*' + starMatch[1].toLowerCase().replace(/h[1-3₁-₃]/g, '').replace(/-$/, '');
-      if (root.length >= 6 && /en$/.test(root)) root = root.slice(0, -2);
-      return foldAscii(root);
-    }
-
-    // 2. コロン以降の抽出 (例: "印欧祖語: sta-")
-    let k = raw;
-    const ci = k.search(/[:：]/);
-    if (ci !== -1 && ROOT_PREFIXES.includes(k.slice(0, ci).trim().toLowerCase())) k = k.slice(ci + 1).trim();
-
-    // 括弧内の日本語解説を除去
-    k = (k.replace(/\s*[\(（].*?[\)）]\s*/g, ' ').trim().toLowerCase().split(/[\s\/,、]+/)[0]) || '';
-    k = foldAscii(k);
-
-    // 単なる言語名や空文字のガード
-    if (!k || ROOT_PREFIXES.includes(k) || k.length < 2) return '';
-
-    if (k.startsWith('*')) return k.replace(/h[1-3₁-₃]/g, '').replace(/-$/, '');
-    if (k.length >= 6 && /(?:are|ere|ire|ari|eri|iri)$/.test(k)) return k.slice(0, -3);
-    if (k.length >= 6 && /en$/.test(k)) return k.slice(0, -2);
-    return '*' + k.replace(/-$/, '');
-  }
-
-  function matchRootInText(tag, textFold) {
-    const k = normRootKey(tag).replace(/^\*/, '');
-    if (k.length < 2 || !textFold) return false;
-    const probe = k.length >= 4 ? k.slice(0, 4) : k;
-    return textFold.includes(probe);
-  }
-
-  // 見出し語自身と語根の真正性バリデーション（例文由来の誤混入を完全遮断）
-  function isValidRootForEntry(rootKey, item) {
-    if (!rootKey || !item || !item.word) return false;
-    const cleanKey = normRootKey(rootKey);
-    if (!cleanKey) return false;
-    const rawRoot = cleanKey.replace(/^\*/, '');
-    if (rawRoot.length < 2) return false;
-
-    // 1. 語根が見出し語そのものと完全一致する場合は語根ではない
-    const wordFold = foldAscii(item.word);
-    if (rawRoot === wordFold) return false;
-
-    // 2. 語源解説文 (etymology) を照合
-    const etyFold = foldAscii(item.etymology || '');
-    if (etyFold) {
-      // 語源文の中にその語根（*sta, sta等）が存在するか
-      const inEty = etyFold.includes('*' + rawRoot) || matchRootInText(cleanKey, etyFold);
-      if (inEty) return true;
-    }
-
-    // 3. 例文 (example.foreign) の誤混入チェック:
-    // もし語源文に一切言及がなく、例文の中に出現する単語から勝手に作られたタグなら拒否
-    const exFold = foldAscii(item.example?.foreign || '');
-    if (exFold && !etyFold.includes(rawRoot)) {
-      // 例文の中にこの語根に似た単語があるか
-      const wordsInEx = exFold.split(/[^a-zA-Z0-9_äöüßÄÖÜ]+/);
-      if (wordsInEx.some(w => w.startsWith(rawRoot) && w !== wordFold)) {
-        return false; // 例文の別単語から混入した偽語根と判定
-      }
-    }
-
-    // 語源文に言及があればOK、語源文自体が未記入ならタグを信用
-    return Boolean(etyFold ? matchRootInText(cleanKey, etyFold) : true);
-  }
-
-  const SUPPLETIVE_MAP = {
-    be: ['am', 'is', 'are', 'was', 'were', 'been', 'being'],
-    go: ['went', 'gone', 'goes', 'going'],
-    good: ['better', 'best'],
-    bad: ['worse', 'worst'],
-    person: ['people', 'persons'],
-    etre: ['suis', 'es', 'est', 'sommes', 'etes', 'sont', 'etais', 'etait', 'ete', 'fus', 'fut', 'soit', 'serai', 'serait'],
-    avoir: ['ai', 'as', 'avons', 'avez', 'ont', 'avais', 'avait', 'eu', 'eut', 'ait', 'aurai', 'aurait'],
-    aller: ['vais', 'vas', 'va', 'allons', 'allez', 'vont', 'allait', 'ira', 'irai', 'aille', 'alle'],
-    faire: ['fais', 'fait', 'faisons', 'faites', 'font', 'faisait', 'fera', 'fasse', 'fit'],
-    pouvoir: ['peux', 'peut', 'pouvons', 'pouvez', 'peuvent', 'pu', 'pourrai', 'puisse'],
-    savoir: ['sais', 'sait', 'savons', 'savez', 'savent', 'su', 'saurai', 'sache'],
-    venir: ['viens', 'vient', 'venons', 'venez', 'viennent', 'venu', 'viendrai', 'vins'],
-    voir: ['vois', 'voit', 'voyons', 'voyez', 'voient', 'vu', 'verrai', 'vis'],
-    prendre: ['prends', 'prend', 'prenons', 'prenez', 'prennent', 'pris', 'prendrai'],
-    sein: ['bin', 'bist', 'ist', 'sind', 'seid', 'war', 'waren', 'gewesen', 'sei', 'waere'],
-    haben: ['habe', 'hast', 'hat', 'hatte', 'hatten', 'gehabt', 'haette'],
-    werden: ['werde', 'wirst', 'wird', 'wurde', 'wurden', 'geworden', 'wuerde'],
-    wissen: ['weiss', 'weisst', 'wusste', 'gewusst']
-  };
-
-  function lcsLen(a, b) {
-    const m = a.length, n = b.length;
-    if (!m || !n) return 0;
-    const dp = new Uint8Array(n + 1);
-    for (let i = 0; i < m; i++) {
-      let prev = 0;
-      for (let j = 0; j < n; j++) {
-        const tmp = dp[j + 1];
-        dp[j + 1] = a[i] === b[j] ? prev + 1 : Math.max(dp[j + 1], dp[j]);
-        prev = tmp;
-      }
-    }
-    return dp[n];
-  }
-
-  function isRelatedWordForm(wordFold, usedFold, gramFold, lang) {
-    if (!usedFold || !wordFold) return false;
-    if (usedFold === wordFold) return true;
-    const minStem = Math.max(3, wordFold.length - 3);
-    if (wordFold.length >= 4 && usedFold.includes(wordFold.slice(0, minStem))) return true;
-
-    const supp = SUPPLETIVE_MAP[wordFold];
-    if (supp?.some(s => usedFold === s || usedFold.split(/\s+/).includes(s))) return true;
-
-    if (gramFold) {
-      const gTokens = gramFold.split(/[,;/\s()]+/).filter(t => t.length >= 3 && !['der','die','das','hat','ist','les','des','pl'].includes(t));
-      if (gTokens.some(t => usedFold.includes(t) || t.includes(usedFold))) return true;
-    }
-
-    if (lang === 'de') {
-      const pref = DE_SEP_PREFIXES.find(p => wordFold.startsWith(p) && wordFold.length - p.length >= 3);
-      if (pref) {
-        const base = wordFold.slice(pref.length);
-        const baseCons = base.replace(/[aeiouy]/g, '');
-        if (usedFold.includes(pref) && (usedFold.includes(base.slice(0, 3)) || (baseCons.length >= 2 && lcsLen(baseCons, usedFold.replace(/[aeiouy]/g, '')) >= 2))) {
-          return true;
-        }
-      }
-    }
-
-    if (wordFold[0] === usedFold[0]) {
-      const consW = wordFold.replace(/[aeiouy]/g, ''), consU = usedFold.replace(/[aeiouy]/g, '');
-      const cLcs = lcsLen(consW, consU);
-      const fullLcs = lcsLen(wordFold, usedFold);
-      const minLen = Math.min(wordFold.length, usedFold.length);
-      if (cLcs >= Math.min(2, consW.length) && fullLcs >= Math.ceil(minLen * 0.55)) return true;
-    }
-    return false;
-  }
-
-  function checkWordInSentence(it) {
-    const sen = foldAscii(it.example?.foreign || '');
-    if (!sen) return true;
-    const w = foldAscii(it.word), gramFold = foldAscii(it.grammar_forms || '');
-    const senWords = sen.split(/[^\p{L}0-9]+/u).filter(Boolean);
-
-    if (w.includes(' ')) {
-      const wParts = w.split(/\s+/).filter(p => p.length >= 2);
-      if (wParts.length && wParts.every(p => sen.includes(p.slice(0, Math.max(2, p.length - 2))))) return true;
-    }
-
-    const stemLen = w.length <= 4 ? w.length : Math.max(4, w.length - 3);
-    const stem = w.slice(0, stemLen);
-    if (senWords.some(sw => sw === w || (sw.startsWith(stem) && Math.abs(sw.length - w.length) <= 4))) return true;
-
-    const gramTokens = gramFold.split(/[,;/\s()]+/).filter(t => t.length >= 3 && !['der','die','das','hat','ist','les','des'].includes(t));
-    if (gramTokens.some(t => senWords.includes(t))) return true;
-
-    const supp = SUPPLETIVE_MAP[w];
-    if (supp?.some(s => senWords.includes(s))) return true;
-
-    if (it.lang === 'de') {
-      const pref = DE_SEP_PREFIXES.find(p => w.startsWith(p) && w.length - p.length >= 3);
-      if (pref) {
-        const base = w.slice(pref.length), baseStem = base.slice(0, Math.max(3, base.length - 2));
-        const baseCons = base.replace(/[aeiouy]/g, '').slice(0, 2);
-        const hasPref = senWords.includes(pref);
-        const hasBase = senWords.some(sw => sw.startsWith(baseStem) || sw.includes(baseStem) || (baseCons.length >= 2 && sw.replace(/[aeiouy]/g, '').startsWith(baseCons)));
-        if (hasPref && hasBase) return true;
-      }
-    }
-
-    const used = foldAscii(it.example?.used_form || '');
-    if (used.length >= 2) {
-      const usedParts = used.split(/[^\p{L}0-9]+/u).filter(p => p.length >= 2);
-      if (usedParts.length && usedParts.every(p => senWords.includes(p) || sen.includes(p)) && isRelatedWordForm(w, used, gramFold, it.lang)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function validateEntry(it) {
-    const f = [], w = foldAscii(it.word), posReg = POS_BY_LANG[it.lang] || POS_BY_LANG.en;
-    if (it.meanings.some(m => !posReg.test(m.pos))) f.push('品詞が言語と不整合');
-    if (it.example?.foreign) {
-      if (!checkWordInSentence(it)) f.push('例文に見出し語なし');
-      if (!/<b>.+?<\/b>/i.test(it.example.ja)) f.push('和訳に<b>なし');
-    }
-    if (it.phonetic && (!IPA_OK.test(it.phonetic) || WIKT_BAD_BRACKET.test(it.phonetic))) f.push('IPA異常');
-    if (it.derivatives.some(d => foldAscii(d.word) === w)) f.push('派生語が見出し語と同一');
-    if (it.etymologyTags.length && it.etymology) {
-      const ety = foldAscii(it.etymology);
-      if (!it.etymologyTags.some(t => matchRootInText(t, ety))) f.push('語根タグが語源文に無い');
-    }
-    return f;
-  }
-
-  const genId = () => (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'vv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
-
-  function parseInputWordSpec(rawStr) {
-    let s = String(rawStr ?? '').trim().normalize('NFC'), homoIdx = 1, senseHint = '';
-    const hashM = s.match(/^(.*?)#(\d+)\s*$/);
-    if (hashM) { s = hashM[1].trim(); homoIdx = Math.max(1, parseInt(hashM[2], 10) || 1); }
-    const parenM = s.match(/^(.*?)[\s]*[\(（]([^\)）]+)[\)）]\s*$/);
-    if (parenM && parenM[1].trim()) { s = parenM[1].trim(); senseHint = parenM[2].trim(); }
-    return { cleanWord: s, homographIndex: homoIdx, senseHint };
-  }
-
-  function makeWordKey(word, lang = 'en', pos = '', homographIndex = 1) {
-    const w = String(word ?? '').trim().normalize('NFC');
-    if (!w) return '';
-    const normW = lang === 'de' ? w : w.toLowerCase();
-    const posPrefix = lang === 'de' && pos ? `:${String(pos).split('[')[0]}` : '';
-    const hSuffix = Number(homographIndex) > 1 ? `#${Number(homographIndex)}` : '';
-    return `${lang}:${normW}${posPrefix}${hSuffix}`;
-  }
-
-  function makeLookupKey(word, lang = 'en', homographIndex = 1) {
-    const w = String(word ?? '').trim().normalize('NFC');
-    const base = lang === 'de' ? w : w.toLowerCase();
-    return Number(homographIndex) > 1 ? `${base}#${Number(homographIndex)}` : base;
-  }
+  // --- 3. 語根正規化・形態素検証 (js/morphology.js へ分離・委譲) ---
+  const ROOT_PREFIXES = global.VocabMorphology?.ROOT_PREFIXES || ['語根', '語幹', '印欧祖語', 'pie', 'ゲルマン祖語', '古高ドイツ語', '中高ドイツ語', '古フランス語', '接頭辞', '前綴り', '接尾辞', 'ラテン語', 'ギリシャ語', '古英語', '同族語', '由来', '借用', '語源'];
+  const normRootKey = s => global.VocabMorphology ? global.VocabMorphology.normRootKey(s) : String(s ?? '').trim().toLowerCase();
+  const matchRootInText = (tag, textFold) => global.VocabMorphology ? global.VocabMorphology.matchRootInText(tag, textFold) : false;
+  const isValidRootForEntry = (rootKey, item) => global.VocabMorphology ? global.VocabMorphology.isValidRootForEntry(rootKey, item) : true;
+  const checkWordInSentence = it => global.VocabMorphology ? global.VocabMorphology.checkWordInSentence(it) : true;
+  const validateEntry = it => global.VocabMorphology ? global.VocabMorphology.validateEntry(it) : [];
+  const parseInputWordSpec = rawStr => global.VocabMorphology ? global.VocabMorphology.parseInputWordSpec(rawStr) : { cleanWord: String(rawStr ?? '').trim(), homographIndex: 1, senseHint: '' };
+  const makeWordKey = (word, lang = 'en', pos = '', homographIndex = 1) => global.VocabMorphology ? global.VocabMorphology.makeWordKey(word, lang, pos, homographIndex) : `${lang}:${word}`;
+  const makeLookupKey = (word, lang = 'en', homographIndex = 1) => global.VocabMorphology ? global.VocabMorphology.makeLookupKey(word, lang, homographIndex) : word;
 
   const sanitizeWiktUrl = url => (typeof url === 'string' && WIKT_URL_RE.test(url.trim())) ? url.trim() : undefined;
 
@@ -1356,6 +1069,9 @@
   }
 
   function formatMeaningAndEty(d) {
+    if (global.VocabExport && typeof global.VocabExport.formatMeaningAndEty === 'function') {
+      return global.VocabExport.formatMeaningAndEty(d);
+    }
     const raw = String(d.etymology || '').trim(), meanings = d.meanings || [];
     const hn = String(d.history_note || '').trim();
     const histDigest = hn ? (hn.startsWith('（') ? hn : `（${hn}）`) : '';
@@ -2866,6 +2582,9 @@
     const nowIso = new Date().toISOString();
     lsSet('vv_last_backup_at', nowIso.slice(0, 19).replace('T', ' '));
     updStats();
+    if (global.VocabExport && typeof global.VocabExport.exportFullJSON === 'function') {
+      return global.VocabExport.exportFullJSON(data);
+    }
     dlBlob([JSON.stringify({ version: 5, exportedAt: nowIso, data }, null, 2)], 'application/json', `vocab_backup_${nowIso.slice(0, 10)}.json`);
   }
 
@@ -2939,6 +2658,9 @@
   function exportAnkiTSV() {
     const list = getFiltered();
     if (!list.length) return alert('単語がありません。');
+    if (global.VocabExport && typeof global.VocabExport.exportAnkiTSV === 'function') {
+      return global.VocabExport.exportAnkiTSV(list, App.lang);
+    }
     const cl = s => esc(String(s || '').replace(/[\t\r\n]+/g, ' ').trim());
     const clAllowBold = s => String(s || '').replace(/[\t\r\n]+/g, ' ').trim().split(/(<b>[\s\S]*?<\/b>)/gi).map(p => /^<b>[\s\S]*<\/b>$/i.test(p) ? `<b>${esc(p.slice(3, -4))}</b>` : esc(p)).join('');
     const sanitizeTag = s => esc(String(s || '').trim().replace(/\s+/g, '_'));
@@ -2956,6 +2678,11 @@
   function exportObsidianMarkdown() {
     const list = getFiltered();
     if (!list.length) return alert('エクスポートする単語がありません。');
+    if (global.VocabExport && typeof global.VocabExport.exportObsidianMarkdown === 'function') {
+      const res = global.VocabExport.exportObsidianMarkdown(list, App.lang);
+      if (res) showToast(`Obsidian用 Markdown (${list.length}語・Wikiリンク対応) を出力しました`, 'ok');
+      return res;
+    }
     const nowIso = new Date().toISOString();
     
     // 単語ごとにObsidian対応のMarkdownノートを構築

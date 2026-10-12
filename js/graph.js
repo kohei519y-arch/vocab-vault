@@ -52,7 +52,7 @@
    */
   function cleanRootKey(k) {
     if (!k) return '';
-    const normFn = global.normRootKey || global.VocabCore?.normRootKey;
+    const normFn = global.VocabMorphology?.normRootKey || global.normRootKey || global.VocabCore?.normRootKey;
     if (typeof normFn === 'function') return normFn(k);
     const s = String(k).trim().toLowerCase();
     return s.startsWith('*') ? s : `*${s}`;
@@ -72,7 +72,7 @@
         return JSON.parse(raw || '[]');
       } catch { return []; }
     });
-    const isValidRootFn = global.isValidRootForEntry || global.VocabCore?.isValidRootForEntry || (() => true);
+    const isValidRootFn = global.VocabMorphology?.isValidRootForEntry || global.isValidRootForEntry || global.VocabCore?.isValidRootForEntry || (() => true);
 
     // 全登録言語ペア辞書、または標準言語キーから単語を収集
     const allPairs = (global.VocabCore?.getAllKnownPairConfigs || global.getAllKnownPairConfigs)?.() || [];

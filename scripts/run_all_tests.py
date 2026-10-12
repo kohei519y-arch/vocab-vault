@@ -40,9 +40,12 @@ def check_jsc_syntax():
         "js/anki.js",
         "js/sync.js",
         "js/ocr.js",
+        "js/morphology.js",
         "js/graph.js",
         "js/feedback.js",
         "js/starter_pack.js",
+        "js/export.js",
+        "js/speech.js",
         "js/app.js",
         "sw.js"
     ]
@@ -537,9 +540,12 @@ def test_html_js_integrity():
         "js/anki.js",
         "js/sync.js",
         "js/ocr.js",
+        "js/morphology.js",
         "js/graph.js",
         "js/feedback.js",
         "js/starter_pack.js",
+        "js/export.js",
+        "js/speech.js",
         "js/app.js"
     ]
     last_idx = -1

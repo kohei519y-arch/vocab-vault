@@ -93,9 +93,12 @@ const basePath = "/Users/yoshikawakohei/Library/Mobile Documents/com~apple~Cloud
 load(basePath + "/js/storage.js");
 load(basePath + "/js/anki.js");
 load(basePath + "/js/sync.js");
+load(basePath + "/js/morphology.js");
 load(basePath + "/js/graph.js");
 load(basePath + "/js/feedback.js");
 load(basePath + "/js/starter_pack.js");
+load(basePath + "/js/export.js");
+load(basePath + "/js/speech.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -296,6 +299,106 @@ try {
   assert("Root node radius is substantially enlarged (>= 10px)", rootNode && rootNode.radius >= 10.0, "Root Radius: " + (rootNode ? rootNode.radius : 0));
 } catch (e) {
   assert("VocabGraph test suite", false, String(e));
+}
+
+// -------------------------------------------------------------
+// TEST 4a: VocabMorphology (Linguistics & Root Engine)
+// -------------------------------------------------------------
+try {
+  assert("VocabMorphology loaded", typeof VocabMorphology === 'object');
+  assert("VocabMorphology contains normRootKey", typeof VocabMorphology.normRootKey === 'function');
+  assert("VocabMorphology contains foldAscii", typeof VocabMorphology.foldAscii === 'function');
+  assert("VocabMorphology contains isValidRootForEntry", typeof VocabMorphology.isValidRootForEntry === 'function');
+  assert("VocabMorphology contains isRelatedWordForm", typeof VocabMorphology.isRelatedWordForm === 'function');
+  assert("VocabMorphology contains checkWordInSentence", typeof VocabMorphology.checkWordInSentence === 'function');
+  assert("VocabMorphology contains parseInputWordSpec", typeof VocabMorphology.parseInputWordSpec === 'function');
+  assert("VocabMorphology contains makeWordKey", typeof VocabMorphology.makeWordKey === 'function');
+
+  // Test foldAscii unicode normalization
+  assert("foldAscii converts French ligatures and German eszett", VocabMorphology.foldAscii("cœur Straße") === "coeur strasse");
+
+  // Test normRootKey PIE normalization
+  assert("normRootKey normalizes asterisk and laryngeals", VocabMorphology.normRootKey("*genh₁-") === "*gen1" || VocabMorphology.normRootKey("*genh₁-").startsWith("*gen"));
+  assert("normRootKey extracts root from descriptive text", VocabMorphology.normRootKey("印欧祖語: *sta- (立つ)") === "*sta");
+
+  // Test isValidRootForEntry
+  const validItem = { word: 'station', etymology: '古フランス語を経てラテン語 statio（*sta- 立つ）に由来。', example: { foreign: 'The train arrived at the station.' } };
+  assert("isValidRootForEntry accepts verified etymology root", VocabMorphology.isValidRootForEntry('*sta-', validItem) === true);
+  assert("isValidRootForEntry rejects headword as root", VocabMorphology.isValidRootForEntry('station', validItem) === false);
+
+  // Test checkWordInSentence and suppletion
+  const suppItem = { word: 'go', example: { foreign: 'Yesterday we went to the museum.' } };
+  assert("checkWordInSentence recognizes suppletive past form 'went' for 'go'", VocabMorphology.checkWordInSentence(suppItem) === true);
+
+  // Test parseInputWordSpec
+  const spec = VocabMorphology.parseInputWordSpec('bank#2');
+  assert("parseInputWordSpec extracts homograph index 2", spec.cleanWord === 'bank' && spec.homographIndex === 2);
+
+  // Test makeWordKey
+  const wk = VocabMorphology.makeWordKey('bank', 'en', 'Noun', 2);
+  assert("makeWordKey formats canonical key with homograph", wk === 'en:bank#2');
+} catch (e) {
+  assert("VocabMorphology test suite", false, String(e));
+}
+
+// -------------------------------------------------------------
+// TEST 4b: VocabExport (Portability & Data Backup Engine)
+// -------------------------------------------------------------
+try {
+  assert("VocabExport loaded", typeof VocabExport === 'object');
+  assert("VocabExport contains dlBlob", typeof VocabExport.dlBlob === 'function');
+  assert("VocabExport contains formatMeaningAndEty", typeof VocabExport.formatMeaningAndEty === 'function');
+  assert("VocabExport contains exportAnkiTSV", typeof VocabExport.exportAnkiTSV === 'function');
+  assert("VocabExport contains exportObsidianMarkdown", typeof VocabExport.exportObsidianMarkdown === 'function');
+  assert("VocabExport contains exportFullJSON", typeof VocabExport.exportFullJSON === 'function');
+
+  const testCard = {
+    word: 'epiphany',
+    meanings: [{ pos: 'Noun', text: '直観的把握、突然のひらめき' }],
+    etymology: '①【古代ギリシャ語】epiphaneia（出現）に由来。',
+    history_note: '新約聖書における公現祭から転じ、一般の覚醒概念へ。'
+  };
+  const fmtRes = VocabExport.formatMeaningAndEty(testCard);
+  assert("formatMeaningAndEty formats compactEty", !fmtRes.compactEty.includes('【古代ギリシャ語】') && fmtRes.compactEty.includes('epiphaneia'), "Compact: " + fmtRes.compactEty);
+  assert("formatMeaningAndEty formats histDigest", fmtRes.histDigest.includes('公現祭'), "Hist: " + fmtRes.histDigest);
+
+  let exportedName = null;
+  dummyElement.click = function() { exportedName = this.download; };
+  const ankiName = VocabExport.exportAnkiTSV([testCard], 'en');
+  assert("VocabExport.exportAnkiTSV generates anki tsv", ankiName === 'anki_en.tsv' && exportedName === 'anki_en.tsv');
+
+  exportedName = null;
+  const obsName = VocabExport.exportObsidianMarkdown([testCard], 'en');
+  assert("VocabExport.exportObsidianMarkdown generates markdown", typeof obsName === 'string' && obsName.startsWith('vocab_obsidian_en_') && exportedName === obsName);
+
+  exportedName = null;
+  const jsonName = VocabExport.exportFullJSON({ 'distinction_entries': [testCard] });
+  assert("VocabExport.exportFullJSON generates backup json", typeof jsonName === 'string' && jsonName.startsWith('vocab_backup_') && exportedName === jsonName);
+} catch (e) {
+  assert("VocabExport test suite", false, String(e));
+}
+
+// -------------------------------------------------------------
+// TEST 4c: VocabSpeech (Native Audio & TTS Engine)
+// -------------------------------------------------------------
+try {
+  assert("VocabSpeech loaded", typeof VocabSpeech === 'object');
+  assert("VocabSpeech contains SPK_SVG", typeof VocabSpeech.SPK_SVG === 'string');
+  assert("VocabSpeech contains mkSpkBtn", typeof VocabSpeech.mkSpkBtn === 'function');
+  assert("VocabSpeech contains pickBestVoice", typeof VocabSpeech.pickBestVoice === 'function');
+  assert("VocabSpeech contains speakText", typeof VocabSpeech.speakText === 'function');
+  assert("VocabSpeech contains stopSpeech", typeof VocabSpeech.stopSpeech === 'function');
+
+  const btnHtml = VocabSpeech.mkSpkBtn('apple', 'en', false);
+  assert("mkSpkBtn produces button element", btnHtml.includes('class="spk-btn "') && btnHtml.includes('data-text="apple"'), "HTML: " + btnHtml);
+
+  const emptyBtn = VocabSpeech.mkSpkBtn('', 'en');
+  assert("mkSpkBtn returns empty string for falsy input", emptyBtn === '');
+
+  VocabSpeech.stopSpeech();
+  assert("stopSpeech executes cleanly without errors", true);
+} catch (e) {
+  assert("VocabSpeech test suite", false, String(e));
 }
 
 // -------------------------------------------------------------
