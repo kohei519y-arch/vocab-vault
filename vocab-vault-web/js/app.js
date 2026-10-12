@@ -1934,175 +1934,47 @@
   const startGraphSimulation = () => global.VocabGraph?.startGraphSimulation();
   const drawGraph = () => global.VocabGraph?.drawGraph();
 
-  // --- 単語入力サジェスト (Autocomplete Dropdown) ---
+  // --- 単語入力サジェスト (js/navigation.js へ分離・委譲) ---
   function initWordSuggest() {
-    const input = $('inWord');
-    const box = $('wordSuggestBox');
-    if (!input || !box) return;
-
-    let activeIndex = -1;
-
-    function renderSuggestions(query) {
-      const raw = query.trim().toLowerCase();
-      if (raw.length < 1) {
-        box.style.display = 'none';
-        box.innerHTML = '';
-        activeIndex = -1;
-        return;
-      }
-
-      const activeCfg = getActivePairConfig();
-      const currentList = getJson(activeCfg.key);
-      const suggestions = [];
-
-      currentList.forEach(item => {
-        if (suggestions.length >= 7) return;
-        const wLow = (item.word || '').toLowerCase();
-        const isExact = wLow === raw;
-        if (isExact || wLow.startsWith(raw) || (raw.length >= 3 && wLow.includes(raw))) {
-          const entry = {
-            type: 'word',
-            word: item.word,
-            meaning: item.meanings?.[0]?.text || '',
-            pos: item.meanings?.[0]?.pos || '',
-            folder: item.folder || '',
-            isRegistered: true,
-            isExact,
-            item
-          };
-          if (isExact) suggestions.unshift(entry);
-          else suggestions.push(entry);
-        }
-      });
-
-      const allRoots = ['*sta-', '*genh₁-', '*bʰer-', '*sekʷ-', '*men-', '*wer-', '*kʷel-', '*dʰeh₁-', '*weid-', '*med-', '*kap-', '*ten-'];
-      allRoots.forEach(r => {
-        if (suggestions.length >= 8) return;
-        const cleanR = r.replace(/[\*h₁-₃\-]/g, '').toLowerCase();
-        if (cleanR.startsWith(raw) || r.toLowerCase().includes(raw)) {
-          suggestions.push({
-            type: 'root',
-            word: r,
-            meaning: '印欧祖語・重要語根',
-            pos: 'Root',
-            isRegistered: false,
-            isExact: false
-          });
-        }
-      });
-
-      if (!suggestions.length) {
-        box.style.display = 'none';
-        box.innerHTML = '';
-        activeIndex = -1;
-        return;
-      }
-
-      activeIndex = -1;
-      box.innerHTML = suggestions.map((s, idx) => {
-        const jumpW = (s.item && s.item.homographIndex > 1) ? `${s.word}#${s.item.homographIndex}` : s.word;
-        return `
-        <div class="suggest-item ${s.isExact ? 'exact-match' : ''}" data-idx="${idx}" data-type="${s.type}" data-word="${esc(jumpW)}">
-          <div class="suggest-item-left">
-            <span class="suggest-item-word">${esc(s.word)}${s.folder ? `<small style="margin-left:6px;font-size:10px;color:var(--m)">[${esc(s.folder)}]</small>` : ''}</span>
-            <span class="suggest-item-meaning">${esc(s.meaning)}</span>
-          </div>
-          <span class="suggest-item-badge ${s.isExact ? 'exact' : s.isRegistered ? 'registered' : s.type === 'root' ? 'root' : ''}">
-            ${s.isExact ? '登録済(タップで移動)' : s.isRegistered ? '登録済' : s.type === 'root' ? '語根' : esc(s.pos)}
-          </span>
-        </div>
-      `;}).join('');
-      box.style.display = 'flex';
-    }
-
-    input.addEventListener('input', e => {
-      renderSuggestions(e.target.value);
-    });
-
-    input.addEventListener('keydown', e => {
-      if (box.style.display === 'none') return;
-      const items = box.querySelectorAll('.suggest-item');
-      if (!items.length) return;
-
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        activeIndex = (activeIndex + 1) % items.length;
-        updateActiveSuggestion(items);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        activeIndex = (activeIndex - 1 + items.length) % items.length;
-        updateActiveSuggestion(items);
-      } else if (e.key === 'Enter') {
-        if (activeIndex >= 0) {
-          e.preventDefault();
-          const selItem = items[activeIndex];
-          applySuggestion(selItem);
-        } else {
-          const firstExact = box.querySelector('.suggest-item.exact-match');
-          if (firstExact) {
-            e.preventDefault();
-            applySuggestion(firstExact);
-          }
-        }
-      } else if (e.key === 'Escape') {
-        box.style.display = 'none';
-      }
-    });
-
-    function updateActiveSuggestion(items) {
-      items.forEach((it, idx) => {
-        it.classList.toggle('active', idx === activeIndex);
-        if (idx === activeIndex) it.scrollIntoView({ block: 'nearest' });
+    if (global.VocabNavigation && typeof global.VocabNavigation.initWordSuggest === 'function') {
+      return global.VocabNavigation.initWordSuggest({
+        input: $('inWord'),
+        box: $('wordSuggestBox'),
+        getCurrentList: () => getJson(getActivePairConfig().key),
+        esc,
+        onJumpWord: w => jumpToWord(w, App.lang),
+        onOpenRootGraph: r => openGraphModal(r)
       });
     }
-
-    function applySuggestion(el) {
-      if (!el) return;
-      const type = el.dataset.type;
-      const word = el.dataset.word;
-      box.style.display = 'none';
-      if (type === 'word') {
-        jumpToWord(word, App.lang);
-        input.value = '';
-        input.blur();
-      } else if (type === 'root') {
-        openGraphModal(word);
-        input.value = '';
-        input.blur();
-      }
-    }
-
-    box.addEventListener('click', e => {
-      const item = e.target.closest('.suggest-item');
-      if (item) applySuggestion(item);
-    });
-
-    document.addEventListener('click', e => {
-      if (!e.target.closest('#inWordWrap')) {
-        box.style.display = 'none';
-      }
-    });
   }
 
-  // --- キーボードファースト: カード選択・ナビゲーション ---
+  // --- キーボードファースト: カード選択・ナビゲーション (js/navigation.js へ分離・委譲) ---
   function updateCardFocus(newIdx) {
+    if (global.VocabNavigation && typeof global.VocabNavigation.clampAndFocusCard === 'function') {
+      const cards = $$('#list .card');
+      if (!cards.length) return;
+      App.focusedCardIndex = global.VocabNavigation.clampAndFocusCard(newIdx, cards);
+      return;
+    }
     const cards = $$('#list .card');
     if (!cards.length) return;
-
     newIdx = Math.max(0, Math.min(newIdx, cards.length - 1));
     App.focusedCardIndex = newIdx;
-
-    cards.forEach((c, i) => {
-      c.classList.toggle('card-focused', i === newIdx);
-    });
-
-    const targetCard = cards[newIdx];
-    if (targetCard) {
-      targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
+    cards.forEach((c, i) => c.classList.toggle('card-focused', i === newIdx));
+    cards[newIdx]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function getFocusedCardItem() {
+    if (global.VocabNavigation && typeof global.VocabNavigation.getFocusedCardItem === 'function') {
+      const cards = $$('#list .card');
+      return global.VocabNavigation.getFocusedCardItem(
+        App.focusedCardIndex,
+        cards,
+        tL => getJson(LANGS[tL]?.key || LANGS.en.key),
+        App.lang,
+        makeLookupKey
+      );
+    }
     const cards = $$('#list .card');
     const targetCard = cards[App.focusedCardIndex];
     if (!targetCard) return null;
@@ -2669,61 +2541,53 @@
     });
 
     window.addEventListener('keydown', e => {
-      if (e.isComposing) return;
-      const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
-      const isAnkiOpen = $('anki')?.style.display === 'block';
-      const anyModalOpen = Boolean(document.querySelector('.modal-ov.open'));
-
-      if (e.key === 'Escape') {
-        if (anyModalOpen) return closeAllModals();
-        if (isAnkiOpen) return exitAnki();
-        if (App.focusedCardIndex >= 0) {
-          App.focusedCardIndex = -1;
-          $$('#list .card.card-focused').forEach(c => c.classList.remove('card-focused'));
-          return;
-        }
-      }
-
-      if ((!inInput && e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) || (e.altKey && e.code === 'KeyF')) {
-        e.preventDefault(); document.body.classList.remove('side-collapsed'); $('qSearch')?.focus();
-      } else if (e.altKey && e.code === 'KeyK') {
-        e.preventDefault(); closeAllModals(); if (isAnkiOpen) exitAnki(); $('inWord')?.focus();
-      } else if (e.altKey && e.code === 'KeyL') {
-        e.preventDefault(); openExtractModal();
-      } else if (e.altKey && e.code === 'KeyM') {
-        e.preventDefault(); toggleMask();
-      } else if (isAnkiOpen && !inInput) {
-        if ((e.code === 'KeyR' || e.key === 's') && App.aList[0]) { e.preventDefault(); speakText(App.aList[0].word, App.aList[0].lang || App.lang); }
-        else if (e.code === 'KeyZ' && App.ankiHistory.length) { e.preventDefault(); undoAnkiRev(); }
-        else if ((e.code === 'Space' || e.key === 'Enter') && $('btnAns')?.style.display !== 'none') { e.preventDefault(); showAns(); }
-        else if ((e.code === 'Space' || e.key === 'Enter') && $('aRat')?.style.display === 'flex') { e.preventDefault(); procRev(2); } // Anki本家仕様: 裏面でのSpaceはGood(普通)で爆速前進
-        else if ($('aRat')?.style.display === 'flex' && ['1','2','3','4'].includes(e.key)) { e.preventDefault(); procRev(parseInt(e.key, 10) - 1); }
-      } else if (!inInput && !anyModalOpen && !isAnkiOpen) {
-        // 通常一覧画面でのキーボードファースト操作 (Linear / Vim ライク)
-        if (e.key === 'j' || e.key === 'ArrowDown') {
-          e.preventDefault();
-          updateCardFocus(App.focusedCardIndex + 1);
-        } else if (e.key === 'k' || e.key === 'ArrowUp') {
-          e.preventDefault();
-          updateCardFocus(App.focusedCardIndex - 1);
-        } else if (e.key === 's') {
-          const item = getFocusedCardItem();
-          if (item) { e.preventDefault(); speakText(item.word, item.lang || App.lang); }
-        } else if (e.key === 'e') {
-          const item = getFocusedCardItem();
-          if (item) { e.preventDefault(); openEditModal(item.id || item.num, item.lang || App.lang); }
-        } else if (e.key === 'd') {
-          const item = getFocusedCardItem();
-          if (item) { e.preventDefault(); delW(item.id || item.num, item.lang || App.lang); }
-        } else if (e.key === 'n') {
-          e.preventDefault(); $('inWord')?.focus();
-        } else if (e.key === 'r') {
-          e.preventDefault(); startAnki();
-        } else if (e.key === 'g') {
-          e.preventDefault(); openGraphModal();
-        } else if (e.key === '?') {
-          e.preventDefault(); toggleModal('shortcutsModal', true);
-        }
+      if (global.VocabNavigation && typeof global.VocabNavigation.handleGlobalKeydown === 'function') {
+        const handled = global.VocabNavigation.handleGlobalKeydown(e, {
+          isAnkiOpen: () => $('anki')?.style.display === 'block',
+          anyModalOpen: () => Boolean(document.querySelector('.modal-ov.open')),
+          closeAllModals,
+          exitAnki,
+          getFocusedCardIndex: () => App.focusedCardIndex,
+          clearCardFocus: () => {
+            App.focusedCardIndex = -1;
+            $$('#list .card.card-focused').forEach(c => c.classList.remove('card-focused'));
+          },
+          focusSearch: () => {
+            document.body.classList.remove('side-collapsed');
+            $('qSearch')?.focus();
+          },
+          focusInput: () => {
+            closeAllModals();
+            if ($('anki')?.style.display === 'block') exitAnki();
+            $('inWord')?.focus();
+          },
+          openExtractModal,
+          toggleMask,
+          ankiSpeak: () => { if (App.aList[0]) speakText(App.aList[0].word, App.aList[0].lang || App.lang); },
+          ankiUndo: () => { if (App.ankiHistory.length) undoAnkiRev(); },
+          ankiAdvance: () => {
+            if ($('btnAns')?.style.display !== 'none') showAns();
+            else if ($('aRat')?.style.display === 'flex') procRev(2);
+          },
+          ankiRate: rating => { if ($('aRat')?.style.display === 'flex') procRev(rating); },
+          moveCardFocus: delta => updateCardFocus(App.focusedCardIndex + delta),
+          speakFocusedCard: () => {
+            const item = getFocusedCardItem();
+            if (item) speakText(item.word, item.lang || App.lang);
+          },
+          editFocusedCard: () => {
+            const item = getFocusedCardItem();
+            if (item) openEditModal(item.id || item.num, item.lang || App.lang);
+          },
+          deleteFocusedCard: () => {
+            const item = getFocusedCardItem();
+            if (item) delW(item.id || item.num, item.lang || App.lang);
+          },
+          startAnki,
+          openGraph: () => openGraphModal(),
+          openShortcutsModal: () => toggleModal('shortcutsModal', true)
+        });
+        if (handled) return;
       }
     });
   }

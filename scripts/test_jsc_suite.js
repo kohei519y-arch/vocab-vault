@@ -104,6 +104,7 @@ load(basePath + "/js/card_view.js");
 load(basePath + "/js/queue.js");
 load(basePath + "/js/modal.js");
 load(basePath + "/js/search.js");
+load(basePath + "/js/navigation.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -568,6 +569,25 @@ try {
   assert("VocabSearch.matchStat detects overdue review", VocabSearch.matchStat({ nextReview: Date.now() - 5000 }, 'due') === true);
   assert("VocabSearch.getPairShortLabel formats pair short codes", VocabSearch.getPairShortLabel('en', 'ja') === '英和' && VocabSearch.getPairShortLabel('ja', 'en') === '和英');
   assert("VocabSearch engine core methods callable", typeof VocabSearch.getFiltered === 'function' && typeof VocabSearch.buildEtyIndex === 'function' && typeof VocabSearch.renderSidebarTree === 'function');
+
+  // Test Scenario I: VocabNavigation isolated module verification
+  assert("VocabNavigation is defined on global scope", typeof VocabNavigation === 'object' && VocabNavigation !== null);
+  var suggestSample = VocabNavigation.buildSuggestions("sta", [{ word: "stand", meanings: [{ text: "立つ", pos: "Verb" }] }]);
+  assert("VocabNavigation.buildSuggestions matches prefix word", suggestSample.some(function(s){ return s.word === "stand"; }));
+  assert("VocabNavigation.buildSuggestions includes PIE root", suggestSample.some(function(s){ return s.type === "root" && s.word.indexOf("sta") !== -1; }));
+  var sHtml = VocabNavigation.renderSuggestHtml(suggestSample);
+  assert("VocabNavigation.renderSuggestHtml produces HTML string", typeof sHtml === 'string' && sHtml.indexOf("suggest-item") !== -1);
+  var mockCardA = { classList: { toggle: function(cls, on){ this._on = on; }, _on: false }, scrollIntoView: function(){} };
+  var mockCardB = { classList: { toggle: function(cls, on){ this._on = on; }, _on: false }, scrollIntoView: function(){} };
+  var focusedIdx = VocabNavigation.clampAndFocusCard(1, [mockCardA, mockCardB]);
+  assert("VocabNavigation.clampAndFocusCard clamps and focuses target", focusedIdx === 1 && mockCardB.classList._on === true && mockCardA.classList._on === false);
+  var handledKey = false;
+  var keyHandled = VocabNavigation.handleGlobalKeydown({ key: "j", isComposing: false, preventDefault: function(){} }, {
+    isAnkiOpen: false,
+    anyModalOpen: false,
+    moveCardFocus: function(delta){ handledKey = (delta === 1); }
+  });
+  assert("VocabNavigation.handleGlobalKeydown delegates j key to moveCardFocus(1)", keyHandled === true && handledKey === true);
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }
