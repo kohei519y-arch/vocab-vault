@@ -593,7 +593,26 @@ def test_html_js_integrity():
         last_idx = idx
 
     if order_ok:
-        log_pass("All modular JS scripts are loaded in deterministic dependency order")
+        log_pass("All modular JS scripts are loaded in deterministic dependency order in index.html")
+
+    # Verify script loading order in dev.html
+    dev_html_path = os.path.join(BASE_DIR, "dev.html")
+    if os.path.exists(dev_html_path):
+        with open(dev_html_path, "r", encoding="utf-8") as f:
+            dev_html = f.read()
+        dev_last_idx = -1
+        dev_order_ok = True
+        for s in expected_order:
+            idx = dev_html.find(s)
+            if idx == -1:
+                log_fail(f"Script tag {s} not found in dev.html")
+                dev_order_ok = False
+            elif idx < dev_last_idx:
+                log_fail(f"Script tag {s} is out of order in dev.html")
+                dev_order_ok = False
+            dev_last_idx = idx
+        if dev_order_ok:
+            log_pass("All modular JS scripts are loaded in deterministic dependency order in dev.html")
 
     # Verify strict HTML tag nesting and zero mismatch errors
     from html.parser import HTMLParser

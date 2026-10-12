@@ -1077,16 +1077,28 @@
   }
 
   function createCardElement(i, opts = {}) {
-    return global.VocabCardView
-      ? global.VocabCardView.createCardElement(i, {
-          queryReg: App.qReg,
-          lang: App.lang,
-          crossLang: App.crossLang,
-          rootIndexMap: App.rootIndexMap,
-          viewMode: App.viewMode,
-          ...opts
-        })
-      : null;
+    if (global.VocabCardView?.createCardElement) {
+      return global.VocabCardView.createCardElement(i, {
+        queryReg: App.qReg,
+        lang: App.lang,
+        crossLang: App.crossLang,
+        rootIndexMap: App.rootIndexMap,
+        viewMode: App.viewMode,
+        ...opts
+      });
+    }
+    // フェイルセーフ・フォールバック (モジュール未ロード時や環境エラー時にも単語を絶対表示)
+    const iL = i.lang || opts.lang || App.lang || 'en';
+    const c = document.createElement('div'), due = (i.nextReview || 0) <= Date.now();
+    const lk = makeLookupKey(i.word, iL, i.homographIndex);
+    c.className = 'card';
+    c.dataset.word = lk;
+    c.dataset.rawWord = i.word;
+    c.dataset.lang = iL;
+    const homoHtml = i.homographIndex > 1 ? `<span class="homo-badge">#${i.homographIndex}</span>` : '';
+    const mText = (i.meanings || []).map(m => `<div class="pos-block"><span class="pos">${esc(m.pos)}</span><span>${esc(m.text)}</span></div>`).join('');
+    c.innerHTML = `<div class="col-left"><div class="hw-wrap"><span class="id">#${i.num}</span>${homoHtml}<span class="hw">${esc(i.word)}</span></div></div><div class="right"><div class="m-line">${mText}</div></div>`;
+    return c;
   }
 
   function setViewMode(mode) {

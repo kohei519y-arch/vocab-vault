@@ -40,9 +40,7 @@
           if (!k.includes('v11')) { caches.delete(k); }
         });
       }).catch(function(){});
-    }
-    window.DEV_MASTER_MODE = true;
-    try { localStorage.setItem('vv_dev_unlocked', '1'); } catch(e){}
+    // 開発・テスト用ファイル
   </script>
 </head>
 <body class="dark side-collapsed">
@@ -893,9 +891,14 @@
 <script src="js/anki.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/ocr.js"></script>
+<script src="js/morphology.js"></script>
 <script src="js/graph.js"></script>
 <script src="js/feedback.js"></script>
+<script src="js/dictionary.js"></script>
 <script src="js/starter_pack.js"></script>
+<script src="js/export.js"></script>
+<script src="js/speech.js"></script>
+<script src="js/card_view.js"></script>
 <script src="js/app.js"></script>
 <script>
   // Service Worker 登録 ＆ 自動更新検知

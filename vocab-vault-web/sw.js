@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v11-network-first';
+const CACHE_NAME = 'vocab-vault-v12-network-first';
 
 const PRECACHE_ASSETS = [
   './',
@@ -14,14 +14,21 @@ const PRECACHE_ASSETS = [
   './js/anki.js',
   './js/sync.js',
   './js/ocr.js',
+  './js/morphology.js',
   './js/graph.js',
   './js/feedback.js',
+  './js/dictionary.js',
   './js/starter_pack.js',
+  './js/export.js',
+  './js/speech.js',
+  './js/card_view.js',
   './js/app.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './icons/apple-touch-icon.png'
+  './icons/apple-touch-icon.png',
+  './icons/icon.svg',
+  './icons/favicon-32.png'
 ];
 
 self.addEventListener('message', event => {
