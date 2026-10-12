@@ -7,53 +7,132 @@
 
   const OFFLINE_QUEUE_KEY = 'vv_offline_review_queue';
 
-  function predDays(e, rating) {
-    const iv = Number(e.interval) || 0;
-    const ef = Number(e.efactor) || 2.5;
-    if (rating === 0) return 0; // もう一度: 1分後
-    if (rating === 1) return Math.max(1, iv * 1.2); // 難しい
-    if (rating === 2) return !e.repetition ? 1 : iv * 2.5; // 普通
-    return !e.repetition ? 4 : iv * ef; // 簡単
-  }
+  const MAX_INTERVAL_DAYS = 3650; // 最大復習間隔（10年）
+  const REQUEST_RETENTION = 0.90; // 目標定着率: 90%
+  const DECAY = -0.5; // FSRS忘却曲線減衰率
+  const FACTOR = 19 / 81; // R(t) = (1 + FACTOR * t / S)^DECAY
 
-  // [認知アンカーボーナス] 語根ネットワークが接続された単語は記憶の干渉が少なく忘却曲線が緩やかなため、復習間隔を最適化
+  /**
+   * [認知アンカーボーナス]
+   * 印欧祖語(PIE)語根ネットワークに接続された単語は、深層意味記憶（Semantic Network）の
+   * 結びつきにより記憶の干渉が抑制され、忘却曲線の減衰が緩やかになる現象を数理モデル化。
+   */
   function getEtymologyAnchorBonus(e) {
     if (!e) return 1.0;
     const tags = Array.isArray(e.etymologyTags)
       ? e.etymologyTags
       : (typeof e.etymologyTags === 'string' ? e.etymologyTags.split(',').map(s => s.trim()).filter(Boolean) : []);
-    if (tags.length >= 3) return 1.15; // 3語根以上の密な関連付け: 間隔15%伸長
-    if (tags.length >= 1) return 1.08; // 語根アンカーあり: 間隔8%伸長
+    const tagCount = tags.length;
+    if (tagCount >= 3) return 1.25; // 3語根以上の密な網状結合: 安定度25%ブースト
+    if (tagCount === 2) return 1.15; // 2語根の結合: 安定度15%ブースト
+    if (tagCount === 1) return 1.08; // 1語根アンカー: 安定度8%ブースト
     return 1.0;
   }
 
+  /**
+   * 現在時刻における記憶保持確率 (Retrievability R) を算出 (0.0〜1.0)
+   */
+  function getRetrievability(e, now = Date.now()) {
+    if (!e || !e.nextReview || !e.interval) return 1.0;
+    const lastReview = Number(e.updatedAt || e.reviewUpdatedAt || (e.nextReview - e.interval * 86400000));
+    const elapsedDays = Math.max(0, (now - lastReview) / 86400000);
+    const s = Math.max(0.1, Number(e.stability) || Number(e.interval) || 1.0);
+    return Math.pow(1 + FACTOR * (elapsedDays / s), DECAY);
+  }
+
+  /**
+   * FSRS-4.5 & SM-2 ハイブリッド復習間隔予測
+   */
+  function predDays(e, rating) {
+    const s = Math.max(0.1, Number(e.stability) || Number(e.interval) || 1.0);
+    const d = Math.max(1, Math.min(10, Number(e.difficulty) || 5.0));
+    const anchorBonus = getEtymologyAnchorBonus(e);
+
+    if (rating === 0) { // Again (もう一度)
+      return 0; // 即時・1分後
+    }
+
+    let nextS = s;
+    if (rating === 1) { // Hard (難しい)
+      nextS = s * Math.max(1.1, (1.2 - 0.05 * d)) * anchorBonus;
+    } else if (rating === 2) { // Good (普通)
+      if (!e.repetition) {
+        nextS = 2.5 * anchorBonus;
+      } else {
+        nextS = s * (1 + Math.exp(1.5) * Math.pow(d, -0.4) * Math.pow(s, -0.1)) * anchorBonus;
+      }
+    } else { // Easy (簡単)
+      if (!e.repetition) {
+        nextS = 5.0 * anchorBonus;
+      } else {
+        nextS = s * (1 + Math.exp(2.0) * Math.pow(d, -0.4) * Math.pow(s, -0.1) * 1.3) * anchorBonus;
+      }
+    }
+
+    // 目標定着率 90% に基づくインターバル計算
+    const intervalDays = (nextS / FACTOR) * (Math.pow(REQUEST_RETENTION, 1 / DECAY) - 1);
+    return Math.max(1, Math.min(MAX_INTERVAL_DAYS, intervalDays));
+  }
+
+  /**
+   * 4つの評価ボタンごとの次回日数予測プレビュー
+   */
+  function predictIntervals(e) {
+    return [0, 1, 2, 3].map(r => {
+      const days = predDays(e, r);
+      if (days === 0) return '1分後';
+      if (days < 1) return `${Math.round(days * 24)}時間後`;
+      if (days < 30) return `${Math.round(days)}日後`;
+      if (days < 365) return `${(days / 30).toFixed(1)}ヶ月後`;
+      return `${(days / 365).toFixed(1)}年後`;
+    });
+  }
+
+  /**
+   * 次回学習スケジュールおよび FSRS 状態パラメータの確定計算
+   */
   function calculateNextReview(e, rating) {
     const now = Date.now();
     let nextInterval = 0;
     let nextRepetition = Number(e.repetition) || 0;
     let nextEfactor = Number(e.efactor) || 2.5;
+    let curDifficulty = Number(e.difficulty) || 5.0;
+    let curStability = Number(e.stability) || Number(e.interval) || 1.0;
     let nextReviewDate = now;
 
+    const anchorBonus = getEtymologyAnchorBonus(e);
+
+    // Difficulty D 更新 (1〜10)
+    const diffDelta = rating === 0 ? 1.2 : rating === 1 ? 0.6 : rating === 2 ? -0.2 : -0.8;
+    const nextDifficulty = Math.max(1.0, Math.min(10.0, Number((curDifficulty + diffDelta).toFixed(2))));
+
     if (rating === 0) {
+      // 忘却時: Stabilityを減衰させ、即座にリラーニングキューへ
       nextRepetition = 0;
       nextInterval = 0;
+      curStability = Math.max(0.2, curStability * 0.3);
       nextReviewDate = now + 60000; // 1分後
     } else {
-      let baseDays = predDays(e, rating);
-      if (rating >= 2) {
-        baseDays *= getEtymologyAnchorBonus(e);
-      }
-      const fuzz = baseDays >= 2 ? (0.96 + Math.random() * 0.08) : 1; // 間隔の分散
-      nextInterval = Number((baseDays * fuzz).toFixed(2));
-      nextEfactor = Math.max(1.3, nextEfactor + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0));
+      const baseDays = predDays(e, rating);
+      const fuzz = baseDays >= 2 ? (0.97 + Math.random() * 0.06) : 1; // 間隔の適度な分散
+      nextInterval = Number(Math.min(MAX_INTERVAL_DAYS, Math.max(1.0, baseDays * fuzz)).toFixed(2));
+      curStability = Number((nextInterval * anchorBonus).toFixed(2));
+
+      // SM-2 互換パラメータの同期
+      nextEfactor = Math.max(1.3, Math.min(3.5, nextEfactor + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0)));
       if (rating >= 2) nextRepetition++;
       nextReviewDate = now + Math.round(nextInterval * 86400000);
     }
+
+    const currentR = getRetrievability({ ...e, stability: curStability, interval: nextInterval, nextReview: nextReviewDate }, now);
 
     return {
       interval: nextInterval,
       repetition: nextRepetition,
       efactor: nextEfactor,
+      stability: curStability,
+      difficulty: nextDifficulty,
+      retrievability: Number(currentR.toFixed(3)),
       nextReview: nextReviewDate,
       updatedAt: now,
       reviewUpdatedAt: now
@@ -320,6 +399,8 @@
 
   global.VocabSRS = {
     predDays,
+    predictIntervals,
+    getRetrievability,
     getEtymologyAnchorBonus,
     calculateNextReview,
     queueOfflineReview,
@@ -330,7 +411,7 @@
     triggerHaptic
   };
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && typeof setTimeout === 'function') {
     setTimeout(recoverOfflineQueueFromIdb, 400);
   }
 })(typeof window !== 'undefined' ? window : globalThis);

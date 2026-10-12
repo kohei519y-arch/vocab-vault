@@ -74,8 +74,19 @@
   async function migrateFromLocalStorageIfNeeded() {
     if (!Storage.dbInst || Storage.migratedFromLs) return;
     try {
-      for (const l of LANG_KEYS) {
-        const k = LANGS[l].key;
+      const keysToMigrate = new Set(LANG_KEYS.map(l => LANGS[l].key));
+      try {
+        if (typeof localStorage !== 'undefined' && localStorage.length) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const lk = localStorage.key(i);
+            if (lk && lk.startsWith('distinction_entries')) keysToMigrate.add(lk);
+          }
+        }
+      } catch {}
+
+      for (const k of keysToMigrate) {
+        const pair = keyToPair(k);
+        const l = pair.srcLang || 'en';
         const idbData = await idbGet(k);
         const rawLs = lsGet(k, '');
         let lsWords = [];
@@ -87,9 +98,9 @@
           try { idbWords = JSON.parse(idbData); } catch {}
         }
 
-        const tMap = getTombstones(l);
-        const cAt = getClearedAt(l);
-        const filterLive = arr => arr.filter(it => !isTombstoned(it, tMap, l, cAt));
+        const tMap = getTombstones(k);
+        const cAt = getClearedAt(k);
+        const filterLive = arr => arr.filter(it => !isTombstoned(it, tMap, k, cAt));
         lsWords = filterLive(lsWords);
         idbWords = filterLive(idbWords);
 
@@ -104,9 +115,8 @@
         }
 
         if (merged.length > 0) {
-          _log(`[Storage Recovery] Restored ${merged.length} ${l} words`);
+          _log(`[Storage Recovery] Restored ${merged.length} words for ${k}`);
           Storage.mem[k] = merged;
-          Storage.mem[l] = merged;
           await idbPut(k, merged);
           try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
         }

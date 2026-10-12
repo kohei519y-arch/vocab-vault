@@ -1362,7 +1362,8 @@
     const etyHtml = compactEty ? `<div class="ety ${isLongEty ? 'clamp' : ''}" ${isLongEty ? 'data-act="toggle-clamp"' : ''}>${wiktPill}${confPill}${hlText(compactEty)}</div>` : '';
 
     const { chipItems, sameList, crossList } = collectEtyPeers(d);
-    const chipsHtml = chipItems.map(c => `<span class="root-chip ${c.count ? 'has-rel' : ''} ${c.hasCog ? 'has-cog' : ''}" data-act="search-root" data-query="${esc(c.key)}" data-xlang="${c.hasCog ? '1' : '0'}">${hlText(c.tag)}${c.count ? `<span class="cnt ${c.hasCog ? 'cog-cnt' : ''}">${c.hasCog ? '3言語:' : ''}${c.count + 1}</span>` : ''}</span>`).join('');
+    const graphSvg = `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
+    const chipsHtml = chipItems.map(c => `<span class="root-chip-wrap"><span class="root-chip ${c.count ? 'has-rel' : ''} ${c.hasCog ? 'has-cog' : ''}" data-act="search-root" data-query="${esc(c.key)}" data-xlang="${c.hasCog ? '1' : '0'}" title="リストで絞り込み">${hlText(c.tag)}${c.count ? `<span class="cnt ${c.hasCog ? 'cog-cnt' : ''}">${c.hasCog ? '3言語:' : ''}${c.count + 1}</span>` : ''}</span><button type="button" class="root-graph-btn" data-act="open-graph" data-root="${esc(c.key)}" title="「${esc(c.tag)}」の語根ネットワークを開く" aria-label="語根グラフ表示">${graphSvg}</button></span>`).join('');
     const fmtPeerLabel = p => p.homographIndex > 1 ? `${p.word}#${p.homographIndex}` : p.word;
     const sLnk = sameList.length ? `<span class="ety-lbl">同語根:</span>` + sameList.map(p => `<a class="rel-link" data-act="jump" data-word="${esc(fmtPeerLabel(p))}" data-lang="${esc(p.lang)}">${esc(fmtPeerLabel(p))}</a>`).join('') : '';
     const cLnk = crossList.length ? `<span class="ety-lbl">同族候補:</span>` + crossList.map(p => `<a class="cog-link" data-act="jump" data-word="${esc(fmtPeerLabel(p))}" data-lang="${esc(p.lang)}"><span class="cog-l">${esc(p.lang.toUpperCase())}</span><span>${esc(fmtPeerLabel(p))}</span></a>`).join('') : '';
@@ -2973,31 +2974,40 @@
     return overdueMs / intervalMs;
   }
 
-  function startAnki() {
+  function startAnki(customCandidates = null) {
     const now = Date.now();
-    const allDue = getFiltered()
-      .filter(i => (i.nextReview || 0) <= now)
-      .sort((a, b) => {
-        const ratioA = getOverdueRatio(a, now);
-        const ratioB = getOverdueRatio(b, now);
-        if (Math.abs(ratioB - ratioA) > 0.01) return ratioB - ratioA;
-        return (a.nextReview || 0) - (b.nextReview || 0);
-      });
-    let reviewCandidates = allDue;
-    if (!reviewCandidates.length) {
-      const allWords = getFiltered();
-      if (!allWords.length) {
-        showToast('復習対象の単語が登録されていません。', 'info', 3000);
-        return;
+    let reviewCandidates = [];
+    const isCustom = Array.isArray(customCandidates) && customCandidates.length > 0;
+    let allDueCount = 0;
+
+    if (isCustom) {
+      reviewCandidates = [...customCandidates];
+    } else {
+      const allDue = getFiltered()
+        .filter(i => (i.nextReview || 0) <= now)
+        .sort((a, b) => {
+          const ratioA = getOverdueRatio(a, now);
+          const ratioB = getOverdueRatio(b, now);
+          if (Math.abs(ratioB - ratioA) > 0.01) return ratioB - ratioA;
+          return (a.nextReview || 0) - (b.nextReview || 0);
+        });
+      allDueCount = allDue.length;
+      reviewCandidates = allDue;
+      if (!reviewCandidates.length) {
+        const allWords = getFiltered();
+        if (!allWords.length) {
+          showToast('復習対象の単語が登録されていません。', 'info', 3000);
+          return;
+        }
+        if (!confirm('現在、復習期日を迎えた単語はありません（すべて定着中）。\n登録済みの単語で事前復習・総復習セッションを開始しますか？')) {
+          return;
+        }
+        reviewCandidates = allWords;
       }
-      if (!confirm('現在、復習期日を迎えた単語はありません（すべて定着中）。\n登録済みの単語で事前復習・総復習セッションを開始しますか？')) {
-        return;
-      }
-      reviewCandidates = allWords;
     }
 
-    // 復習上限キャップ適用
-    const cap = App.dailyReviewCap || 30;
+    // 復習上限キャップ適用 (カスタムリスト時はその全件を尊重)
+    const cap = isCustom ? reviewCandidates.length : (App.dailyReviewCap || 30);
     App.aList = reviewCandidates.slice(0, cap);
     App.ankiTotalCount = App.aList.length;
     App.ankiHistory = [];
@@ -3009,8 +3019,8 @@
     if (global.VocabSRS?.updateOfflineBadgeUI) global.VocabSRS.updateOfflineBadgeUI();
     renderAnki();
 
-    if (allDue.length > cap) {
-      showToast(`期日到来単語が ${allDue.length} 語あります。学習継続のため本日は上限 ${cap} 語に設定されています。`, 'info', 4500);
+    if (!isCustom && allDueCount > cap) {
+      showToast(`期日到来単語が ${allDueCount} 語あります。学習継続のため本日は上限 ${cap} 語に設定されています。`, 'info', 4500);
     }
   }
 
@@ -4415,6 +4425,8 @@ etymology:${eInst}`;
     onLanguagePairChange,
     getActivePairConfig,
     getActivePairFiles,
+    getAllKnownPairConfigs,
+    getPairShortLabel,
     renderPairFileTabs,
     openGraphModal,
     resetGraphZoom,

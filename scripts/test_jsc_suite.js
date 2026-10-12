@@ -93,6 +93,7 @@ const basePath = "/Users/yoshikawakohei/Library/Mobile Documents/com~apple~Cloud
 load(basePath + "/js/storage.js");
 load(basePath + "/js/anki.js");
 load(basePath + "/js/sync.js");
+load(basePath + "/js/graph.js");
 load(basePath + "/js/feedback.js");
 load(basePath + "/js/starter_pack.js");
 
@@ -242,6 +243,40 @@ try {
   assert("All starter pack words have word, meanings array, and etymology", validFields);
 } catch (e) {
   assert("Starter pack test suite", false, String(e));
+}
+
+// -------------------------------------------------------------
+// TEST 4b: VocabGraph (Root Network Engine & Detail Inspector)
+// -------------------------------------------------------------
+try {
+  assert("VocabGraph loaded", typeof VocabGraph === 'object');
+  assert("VocabGraph contains buildGraphData", typeof VocabGraph.buildGraphData === 'function');
+  assert("VocabGraph contains selectNode", typeof VocabGraph.selectNode === 'function');
+  assert("VocabGraph contains toggleColorMode", typeof VocabGraph.toggleColorMode === 'function');
+  assert("VocabGraph contains exportGraphImage", typeof VocabGraph.exportGraphImage === 'function');
+
+  // Test building graph data from entries
+  localStorage.setItem('distinction_entries', JSON.stringify([
+    { id: 'g1', word: 'constant', lang: 'en', etymologyTags: ['*sta-'], meanings: [{ pos: 'Adj', text: '一定の' }] },
+    { id: 'g2', word: 'distant', lang: 'en', etymologyTags: ['*sta-'], meanings: [{ pos: 'Adj', text: '遠い' }] }
+  ]));
+
+  const graphData = VocabGraph.buildGraphData('', false, 'all');
+  const rootNode = graphData.nodes.find(n => n.type === 'root' && n.label.includes('sta'));
+  assert("buildGraphData generates connected root node", !!rootNode, "Root: " + (rootNode ? rootNode.label : 'none'));
+  assert("Root node connects to cognates", rootNode && rootNode.connectedWords.length >= 2, "Children: " + (rootNode ? rootNode.connectedWords.length : 0));
+
+  // Test selecting node
+  VocabGraph.selectNode(rootNode, false);
+  assert("selectNode sets active selectedNode in state", VocabGraph.graphState.selectedNode === rootNode);
+
+  // Test color mode toggle
+  const prevMode = VocabGraph.graphState.colorMode;
+  VocabGraph.toggleColorMode();
+  assert("toggleColorMode switches colorMode", VocabGraph.graphState.colorMode !== prevMode);
+  VocabGraph.toggleColorMode();
+} catch (e) {
+  assert("VocabGraph test suite", false, String(e));
 }
 
 // -------------------------------------------------------------
