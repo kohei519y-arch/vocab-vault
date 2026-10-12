@@ -101,6 +101,7 @@ load(basePath + "/js/starter_pack.js");
 load(basePath + "/js/export.js");
 load(basePath + "/js/speech.js");
 load(basePath + "/js/card_view.js");
+load(basePath + "/js/queue.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -533,6 +534,16 @@ try {
   assert("VocabCardView.createCardElement creates DOM element with correct dataset", sampleEl && sampleEl.className === 'card' && sampleEl.dataset.word === 'epistemic');
   var foundEl = VocabCardView.findCardElement([sampleEl], 'epistemic', 'epistemic', 'epistemic');
   assert("VocabCardView.findCardElement matches created card accurately", foundEl === sampleEl);
+
+  // Test Scenario F: VocabQueue isolated module verification
+  assert("VocabQueue is defined on global scope", typeof VocabQueue === 'object' && VocabQueue !== null);
+  assert("VocabQueue.PHRASE_PARTICLES contains phrasal verb particles", VocabQueue.PHRASE_PARTICLES.has('up') && VocabQueue.PHRASE_PARTICLES.has('down'));
+  var splitIdiom = VocabQueue.splitInputWords("wet blanket", "en");
+  assert("VocabQueue.splitInputWords preserves idioms with whitespace as single unit", splitIdiom.length === 1 && splitIdiom[0] === 'wet blanket');
+  var splitDelim = VocabQueue.splitInputWords("apple, banana, cherry", "en");
+  assert("VocabQueue.splitInputWords correctly splits comma-delimited words", splitDelim.length === 3 && splitDelim[1] === 'banana');
+  assert("VocabQueue.syncPersistedQueue and restorePersistedQueue callable", typeof VocabQueue.syncPersistedQueue === 'function' && typeof VocabQueue.restorePersistedQueue === 'function');
+  assert("VocabQueue.submitW and enqueueTask callable", typeof VocabQueue.submitW === 'function' && typeof VocabQueue.enqueueTask === 'function');
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

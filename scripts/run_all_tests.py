@@ -48,6 +48,7 @@ def check_jsc_syntax():
         "js/export.js",
         "js/speech.js",
         "js/card_view.js",
+        "js/queue.js",
         "js/app.js",
         "sw.js"
     ]
@@ -212,6 +213,7 @@ def test_delete_word_integrity():
         "js/export.js",
         "js/speech.js",
         "js/card_view.js",
+        "js/queue.js",
         "js/app.js"
     ]
     combined_code = """
@@ -294,6 +296,7 @@ def test_mobile_tabs_and_pair_sync():
         "js/export.js",
         "js/speech.js",
         "js/card_view.js",
+        "js/queue.js",
         "js/app.js"
     ]
     combined_code = """
@@ -578,6 +581,7 @@ def test_html_js_integrity():
         "js/export.js",
         "js/speech.js",
         "js/card_view.js",
+        "js/queue.js",
         "js/app.js"
     ]
     last_idx = -1
