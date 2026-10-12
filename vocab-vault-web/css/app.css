@@ -377,6 +377,8 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     box-shadow: none;
     visibility: hidden;
     pointer-events: none;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
   body:not(.side-collapsed) .sidebar {
     transform: translateX(0);
@@ -389,6 +391,13 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     box-shadow: none;
     visibility: hidden;
     pointer-events: none;
+  }
+  body.side-open-lock {
+    overflow: hidden !important;
+    touch-action: none !important;
+  }
+  body.side-open-lock #mainScroll {
+    pointer-events: none !important;
   }
   .side-close-btn {
     display: inline-flex;
@@ -1023,6 +1032,13 @@ kbd.kbd-hint {
 .detail-tab-btn:hover {
   background: var(--bg-hov);
   color: var(--t);
+}
+.detail-tab-btn:active {
+  transform: scale(0.96);
+}
+.detail-tab-btn:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 1px;
 }
 .detail-tab-btn.active {
   background: var(--ac);

@@ -202,21 +202,11 @@
   }
 
   function checkDevMasterMode() {
-    if (typeof window === 'undefined') return false;
-    if (global.DEV_MASTER_MODE === true || window.DEV_MASTER_MODE === true) return true;
-    try {
-      const p = window.location.pathname || '';
-      if (p === '/dev' || p === '/master' || p.endsWith('/dev.html')) {
-        lsSet('vv_dev_unlocked', '1');
-        return true;
-      }
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('dev') === 'master' || urlParams.get('dev') === '1' || urlParams.get('role') === 'developer' || urlParams.get('master') === '1' || urlParams.get('plan') === 'master') {
-        lsSet('vv_dev_unlocked', '1');
-        return true;
-      }
-    } catch {}
-    return lsGet('vv_dev_unlocked', '0') === '1';
+    // [セキュリティ強化] 本番環境でのURLパラメータやLocalStorageによる課金・クォータバイパスを完全根絶
+    if (typeof window !== 'undefined') {
+      try { localStorage.removeItem('vv_dev_unlocked'); } catch {}
+    }
+    return false;
   }
 
   // --- 1. アプリケーション状態の一元管理 ---
@@ -985,13 +975,21 @@
     rootBuckets.forEach((m, k) => App.rootIndexMap.set(k, [...m.values()]));
   }
 
+  const closeSidebar = () => {
+    document.body.classList.add('side-collapsed');
+    document.body.classList.remove('side-open-lock');
+  };
+
   const toggleSidebar = (force = null) => {
-    const isCollapsed = typeof force === 'boolean' ? !force : document.body.classList.contains('side-collapsed');
-    if (isCollapsed) {
+    const shouldOpen = typeof force === 'boolean' ? force : document.body.classList.contains('side-collapsed');
+    if (shouldOpen) {
       document.body.classList.remove('side-collapsed');
-      if (window.innerWidth <= 760) $('qSearch')?.focus();
+      if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+        document.body.classList.add('side-open-lock');
+        $('qSearch')?.focus?.();
+      }
     } else {
-      document.body.classList.add('side-collapsed');
+      closeSidebar();
     }
   };
   const toggleSec = id => $(id)?.classList.toggle('closed');
@@ -1142,7 +1140,7 @@
     renderPairFileTabs();
 
     if ($('anki')?.style.display === 'block') exitAnki();
-    if (window.innerWidth <= 760) document.body.classList.add('side-collapsed');
+    if (window.innerWidth <= 768) closeSidebar();
     load(1);
   }
 
@@ -1168,7 +1166,7 @@
     else if (type === 'cat') App.cat = cleanVal;
 
     if ($('anki')?.style.display === 'block') exitAnki();
-    if (window.innerWidth <= 760) document.body.classList.add('side-collapsed');
+    if (window.innerWidth <= 768) closeSidebar();
     load(1);
   }
 
@@ -1387,10 +1385,10 @@
 
     let accordionBodyContent = '';
     if (hasMultiPanels) {
-      const tabBtns = panels.map(p => `<button type="button" class="detail-tab-btn ${p.id === defaultTab ? 'active' : ''}" data-act="switch-detail-tab" data-tab="${p.id}">${p.label}</button>`).join('') +
-        `<button type="button" class="detail-tab-btn" data-act="switch-detail-tab" data-tab="all">すべて</button>`;
-      const tabsBar = `<div class="detail-tabs-bar">${tabBtns}</div>`;
-      const panelDivs = panels.map(p => `<div class="detail-panel" data-panel="${p.id}" style="display:${p.id === defaultTab ? 'block' : 'none'}">${p.html}</div>`).join('');
+      const tabBtns = panels.map(p => `<button type="button" class="detail-tab-btn ${p.id === defaultTab ? 'active' : ''}" role="tab" aria-selected="${p.id === defaultTab ? 'true' : 'false'}" data-act="switch-detail-tab" data-tab="${p.id}">${p.label}</button>`).join('') +
+        `<button type="button" class="detail-tab-btn ${defaultTab === 'all' ? 'active' : ''}" role="tab" aria-selected="${defaultTab === 'all' ? 'true' : 'false'}" data-act="switch-detail-tab" data-tab="all">すべて</button>`;
+      const tabsBar = `<div class="detail-tabs-bar" role="tablist">${tabBtns}</div>`;
+      const panelDivs = panels.map(p => `<div class="detail-panel" role="tabpanel" data-panel="${p.id}" style="display:${p.id === defaultTab ? 'block' : 'none'}">${p.html}</div>`).join('');
       accordionBodyContent = `${tabsBar}${panelDivs}`;
     } else {
       accordionBodyContent = fullDetailsContent;
@@ -1398,7 +1396,8 @@
 
     const isSimple = App.viewMode === 'simple';
     const openAttr = isSimple ? '' : ' open';
-    const accordion = fullDetailsContent ? `<details class="card-details-accordion ${isSimple ? 'is-simple-mode' : ''}"${openAttr}><summary class="card-details-sum"><span class="sum-lbl">詳細（語源・例文・歴史）を見る</span><span class="sum-arrow">▾</span></summary><div class="card-details-body">${accordionBodyContent}</div></details>` : '';
+    const initialLabel = hasMultiPanels ? `${panels.find(p => p.id === defaultTab)?.label || '詳細'} を表示中` : '詳細（語源・例文・歴史）を見る';
+    const accordion = fullDetailsContent ? `<details class="card-details-accordion ${isSimple ? 'is-simple-mode' : ''}"${openAttr}><summary class="card-details-sum"><span class="sum-lbl">${initialLabel}</span><span class="sum-arrow">▾</span></summary><div class="card-details-body">${accordionBodyContent}</div></details>` : '';
 
     const quickChips = chipsHtml ? `<div class="card-quick-chips">${chipsHtml}</div>` : '';
 
@@ -1885,7 +1884,9 @@
   }
 
   function toggleDarkMode(d) {
-    document.body.classList.toggle('dark', d);
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.classList.toggle('dark', d);
+    }
     lsSet('vv_theme_dark', d ? '1' : '0');
     if ($('chkDark')) $('chkDark').checked = d;
   }
@@ -2101,11 +2102,7 @@
   }
 
   function toggleDevMasterMode() {
-    const next = !App.isDev;
-    App.isDev = next;
-    lsSet('vv_dev_unlocked', next ? '1' : '0');
-    updCloudUI();
-    showToast(next ? '★ 開発者マスターモード（全機能永久無制限・課金不要）を有効化しました！' : '通常ユーザーモードに戻しました。', next ? 'ok' : 'info', 4000);
+    showToast('本番環境では開発者マスターモードは無効化されています。', 'warn', 3000);
   }
 
   async function cloudLogin(isSignUp = false) {
@@ -2940,9 +2937,10 @@
     const rg = $('aRat'), e = App.aList[0];
     if (!e) return;
     rg.style.display = 'flex';
+    const predictions = global.VocabSRS?.predictIntervals ? global.VocabSRS.predictIntervals(e) : null;
     rg.innerHTML = [['#ef4444', '1: もう一度'], ['#f97316', '2: 難しい'], ['#10b981', '3: 普通'], ['#3b82f6', '4: 簡単']].map((c, idx) => {
-      const d = global.VocabSRS?.predDays ? global.VocabSRS.predDays(e, idx) : 1;
-      return `<button type="button" class="b-rat" style="background:${c[0]}" data-act="rate" data-rate="${idx}"><span>${c[1]}</span><small>${d === 0 ? '1分後' : Math.round(d) + '日後'}</small></button>`;
+      const label = predictions ? predictions[idx] : (global.VocabSRS?.predDays ? (global.VocabSRS.predDays(e, idx) === 0 ? '1分後' : Math.round(global.VocabSRS.predDays(e, idx)) + '日後') : '1日後');
+      return `<button type="button" class="b-rat" style="background:${c[0]}" data-act="rate" data-rate="${idx}"><span>${c[1]}</span><small>${label}</small></button>`;
     }).join('');
   }
 
@@ -3954,10 +3952,20 @@ etymology:${eInst}`;
         const tabName = el.dataset.tab;
         const body = el.closest('.card-details-body');
         if (body) {
-          body.querySelectorAll('.detail-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
+          body.querySelectorAll('.detail-tab-btn').forEach(btn => {
+            const isMatch = btn.dataset.tab === tabName;
+            btn.classList.toggle('active', isMatch);
+            btn.setAttribute('aria-selected', isMatch ? 'true' : 'false');
+          });
           body.querySelectorAll('.detail-panel').forEach(panel => {
             panel.style.display = (tabName === 'all' || panel.dataset.panel === tabName) ? 'block' : 'none';
           });
+          const accordion = el.closest('.card-details-accordion');
+          const sumLbl = accordion?.querySelector('.sum-lbl');
+          if (sumLbl) {
+            const labelText = tabName === 'all' ? '詳細（語源・例文・歴史）' : (el.textContent?.trim() || '詳細');
+            sumLbl.textContent = `${labelText} を表示中`;
+          }
         }
       }
       else if (act === 'page') { App.page += Number(el.dataset.dir); render(); $('mainScroll')?.scrollTo(0, 0); }
@@ -4051,7 +4059,12 @@ etymology:${eInst}`;
     window.addEventListener('touchstart', unlockAudio, { passive: true });
     window.addEventListener('click', unlockAudio, { passive: true });
 
-    if (window.innerWidth <= 760) document.body.classList.add('side-collapsed');
+    if (window.innerWidth <= 768) closeSidebar();
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 768 && document.body.classList.contains('side-open-lock')) {
+        document.body.classList.remove('side-open-lock');
+      }
+    }, { passive: true });
     if (lsGet('vv_use_hist_mode', '1') === '0' && $('chkHist')) $('chkHist').checked = false;
     if (lsGet('vv_use_wikt', '1') === '0' && $('chkWikt')) $('chkWikt').checked = false;
     toggleDarkMode(lsGet('vv_theme_dark', '1') === '1');
@@ -4066,7 +4079,9 @@ etymology:${eInst}`;
     else if (global.VocabSync?.isCloudReady?.()) processQueue();
 
     // PWA起動モードの確認
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = (typeof URLSearchParams !== 'undefined' && window.location?.search)
+      ? new URLSearchParams(window.location.search)
+      : { get: () => null };
     if (urlParams.get('mode') === 'anki') {
       setTimeout(() => startAnki(), 250);
     } else if (urlParams.get('mode') === 'extract') {
@@ -4239,6 +4254,7 @@ etymology:${eInst}`;
     validateEntry,
     buildRight,
     toggleSidebar,
+    closeSidebar,
     toggleSec,
     toggleMask,
     toggleCrossLang,
@@ -4313,12 +4329,25 @@ etymology:${eInst}`;
     clearOcrPreview,
     runOcrCurrentFile,
     saveOcrKeyAndExecute,
+    getFiltered,
     initApp
   };
 
-  // 既存のHTMLイベントハンドラから直接参照できるようにwindowに展開
-  Object.assign(global, global.VocabCore);
+  // 既存のHTMLイベントハンドラから直接参照できるように安全にwindowへ展開（readonlyプロパティ衝突を安全にバイパス）
+  if (global.VocabCore) {
+    for (const k of Object.keys(global.VocabCore)) {
+      try {
+        global[k] = global.VocabCore[k];
+      } catch (_) {}
+    }
+  }
 
-  window.addEventListener('DOMContentLoaded', initApp);
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && typeof document !== 'undefined') {
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initApp);
+    } else if (document.body) {
+      initApp(); // すでにDOM読み込み完了済みの場合は即時起動
+    }
+  }
 })(typeof window !== 'undefined' ? window : globalThis);
 

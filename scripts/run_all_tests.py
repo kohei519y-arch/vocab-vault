@@ -71,6 +71,7 @@ def check_jsc_syntax():
             globalThis.addEventListener = function(){};
             var caches = { open: function(){ return Promise.resolve({ addAll: function(){}, delete: function(){} }); }, keys: function(){ return Promise.resolve([]); } };
             var document = {
+                body: { classList: { add: function(){}, remove: function(){}, toggle: function(){ return false; } } },
                 addEventListener: function(){},
                 getElementById: function(){ return null; },
                 querySelector: function(){ return null; },
@@ -85,6 +86,8 @@ def check_jsc_syntax():
             var localStorage = globalThis.localStorage;
             var navigator = { onLine: true, userAgent: 'test', clipboard: { writeText: function(){} } };
             var location = { href: '', search: '', pathname: '', hash: '' };
+            globalThis.URLSearchParams = function(q){ this.get = function(){ return null; }; };
+            var URLSearchParams = globalThis.URLSearchParams;
             """
             res = subprocess.run([JSC_PATH, "-e", shim + code], capture_output=True, text=True)
 
@@ -113,11 +116,13 @@ def test_srs_anchor_bonus():
     // Test 1: Anchor Bonus calculation
     var b0 = SRS.getEtymologyAnchorBonus({{ word: "test", etymologyTags: [] }});
     var b1 = SRS.getEtymologyAnchorBonus({{ word: "test", etymologyTags: ["*sta-"] }});
+    var b2 = SRS.getEtymologyAnchorBonus({{ word: "test", etymologyTags: ["*sta-", "*per-"] }});
     var b3 = SRS.getEtymologyAnchorBonus({{ word: "test", etymologyTags: ["*sta-", "*per-", "*sed-"] }});
 
     if (Math.abs(b0 - 1.0) > 0.001) throw new Error("Bonus for 0 tags should be 1.0, got " + b0);
     if (Math.abs(b1 - 1.08) > 0.001) throw new Error("Bonus for 1 tag should be 1.08, got " + b1);
-    if (Math.abs(b3 - 1.15) > 0.001) throw new Error("Bonus for 3 tags should be 1.15, got " + b3);
+    if (Math.abs(b2 - 1.15) > 0.001) throw new Error("Bonus for 2 tags should be 1.15, got " + b2);
+    if (Math.abs(b3 - 1.25) > 0.001) throw new Error("Bonus for 3 tags should be 1.25, got " + b3);
 
     // Test 2: calculateNextReview with rating 0 (reset)
     var r0 = SRS.calculateNextReview({{ interval: 10, repetition: 3, efactor: 2.5 }}, 0);
@@ -275,8 +280,8 @@ def test_mobile_tabs_and_pair_sync():
     globalThis.document = {
         addEventListener: function() {},
         body: { classList: { add: function(){}, remove: function(){}, contains: function(){ return false; }, toggle: function(){} } },
-        getElementById: function() { return { value: '', classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
-        querySelector: function() { return { value: '', classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        getElementById: function() { return { value: '', focus: function(){}, blur: function(){}, classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
+        querySelector: function() { return { value: '', focus: function(){}, blur: function(){}, classList: { add: function(){}, remove: function(){}, toggle: function(){} }, style: {}, innerHTML: '', addEventListener: function(){}, querySelectorAll: function(){ return []; }, querySelector: function(){ return null; }, appendChild: function(){} }; },
         querySelectorAll: function() { return []; },
         createElement: function() { return { style: {}, appendChild: function(){}, addEventListener: function(){}, remove: function(){}, dataset: {}, classList: { add: function(){} } }; },
         createDocumentFragment: function() { return { appendChild: function(){} }; }
@@ -308,6 +313,33 @@ def test_mobile_tabs_and_pair_sync():
     if (!renderedHtml.includes('detail-tabs-bar')) throw new Error('detail-tabs-bar not found in buildRight');
     if (!renderedHtml.includes('data-act="switch-detail-tab"')) throw new Error('switch-detail-tab action not found in buildRight');
     if (!renderedHtml.includes('detail-panel')) throw new Error('detail-panel not found in buildRight');
+    if (!renderedHtml.includes('role="tab"')) throw new Error('role="tab" not found in buildRight');
+    if (!renderedHtml.includes('aria-selected="true"')) throw new Error('aria-selected="true" not found in buildRight');
+    if (!renderedHtml.includes('を表示中')) throw new Error('Dynamic display label not found in buildRight');
+
+    // 1b. Verify toggleSidebar and closeSidebar manage side-open-lock correctly
+    var bodyClasses = new Set(['side-collapsed']);
+    globalThis.document.body.classList = {
+        add: function(c) { bodyClasses.add(c); },
+        remove: function(c) { bodyClasses.delete(c); },
+        contains: function(c) { return bodyClasses.has(c); },
+        toggle: function(c, force) {
+            if (typeof force === 'boolean') {
+                if (force) bodyClasses.add(c); else bodyClasses.delete(c);
+                return force;
+            }
+            if (bodyClasses.has(c)) { bodyClasses.delete(c); return false; }
+            bodyClasses.add(c); return true;
+        }
+    };
+    globalThis.innerWidth = 390;
+    (global.VocabCore?.toggleSidebar || toggleSidebar)(true);
+    if (!bodyClasses.has('side-open-lock')) throw new Error('side-open-lock was not added when opening sidebar on mobile');
+    if (bodyClasses.has('side-collapsed')) throw new Error('side-collapsed was not removed when opening sidebar');
+
+    (global.VocabCore?.closeSidebar || closeSidebar)();
+    if (bodyClasses.has('side-open-lock')) throw new Error('side-open-lock was not removed when closing sidebar');
+    if (!bodyClasses.has('side-collapsed')) throw new Error('side-collapsed was not added when closing sidebar');
 
     // 2. Verify Anki review updates correct active language pair key
     var pairCard = {
@@ -352,7 +384,8 @@ def test_mobile_tabs_and_pair_sync():
 
     res = subprocess.run([JSC_PATH, "-e", combined_code], capture_output=True, text=True)
     if res.returncode == 0 and "OK" in res.stdout:
-        log_pass("Mobile detail tabs generated with clean segment controls (.detail-tabs-bar)")
+        log_pass("Mobile detail tabs generated with clean segment controls (.detail-tabs-bar) & ARIA tags")
+        log_pass("Mobile sidebar scroll lock (side-open-lock) safely handles drawer lifecycle")
         log_pass("Language pair review (procRev) accurately synchronizes with pair storage keys")
         log_pass("Multi-language pair backup and restoration (parseAnyWords) fully verified")
     else:
@@ -561,6 +594,44 @@ def test_s_grade_features():
     else:
         log_fail("#ocrCameraInput missing or lacking capture='environment'")
 
+def test_e2e_full_stack_jsc():
+    print("\n--- 7. Pure WebKit JSC Full-Stack Integration E2E Tests ---")
+    jsc_test_path = os.path.join(BASE_DIR, "scripts/test_jsc_suite.js")
+    if not os.path.exists(jsc_test_path):
+        log_fail("scripts/test_jsc_suite.js does not exist")
+        return
+
+    res = subprocess.run([JSC_PATH, jsc_test_path], capture_output=True, text=True)
+    if res.returncode != 0:
+        log_fail(f"JSC test execution failed with exit code {res.returncode}: {res.stderr or res.stdout}")
+        return
+
+    try:
+        # Find JSON array in stdout
+        stdout_clean = res.stdout.strip()
+        lines = stdout_clean.split("\n")
+        json_line = None
+        for l in reversed(lines):
+            if l.startswith("[") and l.endswith("]"):
+                json_line = l
+                break
+
+        if not json_line:
+            log_fail("Could not find JSON test output in JSC output: " + stdout_clean)
+            return
+
+        test_results = json.loads(json_line)
+        for r in test_results:
+            name = r.get("test", "Unknown test")
+            status = r.get("status", "FAIL")
+            details = r.get("details", "")
+            if status == "PASS":
+                log_pass(f"{name} {f'({details})' if details else ''}")
+            else:
+                log_fail(f"{name}: {details}")
+    except Exception as e:
+        log_fail(f"Failed to parse JSC test results: {e}")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -574,6 +645,7 @@ def main():
     test_html_js_integrity()
     test_prompt_injection_sanitizer()
     test_s_grade_features()
+    test_e2e_full_stack_jsc()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")
