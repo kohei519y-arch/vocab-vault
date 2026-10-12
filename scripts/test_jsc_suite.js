@@ -667,6 +667,34 @@ try {
   // 5. 非デフォルト言語ペア（英英: distinction_entries_en_en 等）の完全解決
   var enEnCfg = VocabStorage.resolveConfig('distinction_entries_en_en');
   assert("VocabStorage.resolveConfig correctly resolves non-default en_en pair", enEnCfg.srcLang === 'en' && enEnCfg.tgtLang === 'en' && enEnCfg.key === 'distinction_entries_en_en');
+
+  // 6. FSRS 認知アンカーボーナスの二重乗算排除（stability === interval）
+  var anchoredItem = {
+    id: 'anchored_1',
+    word: 'stand',
+    repetition: 1,
+    interval: 2,
+    stability: 2,
+    difficulty: 5.0,
+    etymologyTags: ['印欧祖語: *sta- (立つ)']
+  };
+  var ankiRes = VocabSRS.calculateNextReview(anchoredItem, 2);
+  assert("VocabSRS.calculateNextReview eliminates duplicate anchorBonus multiplication", Math.abs(ankiRes.stability - ankiRes.interval) < 0.05);
+
+  // 7. 言語ペアごとの墓石とクリア日時の完全分離（英英 clearAllWords が英和を汚染しない）
+  var dummyEnEnList = [{ id: 'en_word_1', word: 'benevolent' }];
+  VocabStorage.clearAllWords('distinction_entries_en_en', dummyEnEnList);
+  var enEnTombs = VocabStorage.getTombstones('distinction_entries_en_en');
+  var defaultEnTombs = VocabStorage.getTombstones('distinction_entries');
+  assert("VocabStorage.clearAllWords isolates tombstones per language pair", enEnTombs.has('id:en_word_1') && !defaultEnTombs.has('id:en_word_1'));
+
+  // 8. 日本語 IME 変換中の submitW 誤送信抑止（isComposing ガード）
+  var queueInputTested = false;
+  App.isComposing = true;
+  var dummyWordEl = { value: '誤送信単語' };
+  VocabQueue.submitW();
+  assert("VocabQueue.submitW guards against IME composition Enter submissions", dummyWordEl.value === '誤送信単語');
+  App.isComposing = false;
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

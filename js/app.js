@@ -866,7 +866,7 @@
     getActivePairKey: () => getActivePairConfig().key,
     getList: key => (key === getActivePairConfig().key ? App.entries : getJson(key)),
     saveList: (key, list) => {
-      setJson(key, list, true, true);
+      setJson(key, list, true, false);
       if (global.VocabStorage) global.VocabStorage.state.mem[key] = list;
     },
     findAcrossAllPairs: cur => {
@@ -976,7 +976,7 @@
     const l = App.srcLang;
     const label = pairCfg.label || LANGS[l]?.label || '現在の単語帳';
     if (!confirm(`選択中の単語帳（${label}）の全単語を削除しますか？`)) return;
-    global.VocabStorage?.clearAllWords(l, getJson(pairCfg.key), () => {
+    global.VocabStorage?.clearAllWords(pairCfg.key, getJson(pairCfg.key), () => {
       setJson(pairCfg.key, [], true, true);
       App.entries = [];
       global.VocabStorage.state.mem[pairCfg.key] = [];

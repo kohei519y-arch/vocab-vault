@@ -3,13 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <script>
-    if (typeof window !== 'undefined' && 'caches' in window) {
-      caches.keys().then(function(keys) {
-        keys.forEach(function(k) {
-          if (!k.includes('v11')) { caches.delete(k); }
-        });
-      }).catch(function(){});
-    }
     // [ゼロ障害保証] 自己修復型ウォッチドッグ & エラーバウンダリ
     window.addEventListener('error', function(e) {
       console.warn('[VocabVault Watchdog] Handled error:', e.message);

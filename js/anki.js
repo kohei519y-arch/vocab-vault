@@ -116,7 +116,7 @@
       const baseDays = predDays(e, rating);
       const fuzz = baseDays >= 2 ? (0.97 + Math.random() * 0.06) : 1; // 間隔の適度な分散
       nextInterval = Number(Math.min(MAX_INTERVAL_DAYS, Math.max(1.0, baseDays * fuzz)).toFixed(2));
-      curStability = Number((nextInterval * anchorBonus).toFixed(2));
+      curStability = Number(nextInterval.toFixed(2));
 
       // SM-2 互換パラメータの同期
       nextEfactor = Math.max(1.3, Math.min(3.5, nextEfactor + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0)));

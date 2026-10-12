@@ -733,10 +733,11 @@
         await Promise.all(Array.from(allKeySet).map(async k => {
           const cfg = resolveConfig(k);
           const srcL = cfg.srcLang || keyToLang(k);
-          const b = await idbFetchLangBundle(srcL, manualSalvage);
+          const pairId = cfg.pairId || cfg.key;
+          const b = await idbFetchLangBundle(k, manualSalvage);
           if (!b) return;
-          if (b.clearAt > getClearedAt(srcL)) Storage.clearedAt[srcL] = b.clearAt;
-          if (b.tombs) absorbTombArray(getTombstones(srcL), b.tombs);
+          if (b.clearAt > getClearedAt(k)) Storage.clearedAt[pairId] = b.clearAt;
+          if (b.tombs) absorbTombArray(getTombstones(k), b.tombs);
 
           let idbWords = Array.isArray(b.words) ? b.words : [];
           if (manualSalvage && b.snaps && b.snaps.length) {
@@ -773,11 +774,12 @@
   async function syncFromIdbForLang(l, ctx) {
     const cfg = resolveConfig(l);
     const k = cfg.key;
+    const pairId = cfg.pairId || cfg.key;
     const srcLang = cfg.srcLang || keyToLang(k);
-    const b = await idbFetchLangBundle(srcLang, false);
+    const b = await idbFetchLangBundle(k, false);
     if (!b) return;
-    if (b.clearAt > getClearedAt(srcLang)) Storage.clearedAt[srcLang] = b.clearAt;
-    absorbTombArray(getTombstones(srcLang), b.tombs);
+    if (b.clearAt > getClearedAt(k)) Storage.clearedAt[pairId] = b.clearAt;
+    absorbTombArray(getTombstones(k), b.tombs);
     const merged = mergeWords(ctx.getJson(k), b.words, srcLang, false);
     Storage.mem[srcLang] = merged;
     Storage.mem[k] = merged;

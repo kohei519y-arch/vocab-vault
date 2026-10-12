@@ -590,6 +590,32 @@
         }
       });
     }
+
+    const inWordEl = $('inWord');
+    if (inWordEl) {
+      inWordEl.addEventListener('compositionstart', () => { if (appState) appState.isComposing = true; });
+      inWordEl.addEventListener('compositionend', () => {
+        setTimeout(() => { if (appState) appState.isComposing = false; }, 50);
+      });
+      inWordEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (appState?.isComposing || e.isComposing || e.keyCode === 229)) {
+          e.preventDefault();
+        }
+      });
+    }
+
+    const inFolEl = $('inFol');
+    if (inFolEl) {
+      inFolEl.addEventListener('compositionstart', () => { if (appState) appState.isComposing = true; });
+      inFolEl.addEventListener('compositionend', () => {
+        setTimeout(() => { if (appState) appState.isComposing = false; }, 50);
+      });
+      inFolEl.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && (appState?.isComposing || e.isComposing || e.keyCode === 229)) {
+          e.preventDefault();
+        }
+      });
+    }
   }
 
   /**
