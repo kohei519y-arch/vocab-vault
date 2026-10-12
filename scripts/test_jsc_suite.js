@@ -327,6 +327,24 @@ try {
   exportedBlobName = null;
   VocabCore.exportObsidianMarkdown();
   assert("exportObsidianMarkdown executed and triggered download", typeof exportedBlobName === 'string' && exportedBlobName.includes('obsidian'), "File: " + exportedBlobName);
+
+  // Test jumpToWord with accurate page resolution across pages (PER_PAGE = 30)
+  assert("VocabCore contains jumpToWord", typeof VocabCore.jumpToWord === 'function');
+  const dummyManyWords = [];
+  for (let idx = 1; idx <= 35; idx++) {
+    dummyManyWords.push({ id: 'w' + idx, word: 'testword' + idx, lang: 'en', meanings: [{ pos: 'Noun', text: '意味' + idx }] });
+  }
+  VocabCore.App.entries = dummyManyWords;
+  VocabCore.setJson('distinction_entries', dummyManyWords);
+
+  // 1番目の単語（'new'ソートにより2ページ目・最古にある単語）へジャンプ
+  VocabCore.App.page = 1;
+  VocabCore.jumpToWord('testword1');
+  assert("jumpToWord accurately advances to page 2 for oldest item", VocabCore.App.page === 2, "Page: " + VocabCore.App.page);
+
+  // 35番目の単語（'new'ソートにより1ページ目・最新にある単語）へジャンプ
+  VocabCore.jumpToWord('testword35');
+  assert("jumpToWord returns to page 1 for newest item", VocabCore.App.page === 1, "Page: " + VocabCore.App.page);
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

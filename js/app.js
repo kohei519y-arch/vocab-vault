@@ -1467,27 +1467,130 @@
     if ($('anki')?.style.display === 'block') {
       exitAnki();
     }
+    const modalIds = ['graphModal', 'extractModal', 'settingsModal', 'shortcutsModal'];
+    modalIds.forEach(m => {
+      const el = $(m);
+      if (el && (el.classList?.contains?.('open') || String(el.className || '').includes('open'))) {
+        toggleModal(m, false);
+      }
+    });
+
     const spec = parseInputWordSpec(w);
-    const lk = makeLookupKey(spec.cleanWord, tLang, spec.homographIndex);
-    if (tLang && tLang !== App.lang && !App.crossLang) {
-      App.lang = tLang;
+    const targetWord = spec.cleanWord;
+    const homoIdx = spec.homographIndex || 1;
+    if (!targetWord) return;
+
+    // 1. 言語の判定と切り替え
+    const sLang = tLang || App.lang;
+    let targetEntries = Array.isArray(App.entries) ? App.entries : [];
+    let switchLang = false;
+
+    if (sLang !== App.lang && !App.crossLang) {
+      App.lang = sLang;
+      App.srcLang = sLang;
       lsSet('vv_active_lang', App.lang);
+      lsSet('vv_src_lang', App.srcLang);
+      const pairCfg = getActivePairConfig();
+      App.entries = getJson(pairCfg.key);
+      targetEntries = App.entries;
+      switchLang = true;
+    }
+
+    // 2. 単語エントリの特定（完全一致 / lookupKey一致）
+    const targetLk = makeLookupKey(targetWord, sLang, homoIdx);
+    const baseTargetLk = makeLookupKey(targetWord, sLang, 1);
+
+    let targetItem = targetEntries.find(it => makeLookupKey(it.word, it.lang || sLang, it.homographIndex) === targetLk)
+      || targetEntries.find(it => makeLookupKey(it.word, it.lang || sLang, 1) === baseTargetLk)
+      || targetEntries.find(it => String(it.word || '').toLowerCase() === targetWord.toLowerCase());
+
+    // 現在の言語で見つからない場合、他言語ペアを横断スキャン
+    if (!targetItem && !App.crossLang) {
+      const allPairs = getAllKnownPairConfigs();
+      for (const p of allPairs) {
+        if (p.src === sLang) continue;
+        const list = getJson(p.key);
+        const match = list.find(it => makeLookupKey(it.word, p.src, it.homographIndex) === makeLookupKey(targetWord, p.src, homoIdx)
+          || String(it.word || '').toLowerCase() === targetWord.toLowerCase());
+        if (match) {
+          targetItem = match;
+          App.srcLang = p.src;
+          App.tgtLang = p.tgt;
+          App.lang = p.src;
+          lsSet('vv_src_lang', p.src);
+          lsSet('vv_tgt_lang', p.tgt);
+          lsSet('vv_active_lang', p.src);
+          App.entries = list;
+          targetEntries = list;
+          switchLang = true;
+          break;
+        }
+      }
+    }
+
+    if (!targetItem) {
+      // 登録されていない単語の場合は検索フィルターのみ実行
+      setSearch(targetWord, true);
+      return;
+    }
+
+    // 3. フィルターの自動クリア
+    // 対象単語が現在のフィルタで非表示になってしまわないよう、該当単語を含まないフィルタを解除
+    let needFilterReset = false;
+    if (App.statF !== 'all') {
+      const due = targetItem.nextReview <= Date.now();
+      const matchStat = (App.statF === 'due' && due) || (App.statF === 'fut' && !due);
+      if (!matchStat) needFilterReset = true;
+    }
+    if (App.fol !== 'all' && targetItem.folder !== App.fol) needFilterReset = true;
+    if (App.cat !== 'all' && targetItem.category !== App.cat) needFilterReset = true;
+    if (App.posF !== 'all') needFilterReset = true;
+    if (App.qStr) {
+      const qLower = App.qStr.toLowerCase();
+      if (!String(targetItem.word || '').toLowerCase().includes(qLower)) needFilterReset = true;
+    }
+
+    if (needFilterReset || switchLang) {
       App.statF = App.cat = App.posF = App.fol = 'all';
-      App.qStr = ''; App.qReg = null;
+      App.qStr = '';
+      App.qReg = null;
       if ($('qSearch')) $('qSearch').value = '';
       if ($('qClear')) $('qClear').style.display = 'none';
-      App.pendingJump = { lk, rawW: w, lang:tLang };
-      return load(1);
+      if ($('resetFiltBtn')) $('resetFiltBtn').style.display = 'none';
     }
-    const cards = [...document.querySelectorAll('#list .card')];
-    const el = cards.find(c => c.dataset.word === lk && (!tLang || c.dataset.lang === tLang)) || cards.find(c => c.dataset.word === lk);
-    if (el) {
-      el.scrollIntoView?.({ behavior:'smooth', block:'center' });
-      el.classList.add('highlight-jump');
-      setTimeout(() => el.classList.remove('highlight-jump'), 1700);
-    } else {
-      setSearch(spec.cleanWord, true, tLang !== App.lang ? true : null);
+
+    // 4. 正確なページ番号の算出（何ページ目にあるかを特定して直接ジャンプ）
+    const filtered = getFiltered();
+    const itemIndex = filtered.findIndex(it => (it.id && targetItem.id && it.id === targetItem.id) || (makeLookupKey(it.word, it.lang || sLang, it.homographIndex) === targetLk));
+    const targetPage = itemIndex >= 0 ? Math.floor(itemIndex / PER_PAGE) + 1 : 1;
+
+    App.page = targetPage;
+    render();
+    if (switchLang || needFilterReset) {
+      renderSidebarTree();
+      renderPairFileTabs();
+      updStats();
     }
+
+    // 5. DOM上のカード要素を確実に発見してスクロール＆ハイライト
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const cards = [...document.querySelectorAll('#list .card')];
+        const el = cards.find(c => c.dataset.word === targetLk)
+          || cards.find(c => c.dataset.word === baseTargetLk)
+          || cards.find(c => c.querySelector('.hw')?.textContent?.trim()?.toLowerCase() === targetWord.toLowerCase());
+
+        if (el) {
+          el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+          el.classList?.add?.('highlight-jump');
+          const cIdx = cards.indexOf(el);
+          if (cIdx >= 0) App.focusedCardIndex = cIdx;
+          setTimeout(() => el.classList?.remove?.('highlight-jump'), 2000);
+        } else {
+          $('mainScroll')?.scrollTo?.({ top: 0, behavior: 'smooth' });
+        }
+      }, 70);
+    });
   }
 
   function relTime(ts) {
@@ -3252,8 +3355,10 @@
       }
 
       activeIndex = -1;
-      box.innerHTML = suggestions.map((s, idx) => `
-        <div class="suggest-item ${s.isExact ? 'exact-match' : ''}" data-idx="${idx}" data-type="${s.type}" data-word="${esc(s.word)}">
+      box.innerHTML = suggestions.map((s, idx) => {
+        const jumpW = (s.item && s.item.homographIndex > 1) ? `${s.word}#${s.item.homographIndex}` : s.word;
+        return `
+        <div class="suggest-item ${s.isExact ? 'exact-match' : ''}" data-idx="${idx}" data-type="${s.type}" data-word="${esc(jumpW)}">
           <div class="suggest-item-left">
             <span class="suggest-item-word">${esc(s.word)}${s.folder ? `<small style="margin-left:6px;font-size:10px;color:var(--m)">[${esc(s.folder)}]</small>` : ''}</span>
             <span class="suggest-item-meaning">${esc(s.meaning)}</span>
@@ -3262,7 +3367,7 @@
             ${s.isExact ? '登録済(タップで移動)' : s.isRegistered ? '登録済' : s.type === 'root' ? '語根' : esc(s.pos)}
           </span>
         </div>
-      `).join('');
+      `;}).join('');
       box.style.display = 'flex';
     }
 
@@ -3315,9 +3420,11 @@
       if (type === 'word') {
         jumpToWord(word, App.lang);
         input.value = '';
+        input.blur();
       } else if (type === 'root') {
         openGraphModal(word);
         input.value = '';
+        input.blur();
       }
     }
 
@@ -3585,8 +3692,10 @@
 
     if (rawItems.length === 1 && existingMatches.length === 1 && !newItems.length) {
       // 単一の既登録語を入力した場合: 重複AI通信や二重登録を抑止し、該当カードへ瞬時にスクロール・ハイライト
-      jumpToWord(existingMatches[0].word, sLang);
-      showToast(`「${existingMatches[0].word}」はすでに登録されています（カードに移動しました）`, 'info');
+      const match = existingMatches[0];
+      const jumpKey = match.homographIndex > 1 ? `${match.word}#${match.homographIndex}` : match.word;
+      jumpToWord(jumpKey, sLang);
+      showToast(`「${match.word}」はすでに登録されています（カードに移動しました）`, 'info');
       return;
     }
 
@@ -4200,6 +4309,13 @@ etymology:${eInst}`;
       qIn.addEventListener('compositionstart', () => { App.isComposing = true; });
       qIn.addEventListener('compositionend', e => { App.isComposing = false; clearTimeout(App.searchDebounceTimer); setSearch(e.target.value); });
       qIn.addEventListener('input', e => { if (!App.isComposing) { clearTimeout(App.searchDebounceTimer); App.searchDebounceTimer = setTimeout(() => setSearch(e.target.value), 160); } });
+      qIn.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const val = e.target.value.trim();
+          if (val) jumpToWord(val);
+        }
+      });
     }
   }
 
