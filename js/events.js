@@ -56,8 +56,14 @@
     try {
       const hooks = typeof ctx.getAppSyncHooks === 'function' ? ctx.getAppSyncHooks() : (global.VocabCore?.getAppSyncHooks?.());
       let totalPulled = 0, totalPushed = 0;
-      const langKeys = global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja'];
-      for (const l of langKeys) {
+      const getPairsFn = ctx.getAllKnownPairConfigs || global.VocabCore?.getAllKnownPairConfigs || (() => []);
+      const allKnown = getPairsFn();
+      const syncTargets = new Set(global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja']);
+      allKnown.forEach(p => {
+        const id = p.pairId || p.key;
+        if (id) syncTargets.add(id);
+      });
+      for (const l of syncTargets) {
         const res = await global.VocabSync.syncLangWithSupabase(l, hooks);
         totalPulled += res.pulled;
         totalPushed += res.pushed;

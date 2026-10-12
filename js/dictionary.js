@@ -453,11 +453,31 @@
   }
 
   /**
-   * Gemini API 利用可能モデル一覧の取得
+   * Gemini API 利用可能モデル一覧の取得 (1時間TTLキャッシュ)
    */
   const EXCLUDE_MODELS = ['tts', 'image', 'vision', 'embedding', 'aqa', 'audio', 'learnlm', 'robotics'];
+  let _cachedModels = null;
+  let _cachedModelsTs = 0;
+  const MODELS_CACHE_TTL = 3600000; // 1時間
+
   async function fetchModels(key) {
     if (!key) return [];
+    const now = Date.now();
+    if (_cachedModels && (now - _cachedModelsTs < MODELS_CACHE_TTL)) {
+      return _cachedModels;
+    }
+    try {
+      const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem('vv_cached_gemini_models') : null;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && Array.isArray(parsed.models) && (now - parsed.ts < MODELS_CACHE_TTL)) {
+          _cachedModels = parsed.models;
+          _cachedModelsTs = parsed.ts;
+          return _cachedModels;
+        }
+      }
+    } catch {}
+
     try {
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': key } });
       if (res.ok) {
@@ -473,7 +493,16 @@
           return (isFlashStd ? 400 : n.includes('lite') ? 300 : 100) + ver * 10 - (/preview|-exp/.test(n) ? 60 : 0);
         };
         valid.sort((a, b) => scoreModel(b) - scoreModel(a));
-        if (valid.length) return valid;
+        if (valid.length) {
+          _cachedModels = valid;
+          _cachedModelsTs = now;
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem('vv_cached_gemini_models', JSON.stringify({ ts: now, models: valid }));
+            }
+          } catch {}
+          return valid;
+        }
       }
     } catch (e) {
       console.warn('[fetchModels fallback]', e?.message || e);

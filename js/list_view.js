@@ -126,13 +126,15 @@
     // 5. In-place DOM alignment: innerHTML = '' を撤廃し、最小限の insertBefore で位置調整
     // フォーカス（document.activeElement）、テキスト選択、スクロール位置を完全保持
     if (typeof listContainer.insertBefore === 'function' && listContainer.children !== undefined) {
-      finalNodes.forEach((node, idx) => {
-        if (!node) return;
-        const currentAtIdx = (listContainer.children && idx < listContainer.children.length) ? listContainer.children[idx] : null;
-        if (currentAtIdx !== node) {
-          listContainer.insertBefore(node, currentAtIdx || null);
+      let nextRefNode = null;
+      for (let i = finalNodes.length - 1; i >= 0; i--) {
+        const node = finalNodes[i];
+        if (!node) continue;
+        if (node.nextSibling !== nextRefNode) {
+          listContainer.insertBefore(node, nextRefNode);
         }
-      });
+        nextRefNode = node;
+      }
       if (listContainer.children && listContainer.children.length > finalNodes.length) {
         const finalSet = new Set(finalNodes);
         const toRemove = [];

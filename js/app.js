@@ -667,6 +667,7 @@
     getJson,
     setJson,
     getActivePairConfig,
+    getAllKnownPairConfigs,
     enqueueTask,
     getAppSyncHooks,
     syncFromIdbForLang,
@@ -701,18 +702,31 @@
 
   function getAppSyncHooks() {
     return {
-      getLocalEntries: l => getJson(LANGS[l].key),
-      getLocalTombMap: l => global.VocabStorage ? global.VocabStorage.getTombstones(l) : new Map(),
-      getLocalClearedAt: l => global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0,
+      getLocalEntries: l => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return getJson(cfg.key);
+      },
+      getLocalTombMap: l => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return global.VocabStorage ? global.VocabStorage.getTombstones(cfg.key) : new Map();
+      },
+      getLocalClearedAt: l => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return global.VocabStorage ? global.VocabStorage.getClearedAt(cfg.key) : 0;
+      },
       mergeWords,
-      isTombstoned: (it, m, l, c) => global.VocabStorage ? global.VocabStorage.isTombstoned(it, m, l, c) : false,
+      isTombstoned: (it, m, l, c) => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
+        return global.VocabStorage ? global.VocabStorage.isTombstoned(it, m, cfg.key, c) : false;
+      },
       makeWordKey,
       applyMergedLangState: (l, mergedEntries, mergedTombMap, mergedClearedAt) => {
+        const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : (LANGS[l] || LANGS.en);
         if (global.VocabStorage) {
-          if (mergedClearedAt > global.VocabStorage.getClearedAt(l)) global.VocabStorage.saveClearedAt(l, mergedClearedAt);
-          global.VocabStorage.saveTombstones(l, mergedTombMap);
+          if (mergedClearedAt > global.VocabStorage.getClearedAt(cfg.key)) global.VocabStorage.saveClearedAt(cfg.key, mergedClearedAt);
+          global.VocabStorage.saveTombstones(cfg.key, mergedTombMap);
         }
-        setJson(LANGS[l].key, mergedEntries, true, true, true);
+        setJson(cfg.key, mergedEntries, true, true, true);
       }
     };
   }
@@ -1191,6 +1205,7 @@
     getActivePairConfig,
     getActivePairFiles,
     getAllKnownPairConfigs,
+    getAppSyncHooks,
     getPairShortLabel,
     renderPairFileTabs,
     openGraphModal,

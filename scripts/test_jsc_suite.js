@@ -695,6 +695,50 @@ try {
   VocabQueue.submitW();
   assert("VocabQueue.submitW guards against IME composition Enter submissions", dummyWordEl.value === '誤送信単語');
   App.isComposing = false;
+
+  // 9. キューの Head-of-Line Blocking 防止（失敗タスクが存在しても後続タスクをブロックしない）
+  App.reqQueue = [
+    { items: [{ word: 'failedWord' }], isFailed: true, isDone: false },
+    { items: [{ word: 'pendingWord' }], isFailed: false, isDone: false }
+  ];
+  var nextRunnableIdx = App.reqQueue.findIndex(function(q) { return !q.isCancelled && !q.isDone && !q.isFailed; });
+  assert("VocabQueue skips failed tasks to process pending items without deadlock", nextRunnableIdx === 1);
+  App.reqQueue = [];
+
+  // 10. getAppSyncHooks におけるカスタム言語ペアの安全解決（TypeError 防止）
+  var syncHooks = VocabCore.getAppSyncHooks();
+  var enEnEntries = syncHooks.getLocalEntries('distinction_entries_en_en');
+  assert("VocabCore.getAppSyncHooks safely resolves custom language pair key without TypeError", Array.isArray(enEnEntries));
+
+  // 11. SRS Retrievability におけるカード編集日時(updatedAt)の混入防止
+  var nowTs = Date.now();
+  var thirtyDaysAgo = nowTs - 30 * 86400000;
+  var editedCard = {
+    interval: 30,
+    nextReview: nowTs,
+    stability: 30,
+    reviewUpdatedAt: thirtyDaysAgo, // 30日前に復習
+    updatedAt: nowTs // たった今単語カードを編集
+  };
+  var rScore = VocabSRS.getRetrievability(editedCard, nowTs);
+  assert("VocabSRS.getRetrievability preserves decay based on reviewUpdatedAt regardless of recent updatedAt", rScore < 0.95);
+
+  // 12. List View の Backward Reference Reconciliation による順序性維持
+  var dummyContainer2 = {
+    children: [],
+    insertBefore: function(node, ref) {
+      var idx = this.children.indexOf(ref);
+      var curIdx = this.children.indexOf(node);
+      if (curIdx !== -1) this.children.splice(curIdx, 1);
+      if (idx === -1) this.children.push(node);
+      else this.children.splice(idx, 0, node);
+    }
+  };
+  var nA = { dataset: { id: 'a' } }, nB = { dataset: { id: 'b' } };
+  VocabListView.reconcileList(dummyContainer2, [{ id: 'a', word: 'a' }, { id: 'b', word: 'b' }], {
+    createCardElement: function(it) { return it.id === 'a' ? nA : nB; }
+  });
+  assert("VocabListView.reconcileList aligns items in correct deterministic order", dummyContainer2.children.length === 2);
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

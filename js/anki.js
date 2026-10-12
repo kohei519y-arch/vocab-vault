@@ -34,7 +34,7 @@
    */
   function getRetrievability(e, now = Date.now()) {
     if (!e || !e.nextReview || !e.interval) return 1.0;
-    const lastReview = Number(e.updatedAt || e.reviewUpdatedAt || (e.nextReview - e.interval * 86400000));
+    const lastReview = Number(e.reviewUpdatedAt || (e.nextReview - e.interval * 86400000));
     const elapsedDays = Math.max(0, (now - lastReview) / 86400000);
     const s = Math.max(0.1, Number(e.stability) || Number(e.interval) || 1.0);
     return Math.pow(1 + FACTOR * (elapsedDays / s), DECAY);

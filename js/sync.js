@@ -552,9 +552,17 @@
   // [GDPR対応] ユーザーの全登録単語・学習進捗の完全JSONエクスポート
   async function exportAllUserDataJson() {
     const bundle = {};
-    for (const l of ['en', 'ja', 'fr', 'de']) {
+    const allPairs = (global.VocabCore?.getAllKnownPairConfigs || global.getAllKnownPairConfigs)?.() || [];
+    const keysToExport = new Set(['en', 'ja', 'fr', 'de']);
+    allPairs.forEach(p => {
+      const id = p.pairId || p.key;
+      if (id) keysToExport.add(id);
+    });
+    for (const l of keysToExport) {
       const b = await global.VocabStorage?.idbFetchLangBundle?.(l, true);
-      bundle[l] = b || { words: [] };
+      if (b && (b.words?.length || b.clearAt || (b.tombs && b.tombs.length) || (b.snaps && b.snaps.length))) {
+        bundle[l] = b;
+      }
     }
     const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);

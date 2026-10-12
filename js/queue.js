@@ -57,7 +57,7 @@
   function syncPersistedQueue() {
     try {
       const qList = global.App?.reqQueue || [];
-      const activeQueue = qList.filter(q => !q.isCancelled && !q.isDone).map(({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }) => ({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }));
+      const activeQueue = qList.filter(q => !q.isCancelled && !q.isDone && !q.isFailed).map(({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }) => ({ items, fName, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey }));
       if (global.lsSet) global.lsSet('vv_pending_queue', JSON.stringify(activeQueue));
       else if (typeof localStorage !== 'undefined') localStorage.setItem('vv_pending_queue', JSON.stringify(activeQueue));
     } catch {}
@@ -241,43 +241,57 @@
     const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
 
     try {
-      while (App.reqQueue.length) {
-        const t = App.reqQueue[0];
-        if (t.isCancelled) {
-          t.card?.remove?.();
-          App.reqQueue.shift();
-          syncPersistedQueue();
-          continue;
-        }
-        if (t.isFailed) {
-          // 失敗したタスクは破棄せずキューに留め、ユーザーの再試行・削除操作を待機
+      while (true) {
+        // キャンセルされたタスクのカード除去とキュー掃除
+        App.reqQueue = (App.reqQueue || []).filter(q => {
+          if (q.isCancelled) {
+            q.card?.remove?.();
+            return false;
+          }
+          return true;
+        });
+
+        // 次に処理可能なタスク（未キャンセル・未完了・未失敗）を検索
+        const nextIdx = App.reqQueue.findIndex(q => !q.isCancelled && !q.isDone && !q.isFailed);
+        if (nextIdx === -1) {
+          // 実行可能なタスクがない場合は終了
           break;
         }
+
+        const t = App.reqQueue[nextIdx];
         // もしカードがDOM内に見当たらない場合（再描画直後等）は安全に最前面に再アタッチして進捗表示を維持
         if (t.card && typeof document !== 'undefined' && !document.body.contains(t.card) && $('list')) {
           $('list').prepend(t.card);
         }
+
         let ok = false;
         try {
           ok = await executeBatch(t);
         } catch {
           ok = false;
         }
+
         if (!ok) {
           t.isFailed = true;
           t.isDone = false;
           syncPersistedQueue();
-          break;
+          // 先頭詰まり(Head-of-Line Blocking)を回避: 失敗タスクは保留にし、後続タスクを継続処理
+          continue;
         }
+
         t.isDone = true;
         if (t.card && !t.card.classList?.contains('gen-err') && !t.card.querySelector?.('[data-act="retry-batch"]')) {
           t.card.remove?.();
         }
-        App.reqQueue.shift();
+        const doneIdx = App.reqQueue.indexOf(t);
+        if (doneIdx !== -1) App.reqQueue.splice(doneIdx, 1);
         syncPersistedQueue();
-        if (App.reqQueue.length) await new Promise(r => setTimeout(r, 600));
+
+        if (App.reqQueue.some(q => !q.isCancelled && !q.isDone && !q.isFailed)) {
+          await new Promise(r => setTimeout(r, 600));
+        }
       }
-      if (!App.reqQueue.length && $('list')) {
+      if (!App.reqQueue.some(q => !q.isDone) && $('list')) {
         $('list').querySelectorAll('.loading-card').forEach(c => {
           if (!c.classList.contains('gen-err') && !c.querySelector('[data-act="retry-batch"]')) c.remove();
         });
