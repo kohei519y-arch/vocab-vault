@@ -100,6 +100,7 @@ load(basePath + "/js/dictionary.js");
 load(basePath + "/js/starter_pack.js");
 load(basePath + "/js/export.js");
 load(basePath + "/js/speech.js");
+load(basePath + "/js/card_view.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -505,6 +506,33 @@ try {
   // Test Scenario D: scrollToCard & findCardElement helpers
   assert("scrollToCard helper is defined and callable", typeof VocabCore.scrollToCard === 'function');
   assert("findCardElement helper is defined and callable", typeof VocabCore.findCardElement === 'function');
+
+  // Test Scenario E: VocabCardView isolated module verification
+  assert("VocabCardView is defined on global scope", typeof VocabCardView === 'object' && VocabCardView !== null);
+  assert("VocabCardView.highlightPlain wraps match in mark tag", VocabCardView.highlightPlain("epistemic", /epist/gi).includes('<mark class="hl">epist</mark>'));
+  assert("VocabCardView.relTime handles overdue and future timestamps", VocabCardView.relTime(Date.now() - 1000) === '復習期日' && VocabCardView.relTime(Date.now() + 600000).includes('分後'));
+
+  var sampleCardItem = {
+    id: 'test-card-1',
+    num: 1,
+    word: 'epistemic',
+    homographIndex: 1,
+    lang: 'en',
+    phonetic: 'ˌepɪˈstiːmɪk',
+    meanings: [{ pos: 'adj.', text: '認識の、知識に関する' }],
+    etymology: 'ギリシャ語 episteme（知識）に由来。',
+    etymologyTags: ['印欧祖語: *sta-'],
+    example: { foreign: 'epistemic uncertainty', ja: '認識論的不確実性' },
+    nextReview: Date.now() + 86400000
+  };
+  var sampleRightHtml = VocabCardView.buildRight(sampleCardItem);
+  assert("VocabCardView.buildRight generates meaning section", sampleRightHtml.includes('pos-block') && sampleRightHtml.includes('認識の'));
+  assert("VocabCardView.buildRight generates accordion or tabs structure", sampleRightHtml.includes('card-details-accordion') || sampleRightHtml.includes('detail-tabs-bar'));
+
+  var sampleEl = VocabCardView.createCardElement(sampleCardItem);
+  assert("VocabCardView.createCardElement creates DOM element with correct dataset", sampleEl && sampleEl.className === 'card' && sampleEl.dataset.word === 'epistemic');
+  var foundEl = VocabCardView.findCardElement([sampleEl], 'epistemic', 'epistemic', 'epistemic');
+  assert("VocabCardView.findCardElement matches created card accurately", foundEl === sampleEl);
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

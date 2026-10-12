@@ -47,6 +47,7 @@ def check_jsc_syntax():
         "js/starter_pack.js",
         "js/export.js",
         "js/speech.js",
+        "js/card_view.js",
         "js/app.js",
         "sw.js"
     ]
@@ -198,7 +199,21 @@ def test_storage_tombstones():
 
 def test_delete_word_integrity():
     print("\n--- 3b. Word Deletion (delW) & Storage Sync Test ---")
-    scripts = ["js/storage.js", "js/anki.js", "js/sync.js", "js/ocr.js", "js/graph.js", "js/feedback.js", "js/starter_pack.js", "js/app.js"]
+    scripts = [
+        "js/storage.js",
+        "js/anki.js",
+        "js/sync.js",
+        "js/ocr.js",
+        "js/morphology.js",
+        "js/graph.js",
+        "js/feedback.js",
+        "js/dictionary.js",
+        "js/starter_pack.js",
+        "js/export.js",
+        "js/speech.js",
+        "js/card_view.js",
+        "js/app.js"
+    ]
     combined_code = """
     var window = globalThis;
     var global = globalThis;
@@ -266,7 +281,21 @@ def test_delete_word_integrity():
 
 def test_mobile_tabs_and_pair_sync():
     print("\n--- 3c. Mobile Detail Tabs & Active Pair Sync Test ---")
-    scripts = ["js/storage.js", "js/anki.js", "js/app.js"]
+    scripts = [
+        "js/storage.js",
+        "js/anki.js",
+        "js/sync.js",
+        "js/ocr.js",
+        "js/morphology.js",
+        "js/graph.js",
+        "js/feedback.js",
+        "js/dictionary.js",
+        "js/starter_pack.js",
+        "js/export.js",
+        "js/speech.js",
+        "js/card_view.js",
+        "js/app.js"
+    ]
     combined_code = """
     var global = globalThis;
     globalThis.window = globalThis;
@@ -548,6 +577,7 @@ def test_html_js_integrity():
         "js/starter_pack.js",
         "js/export.js",
         "js/speech.js",
+        "js/card_view.js",
         "js/app.js"
     ]
     last_idx = -1
