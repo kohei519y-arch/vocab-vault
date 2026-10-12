@@ -612,6 +612,128 @@
     if (setListFn) setListFn([]);
   }
 
+  // --- 起動時同期・サルベージ・他タブ同期 (app.js から移管) ---
+  /**
+   * ctx: { getJson, setJson, getActivePairKey, getSrcLang, switchSrcLang(l), setEntries(list),
+   *        reload(), syncCloud(), flushOffline(), confirm(msg), notify(msg), syncFromIdb(l) }
+   */
+  function initStorageAndSync(manualSalvage, ctx) {
+    const confirmFn = ctx.confirm || (typeof confirm === 'function' ? confirm : () => true);
+    const notifyFn = ctx.notify || (typeof alert === 'function' ? alert : () => {});
+    if (manualSalvage && !confirmFn('退避スナップショットおよび全ストレージを走査して、過去に削除した単語も含めて救出・統合しますか？')) return;
+    if (typeof navigator !== 'undefined' && navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+    if (!Storage.bc && typeof BroadcastChannel !== 'undefined') {
+      try {
+        Storage.bc = new BroadcastChannel('vocab_vault_sync');
+        Storage.bc.onmessage = ev => {
+          if (ev.data?.type === 'vault-updated' && LANGS[ev.data.lang]) ctx.syncFromIdb(ev.data.lang);
+        };
+      } catch {}
+    }
+
+    if (manualSalvage) {
+      Storage.mem.en = Storage.mem.fr = Storage.mem.de = null;
+      LANG_KEYS.forEach(l => { saveClearedAt(l, 0); saveTombstones(l, new Map()); });
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k) {
+            const ext = safeParseWords(lsGet(k), keyToLang(k));
+            LANG_KEYS.forEach(l => { if (ext[l].length) ctx.setJson(LANGS[l].key, mergeWords(ctx.getJson(LANGS[l].key), ext[l], l, true), true, true); });
+          }
+        }
+      } catch {}
+      // LocalStorage 全キーから過去の単語（スナップショットや旧キー含む）を事前救出
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k || !(k.includes('distinction_entries') || k.includes('vocab_snapshot') || k.startsWith('vv_'))) continue;
+          const val = localStorage.getItem(k);
+          if (!val || val === '[]' || val.length <= 5) continue;
+          const l = keyToLang(k);
+          const parsed = safeParseWords(val, l)[l];
+          if (!parsed || !parsed.length) continue;
+          const targetK = LANGS[l].key;
+          const cur = ctx.getJson(targetK);
+          const rec = mergeWords(cur, parsed, l, true);
+          if (rec.length > cur.length) {
+            _log(`[Manual Salvage] Rescued ${rec.length - cur.length} words for ${l} from key "${k}"`);
+            Storage.mem[targetK] = rec;
+            Storage.mem[l] = rec;
+            try { localStorage.setItem(targetK, JSON.stringify(rec)); } catch {}
+          }
+        }
+      } catch {}
+    }
+
+    const syncActiveLang = () => {
+      ctx.setEntries(ctx.getJson(ctx.getActivePairKey()));
+      if (!ctx.getJson(ctx.getActivePairKey()).length) {
+        // 現在のペアが空なら、単語が存在する言語に自動フォールバック
+        const foundLang = LANG_KEYS.find(l => ctx.getJson(LANGS[l].key).length > 0);
+        if (foundLang && foundLang !== ctx.getSrcLang()) {
+          ctx.switchSrcLang(foundLang);
+          ctx.setEntries(ctx.getJson(LANGS[foundLang].key));
+        }
+      }
+      ctx.reload();
+    };
+    syncActiveLang();
+
+    // IndexedDB の初期化完了を待機して全データを完全同期・復元
+    initDatabase().then(async () => {
+      try {
+        await Promise.all(LANG_KEYS.map(async l => {
+          const k = LANGS[l].key;
+          const b = await idbFetchLangBundle(l, manualSalvage);
+          if (!b) return;
+          if (b.clearAt > getClearedAt(l)) Storage.clearedAt[l] = b.clearAt;
+          if (b.tombs) absorbTombArray(getTombstones(l), b.tombs);
+
+          let idbWords = Array.isArray(b.words) ? b.words : [];
+          if (manualSalvage && b.snaps && b.snaps.length) {
+            b.snaps.forEach(arr => {
+              const sWords = safeParseWords(arr, l)[l];
+              if (sWords && sWords.length) idbWords = mergeWords(idbWords, sWords, l, true);
+            });
+          }
+          // 通常起動時は墓石を尊重 (ignoreTombstones = manualSalvage)
+          const merged = mergeWords(ctx.getJson(k), idbWords, l, manualSalvage);
+          if (merged.length > 0 || manualSalvage) {
+            Storage.mem[k] = merged;
+            Storage.mem[l] = merged;
+            try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
+            await idbPut(k, merged);
+          }
+        }));
+
+        syncActiveLang();
+        if (ctx.flushOffline) ctx.flushOffline();
+        if (ctx.syncCloud) ctx.syncCloud();
+        if (manualSalvage) {
+          const tot = LANG_KEYS.reduce((s, l) => s + ctx.getJson(LANGS[l].key).length, 0);
+          notifyFn(tot ? `合計 ${tot} 語を検出・復元しました。` : '復元可能なデータは見つかりませんでした。');
+        }
+      } catch (err) {
+        _warn('[Sync Init Error]', err);
+      }
+    });
+  }
+
+  /** 他タブの更新通知を受けて IndexedDB から該当言語を再同期 */
+  async function syncFromIdbForLang(l, ctx) {
+    const b = await idbFetchLangBundle(l, false);
+    if (!b) return;
+    if (b.clearAt > getClearedAt(l)) Storage.clearedAt[l] = b.clearAt;
+    absorbTombArray(getTombstones(l), b.tombs);
+    const k = LANGS[l].key;
+    const merged = mergeWords(ctx.getJson(k), b.words, l, false);
+    Storage.mem[l] = merged;
+    Storage.mem[k] = merged;
+    try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
+    ctx.applyMerged(l, merged);
+  }
+
   global.VocabStorage = {
     LANGS,
     LANG_KEYS,
@@ -640,6 +762,8 @@
     safeParseWords,
     deleteWord,
     clearAllWords,
+    initStorageAndSync,
+    syncFromIdbForLang,
     idbPut,
     idbGet,
     idbAddSnap,
