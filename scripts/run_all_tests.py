@@ -379,6 +379,49 @@ def test_mobile_tabs_and_pair_sync():
         throw new Error("parseAnyWords failed to recognize distinction_entries_en_en key in backup");
     }
 
+    // 4. Verify runPassageExtract and OCR integration
+    if (typeof (global.VocabCore?.callGemini || callGemini) !== 'function') {
+        throw new Error("callGemini is not exported in VocabCore");
+    }
+
+    var samplePassage = "The Renaissance was a fervent period of European cultural, artistic, political and economic rebirth following the Middle Ages. Generally described as taking place from the 14th century to the 17th century, the Renaissance promoted the rediscovery of classical philosophy, literature and art. Some of the greatest thinkers, authors, statesmen, scientists and artists in human history thrived during this era, while global exploration opened up new lands and cultures to European commerce.";
+    
+    // Test input element values
+    var extText = samplePassage;
+    var extEl = { value: extText, focus: function(){} };
+    var origGetEl = globalThis.document.getElementById;
+    globalThis.document.getElementById = function(id) {
+        if (id === 'extTextarea') return extEl;
+        if (id === 'extLevelSel') return { value: 'c1' };
+        if (id === 'extMaxCnt') return { value: '6' };
+        if (id === 'extFolInput') return { value: 'Renaissance' };
+        if (id === 'extLoadBox') return { style: {} };
+        if (id === 'extLoadText') return { textContent: '' };
+        if (id === 'extResSec') return { style: {} };
+        if (id === 'btnRunExtract') return { disabled: false };
+        if (id === 'extResCount') return { textContent: '' };
+        if (id === 'extCandidateGrid') return { innerHTML: '' };
+        if (id === 'btnCommitExt') return { disabled: false, textContent: '' };
+        return origGetEl(id);
+    };
+
+    var extractFn = global.VocabCore?.runPassageExtract || runPassageExtract;
+    var extractDone = false;
+    extractFn().then(function() {
+        extractDone = true;
+    }).catch(function(e) {
+        throw e;
+    });
+    if (typeof drainMicrotasks === 'function') drainMicrotasks();
+
+    if (!extractDone || !App.extCandidates || App.extCandidates.length === 0) {
+        throw new Error("runPassageExtract failed to extract words from passage (done: " + extractDone + ")");
+    }
+    var extractedWords = App.extCandidates.map(c => c.word);
+    if (!extractedWords.includes('Renaissance') && !extractedWords.includes('renaissance') && !extractedWords.includes('European')) {
+        throw new Error("runPassageExtract did not extract expected key words. Got: " + JSON.stringify(extractedWords));
+    }
+
     print("OK");
     """
 
@@ -388,6 +431,7 @@ def test_mobile_tabs_and_pair_sync():
         log_pass("Mobile sidebar scroll lock (side-open-lock) safely handles drawer lifecycle")
         log_pass("Language pair review (procRev) accurately synchronizes with pair storage keys")
         log_pass("Multi-language pair backup and restoration (parseAnyWords) fully verified")
+        log_pass("Passage word extraction & OCR communication engine safely handles extraction without error")
     else:
         log_fail(f"Mobile detail tabs and pair sync error: {res.stderr or res.stdout}")
 
