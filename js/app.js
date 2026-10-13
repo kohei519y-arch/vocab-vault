@@ -1111,6 +1111,9 @@
     bindDelegatedEvents();
     bindWindowEvents();
     await initStorageAndSync(false);
+    if (!App.entries || !App.entries.length) {
+      loadStarterPack();
+    }
     updKeyUI();
     updCloudUI();
     restorePersistedQueue();

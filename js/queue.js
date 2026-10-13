@@ -462,7 +462,7 @@ etymology:${eInst}`;
         const rawArr = await parseApiJsonFn(res);
         returnedList = Array.isArray(rawArr) ? rawArr : [rawArr];
         usedModel = res.usedModel || 'gemini-custom';
-      } else if (global.VocabSync?.isProxyReady?.()) {
+      } else if (global.VocabSync?.isCloudReady?.()) {
         try {
           if (stEl) stEl.textContent = 'クラウドAI (Gemini 3.8 Flash) で生成中...';
           const proxyRes = await global.VocabSync.callVocabGenerateProxy({
@@ -480,7 +480,9 @@ etymology:${eInst}`;
             if (global.updCloudUI) global.updCloudUI();
           }
         } catch (proxyErr) {
-          console.warn('[Proxy Fallback] Switching to built-in knowledge engine:', proxyErr?.message || proxyErr);
+          if (typeof console !== 'undefined' && console.warn) {
+            console.warn('[Proxy Fallback] Switching to built-in knowledge engine:', proxyErr?.message || proxyErr);
+          }
           if (proxyErr.isQuotaExceeded || proxyErr.status === 429) {
             if (global.showToast) global.showToast('クラウドAI枠上限のため、内蔵AIエンジン(完全機密・オフライン)で自動生成します', 'info', 4000);
           }

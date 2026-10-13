@@ -227,7 +227,7 @@
 
     // 空状態のハンドリング
     if (!f.length && !hasLoadingCards) {
-      list.innerHTML = `<div class="empty"><span>単語がありません</span><p>${appState.q || parts.length ? '条件に一致する単語が見つかりませんでした。<br><button type="button" class="btn-o" style="margin-top:10px;font-size:12px" data-act="reset-filter">フィルタを解除する</button>' : '上のバーから単語・熟語・例文を入力して登録してください。'}</p></div>`;
+      list.innerHTML = `<div class="empty"><span>単語がありません</span><p>${appState.q || parts.length ? '条件に一致する単語が見つかりませんでした。<br><button type="button" class="btn-o" style="margin-top:10px;font-size:12px" data-act="reset-filter">フィルタを解除する</button>' : '上のバーから単語・熟語・例文を入力して登録してください。<br><button type="button" class="btn-ac" style="margin-top:12px;font-size:13px;padding:8px 18px" onclick="loadStarterPack()">厳選スターターパック（20選）を読み込む</button>'}</p></div>`;
       pag.innerHTML = '';
       return;
     }
