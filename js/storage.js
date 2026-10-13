@@ -84,15 +84,18 @@
         sub_trans: String(x.sub_trans || x.st || '')
       })),
       contextSentence: raw.contextSentence ? String(raw.contextSentence) : undefined,
-      interval: Number(raw.interval) || 0,
-      repetition: Number(raw.repetition) || 0,
-      efactor: Number(raw.efactor) || 2.5,
-      nextReview: Number(raw.nextReview) || Date.now(),
-      reviewUpdatedAt: Number(raw.reviewUpdatedAt) || Number(raw.review_updated_at) || 0,
+      interval: Number.isFinite(Number(raw.interval)) ? Number(raw.interval) : 0,
+      repetition: Number.isFinite(Number(raw.repetition)) ? Number(raw.repetition) : 0,
+      efactor: Number.isFinite(Number(raw.efactor)) ? Number(raw.efactor) : 2.5,
+      nextReview: Number.isFinite(Number(raw.nextReview)) ? Number(raw.nextReview) : Date.now(),
+      reviewUpdatedAt: Number.isFinite(Number(raw.reviewUpdatedAt || raw.review_updated_at))
+        ? Math.min(Number(raw.reviewUpdatedAt || raw.review_updated_at), Date.now() + 86400000)
+        : 0,
       isDeleted: Boolean(raw.isDeleted || raw.is_deleted),
       flags: Array.isArray(raw.flags) ? raw.flags.map(String) : [],
       gen: raw.gen && typeof raw.gen === 'object' ? { model: String(raw.gen.model || ''), pv: String(raw.gen.pv || ''), at: Number(raw.gen.at) || 0 } : undefined,
-      updatedAt: Number.isFinite(parsedUpd) && parsedUpd > 0 ? parsedUpd : 1
+      // 時計狂い（Clock Skew / Future Timestamp Poisoning）防衛: 未来24時間を超える不正タイムスタンプは現在時刻へクリップ
+      updatedAt: Number.isFinite(parsedUpd) && parsedUpd > 0 ? Math.min(parsedUpd, Date.now() + 86400000) : 1
     };
   }
 

@@ -216,17 +216,27 @@
     }
   }
 
-  async function flushOfflineReviews() {
-    const q = getOfflineQueue();
-    if (!q.length || !navigator.onLine || !global.VocabSync?.isCloudReady?.()) return;
+  let _isFlushingOffline = false;
 
+  async function flushOfflineReviews() {
+    if (_isFlushingOffline) return;
+    const qSnapshot = getOfflineQueue();
+    if (!qSnapshot.length || !navigator.onLine || !global.VocabSync?.isCloudReady?.()) return;
+
+    _isFlushingOffline = true;
     try {
       const syncFn = global.syncCloudNow || global.VocabCore?.syncCloudNow;
       if (typeof syncFn === 'function') {
         await syncFn(false);
-        saveOfflineQueue([]);
+        // 同期完了時に、同期開始時点のスナップショット以降に追加された未同期アイテムを保護
+        const currentQ = getOfflineQueue();
+        const syncedTimestamps = new Set(qSnapshot.map(r => r.queuedAt));
+        const remainingQ = currentQ.filter(r => !syncedTimestamps.has(r.queuedAt));
+        saveOfflineQueue(remainingQ);
       }
-    } catch {}
+    } catch {} finally {
+      _isFlushingOffline = false;
+    }
   }
 
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {

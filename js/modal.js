@@ -460,22 +460,31 @@
     renderExtCandidates();
   }
 
+  let _isCommittingExt = false;
+
   function commitExtractedWords() {
+    if (_isCommittingExt) return;
     const App = global.App || {};
     const sel = (App.extCandidates || []).filter(c => c.checked).map(({ word, pos, meaning, sentence }) => ({ word, pos, meaning, sentence }));
     if (!sel.length) return;
-    const getKeyFn = global.getKey || (() => '');
-    if (App.quotaRemaining === 0 && !getKeyFn()) {
+
+    _isCommittingExt = true;
+    try {
+      const getKeyFn = global.getKey || (() => '');
+      if (App.quotaRemaining === 0 && !getKeyFn()) {
+        toggleModal('extractModal', false);
+        openUpsellModal('今月の無料枠（30語）をすべて消費しました。抽出した単語を一括登録するにはProプランをご利用ください。');
+        return;
+      }
+      const f = $('extFolInput')?.value?.trim() || $('inFol')?.value?.trim() || '';
+      if (f && $('inFol')) $('inFol').value = f;
       toggleModal('extractModal', false);
-      openUpsellModal('今月の無料枠（30語）をすべて消費しました。抽出した単語を一括登録するにはProプランをご利用ください。');
-      return;
-    }
-    const f = $('extFolInput')?.value?.trim() || $('inFol')?.value?.trim() || '';
-    if (f && $('inFol')) $('inFol').value = f;
-    toggleModal('extractModal', false);
-    const regFn = global.VocabQueue?.registerWordsList || global.registerWordsList;
-    if (regFn) {
-      regFn(sel, f, $('chkHist')?.checked, $('chkWikt')?.checked);
+      const regFn = global.VocabQueue?.registerWordsList || global.registerWordsList;
+      if (regFn) {
+        regFn(sel, f, $('chkHist')?.checked, $('chkWikt')?.checked);
+      }
+    } finally {
+      setTimeout(() => { _isCommittingExt = false; }, 600);
     }
   }
 

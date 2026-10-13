@@ -36,12 +36,17 @@
    * 予定インターバルに対する超過度を算出し忘却危機度順に優先ソート
    */
   function getOverdueRatio(item, now = Date.now()) {
-    if (!item) return 0;
-    const next = item.nextReview || 0;
-    if (next > now) return 0;
-    const overdueMs = now - next;
-    const intervalMs = Math.max(1, (Number(item.interval) || 1)) * 86400000;
-    return overdueMs / intervalMs;
+    if (!item || typeof item !== 'object') return 0;
+    const nowTs = Number.isFinite(Number(now)) ? Number(now) : Date.now();
+    const rawNext = Number(item.nextReview);
+    const next = Number.isFinite(rawNext) ? rawNext : nowTs;
+    if (next > nowTs) return 0;
+    const overdueMs = Math.max(0, nowTs - next);
+    const rawInterval = Number(item.interval);
+    const intervalDays = (Number.isFinite(rawInterval) && rawInterval > 0) ? rawInterval : 1.0;
+    const intervalMs = Math.max(86400000, intervalDays * 86400000);
+    const ratio = overdueMs / intervalMs;
+    return Number.isFinite(ratio) ? ratio : 0;
   }
 
   /**

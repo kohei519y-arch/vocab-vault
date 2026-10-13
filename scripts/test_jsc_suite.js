@@ -769,6 +769,91 @@ try {
   var mockNavCtx = { moveCardFocusCalled: false, moveCardFocus: function() { this.moveCardFocusCalled = true; } };
   var handledWithCmd = VocabNavigation.handleGlobalKeydown({ key: 'j', metaKey: true }, mockNavCtx);
   assert("VocabNavigation.handleGlobalKeydown rejects modifier combinations like Cmd+J", handledWithCmd === false && !mockNavCtx.moveCardFocusCalled);
+
+  // 18. 原則1: getOverdueRatio 極限境界値 & 数理防護 (NaN / null / 負数 / 極大値)
+  var ratioNaN = VocabAnkiView.getOverdueRatio({ nextReview: NaN, interval: NaN });
+  var ratioNull = VocabAnkiView.getOverdueRatio(null);
+  var ratioFuture = VocabAnkiView.getOverdueRatio({ nextReview: Date.now() + 100000 });
+  var ratioValid = VocabAnkiView.getOverdueRatio({ nextReview: Date.now() - 86400000, interval: 1 });
+  assert("VocabAnkiView.getOverdueRatio safely handles NaN, null, and future timestamps without NaN or Infinity",
+    typeof ratioNaN === 'number' && !isNaN(ratioNaN) &&
+    ratioNull === 0 &&
+    ratioFuture === 0 &&
+    Math.abs(ratioValid - 1.0) < 0.05
+  );
+
+  // 19. 原則4: VocabStorage.sanitizeItem Clock Skew Poisoning 防衛 (未来24時間超過タイムスタンプのクリップ)
+  var skewedFuture = Date.now() + 86400000 * 30; // 30日後の未来時刻
+  var sanitized = VocabStorage.sanitizeItem({ word: 'skewTest', updatedAt: skewedFuture, reviewUpdatedAt: skewedFuture });
+  assert("VocabStorage.sanitizeItem clips future poisoned timestamps to safe boundary (now + 24h)",
+    sanitized.updatedAt <= Date.now() + 86400000 + 1000 &&
+    sanitized.reviewUpdatedAt <= Date.now() + 86400000 + 1000
+  );
+
+  // 20. 原則3 & 6: VocabExport.importJSON Prototype Pollution 防御
+  var protoPollutedPayload = JSON.stringify({
+    "__proto__": [{ word: "evil" }],
+    "constructor": [{ word: "evil2" }],
+    "prototype": [{ word: "evil3" }],
+    "en": [{ word: "safeWord", meanings: [{ pos: "noun", meaning: "safe" }] }]
+  });
+  var fakeImportEv = {
+    target: {
+      files: [{
+        name: 'backup.json'
+      }]
+    }
+  };
+  var importedData = {};
+  var mockImportCtx = {
+    getJson: function(k) { return importedData[k] || []; },
+    setJson: function(k, v) { importedData[k] = v; },
+    onComplete: function() {}
+  };
+  var origFileReader = globalThis.FileReader;
+  globalThis.FileReader = function() {
+    this.readAsText = function() {
+      if (typeof this.onload === 'function') {
+        this.onload({ target: { result: protoPollutedPayload } });
+      }
+    };
+  };
+  try {
+    VocabExport.importJSON(fakeImportEv, mockImportCtx);
+    assert("VocabExport.importJSON ignores __proto__ and constructor prototype pollution keys",
+      !Object.prototype.hasOwnProperty('evil') &&
+      importedData['distinction_entries'] &&
+      importedData['distinction_entries'].some(function(it) { return it.word === 'safeWord'; })
+    );
+  } finally {
+    globalThis.FileReader = origFileReader;
+  }
+
+  // 21. 原則5: VocabNavigation.handleGlobalKeydown モーダル Tab キーフォーカストラップ (WCAG 2.1 a11y)
+  var focusTrapCalls = [];
+  var elFirst = { focus: function() { focusTrapCalls.push('first'); }, hasAttribute: function() { return false; }, getAttribute: function() { return null; } };
+  var elLast = { focus: function() { focusTrapCalls.push('last'); }, hasAttribute: function() { return false; }, getAttribute: function() { return null; } };
+  var mockModalEl = {
+    querySelectorAll: function() { return [elFirst, elLast]; },
+    contains: function(el) { return el === elFirst || el === elLast; }
+  };
+  var origQuerySelector = documentMock.querySelector;
+  documentMock.querySelector = function(sel) {
+    if (sel.indexOf('.modal-ov.open') !== -1) return mockModalEl;
+    return null;
+  };
+  try {
+    documentMock.activeElement = elLast;
+    var tabHandled = VocabNavigation.handleGlobalKeydown({ key: 'Tab', shiftKey: false, preventDefault: function(){} }, { anyModalOpen: true });
+    assert("VocabNavigation.handleGlobalKeydown traps forward Tab to loop to first modal element", tabHandled === true && focusTrapCalls[focusTrapCalls.length - 1] === 'first');
+
+    documentMock.activeElement = elFirst;
+    var shiftTabHandled = VocabNavigation.handleGlobalKeydown({ key: 'Tab', shiftKey: true, preventDefault: function(){} }, { anyModalOpen: true });
+    assert("VocabNavigation.handleGlobalKeydown traps reverse Shift+Tab to loop to last modal element", shiftTabHandled === true && focusTrapCalls[focusTrapCalls.length - 1] === 'last');
+  } finally {
+    documentMock.querySelector = origQuerySelector;
+    documentMock.activeElement = null;
+  }
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

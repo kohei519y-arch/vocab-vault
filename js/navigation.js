@@ -308,6 +308,43 @@
       }
     }
 
+    if (e.key === 'Tab' && anyModalOpen && doc?.querySelector) {
+      const openModal = doc.querySelector('.modal-ov.open .modal') || doc.querySelector('.modal-ov.open');
+      if (openModal && typeof openModal.querySelectorAll === 'function') {
+        const focusables = Array.from(openModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+          .filter(el => {
+            if (!el || typeof el.focus !== 'function') return false;
+            if (typeof el.hasAttribute === 'function' && el.hasAttribute('disabled')) return false;
+            if (el.getAttribute?.('aria-hidden') === 'true') return false;
+            if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+              try {
+                const s = window.getComputedStyle(el);
+                if (s.display === 'none' || s.visibility === 'hidden') return false;
+              } catch {}
+            }
+            return true;
+          });
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          const active = doc.activeElement;
+          if (e.shiftKey) {
+            if (active === first || (openModal.contains && !openModal.contains(active))) {
+              if (typeof e.preventDefault === 'function') e.preventDefault();
+              last.focus();
+              return true;
+            }
+          } else {
+            if (active === last || (openModal.contains && !openModal.contains(active))) {
+              if (typeof e.preventDefault === 'function') e.preventDefault();
+              first.focus();
+              return true;
+            }
+          }
+        }
+      }
+    }
+
     if ((!inInput && e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) || (e.altKey && e.code === 'KeyF')) {
       e.preventDefault();
       if (typeof ctx.focusSearch === 'function') ctx.focusSearch();

@@ -158,8 +158,12 @@
         const langs = global.VocabStorage?.LANGS || { en: { key: 'distinction_entries' } };
 
         Object.keys(ext).forEach(key => {
-          const incoming = ext[key];
+          if (['__proto__', 'constructor', 'prototype'].includes(key)) return;
+          let incoming = ext[key];
           if (!Array.isArray(incoming) || !incoming.length) return;
+          if (incoming.length > 20000) {
+            incoming = incoming.slice(0, 20000);
+          }
 
           let storageKey = '';
           let l = 'en';
@@ -184,6 +188,7 @@
           const clearedAt = global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0;
 
           incoming.forEach(it => {
+            if (!it || typeof it !== 'object' || Array.isArray(it)) return;
             if (clearedAt > 0 && (it.updatedAt || 0) <= clearedAt) it.updatedAt = now;
             const k = it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex);
             tombMap.delete(`id:${it.id}`);
