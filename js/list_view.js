@@ -60,14 +60,16 @@
       }
     });
 
-    // 2. 既存の通常カード要素をマップ化 (キー: data-id または data-word)
+    // 2. 既存の通常カード要素をマップ化 (キー: data-id または data-word / data-rawWord)
     const existingCardMap = new Map();
     const existingCards = typeof listContainer.querySelectorAll === 'function'
       ? [...listContainer.querySelectorAll('.card')].filter(c => !seenCards.has(c) && !c.classList?.contains('loading-card') && !c.classList?.contains('gen-err') && !c.querySelector?.('[data-act="retry-batch"]'))
       : [];
     existingCards.forEach(c => {
-      const key = (c.dataset && (c.dataset.id || c.dataset.word)) || null;
-      if (key) existingCardMap.set(key, c);
+      if (!c.dataset) return;
+      if (c.dataset.id) existingCardMap.set(c.dataset.id, c);
+      if (c.dataset.word) existingCardMap.set(c.dataset.word, c);
+      if (c.dataset.rawWord) existingCardMap.set(c.dataset.rawWord, c);
     });
 
     const createCardFn = options.createCardElement || (global.VocabCardView ? global.VocabCardView.createCardElement : null);
@@ -78,13 +80,15 @@
     pageItems.forEach(item => {
       const itemKey = item.id || (global.VocabMorphology ? global.VocabMorphology.makeWordKey(item.word, item.lang, item.meanings?.[0]?.pos, item.homographIndex) : item.word);
       activeKeys.add(itemKey);
+      if (item.id) activeKeys.add(item.id);
+      if (item.word) activeKeys.add(item.word);
 
       // キャッシュリビジョンシグネチャ（編集時刻、復習期日、表示モード、検索ハイライトクエリ、フォルダ等）
       const qStr = options.queryReg ? String(options.queryReg.source || '') : '';
       const vMode = options.viewMode || (options.appState?.viewMode) || 'academic';
       const rev = `${item.updatedAt || 0}:${item.interval || 0}:${item.nextReview || 0}:${vMode}:${qStr}:${item.folder || ''}:${options.crossLang ? '1' : '0'}`;
 
-      let cardEl = existingCardMap.get(itemKey);
+      let cardEl = (item.id && existingCardMap.get(item.id)) || existingCardMap.get(itemKey) || existingCardMap.get(item.word);
       if (cardEl && cardEl.dataset?.rev === rev) {
         // [完全一致で再利用] 期日バッジ等の動的属性のみ軽量パッチ
         const dueEl = typeof cardEl.querySelector === 'function' ? cardEl.querySelector('.due') : null;
@@ -130,8 +134,15 @@
       for (let i = finalNodes.length - 1; i >= 0; i--) {
         const node = finalNodes[i];
         if (!node) continue;
-        if (node.nextSibling !== nextRefNode) {
-          listContainer.insertBefore(node, nextRefNode);
+        // nextRefNode が実際に listContainer の直下の子ノードか厳格検証（未追加・親不一致時は null にフォールバック）
+        const validRef = (nextRefNode && nextRefNode.parentNode === listContainer) ? nextRefNode : null;
+        // node がまだ親に追加されていない新規ノードであるか、または位置がズレている場合のみ移動
+        if (node.parentNode !== listContainer || node.nextSibling !== validRef) {
+          try {
+            listContainer.insertBefore(node, validRef);
+          } catch (_) {
+            try { listContainer.appendChild(node); } catch (__) {}
+          }
         }
         nextRefNode = node;
       }

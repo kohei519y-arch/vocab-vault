@@ -723,22 +723,33 @@ try {
   var rScore = VocabSRS.getRetrievability(editedCard, nowTs);
   assert("VocabSRS.getRetrievability preserves decay based on reviewUpdatedAt regardless of recent updatedAt", rScore < 0.95);
 
-  // 12. List View の Backward Reference Reconciliation による順序性維持
+  // 12. List View の Backward Reference Reconciliation による順序性維持 & ブラウザDOM整合性
   var dummyContainer2 = {
     children: [],
     insertBefore: function(node, ref) {
-      var idx = this.children.indexOf(ref);
+      if (ref !== null && this.children.indexOf(ref) === -1) {
+        throw new Error("Failed to execute 'insertBefore' on 'Node': The node before which the new node is to be inserted is not a child of this node.");
+      }
       var curIdx = this.children.indexOf(node);
       if (curIdx !== -1) this.children.splice(curIdx, 1);
-      if (idx === -1) this.children.push(node);
-      else this.children.splice(idx, 0, node);
+      var idx = ref ? this.children.indexOf(ref) : -1;
+      if (idx === -1) {
+        this.children.push(node);
+      } else {
+        this.children.splice(idx, 0, node);
+      }
+      node.parentNode = this;
+      for (var k = 0; k < this.children.length; k++) {
+        this.children[k].nextSibling = this.children[k + 1] || null;
+      }
     }
   };
-  var nA = { dataset: { id: 'a' } }, nB = { dataset: { id: 'b' } };
+  var nA = { dataset: { id: 'a' }, parentNode: null, nextSibling: null };
+  var nB = { dataset: { id: 'b' }, parentNode: null, nextSibling: null };
   VocabListView.reconcileList(dummyContainer2, [{ id: 'a', word: 'a' }, { id: 'b', word: 'b' }], {
     createCardElement: function(it) { return it.id === 'a' ? nA : nB; }
   });
-  assert("VocabListView.reconcileList aligns items in correct deterministic order", dummyContainer2.children.length === 2);
+  assert("VocabListView.reconcileList aligns items in correct deterministic order", dummyContainer2.children.length === 2 && dummyContainer2.children[0] === nA && dummyContainer2.children[1] === nB);
 
   // 13. FSRS NaN 耐性（不正データ時の NaN 伝播防止）
   var nanCard = { stability: NaN, interval: 'invalid', nextReview: NaN, difficulty: null };

@@ -185,6 +185,7 @@
     c.dataset.word = makeLkFn(i.word, iL, i.homographIndex);
     c.dataset.rawWord = i.word;
     c.dataset.lang = iL;
+    if (i.id) c.dataset.id = i.id;
 
     const homoHtml = i.homographIndex > 1 ? `<span class="homo-badge" title="同形異義語 #${i.homographIndex}">#${i.homographIndex}</span>` : '';
     const gramHtml = i.grammar_forms ? `<div class="gram-line">${hlText(i.grammar_forms, false, options.queryReg)}</div>` : '';
