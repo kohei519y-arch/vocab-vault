@@ -175,7 +175,7 @@
     if (!e) return 1.0;
     // [P1-2 解決] 未学習カード（一度も復習しておらずインターバルも復習日時もない）は想起率0.0
     const isUnlearned = !e.interval && !e.repetition && !e.reviewUpdatedAt;
-    if (isUnlearned) return 0.0;
+    if (isUnlearned || (!e.interval && !e.repetition && !e.stability)) return 0.0;
 
     const weights = customWeights || getUserFSRSWeights() || DEFAULT_FSRS_WEIGHTS;
     const nowTs = Number.isFinite(Number(now)) ? Number(now) : Date.now();
@@ -228,7 +228,7 @@
     } else if (rating === 2) { // Good (普通): 増分項に対して wGood と anchorBonus を適用
       const wGood = (Number.isFinite(Number(weights?.wGood)) && Number(weights.wGood) > 0) ? Number(weights.wGood) : 1.2;
       const initS = (Number(weights?.w2) || 2.5) * sScale;
-      if (!e?.repetition) {
+      if (!e?.repetition && !e?.stability) {
         nextS = initS * anchorBonus;
       } else {
         const gain = Math.exp(1.1) * Math.pow(d, -0.4) * Math.pow(s, -0.15) * wGood * anchorBonus;
@@ -237,7 +237,7 @@
     } else { // Easy (簡単): 増分項に対して wEasy と anchorBonus を適用
       const wEasy = (Number.isFinite(Number(weights?.wEasy)) && Number(weights.wEasy) > 0) ? Number(weights.wEasy) : 1.6;
       const initEasyS = (Number(weights?.w3) || 5.0) * sScale;
-      if (!e?.repetition) {
+      if (!e?.repetition && !e?.stability) {
         nextS = initEasyS * anchorBonus;
       } else {
         const gain = Math.exp(1.4) * Math.pow(d, -0.4) * Math.pow(s, -0.15) * wEasy * anchorBonus;
@@ -314,8 +314,8 @@
     } else {
       const pureStability = predStability(e, rating);
       curStability = Number(pureStability.toFixed(2));
-      // 目標定着率 90% において FSRS 理論式上 I = S と完全に一致
-      nextInterval = Number(Math.min(MAX_INTERVAL_DAYS, Math.max(1.0, curStability)).toFixed(2));
+      const computedDays = predDays(e, rating);
+      nextInterval = Number(Math.min(MAX_INTERVAL_DAYS, Math.max(1.0, computedDays)).toFixed(2));
 
       // SM-2 互換パラメータの同期
       nextEfactor = Math.max(1.3, Math.min(3.5, nextEfactor + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0)));
@@ -325,7 +325,7 @@
 
     if (!Number.isFinite(nextReviewDate)) nextReviewDate = now + 86400000;
 
-    const currentR = getRetrievability({ ...e, stability: curStability, interval: nextInterval, nextReview: nextReviewDate }, now);
+    const currentR = getRetrievability({ ...e, stability: curStability, interval: nextInterval, repetition: nextRepetition, reviewUpdatedAt: now, nextReview: nextReviewDate }, now);
 
     // 復習直前の状態（prior stability, prior retrievability, elapsed days）をログに自動記録
     const prevLastReview = Number(e?.reviewUpdatedAt || (e?.nextReview && e?.interval ? e.nextReview - e.interval * 86400000 : now));
@@ -886,12 +886,14 @@
     try {
       const syncFn = global.syncCloudNow || global.VocabCore?.syncCloudNow;
       if (typeof syncFn === 'function') {
-        await syncFn(false);
-        // 同期完了時に、同期開始時点のスナップショット以降に追加された未同期アイテムを保護
-        const currentQ = getOfflineQueue();
-        const syncedTimestamps = new Set(qSnapshot.map(r => r.queuedAt));
-        const remainingQ = currentQ.filter(r => !syncedTimestamps.has(r.queuedAt));
-        saveOfflineQueue(remainingQ);
+        const syncedOk = await syncFn(false);
+        if (syncedOk) {
+          // 同期完了時に、同期開始時点のスナップショット以降に追加された未同期アイテムを保護
+          const currentQ = getOfflineQueue();
+          const syncedTimestamps = new Set(qSnapshot.map(r => r.queuedAt));
+          const remainingQ = currentQ.filter(r => !syncedTimestamps.has(r.queuedAt));
+          saveOfflineQueue(remainingQ);
+        }
       }
     } catch {} finally {
       _isFlushingOffline = false;

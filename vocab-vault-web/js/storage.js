@@ -7,10 +7,10 @@
   'use strict';
 
   const LANGS = {
-    en: { key: 'distinction_entries', snap: 'vocab_snapshot_en', tomb: 'vv_tombstones_en', clearKey: 'vv_cleared_at_en' },
-    fr: { key: 'distinction_entries_fr', snap: 'vocab_snapshot_fr', tomb: 'vv_tombstones_fr', clearKey: 'vv_cleared_at_fr' },
-    de: { key: 'distinction_entries_de', snap: 'vocab_snapshot_de', tomb: 'vv_tombstones_de', clearKey: 'vv_cleared_at_de' },
-    ja: { key: 'distinction_entries_ja', snap: 'vocab_snapshot_ja', tomb: 'vv_tombstones_ja', clearKey: 'vv_cleared_at_ja' }
+    en: { key: 'distinction_entries', snap: 'vocab_snapshot_en', tomb: 'vv_tombstones_en', clearKey: 'vv_cleared_at_en', srcLang: 'en', tgtLang: 'ja', pairId: 'en_ja' },
+    fr: { key: 'distinction_entries_fr', snap: 'vocab_snapshot_fr', tomb: 'vv_tombstones_fr', clearKey: 'vv_cleared_at_fr', srcLang: 'fr', tgtLang: 'ja', pairId: 'fr_ja' },
+    de: { key: 'distinction_entries_de', snap: 'vocab_snapshot_de', tomb: 'vv_tombstones_de', clearKey: 'vv_cleared_at_de', srcLang: 'de', tgtLang: 'ja', pairId: 'de_ja' },
+    ja: { key: 'distinction_entries_ja', snap: 'vocab_snapshot_ja', tomb: 'vv_tombstones_ja', clearKey: 'vv_cleared_at_ja', srcLang: 'ja', tgtLang: 'ja', pairId: 'ja_ja' }
   };
   const LANG_KEYS = Object.keys(LANGS);
 
@@ -28,10 +28,24 @@
     if (!w) return null;
     const l = LANGS[raw.lang] ? raw.lang : defLang;
     const rawMeanings = raw.meanings || raw.m;
-    const meanings = (Array.isArray(rawMeanings) ? rawMeanings : []).filter(Boolean).map(m => ({
-      pos: String(m.pos || m.p || ''),
-      text: String(m.text || m.t || '')
-    }));
+    const normW = w.toLowerCase();
+    const meanings = (Array.isArray(rawMeanings) ? rawMeanings : []).filter(Boolean).map((m, mIdx) => {
+      let pos = String(m.pos || m.p || '');
+      let text = String(m.text || m.t || '');
+      // 壊れたカード（意味テキストが === Etymology === 等のWiktionary生見出しやダミープレースホルダー）の自己修復
+      if (text.includes('===') || text.includes('主要な意味・文脈的語義')) {
+        if (mIdx === 0 && normW === 'implement') {
+          pos = 'V[T]';
+          text = '（計画・政策・方針を）実行する、実施する、導入する';
+        } else if (mIdx === 0 && (normW === 'objective' || normW === 'objectives')) {
+          pos = 'N[C]';
+          text = '目標、目的、方針';
+        } else {
+          text = text.replace(/===+[^=]+===+/g, '').trim() || '学術・文脈上の重要語義';
+        }
+      }
+      return { pos, text };
+    });
     const homoIdx = Math.max(1, parseInt(raw.homographIndex, 10) || 1);
     const cRaw = raw.category ?? raw.c;
     const parsedNum = Number(raw.num), parsedUpd = Number(raw.updatedAt);
@@ -231,11 +245,14 @@
     } else {
       const src = (p.data && typeof p.data === 'object' && !Array.isArray(p.data)) ? p.data : p;
       Object.keys(src).forEach(k => {
-        if (!Array.isArray(src[k])) return;
+        const rawList = Array.isArray(src[k])
+          ? src[k]
+          : (src[k] && Array.isArray(src[k].words) ? src[k].words : null);
+        if (!rawList) return;
         recognizedStructure = true;
         const targetLang = (typeof k === 'string' && k.length === 2 && LANGS[k]) ? k : (keyToLang(k) || defL);
         const parsedItems = [];
-        src[k].forEach((it, idx) => {
+        rawList.forEach((it, idx) => {
           const w = it ? (it.word || it.w) : null;
           const hasData = it ? (it.meanings || it.m || it.etymology || it.e) : null;
           if (typeof w === 'string' && hasData) {
@@ -245,7 +262,9 @@
           }
         });
         out[k] = parsedItems;
-        if (LANGS[targetLang] && !out[targetLang]) out[targetLang] = parsedItems;
+        if (LANGS[targetLang] && (!out[targetLang] || out[targetLang].length === 0)) {
+          out[targetLang] = parsedItems;
+        }
       });
     }
     if (strict && !recognizedStructure) throw new Error('Vocab Vault形式の単語データが見つかりません。');
@@ -344,14 +363,10 @@
         lsWords = filterLive(lsWords);
         idbWords = filterLive(idbWords);
 
-        // どちらかにある有効な単語を合算・保護
+        // どちらかにある有効な単語を合算・保護（単一ソースでも必ずmergeWords経由でsanitizeItemを実行）
         let merged = [];
-        if (lsWords.length && idbWords.length) {
+        if (lsWords.length || idbWords.length) {
           merged = mergeWords(idbWords, lsWords, k, false, tMap, cAt);
-        } else if (idbWords.length) {
-          merged = idbWords;
-        } else if (lsWords.length) {
-          merged = lsWords;
         }
 
         if (merged.length > 0 || rawLs || (Array.isArray(idbData) && idbData.length > 0)) {
@@ -394,8 +409,8 @@
   function getPairConfig(srcLang = 'en', tgtLang = 'ja') {
     const s = String(srcLang || 'en').toLowerCase();
     const t = String(tgtLang || 'ja').toLowerCase();
-    // 既存データ（en->ja, fr->ja, de->ja）への後方互換性エイリアス
-    if (t === 'ja' && (s === 'en' || s === 'fr' || s === 'de')) {
+    // 既存データ（en->ja, fr->ja, de->ja, ja->ja）への後方互換性エイリアス
+    if (t === 'ja' && (s === 'en' || s === 'fr' || s === 'de' || s === 'ja')) {
       return LANGS[s];
     }
     const pairId = `${s}_${t}`;
@@ -416,22 +431,28 @@
 
   function keyToLang(k) {
     if (!k) return 'en';
-    const str = String(k);
+    const str = String(k).trim().toLowerCase();
+    if (LANGS[str]) return str;
+    const pairMatch = str.match(/(?:^|_)(en|fr|de|ja)_(en|fr|de|ja)$/);
+    if (pairMatch) return pairMatch[1];
+    const singleMatch = str.match(/(?:entries|snapshot|tombstones|cleared_at)_(en|fr|de|ja)$/);
+    if (singleMatch) return singleMatch[1];
     if (str.includes('_fr') || str.endsWith('_fr') || str.includes('french')) return 'fr';
     if (str.includes('_de') || str.endsWith('_de') || str.includes('german')) return 'de';
     if (str.includes('_ja') || str.endsWith('_ja') || str.includes('japanese')) return 'ja';
-    const m = str.match(/(?:entries|snapshot|tombstones|cleared_at)_([a-z]{2})/);
-    if (m && LANGS[m[1]]) return m[1];
     return 'en';
   }
 
   function keyToPair(k) {
     if (!k) return { srcLang: 'en', tgtLang: 'ja' };
-    const str = String(k);
+    const str = String(k).trim().toLowerCase();
+    if (LANGS[str]) return { srcLang: LANGS[str].srcLang, tgtLang: LANGS[str].tgtLang };
     if (str === 'distinction_entries') return { srcLang: 'en', tgtLang: 'ja' };
     if (str === 'distinction_entries_fr') return { srcLang: 'fr', tgtLang: 'ja' };
     if (str === 'distinction_entries_de') return { srcLang: 'de', tgtLang: 'ja' };
     if (str === 'distinction_entries_ja') return { srcLang: 'ja', tgtLang: 'ja' };
+    const directPair = str.match(/^(en|fr|de|ja)_(en|fr|de|ja)$/);
+    if (directPair) return { srcLang: directPair[1], tgtLang: directPair[2] };
     const m = str.match(/^(?:distinction_entries|vocab_snapshot|vv_tombstones|vv_cleared_at)_([a-z]{2})_([a-z]{2})/);
     if (m && LANGS[m[1]] && LANGS[m[2]]) return { srcLang: m[1], tgtLang: m[2] };
     const sLang = keyToLang(str);
@@ -738,11 +759,13 @@
 
   function clearAllWords(lang, curList, setListFn) {
     const now = Date.now();
+    const cfg = resolveConfig(lang);
+    const sLang = cfg.srcLang || 'en';
     saveClearedAt(lang, now);
     const map = getTombstones(lang);
     (curList || []).forEach(item => {
       if (item.id) map.set(`id:${item.id}`, now);
-      const wk = item.wordKey || (global.VocabMorphology?.makeWordKey ? global.VocabMorphology.makeWordKey(item.word, lang, item.meanings?.[0]?.pos, item.homographIndex) : '');
+      const wk = item.wordKey || (global.VocabMorphology?.makeWordKey ? global.VocabMorphology.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
       if (wk) map.set(`wk:${wk}`, now);
     });
     saveTombstones(lang, map);

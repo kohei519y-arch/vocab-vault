@@ -3489,7 +3489,7 @@
           efactor: 2.5,
           nextReview: now,
           updatedAt: now,
-          reviewUpdatedAt: now,
+          reviewUpdatedAt: 0,
           isDeleted: false
         };
         if (tombMap) {

@@ -30,7 +30,7 @@
     if (!raw) return '';
 
     // 1. 文字列内にアスタリスク (*) が存在する場合、その *語根 トークンを最優先抽出
-    const starMatch = raw.match(/\*([a-zA-Z0-9_äöüßÄÖÜ₁₂₃₄ḱǵʷʰ-]+)/);
+    const starMatch = raw.match(/\*([a-zA-Z0-9_äöüßÄÖÜāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗ₁₂₃₄ḱǵʷʰ-]+)/);
     if (starMatch) {
       let root = '*' + starMatch[1].toLowerCase().replace(/h[1-3₁-₃]/g, '').replace(/-$/, '');
       if (root.length >= 6 && /en$/.test(root)) root = root.slice(0, -2);

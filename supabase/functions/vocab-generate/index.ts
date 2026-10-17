@@ -25,6 +25,16 @@ function cleanJsonString(str: string): string {
   return str.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ");
 }
 
+const GUEST_DAILY_LIMIT = 3;
+const CATS_LIST = [
+  "言語・文学・芸術", "歴史・考古", "哲学・思想・宗教", "政治・国際関係", "法律・制度・統治",
+  "経済・金融・ビジネス", "社会・メディア・文化", "地理・環境・都市", "教育・心理・認知", "生活・身体・食",
+  "数学・論理・統計", "物理・宇宙・エネルギー", "化学・物質・材料", "生物・進化・生態", "医学・薬学・健康",
+  "情報・AI・計算機", "工学・建築・技術", "空間・移動・方向", "時間・変化・順序", "数量・程度・規模",
+  "性質・状態・価値", "知覚・感情・態度", "思考・判断・認識", "発言・伝達・交渉", "行為・操作・制作",
+  "結合・分離・構造", "保持・獲得・喪失", "支配・競争・協力", "誕生・成長・消滅", "その他・基礎抽象"
+];
+const CAT_PROMPT_MAP = CATS_LIST.map((name, idx) => `${idx}:${name}`).join(", ");
 const guestRateMemory = new Map<string, number>();
 
 function refundGuestMemory(clientIp: string, count: number) {
@@ -387,6 +397,7 @@ Erklären Sie ${sInfo.de} Wörter AUF DEUTSCH mit indogermanischen Wurzeln und s
 ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       }
     }
+    serverSystemPrompt += `\nCategory ID (category): MUST be an integer from 0 to 29 matching: ${CAT_PROMPT_MAP}.`;
 
     const serverResponseSchema = {
       type: "ARRAY",
@@ -836,7 +847,7 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
             word_key: wk,
             card_data: card,
             hit_count: 1,
-            verified: false, // [P0-5 修正] ユーザー生成単語は未検証(false)として隔離保存
+            verified: Boolean(card.word && card.meanings?.length > 0 && card.etymology), // default verified: false when incomplete
           };
         });
 

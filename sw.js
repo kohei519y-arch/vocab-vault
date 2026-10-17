@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v42-url-jump-responsive';
+const CACHE_NAME = 'vocab-vault-v43-native-shell-repair';
 
 // [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
 function fetchWithTimeout(request, timeoutMs = 3000) {
@@ -90,6 +90,9 @@ self.addEventListener('fetch', event => {
   }
 
   const url = new URL(event.request.url);
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
 
   // 外部API (Supabase, Gemini, Wiktionary, Stripe, 外部TTS音声) はキャッシュせず常にブラウザネイティブ通信に委ねる
   if (
@@ -208,7 +211,7 @@ self.addEventListener('notificationclick', event => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
       for (const client of windowClients) {
-        if (client.url.includes('vocab-vault') || client.url.includes('localhost') || client.url.includes('127.0.0.1')) {
+        if (client.url.includes('vocab-vault') || client.url.includes('vocabvault') || client.url.includes('localhost') || client.url.includes('127.0.0.1')) {
           if ('focus' in client) return client.focus();
         }
       }

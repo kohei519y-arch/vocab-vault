@@ -106,18 +106,18 @@
     <!-- X (Twitter) Domestic Viral Thread -->
     <div class="card">
       <div>
-        <h2>🐦 X（Twitter）国内バイラルスレッド</h2>
+        <h2>X（Twitter）国内バイラルスレッド</h2>
         <p>1ポスト目（動画・画像付きフック投稿）をTwitter投稿画面へダイレクト転送します。</p>
       </div>
       <div class="btn-group">
         <button class="btn btn-primary" onclick="launchTwitterThread(1)">
-          🚀 1ポスト目をXで開く（メインフック）
+           1ポスト目をXで開く（メインフック）
         </button>
         <button class="btn btn-outline" onclick="launchTwitterThread(2)">
-          🔗 2ポスト目をXで開く（FSRSアルゴリズム解説）
+           2ポスト目をXで開く（FSRSアルゴリズム解説）
         </button>
         <button class="btn btn-outline" onclick="launchTwitterThread(5)">
-          🎁 5ポスト目をXで開く（リンク・まとめ）
+           5ポスト目をXで開く（リンク・まとめ）
         </button>
       </div>
     </div>
@@ -125,15 +125,15 @@
     <!-- note / Zenn -->
     <div class="card">
       <div>
-        <h2>📝 note & Zenn 開発秘話・理論記事</h2>
+        <h2>note & Zenn 開発秘話・理論記事</h2>
         <p>5,000字級の技術＆学習理論記事をクリップボードにコピーし、記事作成画面を一発で開きます。</p>
       </div>
       <div class="btn-group">
         <button class="btn btn-emerald" onclick="copyAndOpenNote()">
-          📋 note記事本文をコピーして作成画面を開く
+           note記事本文をコピーして作成画面を開く
         </button>
         <button class="btn btn-outline" onclick="copyAndOpenZenn()">
-          📋 Zenn用本文をコピーして作成画面を開く
+           Zenn用本文をコピーして作成画面を開く
         </button>
       </div>
     </div>
@@ -141,15 +141,15 @@
     <!-- Product Hunt Global Launch -->
     <div class="card">
       <div>
-        <h2>🐱 Product Hunt グローバルローンチ</h2>
+        <h2>Product Hunt グローバルローンチ</h2>
         <p>Title, Tagline, Maker Story をワンクリックで取得し、Product Hunt の申請画面を開きます。</p>
       </div>
       <div class="btn-group">
         <button class="btn btn-cyan" onclick="openProductHunt()">
-          🚀 Product Hunt 申請ページを開く
+           Product Hunt 申請ページを開く
         </button>
         <button class="btn btn-outline" onclick="copyPHMakerStory()">
-          📋 Maker Story (First Comment) をコピー
+           Maker Story (First Comment) をコピー
         </button>
       </div>
     </div>
@@ -157,21 +157,21 @@
     <!-- Hacker News & Reddit -->
     <div class="card">
       <div>
-        <h2>👽 Hacker News & Reddit</h2>
+        <h2>Hacker News & Reddit</h2>
         <p>タイトルとURLをプリセットした状態で各コミュニティのSubmit画面を開きます。</p>
       </div>
       <div class="btn-group">
         <button class="btn btn-outline" onclick="openHackerNews()">
-          🟧 Show HN を開く（タイトル自動入力）
+           Show HN を開く（タイトル自動入力）
         </button>
         <button class="btn btn-outline" onclick="openReddit('etymology')">
-          🌐 r/etymology 投稿画面を開く
+           r/etymology 投稿画面を開く
         </button>
         <button class="btn btn-outline" onclick="openReddit('Anki')">
-          📇 r/Anki 投稿画面を開く
+           r/Anki 投稿画面を開く
         </button>
         <button class="btn btn-outline" onclick="openReddit('ObsidianMD')">
-          💎 r/ObsidianMD 投稿画面を開く
+           r/ObsidianMD 投稿画面を開く
         </button>
       </div>
     </div>
@@ -179,14 +179,14 @@
     <!-- Influencer Outreach -->
     <div class="card" style="grid-column: 1 / -1;">
       <div>
-        <h2>🤝 インフルエンサー協業 Outreach テンプレート</h2>
+        <h2>インフルエンサー協業 Outreach テンプレート</h2>
         <p>相手に応じた高返信率のDM・メール文面を1クリックでコピーできます。</p>
       </div>
       <div class="btn-group" style="flex-direction: row; flex-wrap: wrap;">
-        <button class="btn btn-outline" onclick="copyTemplate('ja_dm')">📋 国内X英語インフルエンサーDM</button>
-        <button class="btn btn-outline" onclick="copyTemplate('ja_mail')">📋 国内YouTuber宛 企画提案メール</button>
-        <button class="btn btn-outline" onclick="copyTemplate('en_polyglot')">📋 海外Polyglot/語学者宛 DM (English)</button>
-        <button class="btn btn-outline" onclick="copyTemplate('en_anki')">📋 海外PKM/Ankiブロガー宛 メール (English)</button>
+        <button class="btn btn-outline" onclick="copyTemplate('ja_dm')">国内X英語インフルエンサーDM</button>
+        <button class="btn btn-outline" onclick="copyTemplate('ja_mail')">国内YouTuber宛 企画提案メール</button>
+        <button class="btn btn-outline" onclick="copyTemplate('en_polyglot')">海外Polyglot/語学者宛 DM (English)</button>
+        <button class="btn btn-outline" onclick="copyTemplate('en_anki')">海外PKM/Ankiブロガー宛 メール (English)</button>
       </div>
     </div>
   </div>
@@ -201,17 +201,17 @@ function showToast(msg) {
   const t = document.getElementById('toast');
   t.innerText = msg;
   t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
+  setTimeout(() =>t.classList.remove('show'), 2500);
 }
 
 function launchTwitterThread(part) {
   let text = "";
   if (part === 1) {
-    text = `「英単語の丸暗記」がどうしても苦痛だったので、印欧祖語（語根）から芋づる式に脳内定着させるWebアプリ『VocabVault』を個人開発しました。\n\n語根同士の派生関係を物理シミュレーション（力学バネグラフ）で可視化し、最新の適応型忘却曲線SRSと連動させています。\n\n完全無料・登録不要👇\n${APP_URL}`;
+    text = `「英単語の丸暗記」がどうしても苦痛だったので、印欧祖語（語根）から芋づる式に脳内定着させるWebアプリ『VocabVault』を個人開発しました。\n\n語根同士の派生関係を物理シミュレーション（力学バネグラフ）で可視化し、最新の適応型忘却曲線SRSと連動させています。\n\n完全無料・登録不要\n${APP_URL}`;
   } else if (part === 2) {
     text = `【VocabVaultの特徴 1/3】\n単なる単語帳ではなく、単語同士の「語源的つながり」を動的グラフで体験できます。\n\n例えば *bʰer-（運ぶ）を中心に、differ, prefer, transfer, bear, bring がバネのように結びついて展開。理屈で覚えるから一生忘れません。\n\n${APP_URL}`;
   } else {
-    text = `PC・スマホどちらでもブラウザから即座に動きます。通信不要の完全オフラインPWA・Anki出力にも対応。\n\n英単語の暗記に苦戦している方はぜひ一度触ってみてください👇\n${APP_URL}`;
+    text = `PC・スマホどちらでもブラウザから即座に動きます。通信不要の完全オフラインPWA・Anki出力にも対応。\n\n英単語の暗記に苦戦している方はぜひ一度触ってみてください\n${APP_URL}`;
   }
   const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
   window.open(url, '_blank');
@@ -221,7 +221,7 @@ async function copyAndOpenNote() {
   const noteTitle = "「英単語の丸暗記を根絶する」印欧祖語グラフ×忘却曲線SRSアプリ『VocabVault』を作った理由";
   await navigator.clipboard.writeText(`${noteTitle}\n\n（※ docs/marketing/02_NOTE_ZENN_LAUNCH_STORY_JA.md の内容がここに準備されています）\n\nアプリURL: ${APP_URL}`);
   showToast("記事ドラフトをコピーしました！note作成画面を開きます");
-  setTimeout(() => {
+  setTimeout(() =>{
     window.open("https://note.com/notes/new", "_blank");
   }, 500);
 }
@@ -229,7 +229,7 @@ async function copyAndOpenNote() {
 async function copyAndOpenZenn() {
   await navigator.clipboard.writeText(`VocabVault: ゼロビルド・完全ローカルファーストで挑む語源ネットワーク学習エンジン\nURL: ${APP_URL}`);
   showToast("Zennドラフトをコピーしました！");
-  setTimeout(() => {
+  setTimeout(() =>{
     window.open("https://zenn.dev/new", "_blank");
   }, 500);
 }
@@ -239,7 +239,7 @@ function openProductHunt() {
 }
 
 async function copyPHMakerStory() {
-  const story = `Hey Product Hunt community! 👋 I'm the maker of VocabVault.\n\nLike many language learners, I was frustrated by rote memorization. Words learned in isolation are forgotten quickly.\n\nVocabVault visualizes Proto-Indo-European roots with real-time Canvas 2D spring physics and pairs them with modern spaced repetition (FSRS-4.5).\n\nCheck it out at: ${APP_URL}`;
+  const story = `Hey Product Hunt community!  I'm the maker of VocabVault.\n\nLike many language learners, I was frustrated by rote memorization. Words learned in isolation are forgotten quickly.\n\nVocabVault visualizes Proto-Indo-European roots with real-time Canvas 2D spring physics and pairs them with modern spaced repetition (FSRS-4.5).\n\nCheck it out at: ${APP_URL}`;
   await navigator.clipboard.writeText(story);
   showToast("Maker Story をコピーしました！");
 }
@@ -259,7 +259,7 @@ function openReddit(sub) {
 async function copyTemplate(type) {
   let text = "";
   if (type === 'ja_dm') {
-    text = `はじめまして！いつも英語学習の発信を大変参考に拝見しております。英単語の丸暗記を根絶し、語根から芋づる式に定着させる個人開発Webアプリ『VocabVault』を公開しました。\n🔗 ${APP_URL}\n登録不要で即座に動きます。もしよろしければご意見やフィードバックをいただけますと幸いです！`;
+    text = `はじめまして！いつも英語学習の発信を大変参考に拝見しております。英単語の丸暗記を根絶し、語根から芋づる式に定着させる個人開発Webアプリ『VocabVault』を公開しました。\n ${APP_URL}\n登録不要で即座に動きます。もしよろしければご意見やフィードバックをいただけますと幸いです！`;
   } else if (type === 'en_polyglot') {
     text = `Hi! Huge fan of your language learning content. I recently built VocabVault (${APP_URL}), a local-first web app that renders Proto-Indo-European etymology networks using real-time physics spring models. Zero sign-up required, works completely in-browser. Would love your thoughts!`;
   } else {

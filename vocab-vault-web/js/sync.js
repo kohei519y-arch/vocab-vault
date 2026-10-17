@@ -48,9 +48,10 @@
     const remoteRevUpdByWk = new Map();
     const remoteVerById = new Map();
     const remoteVerByWk = new Map();
+    const sLang = String(lang || 'en').split('_')[0] || 'en';
     (Array.isArray(remoteEntries) ? remoteEntries : []).forEach(r => {
       if (!r) return;
-      const wk = r.wordKey || makeWordKeyFn(r.word, lang, r.meanings?.[0]?.pos, r.homographIndex);
+      const wk = r.wordKey || makeWordKeyFn(r.word, sLang, r.meanings?.[0]?.pos, r.homographIndex);
       const rUpd = Number(r.updatedAt) || 1;
       const rRevUpd = Number(r.reviewUpdatedAt) || 0;
       const rVer = Number(r.version) || 1;
@@ -358,6 +359,7 @@
       return {
         ...base,
         id: r.id || base.id,
+        lang: r.lang || base.lang || dbLang,
         word: r.word || base.word,
         wordKey: r.word_key || base.wordKey,
         pair: r.pair || base.pair || dbPair,
@@ -723,11 +725,17 @@
         bundle[l] = b;
       }
     }
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+    const jsonStr = JSON.stringify(bundle, null, 2);
+    const fileName = `vocab-vault-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    if (global.VocabExport && typeof global.VocabExport.dlBlob === 'function') {
+      global.VocabExport.dlBlob([jsonStr], 'application/json', fileName);
+      return;
+    }
+    const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `vocab-vault-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = fileName;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }

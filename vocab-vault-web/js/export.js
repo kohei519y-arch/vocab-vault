@@ -11,10 +11,19 @@
   const normRootKey = r => global.VocabMorphology?.normRootKey?.(r) || global.normRootKey?.(r) || (String(r || '').startsWith('*') ? String(r || '').trim().toLowerCase() : `*${String(r || '').trim().toLowerCase()}`);
 
   /**
-   * ブラウザ上でBlobデータをファイルとして即時ダウンロード
+   * ブラウザ上でBlobデータをファイルとして即時ダウンロード（macOSネイティブ保存ダイアログ連動）
    */
   function dlBlob(parts, type, name) {
     if (typeof document === 'undefined') return;
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.nativeSave) {
+      try {
+        const text = parts.map(p => (p instanceof Uint8Array || ArrayBuffer.isView(p)) ? '' : String(p ?? '')).join('');
+        window.webkit.messageHandlers.nativeSave.postMessage({ filename: name, content: text });
+        return;
+      } catch (e) {
+        console.warn('Native save failed, falling back to blob', e);
+      }
+    }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(parts, { type }));
     a.download = name;
@@ -393,20 +402,24 @@
       let repetition = 0;
       let efactor = 2.5;
       let nextReview = now;
+      let hasScheduleCols = false;
 
       for (let fIdx = 2; fIdx < fields.length; fIdx++) {
         if (fIdx === tagsCol) continue;
         const val = fields[fIdx].trim();
         const numVal = parseFloat(val);
-        if (Number.isFinite(numVal)) {
+        if (Number.isFinite(numVal) && String(numVal) === val) {
           if (interval === 0 && numVal >= 1 && numVal <= 3650) {
             interval = Math.round(numVal);
             repetition = Math.max(1, Math.round(Math.log2(interval + 1)));
             nextReview = now + (interval * 86400000);
+            hasScheduleCols = true;
           } else if (efactor === 2.5 && numVal >= 1300 && numVal <= 3500) {
             efactor = Number((numVal / 1000).toFixed(2));
+            hasScheduleCols = true;
           } else if (efactor === 2.5 && numVal >= 1.3 && numVal <= 3.5) {
             efactor = Number(numVal.toFixed(2));
+            hasScheduleCols = true;
           }
         }
       }
@@ -429,9 +442,10 @@
         repetition: repetition,
         efactor: efactor,
         nextReview: nextReview,
+        hasScheduleCols: hasScheduleCols,
         createdAt: now,
         updatedAt: now,
-        reviewUpdatedAt: now,
+        reviewUpdatedAt: hasScheduleCols ? now : 0,
         isDeleted: false
       };
 
@@ -471,12 +485,13 @@
       const toAdd = [];
 
       items.forEach((rawItem, idx) => {
+        const hasSched = Boolean(rawItem.hasScheduleCols);
         if ((rawItem.updatedAt || 0) <= clearedAt) rawItem.updatedAt = now;
         const item = sanitizeFn(rawItem, maxNum + idx, targetLang);
         if (!item) return;
         item.wordKey = item.wordKey || makeWordKey(item.word, targetLang, item.meanings?.[0]?.pos, item.homographIndex);
         item.updatedAt = Math.max(Number(item.updatedAt) || 0, now);
-        item.reviewUpdatedAt = Math.max(Number(item.reviewUpdatedAt) || 0, now);
+        item.reviewUpdatedAt = hasSched ? Math.max(Number(item.reviewUpdatedAt) || 0, now) : (Number(rawItem.reviewUpdatedAt) || 0);
         const k = makeLookupKey(item.word, item.lang, item.homographIndex);
         // 過去に削除していた単語を再インポートした場合に墓石を解除
         tombMap.delete(`id:${item.id}`);
@@ -485,6 +500,8 @@
         if (normW) tombMap.delete(`word:${normW}`);
         if (existingMap.has(k)) {
           const ex = existingMap.get(k);
+          tombMap.delete(`id:${ex.id}`);
+          if (ex.wordKey) tombMap.delete(`wk:${ex.wordKey}`);
           Object.assign(ex, {
             meanings: item.meanings?.length ? item.meanings : ex.meanings,
             phonetic: item.phonetic || ex.phonetic,
@@ -492,12 +509,14 @@
             etymologyTags: item.etymologyTags?.length ? item.etymologyTags : ex.etymologyTags,
             core: item.core || ex.core,
             example: item.example || ex.example,
-            interval: item.interval || ex.interval,
-            repetition: item.repetition || ex.repetition,
-            efactor: item.efactor || ex.efactor,
-            nextReview: item.nextReview || ex.nextReview,
+            interval: hasSched ? (item.interval || ex.interval) : ex.interval,
+            repetition: hasSched ? (item.repetition || ex.repetition) : ex.repetition,
+            efactor: hasSched ? (item.efactor || ex.efactor) : ex.efactor,
+            nextReview: hasSched ? (item.nextReview || ex.nextReview) : ex.nextReview,
+            reviewUpdatedAt: hasSched ? now : ex.reviewUpdatedAt,
             version: (Number(ex.version) || 1) + 1,
-            updatedAt: now
+            updatedAt: now,
+            isDeleted: false
           });
           updated++;
         } else {

@@ -508,7 +508,7 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     white-space: nowrap;
   }
   .rib-btn.active .rib-lbl {
-    color: var(--p);
+    color: var(--ac);
     font-weight: 700;
   }
   /* スマホのボトムバーで主要アクション（探す・一覧・復習・語根・抽出・赤シート・設定）に厳選 */
@@ -837,13 +837,13 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   }
 
   /* 8. Anki復習画面のモバイル最適化 */
-  .anki-card {
+  .a-card, .anki-card {
     padding: 16px 12px;
     max-width: 100%;
     margin: 0;
     min-height: 55vh;
   }
-  .a-hw {
+  .a-front, .a-hw {
     font-size: 24px;
   }
   .b-rat {
@@ -854,7 +854,7 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
 @page { size:A4 portrait; margin:5mm 6mm; }
 @media print {
   body, body.dark { --bg-main:#fff; --bg-side:#f8fafc; --b:#cbd5e1; --t:#0f172a; --s:#334155; --m:#64748b; --ac:#6d28d9; --ac-bg:#f3e8ff; --r:#d13438; background:#fff !important; color:var(--t) !important; height:auto !important; overflow:visible !important; font-size:7.8pt; line-height:1.22; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-  .ribbon, .sidebar, .side-backdrop, .tab-bar, .lang-pair-bar, .add-bar, .doc-title, #pag, .card-acts, .due, .tag-wrap, .ety-net, .modal-ov, .loading-card, .spk-btn, .feedback-banner { display:none !important; }
+  .ribbon, .sidebar, .side-backdrop, .tab-bar, .lang-pair-bar, .add-bar, .doc-title, #pag, .card-acts, .due, .tag-wrap, .ety-net, .modal-ov:not(#graphModal.open):not(#graphModal.active), .loading-card, .spk-btn, .feedback-banner, .audio-playlist-bar { display:none !important; }
   .workspace, .main-pane, .content-scroll, .content-inner, #listView { display:block !important; width:100% !important; max-width:100% !important; height:auto !important; overflow:visible !important; padding:0 !important; margin:0 !important; }
   #list { column-count:2; column-gap:4.5mm; column-rule:.5pt solid var(--b); width:100%; }
   .card { display:block !important; background:#fff !important; border-bottom:.5pt solid var(--b); padding:2.5pt 0; margin:0; break-inside:avoid; page-break-inside:avoid; content-visibility:visible !important; }
@@ -1439,39 +1439,37 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   filter: brightness(1.1);
 }
 
-/* 印刷用スタイル (A4チートシート出力) */
+/* 印刷用スタイル (語源マインドマップ A4チートシート出力: #graphModal 開表示時のみ) */
 @media print {
-  body * {
-    visibility: hidden;
+  body:has(#graphModal.open, #graphModal.active) .workspace {
+    display: none !important;
   }
-  #graphModal, #graphModal * {
-    visibility: visible;
+  #graphModal.open, #graphModal.active {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    background: #fff !important;
+    color: #000 !important;
+    opacity: 1 !important;
   }
-  #graphModal {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: auto;
-    background: #fff;
-    color: #000;
-  }
-  .modal.graph-modal {
+  #graphModal.open .modal.graph-modal,
+  #graphModal.active .modal.graph-modal {
     max-width: 100% !important;
     width: 100% !important;
     height: auto !important;
     box-shadow: none !important;
     border: none !important;
   }
-  .modal-hd, .graph-breadcrumb-bar, .graph-timeline-bar, #graphCanvasWrap, #graphMatrixWrap {
+  #graphModal .modal-hd, #graphModal .graph-breadcrumb-bar, #graphModal .graph-timeline-bar, #graphModal #graphCanvasWrap, #graphModal #graphMatrixWrap {
     display: none !important;
   }
-  #graphMindmapWrap {
+  #graphModal #graphMindmapWrap {
     display: block !important;
     padding: 0 !important;
     background: #fff !important;
   }
-  .mindmap-root-card {
+  #graphModal .mindmap-root-card {
     border: 1px solid #ccc !important;
     box-shadow: none !important;
     page-break-inside: avoid;
@@ -2455,5 +2453,14 @@ body.dark .detail-tab-btn.active {
   transform: translateY(1px);
 }
 
-
-
+/* --- メイン画面の整理: スクリーンショットのステータスバッジ・チェックボックス等の非表示化 --- */
+#tabActs,
+#storageWarnBanner,
+#aiQuotaBadge,
+#cloudSyncBadge,
+#addOpts,
+#btnToggleAddOpts,
+#userFeedbackBanner,
+.report-ety-btn {
+  display: none !important;
+}

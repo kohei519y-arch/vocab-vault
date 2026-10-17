@@ -525,6 +525,7 @@ BEGIN
     v_current_usage := GREATEST(0, v_rec.usage_count + p_count);
     UPDATE public.guest_rate_limits
     SET usage_count = v_current_usage,
+        reset_at = v_rec.reset_at,
         updated_at = v_now
     WHERE ip = p_ip;
     RETURN jsonb_build_object('allowed', true, 'usage_count', v_current_usage, 'remaining', GREATEST(0, p_daily_limit - v_current_usage));
@@ -638,9 +639,9 @@ BEGIN
     );
   END IF;
 
-  -- [P1-2 解決] 既存のアクティブな別サブスクリプションに対する古い deleted/updated イベントを無視
+  -- [P1-2 解決] 既存のアクティブな別サブスクリプションに対する古い deleted/updated/past_due イベントを無視
   IF v_cur_status IN ('active', 'trialing')
-     AND p_subscription_status IN ('canceled', 'unpaid', 'incomplete_expired')
+     AND p_subscription_status IN ('canceled', 'unpaid', 'incomplete_expired', 'past_due')
      AND p_stripe_subscription_id IS NOT NULL THEN
     PERFORM 1 FROM public.profiles
     WHERE id = v_target_user_id
@@ -745,7 +746,7 @@ BEGIN
   END IF;
 
   WITH input_rows AS (
-    SELECT
+    SELECT DISTINCT ON (v_uid, (elem->>'id')::TEXT)
       v_uid AS user_id,
       (elem->>'id')::TEXT AS id,
       (elem->>'lang')::TEXT AS lang,
@@ -813,6 +814,7 @@ BEGIN
       -- [P0-3 解決] ストレージ枯渇攻撃（巨大文字列・巨大JSONBペイロード注入）を遮断
       AND length(COALESCE(elem->>'word', '')) <= 255
       AND length(COALESCE(elem->'card_data', '{}'::JSONB)::TEXT) <= 50000
+    ORDER BY v_uid, (elem->>'id')::TEXT, updated_at DESC, review_updated_at DESC
   ),
   upserted AS (
     INSERT INTO public.user_vocab_entries (
@@ -861,6 +863,7 @@ BEGIN
       server_updated_at = v_server_now
     WHERE EXCLUDED.updated_at >= user_vocab_entries.updated_at
        OR EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at
+       OR COALESCE(CASE WHEN (EXCLUDED.card_data->>'version') ~ '^[0-9]+$' THEN (EXCLUDED.card_data->>'version')::BIGINT ELSE 1 END, 1) > COALESCE(CASE WHEN (user_vocab_entries.card_data->>'version') ~ '^[0-9]+$' THEN (user_vocab_entries.card_data->>'version')::BIGINT ELSE 1 END, 1)
     RETURNING 1
   )
   SELECT count(*) INTO v_upserted_count FROM upserted;

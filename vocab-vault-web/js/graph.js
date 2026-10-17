@@ -7,15 +7,16 @@
 
   const LANG_GRAPH_COLORS = {
     root: '#7c3aed',
-    en: '#2563eb',
-    fr: '#06b6d4',
-    de: '#f59e0b',
-    ja: '#10b981'
+    en: '#38bdf8',
+    fr: '#a78bfa',
+    de: '#fbbf24',
+    ja: '#34d399'
   };
 
   const RETENTION_COLORS = {
     root: '#7c3aed',
-    due: '#ef4444',
+    due: '#fb7185',
+    new: '#60a5fa',
     learning: '#f59e0b',
     mastered: '#10b981'
   };
@@ -133,12 +134,18 @@
   };
 
   /**
-   * 語根キーの安全な正規化 & 表記ゆれ・同根統合
+   * 語根キーの安全な正規化 & 表記ゆれ・同根統合（日本語言語名コロン等のノイズを完全排除）
    */
   function cleanRootKey(k) {
     if (!k) return '';
     const s = String(k).trim().toLowerCase();
+    // 日本語の言語名ラベル（フランス語:, 中世ラテン語:, etc.）やコロン付きテキストは語根ではないので完全に排除
+    if (/[:：]/.test(s) || /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(s)) {
+      return '';
+    }
     const rawClean = s.replace(/^\*/, '').replace(/-$/, '').trim();
+    if (rawClean.length < 2) return '';
+
     const flat = rawClean
       .replace(/[āáàâä]/g, 'a')
       .replace(/[ēéèêë]/g, 'e')
@@ -153,11 +160,64 @@
     const normFn = global.VocabMorphology?.normRootKey || global.normRootKey || global.VocabCore?.normRootKey;
     if (typeof normFn === 'function') {
       const res = normFn(k);
+      if (!res || /[:：]/.test(res) || /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(res)) return '';
       const resFlat = res.replace(/^\*/, '').replace(/-$/, '');
       if (CANONICAL_ROOT_ALIASES[resFlat]) return CANONICAL_ROOT_ALIASES[resFlat];
       return res.startsWith('*') ? res : `*${res}`;
     }
     return s.startsWith('*') ? s : `*${s}`;
+  }
+
+  /**
+   * 語根キーの代表原義（コアイメージ・日本語意味）を取得（天体図ネットワークでの視覚的実用化）
+   */
+  function getRootMeaning(rootKey, connectedWords = []) {
+    if (!rootKey) return '';
+    const cleanK = cleanRootKey(rootKey);
+    if (!cleanK) return '';
+    const rawK = cleanK.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+
+    // 1. BUILTIN_ETYMOLOGY_KNOWLEDGE の照合
+    const builtinRoots = (global.VocabDictionary?.BUILTIN_ETYMOLOGY_KNOWLEDGE || global.BUILTIN_ETYMOLOGY_KNOWLEDGE)?.roots || {};
+    for (const [k, info] of Object.entries(builtinRoots)) {
+      const bRaw = k.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+      if (bRaw === rawK || bRaw.replace(/h[1-4]/g, '') === rawK.replace(/h[1-4]/g, '')) {
+        if (info.meaning) {
+          return info.meaning.split(/[,、/／]/).slice(0, 2).join('・').trim();
+        }
+      }
+    }
+
+    // 2. VocabEikenCatalog の照合
+    if (global.VocabEikenCatalog) {
+      const getRootFn = typeof global.VocabEikenCatalog.getRoot === 'function'
+        ? global.VocabEikenCatalog.getRoot.bind(global.VocabEikenCatalog)
+        : (rk => (global.VocabEikenCatalog.ROOTS || []).find(r => r && (r.rootKey === rk || (r.rootKey && r.rootKey.replace(/^\*/, '').replace(/-$/, '') === (rk || '').replace(/^\*/, '').replace(/-$/, '')))));
+      const eikenRoot = getRootFn(cleanK) || getRootFn(`*${rawK}-`) || getRootFn(`*${rawK}`);
+      if (eikenRoot?.meaning) {
+        return eikenRoot.meaning.split(/[,、/／]/).slice(0, 2).join('・').trim();
+      }
+    }
+
+    // 3. 接続単語の語源解説文 (etymology) 内の括弧から抽出
+    if (Array.isArray(connectedWords) && connectedWords.length > 0) {
+      for (const w of connectedWords) {
+        const ety = String(w.item?.etymology || '');
+        const escRaw = rawK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const match = ety.match(new RegExp(`\\*${escRaw}[^\\(（]*[\\(（]([^\\)）]{1,12})[\\)）]`, 'i'));
+        if (match && match[1]) {
+          const m = match[1].split(/[,、/／]/).slice(0, 2).join('・').trim();
+          if (m && !m.includes('http') && m.length <= 10) return m;
+        }
+      }
+      for (const w of connectedWords) {
+        if (w.item?.core && typeof w.item.core === 'string' && w.item.core.length <= 10) {
+          return w.item.core.split(/[,、/／]/)[0].trim();
+        }
+      }
+    }
+
+    return '';
   }
 
   /**
@@ -287,16 +347,20 @@
       (Array.isArray(list) ? list : []).forEach(item => {
         if (!item || !item.word) return;
 
-        // 1. 語根タグの取得（未設定の場合は解説文から正規表現フォールバック抽出）
-        let itemRoots = (Array.isArray(item.etymologyTags) ? item.etymologyTags : [])
-          .map(cleanRootKey)
-          .filter(r => r && isValidRootFn(r, item));
+        // 1. 語根タグの取得（未設定の場合は解説文から正規表現フォールバック抽出・結果をメモ化）
+        let itemRoots = item._cachedRoots;
+        if (!itemRoots) {
+          itemRoots = (Array.isArray(item.etymologyTags) ? item.etymologyTags : [])
+            .map(cleanRootKey)
+            .filter(r => r && isValidRootFn(r, item));
 
-        if (!itemRoots.length && item.etymology) {
-          const matches = String(item.etymology).match(/\*([a-zāēīōūáéíóúh₁₂₃₂₃h]+(?:-[a-zāēīōūáéíóúh₁₂₃]*)?)/gi);
-          if (matches) {
-            itemRoots = matches.map(cleanRootKey).filter(r => r && isValidRootFn(r, item));
+          if (!itemRoots.length && item.etymology) {
+            const matches = String(item.etymology).match(/\*([a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]+(?:-[a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]*)?)/gi);
+            if (matches) {
+              itemRoots = matches.map(cleanRootKey).filter(r => r && isValidRootFn(r, item));
+            }
           }
+          item._cachedRoots = itemRoots;
         }
 
         if (!itemRoots.length) return;
@@ -1032,7 +1096,9 @@
       rList.sort((a, b) => b.childCount - a.childCount);
       html += `<optgroup label="[領域] ${rObj.label}">`;
       rList.forEach(r => {
-        html += `<option value="${r.label}">${r.label} (${r.childCount}語)</option>`;
+        const m = r.rootMeaning || getRootMeaning(r.label, r.connectedWords);
+        const mStr = m ? ` - ${m}` : '';
+        html += `<option value="${r.label}">${r.label}${mStr} (${r.childCount}語)</option>`;
       });
       html += '</optgroup>';
     });
@@ -1594,8 +1660,8 @@
         if (matched) {
           const now = Date.now();
           const rVal = global.VocabSRS?.getRetrievability ? global.VocabSRS.getRetrievability(matched.item, now) : 0.9;
-          const bgPill = rVal >= 0.88 ? 'rgba(16, 185, 129, 0.15)' : (rVal >= 0.70 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)');
-          const borderPill = rVal >= 0.88 ? '#10b981' : (rVal >= 0.70 ? '#f59e0b' : '#ef4444');
+          const bgPill = rVal >= 0.88 ? 'rgba(16, 185, 129, 0.15)' : (rVal >= 0.70 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(251, 113, 133, 0.15)');
+          const borderPill = rVal >= 0.88 ? '#10b981' : (rVal >= 0.70 ? '#f59e0b' : '#fb7185');
 
           return `
             <td class="matrix-td">
@@ -1727,17 +1793,18 @@
     if (graphState.colorMode === 'retention') {
       legend.innerHTML = `
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#7c3aed"></span>語根</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ef4444"></span>復習期日</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#fb7185"></span>復習期日</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#60a5fa"></span>新規</span>
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></span>学習中(&lt;7日)</span>
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#10b981"></span>長期定着(7日+)</span>
       `;
     } else {
       legend.innerHTML = `
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#7c3aed"></span>語根(Root)</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#2563eb"></span>英語</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#06b6d4"></span>仏語</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></span>独語</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#10b981"></span>日本語</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#38bdf8"></span>英語</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#a78bfa"></span>仏語</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#fbbf24"></span>独語</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#34d399"></span>日本語</span>
       `;
     }
   }
@@ -1859,7 +1926,7 @@
     graphState.ctx = canvas.getContext('2d');
     graphState.width = wrap.clientWidth || 800;
     graphState.height = wrap.clientHeight || 600;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = graphState.width * dpr;
     canvas.height = graphState.height * dpr;
     canvas.style.width = graphState.width + 'px';
@@ -1870,16 +1937,18 @@
     if (filterInput) filterInput.value = normTarget ? normTarget : '';
     graphState.filterQuery = normTarget;
 
-    const allRootsData = buildGraphData('', false, graphState.langFilter);
-    if (allRootsData.nodes.length > 120 && !targetRoot) {
+    // 軽量化: 重複ビルド（buildGraphDataの多重実行）を完全撤廃しエントリー数から瞬時にclusterOnly判定
+    const currentEntryCount = (global.VocabCore?.getAppState?.()?.entries?.length) || (global.App?.entries?.length) || 0;
+    if (currentEntryCount > 120 && !targetRoot) {
       graphState.clusterOnly = true;
-    } else {
+    } else if (!targetRoot) {
       graphState.clusterOnly = false;
     }
 
     const clusterBtn = document.getElementById('graphClusterFilterBtn');
     if (clusterBtn) clusterBtn.classList.toggle('active', graphState.clusterOnly);
 
+    // 1回のみ高速ビルド
     const { nodes, edges } = buildGraphData(normTarget, graphState.clusterOnly, graphState.langFilter);
     graphState.nodes = nodes;
     graphState.edges = edges;
@@ -1907,7 +1976,11 @@
       graphUIManager.applyMode(graphState.activeViewTab || 'network');
     }
 
-    wakeGraphSimulation();
+    if (graphState.layoutMode === 'tree') {
+      startTreeEasingAnimation();
+    } else {
+      wakeGraphSimulation();
+    }
   }
 
   function resetGraphZoom() {
@@ -2039,10 +2112,16 @@
       octx.textAlign = 'left';
 
       const dataUrl = offCanvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = `vocab-vault-lineage-tree-${new Date().toISOString().slice(0, 10)}.png`;
-      a.click();
+      const fileName = `vocab-vault-lineage-tree-${new Date().toISOString().slice(0, 10)}.png`;
+      if (global.webkit?.messageHandlers?.nativeSave) {
+        const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+        global.webkit.messageHandlers.nativeSave.postMessage({ filename: fileName, base64, mime: 'image/png' });
+      } else {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = fileName;
+        a.click();
+      }
       const toastFn = global.showToast || global.VocabCore?.showToast;
       if (typeof toastFn === 'function') {
         toastFn(isEn ? 'Constellation & Lineage Tree Share Card exported (1200x630px)!' : '語源星座・系統樹シェアカード（1200×630px）を出力しました！', 'ok', 4000);
@@ -2051,10 +2130,16 @@
       console.warn('[Graph Export Error]', e);
       try {
         const dataUrl = canvas.toDataURL('image/png');
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `vocab-vault-root-network-${new Date().toISOString().slice(0, 10)}.png`;
-        a.click();
+        const fileName = `vocab-vault-graph-${new Date().toISOString().slice(0, 10)}.png`;
+        if (global.webkit?.messageHandlers?.nativeSave) {
+          const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+          global.webkit.messageHandlers.nativeSave.postMessage({ filename: fileName, base64, mime: 'image/png' });
+        } else {
+          const a = document.createElement('a');
+          a.href = dataUrl;
+          a.download = fileName;
+          a.click();
+        }
       } catch {}
     }
   }
@@ -2064,7 +2149,7 @@
     graphState.selectedNode = node;
     renderDetailDrawer(node);
     if (center && node) {
-      centerOnNode(node, Math.max(graphState.zoom, 1.15));
+      centerOnNode(node, graphState.zoom);
     } else {
       drawGraph();
     }
@@ -2445,17 +2530,17 @@
 
   function getEnglishPairKeyAndEntries() {
     const app = global.VocabCore?.App || global.App;
-    const activeCfg = (global.VocabCore?.getActivePairConfig || global.getActivePairConfig)?.() || { key: 'distinction_entries', srcLang: 'en' };
-    const isEnActive = (activeCfg.srcLang || app?.srcLang || app?.lang || 'en') === 'en';
-    const saveKey = isEnActive ? (activeCfg.key || 'distinction_entries') : 'distinction_entries';
+    const activeCfg = (global.VocabCore?.getActivePairConfig || global.getActivePairConfig)?.() || { key: 'distinction_entries', srcLang: 'en', tgtLang: 'ja' };
+    const isEnJaActive = (activeCfg.srcLang || app?.srcLang || app?.lang || 'en') === 'en' && (activeCfg.tgtLang || app?.tgtLang || 'ja') === 'ja';
+    const saveKey = isEnJaActive ? (activeCfg.key || 'distinction_entries') : 'distinction_entries';
     const getJsonFn = global.VocabCore?.getJson || global.getJson || global.VocabStorage?.getJson;
-    if (isEnActive && Array.isArray(app?.entries) && app.entries.length > 0) {
+    if (isEnJaActive && Array.isArray(app?.entries) && app.entries.length > 0) {
       return { saveKey, entries: app.entries, isEnActive: true };
     }
     const entries = typeof getJsonFn === 'function'
       ? getJsonFn(saveKey)
-      : (isEnActive && Array.isArray(app?.entries) ? app.entries : (global.VocabStorage?.state?.mem?.[saveKey] || []));
-    return { saveKey, entries: Array.isArray(entries) ? entries : [], isEnActive };
+      : (isEnJaActive && Array.isArray(app?.entries) ? app.entries : (global.VocabStorage?.state?.mem?.[saveKey] || []));
+    return { saveKey, entries: Array.isArray(entries) ? entries : [], isEnActive: isEnJaActive };
   }
 
   function persistUnlockedEntries(nextEntries, targetKey = null) {
@@ -3001,60 +3086,61 @@
         // B. 第2階層 サンバースト扇状エリア (Tier 2: r = 90 〜 330)
         // ゲルマン語派 (黄〜緑系: 10時〜2時 / 上部)
         drawSectorBand(90, 330, -3 * Math.PI / 4, -Math.PI / 4,
-          isDark ? 'rgba(132, 204, 22, 0.07)' : 'rgba(101, 163, 13, 0.06)',
-          isDark ? 'rgba(163, 230, 53, 0.32)' : 'rgba(101, 163, 13, 0.32)'
+          isDark ? 'rgba(132, 204, 22, 0.05)' : 'rgba(101, 163, 13, 0.04)',
+          isDark ? 'rgba(163, 230, 53, 0.12)' : 'rgba(101, 163, 13, 0.10)'
         );
         // イタリック語派 (青〜紫系: 2時〜6時 / 右下)
         drawSectorBand(90, 330, -Math.PI / 4, 3 * Math.PI / 5,
-          isDark ? 'rgba(56, 189, 248, 0.07)' : 'rgba(2, 132, 199, 0.06)',
-          isDark ? 'rgba(56, 189, 248, 0.32)' : 'rgba(2, 132, 199, 0.32)'
+          isDark ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.04)',
+          isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.10)'
         );
         // ギリシャ古典・その他 (紫系: 6時〜10時 / 左下)
         drawSectorBand(90, 330, 3 * Math.PI / 5, 5 * Math.PI / 4,
-          isDark ? 'rgba(192, 132, 252, 0.05)' : 'rgba(147, 51, 234, 0.05)',
-          isDark ? 'rgba(192, 132, 252, 0.24)' : 'rgba(147, 51, 234, 0.24)'
+          isDark ? 'rgba(192, 132, 252, 0.04)' : 'rgba(147, 51, 234, 0.03)',
+          isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(147, 51, 234, 0.08)'
         );
 
         // C. 第3階層 サンバースト扇状エリア (Tier 3: r = 345 〜 520)
         // 西ゲルマン語群 (明るい緑)
         drawSectorBand(345, 520, -3 * Math.PI / 4 + 0.03, -Math.PI / 4 - 0.03,
-          isDark ? 'rgba(34, 197, 94, 0.08)' : 'rgba(22, 163, 74, 0.06)',
-          isDark ? 'rgba(74, 222, 128, 0.35)' : 'rgba(22, 163, 74, 0.32)'
+          isDark ? 'rgba(34, 197, 94, 0.05)' : 'rgba(22, 163, 74, 0.04)',
+          isDark ? 'rgba(74, 222, 128, 0.14)' : 'rgba(22, 163, 74, 0.10)'
         );
         // ロマンス諸語 (鮮やかな青)
         drawSectorBand(345, 520, -Math.PI / 4 + 0.03, 3 * Math.PI / 5 - 0.03,
-          isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(79, 70, 229, 0.06)',
-          isDark ? 'rgba(129, 140, 248, 0.35)' : 'rgba(79, 70, 229, 0.32)'
+          isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(79, 70, 229, 0.04)',
+          isDark ? 'rgba(129, 140, 248, 0.14)' : 'rgba(79, 70, 229, 0.10)'
         );
         // ヘレニック・学術語群
         drawSectorBand(345, 520, 3 * Math.PI / 5 + 0.03, 5 * Math.PI / 4 - 0.03,
-          isDark ? 'rgba(168, 85, 247, 0.05)' : 'rgba(126, 34, 206, 0.04)',
-          isDark ? 'rgba(192, 132, 252, 0.22)' : 'rgba(126, 34, 206, 0.22)'
+          isDark ? 'rgba(168, 85, 247, 0.04)' : 'rgba(126, 34, 206, 0.03)',
+          isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(126, 34, 206, 0.08)'
         );
 
         // D. 第4階層 ガイドライン (Tier 4: r = 440, 610, 780, 950, 1100)
         const guideOrbits = [440, 610, 780, 950, 1100];
-        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
         ctx.lineWidth = 1.0;
         ctx.setLineDash([3, 5]);
+        ctx.beginPath();
         guideOrbits.forEach(r => {
-          ctx.beginPath();
+          ctx.moveTo(cx + r, cy);
           ctx.arc(cx, cy, r, 0, Math.PI * 2);
-          ctx.stroke();
         });
+        ctx.stroke();
         ctx.setLineDash([]);
 
         // E. 放射状セクター境界線（中心から伸びる細いガイド線）
         const sectorDividers = [-3 * Math.PI / 4, -Math.PI / 4, 3 * Math.PI / 5];
-        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
         ctx.lineWidth = 1.0;
         ctx.setLineDash([4, 4]);
+        ctx.beginPath();
         sectorDividers.forEach(angle => {
-          ctx.beginPath();
           ctx.moveTo(cx + 60 * Math.cos(angle), cy + 60 * Math.sin(angle));
           ctx.lineTo(cx + 1100 * Math.cos(angle), cy + 1100 * Math.sin(angle));
-          ctx.stroke();
         });
+        ctx.stroke();
         ctx.setLineDash([]);
 
         // F. サンバースト各階層の文字ラベル（落ち着いた高コントラストタイポグラフィ）
@@ -3151,29 +3237,28 @@
         ctx.lineWidth = 0.8;
       } else if (isTree && e.kind === 'root_to_branch') {
         // 語根から古典枝への主幹エネルギー導管
-        ctx.strokeStyle = isDark ? 'rgba(192, 132, 252, 0.80)' : 'rgba(124, 58, 237, 0.70)';
-        ctx.lineWidth = 2.4;
-        ctx.shadowColor = isDark ? 'rgba(167, 139, 250, 0.50)' : 'rgba(124, 58, 237, 0.35)';
-        ctx.shadowBlur = 6;
+        ctx.strokeStyle = isDark ? 'rgba(192, 132, 252, 0.70)' : 'rgba(124, 58, 237, 0.60)';
+        ctx.lineWidth = 2.0;
+        ctx.shadowBlur = 0;
       } else if (isTree && e.kind === 'branch_to_leaf') {
-        // 古典枝から現代見出し語への覚醒導管
-        ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.75)' : 'rgba(37, 99, 235, 0.65)';
-        ctx.lineWidth = 1.8;
-        ctx.shadowColor = isDark ? 'rgba(56, 189, 248, 0.40)' : 'rgba(37, 99, 235, 0.25)';
-        ctx.shadowBlur = 4;
+        // 古典枝から現代見出し語への導管
+        ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.45)' : 'rgba(37, 99, 235, 0.40)';
+        ctx.lineWidth = 1.2;
+        ctx.shadowBlur = 0;
       } else {
         // FSRS Stability S 連動の枝の太さと光彩
-        const branchThickness = Math.min(4.5, Math.max(0.8, 0.8 + Math.log2(Math.max(1, stability)) * 0.65));
+        const branchThickness = Math.min(3.5, Math.max(0.8, 0.8 + Math.log2(Math.max(1, stability)) * 0.55));
         if (stability >= 21 && wordNode) {
-          ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.85)' : 'rgba(217, 119, 6, 0.80)';
-          ctx.shadowColor = 'rgba(245, 158, 11, 0.55)';
-          ctx.shadowBlur = 6;
+          ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.75)' : 'rgba(217, 119, 6, 0.70)';
+          ctx.shadowBlur = 0;
           ctx.lineWidth = branchThickness;
         } else if (stability >= 7 && wordNode) {
-          ctx.strokeStyle = isDark ? 'rgba(16, 185, 129, 0.75)' : 'rgba(5, 150, 105, 0.70)';
+          ctx.strokeStyle = isDark ? 'rgba(16, 185, 129, 0.65)' : 'rgba(5, 150, 105, 0.60)';
+          ctx.shadowBlur = 0;
           ctx.lineWidth = branchThickness;
         } else {
           ctx.strokeStyle = baseEdgeColor;
+          ctx.shadowBlur = 0;
           ctx.lineWidth = branchThickness;
         }
       }
@@ -3209,7 +3294,8 @@
 
     // 2. ノード描画 (Semantic Zoom LOD 対応 & 境界半径バッファ付きカリング)
     const totalWordsCount = graphState.nodes.filter(nd => nd.type === 'word').length;
-    const textThresholdZoom = totalWordsCount > 400 ? 0.92 : (totalWordsCount > 100 ? 0.82 : 0.70);
+    // 星団のみモード時や単語数が適度な場合はズーム38%から単語ラベルを美しく表示して実用性を最大化
+    const textThresholdZoom = (graphState.clusterOnly || totalWordsCount < 150) ? 0.38 : (totalWordsCount > 400 ? 0.72 : 0.52);
 
     for (let i = 0; i < graphState.nodes.length; i++) {
       const n = graphState.nodes[i];
@@ -3226,7 +3312,16 @@
         (focusNode.type === 'branch' && focusNode.connectedWords?.includes(n)) ||
         (focusNode.type === 'word' && (focusNode.connectedRoots?.includes(n) || n.parentWord === focusNode.label))
       );
-      const isMatch = isFiltered && n.label.toLowerCase().includes(filterQ);
+      // 単語名だけでなく、語根・日本語意味・コアイメージでのインクリメンタル検索に対応
+      const isMatch = isFiltered && (
+        n.label.toLowerCase().includes(filterQ) ||
+        (n.type === 'root' && ((n.rootMeaning || '').toLowerCase().includes(filterQ) || (n.eikenMeaning || '').toLowerCase().includes(filterQ))) ||
+        (n.type === 'word' && (
+          (n.meaning || '').toLowerCase().includes(filterQ) ||
+          (n.item?.core || '').toLowerCase().includes(filterQ) ||
+          (n.connectedRoots || []).some(r => (r.label || '').toLowerCase().includes(filterQ) || (r.rootMeaning || '').toLowerCase().includes(filterQ))
+        ))
+      );
 
       // タイムライン時代フィルター
       let isDimmedByEra = false;
@@ -3248,19 +3343,30 @@
         nodeColor = isDark ? '#ea580c' : '#c2410c'; // ボス語根は赤熱するコア (Glowing Ember Core)
       } else if (n.type === 'word') {
         const rVal = global.VocabSRS?.getRetrievability ? global.VocabSRS.getRetrievability(n.item, now) : ((n.item?.nextReview || 0) <= now ? 0.65 : 0.95);
-        if (isRetention || isTree) {
-          if (rVal >= 0.88) nodeColor = '#10b981'; // 深いエメラルドグリーン (習得済・定着)
-          else if (rVal >= 0.70) nodeColor = '#f59e0b'; // 真鍮色 (安定)
-          else nodeColor = '#ef4444'; // 要復習
+        if (isRetention) {
+          // 定着度カラーモード時
+          if (rVal >= 0.88) {
+            nodeColor = '#10b981'; // 習得済・定着: 輝くエメラルド
+          } else if (rVal >= 0.70) {
+            nodeColor = '#f59e0b'; // 安定期: 黄金アンバー
+          } else if (!n.item?.nextReview || (n.item?.reps || 0) === 0) {
+            nodeColor = '#60a5fa'; // 新規・探索中: 澄んだスカイブルー
+          } else {
+            nodeColor = '#fb7185'; // 要復習: 上品なネオンローズコーラル（生々しい血赤を排除）
+          }
         } else {
-          nodeColor = LANG_GRAPH_COLORS[n.lang] || '#38bdf8';
+          // 通常表示: 言語系統・ジュエルトーン（赤点混在を完全に根絶）
+          if (n.lang === 'fr') nodeColor = '#a78bfa'; // フランス語: ラベンダー
+          else if (n.lang === 'de') nodeColor = '#fbbf24'; // ドイツ語: アンバー
+          else if (n.lang === 'ja') nodeColor = '#34d399'; // 日本語: ミント
+          else nodeColor = '#38bdf8'; // 英語・ゲルマン系: エレガントなシアンアクア
         }
       } else if (n.type === 'branch') {
-        nodeColor = isDark ? '#f59e0b' : '#d97706'; // 古典分岐: 真鍮・黄金
+        nodeColor = isDark ? '#fbbf24' : '#d97706'; // 古典分岐: 真鍮・黄金
       } else if (n.type === 'ghost_bud') {
-        nodeColor = isDark ? '#475569' : '#64748b'; // 未解放: くすんだグレー・鉄色 (Slate / Iron Gray)
+        nodeColor = isDark ? '#64748b' : '#94a3b8'; // 未解放: スレート
       } else if (n.type === 'twig') {
-        nodeColor = isDark ? '#334155' : '#94a3b8'; // 派生小枝: ミニマルな鉄色
+        nodeColor = isDark ? '#475569' : '#94a3b8'; // 派生小枝
       }
 
       const minScreenR = n.type === 'root' ? 11.0 : (n.type === 'branch' ? 8.0 : (n.type === 'word' ? 5.5 : 3.5));
@@ -3335,24 +3441,24 @@
         ctx.fillStyle = isTree ? (isDark ? '#fb923c' : '#ea580c') : (isDark ? '#c084fc' : '#7c3aed');
         ctx.fillText(displayRootTitle, n.x, n.y + drawRadius + rootFontSize + 2);
 
-        // 語根の簡潔な原義キーワード（文ブロックや他単語のcoreは厳禁・過密を徹底防止）
-        let shortRootMeaning = n.eikenMeaning || (n.id === 'root:pie:unified' ? 'Root of IE' : '');
-        if (!shortRootMeaning && n.connectedWords?.[0]?.item?.etymology) {
-          const match = String(n.connectedWords[0].item.etymology).match(/\*[a-zāēīōūáéíóúh₁₂₃]+[^\(（]*[\(（]([^\)）]{1,8})[\)）]/i);
-          if (match && match[1]) shortRootMeaning = match[1].trim();
+        // 語根の簡潔な原義キーワード（天体図ネットワークでの意味把握を可能にする）
+        let shortRootMeaning = n.rootMeaning;
+        if (!shortRootMeaning) {
+          shortRootMeaning = n.eikenMeaning || getRootMeaning(n.label, n.connectedWords);
+          n.rootMeaning = shortRootMeaning;
         }
         if (shortRootMeaning && n.id !== 'root:pie:unified') {
-          shortRootMeaning = shortRootMeaning.split(/[,、/／]/)[0].trim().slice(0, 8);
+          shortRootMeaning = shortRootMeaning.split(/[,、/／]/)[0].trim().slice(0, 10);
         }
-        if (shortRootMeaning && (zoom >= 0.85 || isSelected || isHover)) {
-          const mFontSize = Math.round(Math.max(8.5, 10 / Math.sqrt(zoom)));
-          const mY = n.y + drawRadius + rootFontSize + mFontSize + 4;
+        if (shortRootMeaning && (zoom >= 0.32 || isSelected || isHover)) {
+          const mFontSize = Math.round(Math.max(8.5, 10.0 / Math.sqrt(Math.max(0.35, zoom))));
+          const mY = n.y + drawRadius + rootFontSize + mFontSize + 3;
           const displayLabel = isTree ? `(PIE: ${shortRootMeaning})` : `(${shortRootMeaning})`;
           ctx.font = `600 ${mFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
           ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
           ctx.lineWidth = 2.8;
           ctx.strokeText(displayLabel, n.x, mY);
-          ctx.fillStyle = isDark ? '#cbd5e1' : '#475569';
+          ctx.fillStyle = isDark ? '#93c5fd' : '#1d4ed8';
           ctx.fillText(displayLabel, n.x, mY);
         }
 
@@ -3523,29 +3629,40 @@
         const meaningText = (isMask && !isHover && !isSelected) ? '[ ????? ]' : (n.meaning || '');
         const isFocusHighlight = isSelected || isHover;
 
-        // --- 円形幾何学ノードの描画 ---
+        // --- 美麗な多層発光ノード（Luminous Celestial Star Node）---
+        // 1. 周囲のソフトグロー（Soft Ambient Glow / 微光ハロー）
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, drawRadius + 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = isFocusHighlight
+          ? (isSelected ? 'rgba(56, 189, 248, 0.35)' : 'rgba(167, 139, 250, 0.30)')
+          : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)');
+        ctx.fill();
+
+        // 2. コア本体
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
         ctx.fillStyle = nodeColor;
         ctx.fill();
 
-        // ホバーまたは選択時の美麗な発光ハイライトリング
+        // 3. 繊細な外周リムリング（Glass Specular Rim）
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = isFocusHighlight
+          ? (isSelected ? '#38bdf8' : '#a78bfa')
+          : (isDark ? 'rgba(255, 255, 255, 0.40)' : 'rgba(255, 255, 255, 0.70)');
+        ctx.lineWidth = isFocusHighlight ? 2.0 : 0.8;
         if (isFocusHighlight) {
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, drawRadius + 4.5, 0, Math.PI * 2);
-          ctx.strokeStyle = isSelected ? '#38bdf8' : '#a78bfa';
-          ctx.lineWidth = 2.4;
           ctx.shadowColor = isSelected ? '#38bdf8' : '#a78bfa';
-          ctx.shadowBlur = 9;
-          ctx.stroke();
-          ctx.shadowBlur = 0;
-        } else {
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, drawRadius + 0.5, 0, Math.PI * 2);
-          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(0, 0, 0, 0.15)';
-          ctx.lineWidth = 1.0;
-          ctx.stroke();
+          ctx.shadowBlur = 8;
         }
+        ctx.stroke();
+        if (isFocusHighlight) ctx.shadowBlur = 0;
+
+        // 4. 中心スペキュラー輝点（Star Specular Point）: 星のように輝くハイライト
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, Math.max(1.0, drawRadius * 0.28), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.fill();
 
         // 見出し語ラベル描画（ズームイン時、ホバー・選択時、または検索マッチ時）
         if (zoom >= textThresholdZoom || isFocusHighlight || isMatch) {
@@ -3595,10 +3712,23 @@
             ctx.fillText(shortMeaning, n.x, mY);
           }
         } else {
-          // --- 俯瞰・星辰モード (3,000単語規模でもFPS 60維持 & 美しい星雲ネットワーク): 定着度カラーのノード円のみを高速描画 ---
+          // --- 俯瞰・星辰モード: 軽快かつ美しい星屑レンダリング ---
+          const dotR = Math.max(3.0, drawRadius * 0.85);
           ctx.beginPath();
-          ctx.arc(n.x, n.y, Math.max(3.0, drawRadius * 0.85), 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
           ctx.fillStyle = nodeColor;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
+          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.60)';
+          ctx.lineWidth = 0.7;
+          ctx.stroke();
+
+          // 微細な中心ハイライト
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, Math.max(1.0, dotR * 0.32), 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
           ctx.fill();
         }
       }

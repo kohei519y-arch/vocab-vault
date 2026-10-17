@@ -21,3 +21,12 @@ __pycache__/
 # Local backup / zip
 *.zip
 dist/
+VocabVault_Recovered_Full_Backup.json
+
+# Local AI audit prompts and temporary helper scripts
+ai_audit_prompts/
+*.command
+Part*.txt
+VocabVault_All_In_One.txt
+ETYMOLOGY_GRAPH_REVIEW_PROMPT.txt
+厳密監査用プロンプト.txt

@@ -62,7 +62,8 @@ serve(async (req) => {
     if (typeof returnUrl === "string" && returnUrl.trim()) {
       try {
         const parsedUrl = new URL(returnUrl.trim());
-        if (ALLOWED_ORIGINS.includes(parsedUrl.origin) || parsedUrl.origin.endsWith(".vercel.app")) {
+        const isAllowedVercel = /^https:\/\/vocab-vault(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(parsedUrl.origin);
+        if (ALLOWED_ORIGINS.includes(parsedUrl.origin) || isAllowedVercel) {
           safeReturnUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
         }
       } catch {

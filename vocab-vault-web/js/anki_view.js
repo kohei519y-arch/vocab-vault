@@ -373,33 +373,39 @@
 
     const rawEx = rawWithTags.replace(/<[^>]+>/g, '').trim();
     const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const WORD_CHAR_CLASS = 'a-zA-Z0-9_äöüßÄÖÜéèêëàâùûüîïôœçÉÈÊËÀÂÙÛÜÎÏÔŒÇ';
     // 語幹（先頭4文字以上）での派生・活用形マッチも候補に追加
     const stem = word.length >= 5 ? word.slice(0, word.length - 2) : '';
     const targetCandidates = [usedForm, word].filter(Boolean);
     let match = null;
 
     for (const target of targetCandidates) {
-      // 活用語尾（-s, -es, -ed, -ing, -d, -ly 等）を伴う単語境界マッチ
-      const regInflected = new RegExp(`\\b${escapeRegExp(target)}(?:s|es|d|ed|ing|er|est|ly|n)?\\b`, 'i');
+      // Unicode対応の単語境界 + 活用語尾マッチ
+      const regInflected = new RegExp(`(^|[^${WORD_CHAR_CLASS}])(${escapeRegExp(target)}(?:s|es|d|ed|ing|er|est|ly|n)?)(?=[^${WORD_CHAR_CLASS}]|$)`, 'i');
       const mB = regInflected.exec(rawEx);
       if (mB) {
-        match = { start: mB.index, len: mB[0].length, matchedText: mB[0] };
+        const prefixLen = mB[1] ? mB[1].length : 0;
+        match = { start: mB.index + prefixLen, len: mB[2].length, matchedText: mB[2] };
         break;
       }
-      const regSimple = new RegExp(escapeRegExp(target), 'i');
-      const mS = regSimple.exec(rawEx);
-      if (mS) {
-        match = { start: mS.index, len: mS[0].length, matchedText: mS[0] };
-        break;
+      // 空白を含まないフレーズや日本語等の場合のみ単純一致フォールバック（英単語の短語が別単語内部を破壊するのを防止）
+      if (/[^a-zA-Z]/.test(target) || target.length >= 6) {
+        const regSimple = new RegExp(escapeRegExp(target), 'i');
+        const mS = regSimple.exec(rawEx);
+        if (mS) {
+          match = { start: mS.index, len: mS[0].length, matchedText: mS[0] };
+          break;
+        }
       }
     }
 
     // 語幹によるフォールバック検索（例: conceive -> conceived, conceiving）
     if (!match && stem.length >= 4) {
-      const regStem = new RegExp(`\\b${escapeRegExp(stem)}[a-zA-Zäöüßéèêàù]*\\b`, 'i');
+      const regStem = new RegExp(`(^|[^${WORD_CHAR_CLASS}])(${escapeRegExp(stem)}[${WORD_CHAR_CLASS}]*)(?=[^${WORD_CHAR_CLASS}]|$)`, 'i');
       const mStem = regStem.exec(rawEx);
       if (mStem) {
-        match = { start: mStem.index, len: mStem[0].length, matchedText: mStem[0] };
+        const prefixLen = mStem[1] ? mStem[1].length : 0;
+        match = { start: mStem.index + prefixLen, len: mStem[2].length, matchedText: mStem[2] };
       }
     }
 
@@ -430,7 +436,33 @@
     if (pos || meaning) {
       badges.push(`<div class="cloze-hint-badge">${CLOZE_BOOK_SVG}${pos ? `[${esc(pos)}] ` : ''}${esc(meaning || '')}</div>`);
     }
-    return badges.join('');
+    const firstChar = item.word ? item.word.charAt(0) : '';
+    const lenHint = item.word ? `${item.word.length}文字 / 先頭 '${esc(firstChar)}...'` : 'スペルを入力';
+    const typeBox = `<div class="cloze-type-wrap" style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center">
+      <input type="text" id="clozeTypeInput" class="cloze-type-input" placeholder="タイピング産出 (${lenHint})" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;width:230px;text-align:center" onkeydown="if(event.key==='Enter'){event.preventDefault();window.VocabAnkiView?.checkClozeTyping?.();}">
+      <button type="button" class="btn-xs btn-ac-o" onclick="window.VocabAnkiView?.checkClozeTyping?.()">判定</button>
+    </div>`;
+    return badges.join('') + typeBox;
+  }
+
+  function checkClozeTyping() {
+    const inp = $('clozeTypeInput');
+    const cur = global.VocabCore?.App?.aList?.[0];
+    if (!inp || !cur) return;
+    const val = inp.value.trim().toLowerCase();
+    const target = String(cur.word || '').trim().toLowerCase();
+    if (!val) {
+      showAns();
+      return;
+    }
+    if (val === target) {
+      inp.style.borderColor = 'var(--ok)';
+      global.VocabModal?.showToast?.(`正解！「${cur.word}」を正確に産出できました。`, 'ok', 2500);
+    } else {
+      inp.style.borderColor = 'var(--ng)';
+      global.VocabModal?.showToast?.(`惜しい！入力: ${inp.value} → 正解: ${cur.word}`, 'warn', 3500);
+    }
+    showAns();
   }
 
   let swipeAttached = false;
@@ -506,7 +538,13 @@
     if (contextBox && contextText) {
       if (i.contextSentence) {
         contextBox.style.display = 'block';
-        contextText.textContent = `“${i.contextSentence}”`;
+        if (mode === 'cloze' && i.word) {
+          const escW = String(i.word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const maskedCtx = String(i.contextSentence).replace(new RegExp(`\\b${escW}(?:s|es|d|ed|ing|er|est|ly|n)?\\b`, 'gi'), '[ ????? ]');
+          contextText.textContent = `“${maskedCtx}”`;
+        } else {
+          contextText.textContent = `“${i.contextSentence}”`;
+        }
       } else {
         contextBox.style.display = 'none';
       }
@@ -772,6 +810,20 @@
         const legCount = parseInt(localStorage.getItem(legacyDateKey) || '0', 10);
         if (legCount > 0) {
           localStorage.setItem(legacyDateKey, String(legCount - 1));
+        }
+        // [NEW-P2-3 修正] オフライン復習キューからもUndo対象カードの最新レコードを取り消す
+        const rawOffQ = localStorage.getItem('vv_offline_review_queue');
+        if (rawOffQ) {
+          const offQ = JSON.parse(rawOffQ);
+          if (Array.isArray(offQ) && offQ.length > 0) {
+            for (let qi = offQ.length - 1; qi >= 0; qi--) {
+              if (offQ[qi] && (offQ[qi].id === last.id || (offQ[qi].word === e.word && offQ[qi].lang === (e.lang || 'en')))) {
+                offQ.splice(qi, 1);
+                localStorage.setItem('vv_offline_review_queue', JSON.stringify(offQ));
+                break;
+              }
+            }
+          }
         }
       }
     } catch {}
@@ -1118,6 +1170,7 @@
     toggleAnkiMode,
     buildClozeSentenceHtml,
     buildClozeHintsHtml,
+    checkClozeTyping,
     getOverdueRatio,
     setDailyReviewCap,
     getStreakInfo,

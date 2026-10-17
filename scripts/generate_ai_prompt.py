@@ -58,7 +58,11 @@ HEADER_COMMON = r"""## Vocab Vault — 本番リリース最終判定 再監査�
 | **[P0]** | **P0-8** | **語源系統樹における二重表示（CanvasカードとDOMツールチップの重複競合）**: ノードホバー時に、Canvas 2D内部で直接描画していたフローティングカードとHTMLのDOMツールチップ（`#graphTooltip`）が同一座標に重複描画され、文字が二重にブレて視認不能になっていた。 | Canvas内部での重畳カード描画（長方形ボックス）を完全撤去。単一のDOMツールチップ（`#graphTooltip`）に一本化し、Canvas上は発光オーラリング（`#38bdf8`/`#a78bfa`）のみを描画して視認性と60FPSを両立。 | `js/graph.js`<br>`css/app.css` |
 | **[P0]** | **P0-9** | **3,000単語規模におけるノード重なり・密集の解消と超高速描画**: 語彙が数千単語に達した際にノードとラベルテキストが過密に重なり合い、力学計算が重層化してFPS低下と視認破綻が生じる。 | $O(N)$ 空間ハッシュグリッド（Spatial Hash Grid）リラクゼーション、動的セマンティックズーム閾値（`textThresholdZoom`）、および視界外フラスティングカリング（Frustum Culling）を導入し、数千語規模でも60FPS描画と高い可読性を保証。 | `js/graph.js` |
 | **[P0]** | **P0-10** | **データバインディング欠陥による `[object Object]` 表示と印欧祖語（PIE）語根の分散重複**: JSONオブジェクトが適切に文字列化されず `[object Object]` と表示されるデータバインディングバグ、および同一印欧祖語（`*sta-`, `*kap-` 等）が複数ノードに分裂・重複して階層関係が破綻していた。 | 型安全なデータマッピング・サニタイズ処理とフォールバックを実装し、PIE語根マップによる名寄せ統合を実施。語根重複を根絶し階層系統樹を統一。 | `js/graph.js`<br>`js/morphology.js` |
+| **[P0]** | **P0-11** | **macOS ネイティブシェル（WKWebView）における単語削除・操作不能**: WKUIDelegate の `runJavaScriptConfirmPanelWithMessage` が未実装の場合、WebKit は JS の `confirm()` に無条件で `false` を返却し、単語削除ボタンが一切反応しなくなる。 | `scripts/native_app/main.m` に NSAlert による動的確認シートを実装。さらにメッセージ内容を解析し、「削除」「保存」「リセット」「再分散する」「開始」「OK」を文脈に応じて動的切り替え。 | `scripts/native_app/main.m` |
+| **[P0]** | **P0-12** | **ネイティブシェルにおける Blob URL / ファイル保存・読込遮断**: WKWebView 上で `<a>` タグの `blob:` ダウンロードを実行すると外部アプリ呼出の誤作動や保存不能が生じる。 | `nativeSave` スクリプトメッセージハンドラによる `NSSavePanel` 保存、`runOpenPanelWithParameters` による `NSOpenPanel` 読込、および `blob:` ナビゲーションの安全遮断を実装。 | `scripts/native_app/main.m`<br>`js/export.js` |
 | **[P1]** | **P1-7** | **語源系統樹における段階的開示（Progressive Disclosure）と視覚的過負荷の防止**: 一度に全ノードを展開すると認知負荷が超過するため、初期表示は主要語根のみに抑え、クリックで下位ブランチを動的展開するアコーディオン設計を導入。 | `graphUIManager` による段階的開示、パンくずリスト（Breadcrumbs）、および確定座標イージングアニメーション（Cubic Bezier）を整備。 | `js/graph.js` |
+| **[P1]** | **P1-8** | **語源生マークアップ混入と不規則・屈折語尾の Lemmatization 欠落**: 複数形（`objectives` 等）で語源照合に失敗しダミーが生成される問題、および Wiktionary の `extract` から語源ヘッダー（`=== Etymology ===`）が語義欄に漏出する問題。 | `js/dictionary.js` で屈折語尾 Lemmatization（`-s`, `-es`, `-ed`, `-ing`）と語源ヘッダー除外フィルターを導入。`js/storage.js` で既存壊れカードの自己修復サニタイズを実装。 | `js/dictionary.js`<br>`js/storage.js` |
+| **[P1]** | **P1-9** | **救出データのゾンビ復活・再上書きリスク**: 初回起動時のデータ復元がセッションフラグのみの場合、ユーザーが単語を削除した後に再起動するとバックアップから削除単語がゾンビ復活する。 | `scripts/native_app/main.m` において、`localStorage.getItem('vv_native_restored_v1')` による初回 1 回限定の安全永続化ガードを導入。 | `scripts/native_app/main.m` |
 
 ---
 
@@ -141,7 +145,7 @@ HEADER_COMMON = r"""## Vocab Vault — 本番リリース最終判定 再監査�
 20. `js/anki.js` — FSRS-4.5 / SM-2 間隔反復忘却曲線エンジン、パラメータ最適化
 21. `js/anki_view.js` — フラッシュカード復習 UI、Cloze 産出モード、Undo 復元、スヌーズ再配分
 
-### 【Part 3: 語源ネットワーク・系統樹・カタログ・OCR・開発環境】（計11ファイル）
+### 【Part 3: 語源ネットワーク・系統樹・カタログ・ネイティブアプリ・開発環境】（計12ファイル）
 22. `js/morphology.js` — 印欧祖語(PIE)語根ナレッジ、同根語マトリクス、語根抽出、i18n対応
 23. `js/eiken_catalog.js` — 英検準1級 語根マスターカタログ (200語)・Fog of War・ゼロAPIコスト展開
 24. `js/graph.js` — 4階層言語進化系統樹・語彙スキルツリー・確定座標イージング・Canvas 2Dエンジン
@@ -152,7 +156,8 @@ HEADER_COMMON = r"""## Vocab Vault — 本番リリース最終判定 再監査�
 29. `js/modal.js` — モーダル管理、Anki インポート、アカウント設定、診断
 30. `js/feedback.js` — ユーザーフィードバック収集、問い合わせ
 31. `js/export.js` — Anki TSV / Obsidian Markdown / JSON バックアップ出力
-32. `dev.html` — 開発者マスター版（課金・クォータ制限バイパス環境）
+32. `scripts/native_app/main.m` — macOS Cocoa/WebKit スタンドアロンネイティブシェル、ダイアログ、ファイルI/O
+33. `dev.html` — 開発者マスター版（課金・クォータ制限バイパス環境）
 
 ---
 
@@ -164,10 +169,10 @@ HEADER_COMMON = r"""## Vocab Vault — 本番リリース最終判定 再監査�
    - `[RELEASE GRANTED / 本番投入可]` または `[RELEASE BLOCKED / 本番投入不可]`
    - 判定理由（要約：P0 の有無、商用決済・データ保全の信頼性、SaaSとしての完成度）
 
-2. **指摘事項（P0〜P1 計13件）の再評価**:
+2. **指摘事項（P0〜P1 計17件）の再評価**:
    - 各指摘について「完全解決」「不完全（残存リスクあり）」「デグレード発生」のいずれかを判定し、根拠コードを示して理由を述べてください。
 
-3. **新規実装機能（Phase 1: i18n/Stripe Checkout/Portal, Phase 2: 系統樹確定レイアウト/英検200語/Cloze/Playlist, Phase 3: SNSシェア）の品質評価**:
+3. **新規実装機能（Phase 1: i18n/Stripe Checkout/Portal, Phase 2: 系統樹確定レイアウト/英検200語/Cloze/Playlist, Phase 3: SNSシェア, Phase 4: Macネイティブ独立アプリ）の品質評価**:
    - アルゴリズムの正確性、メモリリークの有無、UI パフォーマンス、エッジケース処理の合否。
 
 4. **新規検出リスク一覧（Severity 別）**:
@@ -210,7 +215,7 @@ FILES_PART2 = [
     ("js/anki_view.js", "javascript", "【ファイル: js/anki_view.js — フラッシュカード復習UI・Cloze産出モード・Undo復元・学習アナリティクス】"),
 ]
 
-# Part 3: Etymology Graph, Catalog, Morphology, Vision OCR, Search, Navigation, Export & Dev (11 files)
+# Part 3: Etymology Graph, Catalog, Morphology, Vision OCR, Search, Navigation, Export, Native Shell & Dev (12 files)
 FILES_PART3 = [
     ("js/morphology.js", "javascript", "【ファイル: js/morphology.js — 印欧祖語(PIE)語根ナレッジ・同根語マトリクス・語根抽出】"),
     ("js/eiken_catalog.js", "javascript", "【ファイル: js/eiken_catalog.js — 英検準1級 語根マスターカタログ (200語)・Fog of War・ゼロAPIコスト展開】"),
@@ -222,6 +227,7 @@ FILES_PART3 = [
     ("js/modal.js", "javascript", "【ファイル: js/modal.js — モーダルUI・Anki TSVインポート・アカウント設定・診断】"),
     ("js/feedback.js", "javascript", "【ファイル: js/feedback.js — 需要検証・ユーザーフィードバック収集・ヒアリング】"),
     ("js/export.js", "javascript", "【ファイル: js/export.js — Anki TSV / Obsidian Markdown / JSON バックアップ出力】"),
+    ("scripts/native_app/main.m", "objectivec", "【ファイル: scripts/native_app/main.m — macOS Cocoa/WebKit スタンドアロンネイティブシェル・ダイアログ・ファイルI/O・自動復元】"),
     ("dev.html", "html", "【ファイル: dev.html — 開発者マスター版（課金制限バイパス）】"),
 ]
 
@@ -289,8 +295,8 @@ def main():
         f.write(p2_content)
     print(f"Generated {PART2_FRONTEND_FILE} & {p2_txt_path} ({len(p2_content)} bytes)")
 
-    # 5. Part 3 (Etymology Graph / Eiken Catalog / Morphology / OCR / Navigation / Dev) (.md & .txt)
-    p3_header = HEADER_COMMON + "\n> **【重要: 3分割送信 Part 3 of 3 — 語源ネットワーク・系統樹・カタログ・OCR・開発ツール】**\n> 本コードベース（全32ファイル）をAIに送信するため、3分割した第3弾（完結編）です。\n> 【Part 3 収録内容（計11ファイル）】\n> - 印欧祖語(PIE)語根ナレッジ・同根語マトリクス（morphology.js）\n> - 英検準1級 語根マスターカタログ (200語)・Fog of War（eiken_catalog.js）\n> - 4階層言語進化系統樹・語彙スキルツリー・Canvas 2Dエンジン（graph.js）\n> - 初回起動用スターターパック（starter_pack.js）\n> - 画像圧縮＆Gemini Vision OCR（ocr.js）\n> - 高速インクリメンタル検索エンジン（search.js）\n> - キーボードナビゲーション＆a11yフォーカストラップ（navigation.js）\n> - モーダル管理・Ankiインポート・診断（modal.js）\n> - ユーザーフィードバック収集（feedback.js）\n> - Anki TSV / Obsidian Markdown / JSON バックアップ出力（export.js）\n> - 開発者マスター環境・課金バイパス版（dev.html）\n>\n> ※「Part 1（バックエンド・DB・同期）」および「Part 2（フロントエンドコア・FSRS）」と全パーツが揃いました。全32ファイルに基づき、最終判定および包括的な改善提案を提示してください。\n\n## 5. ソースコード Part 3 (Etymology Graph / Catalog / Suite)\n"
+    # 5. Part 3 (Etymology Graph / Eiken Catalog / Morphology / OCR / Navigation / Native App / Dev) (.md & .txt)
+    p3_header = HEADER_COMMON + "\n> **【重要: 3分割送信 Part 3 of 3 — 語源ネットワーク・系統樹・カタログ・ネイティブアプリ・開発ツール】**\n> 本コードベース（全33ファイル）をAIに送信するため、3分割した第3弾（完結編）です。\n> 【Part 3 収録内容（計12ファイル）】\n> - 印欧祖語(PIE)語根ナレッジ・同根語マトリクス（morphology.js）\n> - 英検準1級 語根マスターカタログ (200語)・Fog of War（eiken_catalog.js）\n> - 4階層言語進化系統樹・語彙スキルツリー・Canvas 2Dエンジン（graph.js）\n> - 初回起動用スターターパック（starter_pack.js）\n> - 画像圧縮＆Gemini Vision OCR（ocr.js）\n> - 高速インクリメンタル検索エンジン（search.js）\n> - キーボードナビゲーション＆a11yフォーカストラップ（navigation.js）\n> - モーダル管理・Ankiインポート・診断（modal.js）\n> - ユーザーフィードバック収集（feedback.js）\n> - Anki TSV / Obsidian Markdown / JSON バックアップ出力（export.js）\n> - macOS Cocoa/WebKit スタンドアロンネイティブシェル（scripts/native_app/main.m）\n> - 開発者マスター環境・課金バイパス版（dev.html）\n>\n> ※「Part 1（バックエンド・DB・同期）」および「Part 2（フロントエンドコア・FSRS）」と全パーツが揃いました。全33ファイルに基づき、最終判定および包括的な改善提案を提示してください。\n\n## 5. ソースコード Part 3 (Etymology Graph / Catalog / Native Shell / Suite)\n"
     p3_parts = [p3_header]
     for rel, lang, title in FILES_PART3:
         p3_parts.append(load_file_content(rel, lang, title))
@@ -325,25 +331,25 @@ def main():
 
 本フォルダには、外部の最先端AI（Claude 3.7 Sonnet / OpenAI o1 / GPT-4o / Gemini 2.0 Pro / DeepSeek 等）にコードベース全体の再監査を依頼するためのプロンプトおよびソースコード一式が格納されています。
 
-## 【超重要】AIがZipファイルを開けない理由と解決策
+## AIがZipファイルを開けない理由と解決策
 
-ChatGPT や Claude のWebチャット画面は、セキュリティ上の制限により **`.zip` 圧縮ファイルの直接展開に対応していません**。
-そのため、AIにコードを読み込ませる際は **`.txt` ファイルとしてドラッグ＆ドロップ添付する** のが最も確実です。
+ChatGPT や Claude のWebチャット画面は、セキュリティ上の制限により **.zip 圧縮ファイルの直接展開に対応していません**。
+そのため、AIにコードを読み込ませる際は **.txt ファイルとしてドラッグ＆ドロップ添付する** のが最も確実です。
 
 ---
 
-## おすすめ送信手順（100%確実にAIが読める【3分割】送信方法）
+## おすすめ送信手順（確実にAIが読める【3分割】送信方法）
 
-全32ファイル（約1.4MB）を約350KB〜480KBずつの【3分割】に整理しています。どのAIでも文字数・トークン上限に引っかかることなく快適に送信できます。
+全33ファイル（約1.4MB）を約350KB〜490KBずつの【3分割】に整理しています。どのAIでも文字数・トークン上限に引っかかることなく快適に送信できます。
 
 ### 方法A: Claude 3.7 Sonnet または ChatGPT Plus (o1 / GPT-4o)
-1. **`Part1_Backend_DB_Sync.txt`** をチャット画面にドラッグ＆ドロップして送信。
-2. 続けて **`Part2_Frontend_Logic_FSRS.txt`** をドラッグ＆ドロップして送信。
-3. 続けて **`Part3_Graph_Catalog_Suite.txt`** をドラッグ＆ドロップして送信。
-※ Claude 3.7 Sonnetなら3つのファイルを同時にチャット欄に添付して一撃で送信することも可能です！
+1. **Part1_Backend_DB_Sync.txt** をチャット画面にドラッグ＆ドロップして送信。
+2. 続けて **Part2_Frontend_Logic_FSRS.txt** をドラッグ＆ドロップして送信。
+3. 続けて **Part3_Graph_Catalog_Suite.txt** をドラッグ＆ドロップして送信。
+※ Claude 3.7 Sonnetなら3つのファイルを同時にチャット欄に添付して送信することも可能です。
 
 ### 方法B: Google AI Studio / Gemini 2.0 Pro（超長文 100万〜200万トークン対応）
-1. **`VocabVault_All_In_One.txt`**（約1.4MB）を1ファイルだけドラッグ＆ドロップして送信。
+1. **VocabVault_All_In_One.txt**（約1.4MB）を1ファイルだけドラッグ＆ドロップして送信。
 
 ---
 
@@ -351,15 +357,15 @@ ChatGPT や Claude のWebチャット画面は、セキュリティ上の制限�
 
 | ファイル名 | 推奨AI | 説明 |
 | :--- | :--- | :--- |
-| **`Part1_Backend_DB_Sync.txt`** | **全AI共通（Part 1）** | 指示文 + バックエンド・DB・Stripe・同期・ストレージ・シェル（計11ファイル、約365KB）。 |
-| **`Part2_Frontend_Logic_FSRS.txt`** | **全AI共通（Part 2）** | 指示文 + フロントエンドコア・FSRS忘却曲線・AI生成キュー・復習UI（計10ファイル、約415KB）。 |
-| **`Part3_Graph_Catalog_Suite.txt`** | **全AI共通（Part 3）** | 指示文 + 語源ネットワーク・系統樹・英検カタログ・OCR・開発環境（計11ファイル、約490KB）。 |
-| **`VocabVault_All_In_One.txt`** | **Google AI Studio / Gemini** | 指示文 + 全32ファイルを1つに結合した完全版（約1.4MB）。長大コンテキスト対応AI向け。 |
-| **`RE_AUDIT_INSTRUCTION_ONLY.txt`** | **指示文のみコピペ用** | 指示文と指摘事項対比表のみ（約19KB）。 |
+| **Part1_Backend_DB_Sync.txt** | **全AI共通（Part 1）** | 指示文 + バックエンド・DB・Stripe・同期・ストレージ・シェル（計11ファイル、約365KB）。 |
+| **Part2_Frontend_Logic_FSRS.txt** | **全AI共通（Part 2）** | 指示文 + フロントエンドコア・FSRS忘却曲線・AI生成キュー・復習UI（計10ファイル、約415KB）。 |
+| **Part3_Graph_Catalog_Suite.txt** | **全AI共通（Part 3）** | 指示文 + 語源ネットワーク・系統樹・英検カタログ・OCR・ネイティブシェル・開発環境（計12ファイル、約490KB）。 |
+| **VocabVault_All_In_One.txt** | **Google AI Studio / Gemini** | 指示文 + 全33ファイルを1つに結合した完全版（約1.4MB）。長大コンテキスト対応AI向け。 |
+| **RE_AUDIT_INSTRUCTION_ONLY.txt** | **指示文のみコピペ用** | 指示文と指摘事項対比表のみ（約19KB）。 |
 
 ## クイック実行（Mac）
 
-プロジェクト直下の **`AI用プロンプトをクリップボードにコピー.command`** をダブルクリックすると、コピーするPart（1, 2, 3）の選択肢が表示され、ワンタッチでクリップボードにコピーできます。
+プロジェクト直下の **Part1_コピー.command**, **Part2_コピー.command**, **Part3_コピー.command** をダブルクリックすると、各Partがワンタッチでクリップボードにコピーされます。
 """)
     print(f"Generated {readme_path}")
 

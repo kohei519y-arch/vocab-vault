@@ -94,9 +94,11 @@
         }
         updCloudUI(ctx);
         if (manual) alert(`クラウド差分同期完了\n・受信(Pull): ${totalPulled} 件\n・送信(Push): ${totalPushed} 件`);
+        return true;
       } catch (e) {
         if (manual) alert(`同期エラー: ${e.message}`);
         updCloudUI(ctx);
+        return false;
       } finally {
         if (appState) appState.isSyncing = false;
       }
@@ -415,6 +417,7 @@
         seenIds.add(item.id);
 
         // 2. タイムスタンプ・SRS状態の正規化
+        let srsModified = false;
         if (!Number.isFinite(item.updatedAt) || item.updatedAt <= 0 || item.updatedAt > now + 86400000 * 365) {
           item.updatedAt = now;
           itemModified = true;
@@ -422,14 +425,17 @@
         if (!Number.isFinite(item.nextReview) || item.nextReview < 0) {
           item.nextReview = now + 86400000;
           itemModified = true;
+          srsModified = true;
         }
         if (!Number.isFinite(item.interval) || item.interval < 0) {
           item.interval = 1;
           itemModified = true;
+          srsModified = true;
         }
         if (!Number.isFinite(item.efactor) || item.efactor < 1.3 || item.efactor > 4.0) {
           item.efactor = 2.5;
           itemModified = true;
+          srsModified = true;
         }
 
         // 3. wordKey の補完
@@ -444,6 +450,7 @@
         if (itemModified) {
           item.version = (Number(item.version) || 1) + 1;
           item.updatedAt = now;
+          if (srsModified) item.reviewUpdatedAt = now;
           langFixed++;
           issuesFixed++;
         }
@@ -486,8 +493,9 @@
     const getJsonFn = ctx.getJson || global.VocabCore?.getJson;
     const setJsonFn = ctx.setJson || global.VocabCore?.setJson;
     const pairKey = activeCfg ? activeCfg.key : (ctx.pairKey || 'distinction_entries');
-    const list = typeof ctx.getList === 'function' ? ctx.getList() : (typeof getJsonFn === 'function' ? getJsonFn(pairKey) : []);
-    const overdue = list.filter(i => (i.nextReview || 0) <= now);
+    const rawList = typeof ctx.getList === 'function' ? ctx.getList(pairKey) : (typeof getJsonFn === 'function' ? getJsonFn(pairKey) : []);
+    const list = Array.isArray(rawList) ? rawList : [];
+    const overdue = list.filter(i => i && !i.isDeleted && (i.nextReview || 0) <= now);
     if (!overdue.length) return alert('期日超過の復習単語はありません。');
 
     if (!confirm(`期日超過の ${overdue.length} 語を、今後7日間に均等になだらかに再分散（スヌーズ）しますか？\n（毎日の復習負担が分散され、無理なく再開できます）`)) return;
@@ -502,7 +510,11 @@
     });
 
     if (typeof ctx.saveList === 'function') {
-      ctx.saveList(list);
+      if (ctx.saveList.length >= 2) {
+        ctx.saveList(pairKey, list);
+      } else {
+        ctx.saveList(list);
+      }
     } else if (typeof setJsonFn === 'function') {
       setJsonFn(pairKey, list, true);
     }

@@ -25,8 +25,16 @@
         el.classList.toggle('open');
       }
     }
-    if (id === 'graphModal' && el && !el.classList.contains('open') && global.graphState?.animId) {
-      try { cancelAnimationFrame(global.graphState.animId); global.graphState.animId = null; } catch {}
+    if (id === 'graphModal' && el && !el.classList.contains('open')) {
+      try {
+        if (global.graphState?.animId) { cancelAnimationFrame(global.graphState.animId); global.graphState.animId = null; }
+        const vs = global.VocabGraph?.state;
+        if (vs?.animId) { cancelAnimationFrame(vs.animId); vs.animId = null; }
+        if (vs?.treeEasingTimer) { cancelAnimationFrame(vs.treeEasingTimer); vs.treeEasingTimer = null; }
+      } catch {}
+    }
+    if (id === 'cameraOcrModal' && el && !el.classList.contains('open')) {
+      try { global.VocabOCR?.stopCameraOcr?.(); } catch {}
     }
     const any = Boolean(document.querySelector?.('.modal-ov.open'));
     const ws = document.querySelector?.('.workspace');
@@ -49,6 +57,10 @@
         cancelAnimationFrame(global.graphState.animId);
         global.graphState.animId = null;
       }
+      const vs = global.VocabGraph?.state;
+      if (vs?.animId) { cancelAnimationFrame(vs.animId); vs.animId = null; }
+      if (vs?.treeEasingTimer) { cancelAnimationFrame(vs.treeEasingTimer); vs.treeEasingTimer = null; }
+      global.VocabOCR?.stopCameraOcr?.();
     } catch {}
     const ws = document.querySelector?.('.workspace');
     if (ws) ws.inert = false;
@@ -546,7 +558,9 @@
     if (conflictIdx !== -1) {
       const [removed] = list.splice(conflictIdx, 1);
       if (removed?.id) tombMap.set(`id:${removed.id}`, now);
-      if (removed?.wordKey) tombMap.set(`wk:${removed.wordKey}`, now);
+      if (removed?.wordKey && removed.wordKey !== newWk && removed.wordKey !== updated.wordKey) {
+        tombMap.set(`wk:${removed.wordKey}`, now);
+      }
     }
     if (global.VocabStorage) global.VocabStorage.saveTombstones(targetKey, tombMap);
 

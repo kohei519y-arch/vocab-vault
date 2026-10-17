@@ -64,10 +64,21 @@
   }
 
   function checkDevMasterMode() {
-    // [セキュリティ強化] 本番環境でのURLパラメータやLocalStorageによる課金・クォータバイパスを完全根絶
-    if (typeof window !== 'undefined') {
-      try { localStorage.removeItem('vv_dev_unlocked'); } catch {}
+    if (typeof window === 'undefined') return false;
+    if (window.__VV_DEV_MASTER === true) return true;
+    const path = String(window.location?.pathname || '');
+    const proto = String(window.location?.protocol || '');
+    const host = String(window.location?.hostname || '');
+    if (path.endsWith('/dev.html') || path.endsWith('dev.html')) return true;
+    const isProdHost = host.endsWith('github.io') || host.endsWith('vocab-vault.app') || host.endsWith('vercel.app');
+    if (!isProdHost && (proto === 'file:' || host === 'localhost' || host === '127.0.0.1')) {
+      try {
+        return localStorage.getItem('vv_dev_unlocked') === '1';
+      } catch {
+        return false;
+      }
     }
+    try { localStorage.removeItem('vv_dev_unlocked'); } catch {}
     return false;
   }
 
@@ -83,12 +94,7 @@
     indexCache: new WeakMap(),
     rootIndexMap: new Map(),
     focusedCardIndex: -1,
-    viewMode: (function() {
-      const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
-      const saved = lsGet(isMobile ? 'vv_view_mode_mobile' : 'vv_view_mode', null);
-      if (saved) return saved;
-      return isMobile ? 'simple' : 'academic';
-    })(),
+    viewMode: 'academic',
     dailyReviewCap: parseInt(lsGet('vv_daily_review_cap', '30'), 10) || 30,
     isDev: checkDevMasterMode(),
 
@@ -177,8 +183,8 @@
     return 'builtin_internal';
   }
 
-  function lsGet(k, d = '') { return global.VocabStorage ? global.VocabStorage.lsGet(k, d) : (localStorage.getItem(k) ?? d); }
-  function lsSet(k, v) { return global.VocabStorage ? global.VocabStorage.lsSet(k, v) : (localStorage.setItem(k, v), true); }
+  function lsGet(k, d = '') { return global.VocabStorage ? global.VocabStorage.lsGet(k, d) : ((typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null) ?? d); }
+  function lsSet(k, v) { return global.VocabStorage ? global.VocabStorage.lsSet(k, v) : (typeof localStorage !== 'undefined' ? (localStorage.setItem(k, v), true) : false); }
 
   function dlBlob(parts, type, name) {
     if (global.VocabExport && typeof global.VocabExport.dlBlob === 'function') {
@@ -247,7 +253,11 @@
     const pair = global.VocabStorage?.keyToPair ? global.VocabStorage.keyToPair(k) : { srcLang: keyToLang(k), tgtLang: 'ja' };
     const l = pair.srcLang;
     const storageKey = k;
-    if (global.VocabStorage && Array.isArray(global.VocabStorage.state.mem[storageKey])) return global.VocabStorage.state.mem[storageKey];
+    if (global.VocabStorage && Array.isArray(global.VocabStorage.state.mem[storageKey])) {
+      const memArr = global.VocabStorage.state.mem[storageKey];
+      noteBase(storageKey, memArr);
+      return memArr;
+    }
     const rawStr = lsGet(storageKey, '');
     const parsed = rawStr ? (safeParseWords(rawStr, l)[l] || []) : [];
     if (!parsed.length && rawStr.trim().length > 2) {
@@ -256,6 +266,7 @@
     }
     const merged = mergeWords(parsed, [], storageKey, false);
     if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = merged;
+    noteBase(storageKey, merged);
     return merged;
   }
 
@@ -735,19 +746,14 @@
   const toggleDarkMode = d => global.VocabModal ? global.VocabModal.toggleDarkMode(d) : undefined;
 
   async function promptAppInstall() {
-    const isStandalone = (typeof window !== 'undefined') && (
+    const isNativeApp = (typeof window !== 'undefined') && (
+      window.location.protocol === 'file:' ||
+      Boolean(window.webkit?.messageHandlers?.nativeSave) ||
       window.matchMedia?.('(display-mode: standalone)').matches ||
       window.navigator?.standalone === true
     );
-    if (isStandalone) {
-      showToast('既に単体アプリウィンドウとして起動しています。', 'ok', 3500);
-      return;
-    }
-
-    // 1. file:// プロトコルで開かれている場合の親切なハンドリング
-    if (window.location.protocol === 'file:') {
-      showToast('【Mac単体アプリ】Finderでフォルダ内の「Vocab Vault.app」または「Vocab Vault.command」をダブルクリックすると単体アプリとして起動できます！', 'ok', 6500);
-      toggleModal('installGuideModal', true);
+    if (isNativeApp) {
+      showToast('既に専用アプリ（Vocab Vault）としてインストール・起動されています。', 'ok', 3500);
       return;
     }
 
@@ -776,6 +782,18 @@
       showToast('ブラウザのメニューまたはアドレスバー右端のインストールアイコンから単体アプリ化できます。', 'info', 4500);
     }
     toggleModal('installGuideModal', true);
+  }
+
+  function printVocabList() {
+    if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.nativePrint) {
+      try {
+        window.webkit.messageHandlers.nativePrint.postMessage({});
+        return;
+      } catch {}
+    }
+    if (typeof window !== 'undefined' && typeof window.print === 'function') {
+      window.print();
+    }
   }
 
   const openUpsellModal = reason => global.VocabModal ? global.VocabModal.openUpsellModal(reason) : undefined;
@@ -838,7 +856,20 @@
   }
 
   function toggleDevMasterMode() {
-    showToast('本番環境では開発者マスターモードは無効化されています。', 'warn', 3000);
+    const host = String(window.location?.hostname || '');
+    const isProdHost = host.endsWith('github.io') || host.endsWith('vocab-vault.app') || host.endsWith('vercel.app');
+    if (isProdHost && !String(window.location?.pathname || '').endsWith('dev.html')) {
+      showToast('本番環境では開発者マスターモードは無効化されています。', 'warn', 3000);
+      return;
+    }
+    App.isDev = !App.isDev;
+    App.isPro = App.isDev || Boolean(global.VocabSync?.getSession?.()?.user?.isPro);
+    try {
+      if (App.isDev) localStorage.setItem('vv_dev_unlocked', '1');
+      else localStorage.removeItem('vv_dev_unlocked');
+    } catch {}
+    updCloudUI();
+    showToast(App.isDev ? '開発者マスターモードを有効化しました（Pro機能全開放）' : '開発者マスターモードを解除しました', 'ok', 3000);
   }
 
   async function cloudLogin(isSignUp = false) {
@@ -1150,15 +1181,17 @@
     };
     const rescueOtherPairs = id => {
       for (const p of getAllKnownPairConfigs()) {
+        if (p.key === targetKey) continue;
         const other = getJson(p.key);
         const n = Number(id);
-        const idx = other.findIndex(i => (typeof id === 'string' && id && (i.id === id || i.word === id)) || (Number.isFinite(n) && n > 0 && Number(i.num) === n));
+        const allowNumMatch = (!tL || p.src === tL);
+        const idx = other.findIndex(i => (typeof id === 'string' && id && (i.id === id || i.word === id)) || (allowNumMatch && Number.isFinite(n) && n > 0 && Number(i.num) === n));
         if (idx !== -1) {
           const tgt = { ...other[idx], isDeleted: true, updatedAt: Date.now() };
           // [NEW-P0-3 修正] p.src ではなく p.key (ペア専用ストレージキー) に墓石を記録
           global.VocabStorage?.recordTombstone(tgt, p.key, tgt.updatedAt);
           setJson(p.key, other.filter((_, i) => i !== idx).map((it, i) => ({ ...it, num: i + 1 })), true, true);
-          break;
+          return tgt;
         }
       }
       load(App.page);
@@ -1234,9 +1267,12 @@
     switchSrcLang: l => {
       App.srcLang = l;
       App.lang = l;
+      App.tgtLang = 'ja';
       lsSet('vv_src_lang', l);
       lsSet('vv_active_lang', l);
+      lsSet('vv_tgt_lang', 'ja');
       if ($('srcLangSel')) $('srcLangSel').value = l;
+      if ($('tgtLangSel')) $('tgtLangSel').value = 'ja';
       renderPairFileTabs();
     },
     reload: () => load(App.page || 1),
@@ -1293,13 +1329,21 @@
     $('btnModeSimple')?.classList.toggle('active', App.viewMode === 'simple');
 
     if (window.innerWidth <= 768) closeSidebar();
-    if (lsGet('vv_use_hist_mode', '1') === '0' && $('chkHist')) $('chkHist').checked = false;
-    if (lsGet('vv_use_wikt', '1') === '0' && $('chkWikt')) $('chkWikt').checked = false;
+    if ($('chkHist')) $('chkHist').checked = true;
+    if ($('chkWikt')) $('chkWikt').checked = true;
     toggleDarkMode(lsGet('vv_theme_dark', '1') === '1');
-    if (lsGet('vv_banner_closed', '0') === '0' && $('userFeedbackBanner')) $('userFeedbackBanner').style.display = 'flex';
+    if ($('userFeedbackBanner')) $('userFeedbackBanner').style.display = 'none';
     initWordSuggest();
     bindDelegatedEvents();
     bindWindowEvents();
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('vocab-locale-changed', () => {
+        renderPairFileTabs();
+        renderSidebarTree();
+        updCloudUI();
+        if ($('anki')?.style.display !== 'block') load(App.page || 1);
+      });
+    }
     await initStorageAndSync(false);
     if (!App.entries || !App.entries.length) {
       const curPairCfg = getActivePairConfig();
@@ -1315,7 +1359,7 @@
     updCloudUI();
     restorePersistedQueue();
     if (getKey()) fetchModels(getKey()).then(() => processQueue()).catch(() => {});
-    else if (global.VocabSync?.isCloudReady?.()) processQueue();
+    else if (global.VocabSync?.isProxyReady?.()) processQueue();
 
     // PWA起動モードおよびURLディープリンク (?w=単語, ?word=単語, ?q=検索クエリ, #単語) の確認
     const urlParams = (typeof URLSearchParams !== 'undefined' && window.location?.search)
@@ -1468,6 +1512,8 @@
     syncCloudNow,
     salvageAll,
     toggleDarkMode,
+    promptAppInstall,
+    printVocabList,
     showToast,
     deleteAccountPermanently,
     canGenerateWords,
@@ -1500,6 +1546,10 @@
         global[k] = global.VocabCore[k];
       } catch (_) {}
     }
+    global.promptAppInstall = promptAppInstall;
+    global.printVocabList = printVocabList;
+    global.openAnalyticsModal = () => global.VocabAnkiView?.openAnalyticsModal?.();
+    global.closeAnalyticsModal = () => global.VocabAnkiView?.closeAnalyticsModal?.();
   }
 
   if (typeof window !== 'undefined' && typeof window.addEventListener === 'function' && typeof document !== 'undefined') {

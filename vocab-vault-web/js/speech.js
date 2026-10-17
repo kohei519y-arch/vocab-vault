@@ -213,6 +213,8 @@
     }
     if (currentAudioEl) {
       try {
+        currentAudioEl.onended = null;
+        currentAudioEl.onerror = null;
         currentAudioEl.pause();
         currentAudioEl.currentTime = 0;
       } catch {}
@@ -228,6 +230,11 @@
     }
     retainedUtterances.clear();
     activeUtter = null;
+    if (typeof activeOnEnd === 'function') {
+      const cb = activeOnEnd;
+      activeOnEnd = null;
+      try { cb(); } catch {}
+    }
   }
 
   /**
@@ -255,15 +262,20 @@
         return;
       }
       try {
+        let settled = false;
         const audio = new Audio(urls[idx]);
         audio.referrerPolicy = 'no-referrer';
         currentAudioEl = audio;
         audio.onended = () => {
+          if (settled) return;
+          settled = true;
           if (currentAudioEl === audio) currentAudioEl = null;
           clearActiveWordHighlight();
           if (typeof onEnd === 'function') onEnd();
         };
         audio.onerror = () => {
+          if (settled) return;
+          settled = true;
           if (currentAudioEl === audio) currentAudioEl = null;
           tryNext(idx + 1);
         };
@@ -272,6 +284,9 @@
           playPromise.then(() => {
             audioCache.set(cacheKey, urls[idx]);
           }).catch(() => {
+            if (settled) return;
+            settled = true;
+            if (currentAudioEl === audio) currentAudioEl = null;
             tryNext(idx + 1);
           });
         }
@@ -282,13 +297,17 @@
     tryNext(0);
   }
 
+  let activeOnEnd = null;
+
   function playSpeechFallback(clean, l, defTag, ttsRate = 0.95, targetEl = null, onEnd = null) {
     let finished = false;
     const finish = () => {
       if (finished) return;
       finished = true;
+      if (activeOnEnd === finish) activeOnEnd = null;
       if (typeof onEnd === 'function') onEnd();
     };
+    activeOnEnd = finish;
 
     if (typeof window === 'undefined' || !window.speechSynthesis) {
       tryPlayExternalAudio(clean, l, finish);

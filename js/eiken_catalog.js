@@ -1300,13 +1300,46 @@
     },
 
     /**
+     * 単一語根のメタデータを取得
+     */
+    getRoot: function(rootKey) {
+      if (!rootKey) return null;
+      const norm = s => String(s || '').trim().toLowerCase().replace(/^\*/, '').replace(/-$/, '');
+      const target = norm(rootKey);
+      return EIKEN_PRE1_ROOTS.find(r => norm(r.rootKey) === target) || null;
+    },
+
+    /**
      * 指定語根の全準1級単語を取得
      */
     getWordsByRoot: function(rootKey) {
       if (!rootKey) return [];
-      const cleanR = String(rootKey).replace(/h[1-3₁-₃]/g, '').toLowerCase();
+      const CATALOG_ROOT_ALIASES = {
+        '*dic-': '*deik-',
+        '*dic': '*deik-',
+        '*vid-': '*weid-',
+        '*vid': '*weid-',
+        '*sec-': '*sekw-',
+        '*sec': '*sekw-',
+        '*stā-': '*sta-',
+        '*stā': '*sta-',
+        '*gn-': '*gno-',
+        '*gn': '*gno-',
+        '*graph-': '*grebh-',
+        '*graph': '*grebh-'
+      };
+      const normRoot = s => String(s || '').trim().toLowerCase()
+        .replace(/h[1-3₁-₃]/g, '')
+        .replace(/[āăáàâ]/g, 'a')
+        .replace(/[ēĕéèêḗ]/g, 'e')
+        .replace(/[īĭíìî]/g, 'i')
+        .replace(/[ōŏóòôǭ]/g, 'o')
+        .replace(/[ūŭúùû]/g, 'u');
+      const rawR = normRoot(rootKey);
+      const mappedR = CATALOG_ROOT_ALIASES[rawR] || rawR;
+      const cleanR = normRoot(mappedR);
       for (const [rKey, list] of ROOT_WORD_MAP.entries()) {
-        const c = rKey.replace(/h[1-3₁-₃]/g, '').toLowerCase();
+        const c = normRoot(rKey);
         if (cleanR === c || cleanR.startsWith(c.replace(/-$/, ''))) {
           return list;
         }

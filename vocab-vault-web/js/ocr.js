@@ -171,15 +171,16 @@
 
     const getKeyFn = global.getKey || global.VocabCore?.getKey;
     const customKey = typeof getKeyFn === 'function' ? getKeyFn() : '';
+    const isCloudOrPro = Boolean(global.App?.isPro || global.App?.isDev || global.VocabSync?.isCloudReady?.());
 
-    if (!customKey) {
+    if (!customKey && !isCloudOrPro && typeof global.TextDetector === 'undefined') {
       if (promptSec) promptSec.style.display = 'block';
       if (inlineKey) {
         setTimeout(() => inlineKey.focus(), 50);
       }
       const toastFn = global.showToast || global.VocabCore?.showToast;
       if (typeof toastFn === 'function') {
-        toastFn('画像・スクリーンショットを受け付けました。APIキーを設定すると文字起こしが開始されます。', 'info', 4000);
+        toastFn('画像・スクリーンショットを受け付けました。APIキーを設定すると高精度AI文字起こしが開始されます。', 'info', 4000);
       }
       return;
     }
@@ -233,9 +234,30 @@
     const fMeta = document.getElementById('ocrFileMeta');
 
     if (!customKey) {
+      if (typeof global.TextDetector === 'function' && typeof createImageBitmap === 'function') {
+        try {
+          if (loadBox) loadBox.style.display = 'flex';
+          if (loadText) loadText.textContent = 'ブラウザ内蔵OCRエンジンで文字起こし中...';
+          const bitmap = await createImageBitmap(file);
+          const detector = new global.TextDetector();
+          const blocks = await detector.detect(bitmap);
+          const detectedText = (blocks || []).map(b => b.rawValue).join('\n').trim();
+          if (detectedText && textarea) {
+            const cur = textarea.value.trim();
+            textarea.value = cur ? `${cur}\n\n${detectedText}` : detectedText;
+            recordOcrUsage(1);
+            if (typeof toastFn === 'function') toastFn('文字起こしが完了しました。', 'ok', 3000);
+            return;
+          }
+        } catch (tdErr) {
+          console.warn('Native TextDetector failed:', tdErr);
+        } finally {
+          if (loadBox) loadBox.style.display = 'none';
+        }
+      }
       if (promptSec) promptSec.style.display = 'block';
       if (inlineKey) inlineKey.focus();
-      if (typeof toastFn === 'function') toastFn('文字起こしを実行するにはGemini APIキーを入力してください。', 'err', 3000);
+      if (typeof toastFn === 'function') toastFn('画像文字起こしにはGemini APIキーの設定が必要です（長文テキストの貼り付け抽出はAPIキー不要でご利用いただけます）。', 'info', 4500);
       return;
     }
 
@@ -503,6 +525,31 @@
       if (!Array.isArray(arr) || !arr.length) {
         arr = fallbackExtract();
       }
+
+      // [NEW-P0-3 修正] BYOK未設定時も内蔵カタログ・知識ベースから高精度な品詞・語義を補完
+      const eikenCat = global.VocabEikenCatalog;
+      const builtinKb = global.VocabDictionary?.BUILTIN_ETYMOLOGY_KNOWLEDGE || {};
+      arr = arr.map(item => {
+        if (!item || !item.word) return item;
+        const wLower = String(item.word).trim().toLowerCase();
+        const kbEntry = builtinKb[wLower];
+        const catEntry = eikenCat?.findCatalogWord?.(wLower);
+        if (kbEntry) {
+          return {
+            ...item,
+            pos: (!item.pos || item.pos === '重要語') ? (kbEntry.pos || '重要語') : item.pos,
+            meaning: (!item.meaning || item.meaning === '文脈上の重要語') ? (kbEntry.meaning || item.meaning) : item.meaning
+          };
+        }
+        if (catEntry) {
+          return {
+            ...item,
+            pos: (!item.pos || item.pos === '重要語') ? (catEntry.pos || '重要語') : item.pos,
+            meaning: (!item.meaning || item.meaning === '文脈上の重要語') ? (catEntry.meaning || item.meaning) : item.meaning
+          };
+        }
+        return item;
+      });
 
       const pairCfg = typeof ctx.getActivePairConfig === 'function' ? ctx.getActivePairConfig() : (global.VocabCore?.getActivePairConfig?.());
       const getJsonFn = ctx.getJson || global.VocabCore?.getJson;

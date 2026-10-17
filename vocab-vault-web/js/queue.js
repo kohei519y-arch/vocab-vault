@@ -465,7 +465,7 @@ etymology:${eInst}`;
         const rawArr = await parseApiJsonFn(res);
         returnedList = Array.isArray(rawArr) ? rawArr : [rawArr];
         usedModel = res.usedModel || 'gemini-custom';
-      } else if (global.VocabSync?.isCloudReady?.()) {
+      } else if (global.VocabSync?.isProxyReady?.() && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
         try {
           if (stEl) stEl.textContent = 'クラウドAI (Gemini 3.8 Flash) で生成中...';
           const proxyRes = await global.VocabSync.callVocabGenerateProxy({
@@ -631,7 +631,7 @@ etymology:${eInst}`;
             isDeleted: false
           });
         } else {
-          cur.push({ ...a, num: ++maxNum, folder: fName || undefined, version: Number(a.version) || 1, updatedAt: now, reviewUpdatedAt: now, isDeleted: false });
+          cur.push({ ...a, num: ++maxNum, folder: fName || undefined, version: Number(a.version) || 1, updatedAt: now, reviewUpdatedAt: Number(a.reviewUpdatedAt) || 0, isDeleted: false });
         }
       });
 

@@ -84,9 +84,40 @@
       '*port-': { label: '*port-', meaning: '運ぶ、通す、出入口', words: ['port', 'export', 'import', 'transport', 'report', 'support', 'portal', 'deport', 'opportunity', 'porter', 'transporter', 'pforte', 'transportieren'] },
       '*tragh-': { label: '*tragh-', meaning: '引く、引っ張る、進む', words: ['drag', 'draw', 'tractor', 'attract', 'contract', 'extract', 'distract', 'retract', 'treat', 'trait', 'trace', 'traiter', 'attirer', 'trecken', 'vertrag'] },
       '*sent-': { label: '*sent-', meaning: '感じる、知覚する、向かう', words: ['sense', 'scent', 'sentiment', 'consent', 'resent', 'assent', 'dissent', 'sentence', 'sensitive', 'sentir', 'sentiment', 'sinn', 'sinne', 'senden'] },
-      '*vert-': { label: '*vert-', meaning: '回る、向きを変える、転換する', words: ['convert', 'revert', 'divert', 'advertise', 'universe', 'version', 'vertical', 'reverse', 'controversy', 'introvert', 'extrovert', 'convertir', 'verser', 'werden', 'antwort'] }
+      '*vert-': { label: '*vert-', meaning: '回る、向きを変える、転換する', words: ['convert', 'revert', 'divert', 'advertise', 'universe', 'version', 'vertical', 'reverse', 'controversy', 'introvert', 'extrovert', 'convertir', 'verser', 'werden', 'antwort'] },
+      '*ye-': { label: '*ye-', meaning: '投げる、放つ、送る', words: ['objective', 'subject', 'project', 'reject', 'inject', 'object', 'adjacent', 'trajectory'] }
     },
     historical: {
+      'objective': {
+        etymology: 'ラテン語 objectivus (objectum 前に投げられたもの; ob- 前へ + iacere 投げる) に由来し、印欧祖語 *ye- (投げる、放つ) に遡る。',
+        etymologyTags: ['*ye-'],
+        core: '前方に投げ出されて目に入ってくる対象・目指すべき標的のイメージ。',
+        history_note: '中世スコラ哲学で「知性に対して対象として投げ出されているもの」を意味した概念が、近代科学で「主観から独立した客観的実在・達成すべき目標」へと転化した。',
+        meanings: [
+          { pos: 'N[C]', text: '目標、目的、方針' },
+          { pos: 'Adj', text: '客観的な、実在の、偏見のない' }
+        ],
+        example: {
+          foreign: 'Our primary objective is to complete the project on schedule.',
+          ja: '私たちの主要な目標は、予定通りにプロジェクトを完了させることである。',
+          used_form: 'objective'
+        }
+      },
+      'implement': {
+        etymology: 'ラテン語 implementum（満たすこと、器具；impleō「満たす」＋-mentum）に由来し、印欧祖語 *pel-（満たす、注ぐ、多い）に遡る。',
+        etymologyTags: ['*pel-'],
+        core: '目的や空間を「満たす」ための道具・器具から、計画や方針を「実行・充足する」ことへと転化。',
+        history_note: '原義は「満たす道具」を意味したが、19世紀以降の近代的行政・組織論において「方針・政策を完全に実施・具体化する」という動詞用法が定着した。',
+        meanings: [
+          { pos: 'V[T]', text: '（計画・政策・方針を）実行する、実施する、導入する' },
+          { pos: 'N[C]', text: '道具、器具、用具（農具・工具など）' }
+        ],
+        example: {
+          foreign: 'The leadership agreed to implement the strategic reforms immediately.',
+          ja: '指導部は戦略的改革を直ちに<b>実行する</b>ことで合意した。',
+          used_form: 'implement'
+        }
+      },
       'wet': {
         etymology: '古英語 wæt (印欧祖語 *wed- 水) 由来。',
         etymologyTags: ['*wed-'],
@@ -413,8 +444,38 @@
       const rawW = String(it.reqWord || it.word || '').trim();
       const normW = rawW.toLowerCase().normalize('NFC');
 
-      // 英検準1級カタログの完全オフライン・ゼロレイテンシ即時展開
-      const eikenCard = global.VocabEikenCatalog ? global.VocabEikenCatalog.getWord(normW) : null;
+      // 屈折語尾の原形推定 (Lemmatization: 複数形・過去形・進行形・重複子音対応)
+      const stemCandidates = [normW];
+      if (normW.endsWith('ies') && normW.length > 4) stemCandidates.push(normW.slice(0, -3) + 'y');
+      if (normW.endsWith('ied') && normW.length > 4) stemCandidates.push(normW.slice(0, -3) + 'y');
+      if (normW.endsWith('s') && !normW.endsWith('ss') && normW.length > 3) stemCandidates.push(normW.slice(0, -1));
+      if (normW.endsWith('es') && normW.length > 3) stemCandidates.push(normW.slice(0, -2));
+      if (normW.endsWith('ed') && normW.length > 3) {
+        stemCandidates.push(normW.slice(0, -1));
+        const baseEd = normW.slice(0, -2);
+        stemCandidates.push(baseEd);
+        if (baseEd.length >= 3 && baseEd[baseEd.length - 1] === baseEd[baseEd.length - 2]) {
+          stemCandidates.push(baseEd.slice(0, -1));
+        }
+      }
+      if (normW.endsWith('ing') && normW.length > 4) {
+        const baseIng = normW.slice(0, -3);
+        stemCandidates.push(baseIng + 'e');
+        stemCandidates.push(baseIng);
+        if (baseIng.length >= 3 && baseIng[baseIng.length - 1] === baseIng[baseIng.length - 2]) {
+          stemCandidates.push(baseIng.slice(0, -1));
+        }
+      }
+
+      // 英検準1級カタログの完全オフライン照合 (原形候補も含めて走査)
+      let eikenCard = null;
+      if (global.VocabEikenCatalog) {
+        for (const cand of stemCandidates) {
+          eikenCard = global.VocabEikenCatalog.getWord(cand);
+          if (eikenCard) break;
+        }
+      }
+
       if (eikenCard) {
         return {
           reqIndex: idx,
@@ -436,22 +497,33 @@
       }
 
       const wRef = wiktMap?.get ? wiktMap.get(idx) : null;
-      const histData = BUILTIN_ETYMOLOGY_KNOWLEDGE.historical[normW];
+      
+      // 内蔵語源・歴史ナレッジの照合 (原形候補も含めて走査)
+      let histData = null;
+      for (const cand of stemCandidates) {
+        if (BUILTIN_ETYMOLOGY_KNOWLEDGE.historical[cand]) {
+          histData = BUILTIN_ETYMOLOGY_KNOWLEDGE.historical[cand];
+          break;
+        }
+      }
 
       let rootKey = null;
       if (histData?.etymologyTags?.length) {
         rootKey = histData.etymologyTags[0];
       } else {
-        for (const [rKey, rInfo] of Object.entries(BUILTIN_ETYMOLOGY_KNOWLEDGE.roots)) {
-          if (rInfo.words && rInfo.words.includes(normW)) {
-            rootKey = rKey;
-            break;
+        for (const cand of stemCandidates) {
+          for (const [rKey, rInfo] of Object.entries(BUILTIN_ETYMOLOGY_KNOWLEDGE.roots)) {
+            if (rInfo.words && rInfo.words.includes(cand)) {
+              rootKey = rKey;
+              break;
+            }
           }
+          if (rootKey) break;
         }
       }
 
       if (!rootKey && wRef?.extract) {
-        const m = wRef.extract.match(/\*([a-zA-Z0-9_äöüßÄÖÜ₁₂₃₄ḱǵʷʰ-]+-?)/);
+        const m = wRef.extract.match(/\*([a-zA-Z0-9_äöüßÄÖÜāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗ₁₂₃₄ḱǵʷʰ-]+-?)/);
         if (m) {
           const cand = `*${m[1].replace(/^-|-$/g, '')}-`;
           if (BUILTIN_ETYMOLOGY_KNOWLEDGE.roots[cand]) rootKey = cand;
@@ -473,21 +545,55 @@
 
       const etymologyTags = rootKey ? [rootKey] : (histData?.etymologyTags || []);
       const etymologyConfidence = rootKey ? 'certain' : (histData ? 'certain' : 'unknown');
-      const core = histData?.core || (rootInfo ? `「${rootInfo.meaning}」をコアイメージとして語義が展開。` : `「${rawW}」の持つ本質的・直感的なイメージ。`);
+      const core = histData?.core || (rootInfo ? `「${rootInfo.meaning}」をコアイメージとして語義が展開。` : `語根・派生関係から構成される学術的概念イメージ。`);
       const history_note = (useHist && histData?.history_note) ? histData.history_note : '';
 
       let meanings = histData?.meanings;
       if (!meanings || !meanings.length) {
         const isPhrase = rawW.includes(' ');
         const pos = isPhrase ? 'Idiom' : (rawW.endsWith('ly') ? 'Adv' : (rawW.endsWith('tion') || rawW.endsWith('ment') ? 'N[U]' : (rawW.endsWith('ed') || rawW.endsWith('ing') || rawW.endsWith('able') ? 'Adj' : 'N[C]')));
-        meanings = [{ pos, text: `${rawW}の主要な意味・文脈的語義` }];
+        
+        // Wiktionaryの抜粋テキストが存在する場合は語義行のみを抽出し、語源・発音見出しや活用行は完全除外
+        let defText = '';
+        if (wRef?.extract) {
+          const lines = wRef.extract.split('\n');
+          let inSkipSection = false;
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (trimmed.startsWith('=')) {
+              const sec = trimmed.replace(/=/g, '').trim().toLowerCase();
+              inSkipSection = /^(etymology|pronunciation|alternative forms|derived terms|related terms|translations|anagrams|further reading|references)/.test(sec);
+              continue;
+            }
+            if (inSkipSection) continue;
+            const lower = trimmed.toLowerCase();
+            if (
+              lower.includes('borrowed from') ||
+              lower.includes('etymology') ||
+              /^(from |inherited from |derived from |learned borrowing |orthographic borrowing |calque of |cognate with |compare |see also |ipa\(|rhymes:)/i.test(trimmed) ||
+              (lower.startsWith(normW + ' (') && /(plural|third-person|present participle|past tense|comparative|countable|uncountable)/i.test(lower))
+            ) {
+              continue;
+            }
+            const clean = trimmed.replace(/^[0-9#*.\s]+/, '').trim();
+            if (clean.length > 5 && !clean.startsWith('(')) {
+              defText = clean.slice(0, 120);
+              break;
+            }
+          }
+        }
+        if (!defText) {
+          defText = isPhrase ? '成句・熟語' : (pos.startsWith('N') ? '名詞（学術・文脈語義）' : (pos === 'Adj' ? '形容詞（状態・性質）' : '動詞・文脈語義'));
+        }
+        meanings = [{ pos, text: defText }];
       }
 
       let example = histData?.example;
       if (!example) {
         example = {
-          foreign: `This example illustrates the proper academic usage of ${rawW}.`,
-          ja: `この例文は<b>${rawW}</b>の適切な学術的用法を示している。`,
+          foreign: `This context illustrates the academic usage of ${rawW}.`,
+          ja: `文脈における<b>${rawW}</b>の学術的用法。`,
           used_form: rawW
         };
       }
