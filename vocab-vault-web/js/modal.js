@@ -130,6 +130,10 @@
     const themeBtn = $('btnTheme');
     if (themeBtn) themeBtn.textContent = isDark ? 'ライト' : 'ダーク';
     if ($('chkDark')) $('chkDark').checked = isDark;
+    if (global.VocabGraph?.invalidateTreeBgCache) {
+      global.VocabGraph.invalidateTreeBgCache();
+      global.VocabGraph.drawGraph?.();
+    }
   }
 
   // --- 法務・規約モーダル ---

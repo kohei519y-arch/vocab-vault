@@ -1049,8 +1049,8 @@
             const thetaB = (numB === 1) ? sDef.center : (currentTheta + branchSpan / 2);
             currentTheta += branchSpan;
 
-            // 第1軌道: 古典分岐ノード (r = 210〜470 5段階スタガー配置でブランチ同士の接触・重合を解消し、広々と配分)
-            const bRadius = (numB <= 2) ? 240 : (210 + (bIdx % 5) * 65);
+            // 第1軌道: 古典分岐ノード (r = 220〜495 6段階スタガー配置でブランチ同士の接触・重合を解消し、広々と配分)
+            const bRadius = (numB <= 2) ? 250 : (220 + (bIdx % 6) * 55);
             bNode.targetX = rNode.targetX + bRadius * Math.cos(thetaB);
             bNode.targetY = rNode.targetY + bRadius * Math.sin(thetaB);
             bNode.angle = thetaB;
@@ -2112,6 +2112,7 @@
       canvas.height = realH * dpr;
       canvas.style.width = realW + 'px';
       canvas.style.height = realH + 'px';
+      invalidateTreeBgCache();
     }
   }
 
@@ -2212,6 +2213,7 @@
 
     graphState.canvas = canvas;
     graphState.ctx = canvas.getContext('2d');
+    invalidateTreeBgCache();
     graphState.width = wrap.clientWidth || 800;
     graphState.height = wrap.clientHeight || 600;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -3328,6 +3330,147 @@
     });
   }
 
+  // --- 系統樹背景のオフスクリーンCanvas超高速キャッシュ (GPUテクスチャブリット) ---
+  let treeBgCacheCanvas = null;
+  let treeBgCacheDark = null;
+
+  function invalidateTreeBgCache() {
+    treeBgCacheCanvas = null;
+    treeBgCacheDark = null;
+  }
+
+  function getTreeBackgroundCache(isDark) {
+    if (treeBgCacheCanvas && treeBgCacheDark === isDark) {
+      return treeBgCacheCanvas;
+    }
+    // 直径3100pxの扇形・同心円エリアを 1550x1550 (0.5倍スケール) のオフスクリーンCanvasに1回だけ事前ベイク
+    const size = 1550;
+    const scale = 0.5;
+    const offCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    if (!offCanvas) return null;
+    offCanvas.width = size;
+    offCanvas.height = size;
+    const bCtx = offCanvas.getContext('2d');
+    if (!bCtx) return null;
+
+    bCtx.save();
+    bCtx.scale(scale, scale);
+    const cx = 1550;
+    const cy = 1550;
+
+    // A. 語根コア後方の重厚で落ち着いたダークグラデーション
+    const bgGrad = bCtx.createRadialGradient(cx, cy, 30, cx, cy, 1550);
+    bgGrad.addColorStop(0, isDark ? 'rgba(15, 23, 42, 0.40)' : 'rgba(241, 245, 249, 0.40)');
+    bgGrad.addColorStop(0.35, isDark ? 'rgba(11, 17, 32, 0.25)' : 'rgba(248, 250, 252, 0.25)');
+    bgGrad.addColorStop(0.80, isDark ? 'rgba(3, 7, 18, 0.12)' : 'rgba(255, 255, 255, 0.12)');
+    bgGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    bCtx.fillStyle = bgGrad;
+    bCtx.beginPath();
+    bCtx.arc(cx, cy, 1550, 0, Math.PI * 2);
+    bCtx.fill();
+
+    function drawSectorBand(innerR, outerR, startAngle, endAngle, fillColor, strokeColor) {
+      bCtx.beginPath();
+      bCtx.arc(cx, cy, outerR, startAngle, endAngle, false);
+      bCtx.arc(cx, cy, innerR, endAngle, startAngle, true);
+      bCtx.closePath();
+      if (fillColor) {
+        bCtx.fillStyle = fillColor;
+        bCtx.fill();
+      }
+      if (strokeColor) {
+        bCtx.strokeStyle = strokeColor;
+        bCtx.lineWidth = 1.0;
+        bCtx.stroke();
+      }
+    }
+
+    // B. 第2階層 サンバースト扇状エリア
+    drawSectorBand(100, 480, -3 * Math.PI / 4, -Math.PI / 4,
+      isDark ? 'rgba(132, 204, 22, 0.05)' : 'rgba(101, 163, 13, 0.04)',
+      isDark ? 'rgba(163, 230, 53, 0.12)' : 'rgba(101, 163, 13, 0.10)'
+    );
+    drawSectorBand(100, 480, -Math.PI / 4, 3 * Math.PI / 5,
+      isDark ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.04)',
+      isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.10)'
+    );
+    drawSectorBand(100, 480, 3 * Math.PI / 5, 5 * Math.PI / 4,
+      isDark ? 'rgba(192, 132, 252, 0.04)' : 'rgba(147, 51, 234, 0.03)',
+      isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(147, 51, 234, 0.08)'
+    );
+
+    // C. 第3階層 サンバースト扇状エリア
+    drawSectorBand(495, 780, -3 * Math.PI / 4 + 0.03, -Math.PI / 4 - 0.03,
+      isDark ? 'rgba(34, 197, 94, 0.05)' : 'rgba(22, 163, 74, 0.04)',
+      isDark ? 'rgba(74, 222, 128, 0.14)' : 'rgba(22, 163, 74, 0.10)'
+    );
+    drawSectorBand(495, 780, -Math.PI / 4 + 0.03, 3 * Math.PI / 5 - 0.03,
+      isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(79, 70, 229, 0.04)',
+      isDark ? 'rgba(129, 140, 248, 0.14)' : 'rgba(79, 70, 229, 0.10)'
+    );
+    drawSectorBand(495, 780, 3 * Math.PI / 5 + 0.03, 5 * Math.PI / 4 - 0.03,
+      isDark ? 'rgba(168, 85, 247, 0.04)' : 'rgba(126, 34, 206, 0.03)',
+      isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(126, 34, 206, 0.08)'
+    );
+
+    // D. 第4階層 ガイドライン
+    const guideOrbits = [560, 750, 940, 1130, 1320];
+    bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
+    bCtx.lineWidth = 1.0;
+    bCtx.setLineDash([3, 5]);
+    bCtx.beginPath();
+    guideOrbits.forEach(r => {
+      bCtx.moveTo(cx + r, cy);
+      bCtx.arc(cx, cy, r, 0, Math.PI * 2);
+    });
+    bCtx.stroke();
+    bCtx.setLineDash([]);
+
+    // E. 放射状セクター境界線
+    const sectorDividers = [-3 * Math.PI / 4, -Math.PI / 4, 3 * Math.PI / 5];
+    bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+    bCtx.lineWidth = 1.0;
+    bCtx.setLineDash([4, 4]);
+    bCtx.beginPath();
+    sectorDividers.forEach(angle => {
+      bCtx.moveTo(cx + 60 * Math.cos(angle), cy + 60 * Math.sin(angle));
+      bCtx.lineTo(cx + 1450 * Math.cos(angle), cy + 1450 * Math.sin(angle));
+    });
+    bCtx.stroke();
+    bCtx.setLineDash([]);
+
+    // F. サンバースト階層ラベル
+    bCtx.textAlign = 'center';
+    bCtx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    bCtx.fillStyle = isDark ? '#bef264' : '#4d7c0f';
+    bCtx.fillText('ゲルマン語派 / Germanic', cx, cy - 260);
+
+    bCtx.fillStyle = isDark ? '#7dd3fc' : '#0369a1';
+    const itX = cx + 260 * Math.cos(Math.PI / 6);
+    const itY = cy + 260 * Math.sin(Math.PI / 6);
+    bCtx.fillText('イタリック語派 / Italic', itX, itY);
+
+    bCtx.fillStyle = isDark ? '#d8b4fe' : '#7e22ce';
+    const hlX = cx + 260 * Math.cos(11 * Math.PI / 12);
+    const hlY = cy + 260 * Math.sin(11 * Math.PI / 12);
+    bCtx.fillText('ギリシャ・古典諸派', hlX, hlY);
+
+    bCtx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    bCtx.fillStyle = isDark ? '#86efac' : '#15803d';
+    bCtx.fillText('西ゲルマン語群 / West Germanic', cx, cy - 540);
+
+    bCtx.fillStyle = isDark ? '#a5b4fc' : '#4338ca';
+    const roX = cx + 540 * Math.cos(Math.PI / 6);
+    const roY = cy + 540 * Math.sin(Math.PI / 6);
+    bCtx.fillText('ロマンス諸語 / Romance', roX, roY);
+
+    bCtx.restore();
+
+    treeBgCacheCanvas = offCanvas;
+    treeBgCacheDark = isDark;
+    return offCanvas;
+  }
+
   /**
    * ビューポート・カリング & Semantic Zoom (LOD) 対応のCanvas描画
    */
@@ -3366,148 +3509,24 @@
     const zoom = graphState.zoom;
     const isTree = (graphState.layoutMode === 'tree');
 
-    // 0. SF/ダークファンタジー調 放射状スキルツリー ガイドライン & セクター分割
+    // 0. SF/ダークファンタジー調 放射状スキルツリー ガイドライン & セクター（オフスクリーン超高速テクスチャ描画）
     if (isTree) {
-      ctx.save();
-
-      // アクティブな語根の中心点を取得
       const treeRoots = graphState.nodes.filter(n => n.type === 'root');
       const rootCenters = treeRoots.length > 0
-        ? treeRoots.map(r => ({ x: r.targetX !== undefined ? r.x : 0, y: r.targetY !== undefined ? r.y : 0, label: r.label }))
-        : [{ x: 0, y: 0, label: '' }];
+        ? treeRoots.map(r => ({ x: r.targetX !== undefined ? r.x : 0, y: r.targetY !== undefined ? r.y : 0 }))
+        : [{ x: 0, y: 0 }];
 
-      rootCenters.forEach(center => {
-        const cx = center.x;
-        const cy = center.y;
-
-        // 視野外カリング: 画面外の語根の重いセクターバンド計算・グラデーション描画を完全スキップ
-        if (cx + 1600 < viewLeft || cx - 1600 > viewRight || cy + 1600 < viewTop || cy - 1600 > viewBottom) {
-          return;
-        }
-
-        // A. 語根コア後方の重厚で落ち着いたダークグラデーション（過剰発光を抑えたダークテーマ）
-        const bgGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 1550);
-        bgGrad.addColorStop(0, isDark ? 'rgba(15, 23, 42, 0.40)' : 'rgba(241, 245, 249, 0.40)');
-        bgGrad.addColorStop(0.35, isDark ? 'rgba(11, 17, 32, 0.25)' : 'rgba(248, 250, 252, 0.25)');
-        bgGrad.addColorStop(0.80, isDark ? 'rgba(3, 7, 18, 0.12)' : 'rgba(255, 255, 255, 0.12)');
-        bgGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = bgGrad;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 1550, 0, Math.PI * 2);
-        ctx.fill();
-
-        // 扇形アーク描画ヘルパー
-        function drawSectorBand(innerR, outerR, startAngle, endAngle, fillColor, strokeColor) {
-          ctx.beginPath();
-          ctx.arc(cx, cy, outerR, startAngle, endAngle, false);
-          ctx.arc(cx, cy, innerR, endAngle, startAngle, true);
-          ctx.closePath();
-          if (fillColor) {
-            ctx.fillStyle = fillColor;
-            ctx.fill();
+      const bgCache = getTreeBackgroundCache(isDark);
+      if (bgCache) {
+        rootCenters.forEach(center => {
+          const cx = center.x;
+          const cy = center.y;
+          if (cx + 1600 < viewLeft || cx - 1600 > viewRight || cy + 1600 < viewTop || cy - 1600 > viewBottom) {
+            return;
           }
-          if (strokeColor) {
-            ctx.strokeStyle = strokeColor;
-            ctx.lineWidth = 1.0;
-            ctx.stroke();
-          }
-        }
-
-        // B. 第2階層 サンバースト扇状エリア (Tier 2: r = 100 〜 480)
-        // ゲルマン語派 (黄〜緑系: 10時〜2時 / 上部)
-        drawSectorBand(100, 480, -3 * Math.PI / 4, -Math.PI / 4,
-          isDark ? 'rgba(132, 204, 22, 0.05)' : 'rgba(101, 163, 13, 0.04)',
-          isDark ? 'rgba(163, 230, 53, 0.12)' : 'rgba(101, 163, 13, 0.10)'
-        );
-        // イタリック語派 (青〜紫系: 2時〜6時 / 右下)
-        drawSectorBand(100, 480, -Math.PI / 4, 3 * Math.PI / 5,
-          isDark ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.04)',
-          isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.10)'
-        );
-        // ギリシャ古典・その他 (紫系: 6時〜10時 / 左下)
-        drawSectorBand(100, 480, 3 * Math.PI / 5, 5 * Math.PI / 4,
-          isDark ? 'rgba(192, 132, 252, 0.04)' : 'rgba(147, 51, 234, 0.03)',
-          isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(147, 51, 234, 0.08)'
-        );
-
-        // C. 第3階層 サンバースト扇状エリア (Tier 3: r = 495 〜 780)
-        // 西ゲルマン語群 (明るい緑)
-        drawSectorBand(495, 780, -3 * Math.PI / 4 + 0.03, -Math.PI / 4 - 0.03,
-          isDark ? 'rgba(34, 197, 94, 0.05)' : 'rgba(22, 163, 74, 0.04)',
-          isDark ? 'rgba(74, 222, 128, 0.14)' : 'rgba(22, 163, 74, 0.10)'
-        );
-        // ロマンス諸語 (鮮やかな青)
-        drawSectorBand(495, 780, -Math.PI / 4 + 0.03, 3 * Math.PI / 5 - 0.03,
-          isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(79, 70, 229, 0.04)',
-          isDark ? 'rgba(129, 140, 248, 0.14)' : 'rgba(79, 70, 229, 0.10)'
-        );
-        // ヘレニック・学術語群
-        drawSectorBand(495, 780, 3 * Math.PI / 5 + 0.03, 5 * Math.PI / 4 - 0.03,
-          isDark ? 'rgba(168, 85, 247, 0.04)' : 'rgba(126, 34, 206, 0.03)',
-          isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(126, 34, 206, 0.08)'
-        );
-
-        // D. 第4階層 ガイドライン (Tier 4: r = 560, 750, 940, 1130, 1320)
-        const guideOrbits = [560, 750, 940, 1130, 1320];
-        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
-        ctx.lineWidth = 1.0;
-        ctx.setLineDash([3, 5]);
-        ctx.beginPath();
-        guideOrbits.forEach(r => {
-          ctx.moveTo(cx + r, cy);
-          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.drawImage(bgCache, cx - 1550, cy - 1550, 3100, 3100);
         });
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // E. 放射状セクター境界線（中心から伸びる細いガイド線）
-        const sectorDividers = [-3 * Math.PI / 4, -Math.PI / 4, 3 * Math.PI / 5];
-        ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-        ctx.lineWidth = 1.0;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        sectorDividers.forEach(angle => {
-          ctx.moveTo(cx + 60 * Math.cos(angle), cy + 60 * Math.sin(angle));
-          ctx.lineTo(cx + 1450 * Math.cos(angle), cy + 1450 * Math.sin(angle));
-        });
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // F. サンバースト各階層の文字ラベル（落ち着いた高コントラストタイポグラフィ）
-        if (zoom >= 0.35) {
-          ctx.save();
-          ctx.textAlign = 'center';
-
-          // Tier 2 ラベル
-          ctx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-          ctx.fillStyle = isDark ? '#bef264' : '#4d7c0f';
-          ctx.fillText('ゲルマン語派 / Germanic', cx, cy - 260);
-
-          ctx.fillStyle = isDark ? '#7dd3fc' : '#0369a1';
-          const itX = cx + 260 * Math.cos(Math.PI / 6);
-          const itY = cy + 260 * Math.sin(Math.PI / 6);
-          ctx.fillText('イタリック語派 / Italic', itX, itY);
-
-          ctx.fillStyle = isDark ? '#d8b4fe' : '#7e22ce';
-          const hlX = cx + 260 * Math.cos(11 * Math.PI / 12);
-          const hlY = cy + 260 * Math.sin(11 * Math.PI / 12);
-          ctx.fillText('ギリシャ・古典諸派', hlX, hlY);
-
-          // Tier 3 ラベル
-          ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-          ctx.fillStyle = isDark ? '#86efac' : '#15803d';
-          ctx.fillText('西ゲルマン語群 / West Germanic', cx, cy - 540);
-
-          ctx.fillStyle = isDark ? '#a5b4fc' : '#4338ca';
-          const roX = cx + 540 * Math.cos(Math.PI / 6);
-          const roY = cy + 540 * Math.sin(Math.PI / 6);
-          ctx.fillText('ロマンス諸語 / Romance', roX, roY);
-
-          ctx.restore();
-        }
-      });
-
-      ctx.restore();
+      }
     }
 
     // 1. エッジ描画（発光エネルギー導管）
@@ -3612,21 +3631,29 @@
       ctx.beginPath();
       ctx.moveTo(e.source.x, e.source.y);
       if (isTree) {
-        // 放射状スキルツリー用 極座標ベジェ曲線 (Radial Polar Cubic Bezier)
-        const rNode = e.source.rootLabel ? rootMap.get(e.source.rootLabel) : null;
-        const rx = rNode ? (rNode.targetX !== undefined ? rNode.x : 0) : 0;
-        const ry = rNode ? (rNode.targetY !== undefined ? rNode.y : 0) : 0;
-        const r1 = Math.hypot(e.source.x - rx, e.source.y - ry);
-        const r2 = Math.hypot(e.target.x - rx, e.target.y - ry);
-        const midR = (r1 + r2) / 2;
-        const angleS = Math.atan2(e.source.y - ry, e.source.x - rx);
-        const angleT = Math.atan2(e.target.y - ry, e.target.x - rx);
-        let dAngle = angleT - angleS;
-        while (dAngle > Math.PI) dAngle -= Math.PI * 2;
-        while (dAngle < -Math.PI) dAngle += Math.PI * 2;
-        const cpAngle = angleS + dAngle * 0.5;
-        const cpX = rx + midR * Math.cos(cpAngle);
-        const cpY = ry + midR * Math.sin(cpAngle);
+        // 放射状スキルツリー用 極座標ベジェ曲線（制御点キャッシングで三角関数計算を毎フレーム0回化）
+        let cpX = e._cpX;
+        let cpY = e._cpY;
+        if (cpX === undefined || e._lastSrcX !== e.source.x || e._lastTgtX !== e.target.x) {
+          const rNode = e.source.rootLabel ? rootMap.get(e.source.rootLabel) : null;
+          const rx = rNode ? (rNode.targetX !== undefined ? rNode.x : 0) : 0;
+          const ry = rNode ? (rNode.targetY !== undefined ? rNode.y : 0) : 0;
+          const r1 = Math.hypot(e.source.x - rx, e.source.y - ry);
+          const r2 = Math.hypot(e.target.x - rx, e.target.y - ry);
+          const midR = (r1 + r2) / 2;
+          const angleS = Math.atan2(e.source.y - ry, e.source.x - rx);
+          const angleT = Math.atan2(e.target.y - ry, e.target.x - rx);
+          let dAngle = angleT - angleS;
+          while (dAngle > Math.PI) dAngle -= Math.PI * 2;
+          while (dAngle < -Math.PI) dAngle += Math.PI * 2;
+          const cpAngle = angleS + dAngle * 0.5;
+          cpX = rx + midR * Math.cos(cpAngle);
+          cpY = ry + midR * Math.sin(cpAngle);
+          e._cpX = cpX;
+          e._cpY = cpY;
+          e._lastSrcX = e.source.x;
+          e._lastTgtX = e.target.x;
+        }
         ctx.bezierCurveTo(
           (e.source.x * 2 + cpX) / 3, (e.source.y * 2 + cpY) / 3,
           (cpX + e.target.x * 2) / 3, (cpY + e.target.y * 2) / 3,
@@ -3677,14 +3704,15 @@
       if (era === 0 && n.type !== 'root') isDimmedByEra = true;
       if (era === 1 && (n.type === 'twig' || n.lang === 'ja')) isDimmedByEra = true;
 
-      ctx.save();
+      let nodeAlpha = 1.0;
       if (isDimmedByEra) {
-        ctx.globalAlpha = 0.12;
+        nodeAlpha = 0.12;
       } else if (focusNode && !isSelected && !isHover && !isConnectedToFocus) {
-        ctx.globalAlpha = 0.12;
+        nodeAlpha = 0.12;
       } else if (isFiltered && !isMatch) {
-        ctx.globalAlpha = 0.15;
+        nodeAlpha = 0.15;
       }
+      if (nodeAlpha !== 1.0) ctx.globalAlpha = nodeAlpha;
 
       // カラー算出
       let nodeColor = LANG_GRAPH_COLORS.root;
@@ -3748,17 +3776,15 @@
         ctx.stroke();
 
         // コア本体
-        const rootGrad = ctx.createRadialGradient(
-          n.x - drawRadius * 0.32, n.y - drawRadius * 0.32, Math.max(0.8, drawRadius * 0.1),
-          n.x, n.y, drawRadius
-        );
-        rootGrad.addColorStop(0, '#ffffff');
-        rootGrad.addColorStop(0.35, nodeColor);
-        rootGrad.addColorStop(1, isTree ? (isDark ? '#9a3412' : '#c2410c') : (isDark ? '#581c87' : '#6b21a8'));
-
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = rootGrad;
+        ctx.fillStyle = nodeColor;
+        ctx.fill();
+
+        // 中心自己発光インナーコア
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, drawRadius * 0.42, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
         ctx.fill();
 
         if (isSelected) {
@@ -3870,18 +3896,10 @@
           : (isHover ? 'rgba(251, 191, 36, 0.24)' : (isDark ? 'rgba(245, 158, 11, 0.14)' : 'rgba(217, 119, 6, 0.09)'));
         ctx.fill();
 
-        // 2. コア本体: 3Dラジアル球体グラデーション（アンバー系）
-        const bGrad = ctx.createRadialGradient(
-          n.x - drawRadius * 0.32, n.y - drawRadius * 0.32, Math.max(0.5, drawRadius * 0.08),
-          n.x, n.y, drawRadius
-        );
-        bGrad.addColorStop(0, isDark ? '#fef3c7' : '#ffffff');
-        bGrad.addColorStop(0.35, isDark ? '#fbbf24' : '#f59e0b');
-        bGrad.addColorStop(1, isDark ? '#b45309' : '#92400e');
-
+        // 2. コア本体
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = bGrad;
+        ctx.fillStyle = isDark ? '#fbbf24' : '#d97706';
         ctx.fill();
 
         // 3. 繊細な外周リムリング
@@ -3890,8 +3908,14 @@
         ctx.strokeStyle = isSelected
           ? '#fef08a'
           : (isHover ? '#fbbf24' : (isDark ? 'rgba(254, 243, 199, 0.60)' : 'rgba(255, 255, 255, 0.85)'));
-        ctx.lineWidth = isSelected ? 2.2 : (isHover ? 1.6 : 1.0);
+        ctx.lineWidth = isSelected ? 2.0 : (isHover ? 1.5 : 0.9);
         ctx.stroke();
+
+        // 4. 中心自己発光コア
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, drawRadius * 0.40, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+        ctx.fill();
 
         if (zoom >= 0.40 || isSelected || isHover) {
           const bFontSize = Math.round(Math.max(9.5, 11.0 / Math.sqrt(zoom)));
@@ -4016,32 +4040,26 @@
           : (isHover ? 'rgba(167, 139, 250, 0.28)' : colorToRgba(nodeColor, isDark ? 0.16 : 0.12));
         ctx.fill();
 
-        // 2. コア本体: 3Dラジアル球体グラデーション（光源は左上）
-        const sphereGrad = ctx.createRadialGradient(
-          n.x - drawRadius * 0.32, n.y - drawRadius * 0.32, Math.max(0.5, drawRadius * 0.08),
-          n.x, n.y, drawRadius
-        );
-        sphereGrad.addColorStop(0, '#ffffff');
-        sphereGrad.addColorStop(0.38, nodeColor);
-        sphereGrad.addColorStop(1, colorToRgba(nodeColor, 0.82));
-
+        // 2. コア本体
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = sphereGrad;
+        ctx.fillStyle = nodeColor;
         ctx.fill();
 
-        // 3. 繊細な外周リムリング（Glass Specular Rim）
+        // 3. 繊細な外周リムリング
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
         ctx.strokeStyle = isSelected
           ? '#bae6fd'
           : (isHover ? '#e9d5ff' : (isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.75)'));
         ctx.lineWidth = isFocusHighlight ? 2.0 : 0.8;
-        if (isFocusHighlight) {
-          ctx.shadowColor = isSelected ? '#38bdf8' : '#a78bfa';
-          ctx.shadowBlur = 8;
-        }
         ctx.stroke();
+
+        // 4. 中心自己発光コア
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, drawRadius * 0.36, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+        ctx.fill();
         if (isFocusHighlight) ctx.shadowBlur = 0;
 
         // 見出し語ラベル描画（ズームイン時、ホバー・選択時、または検索マッチ時）
@@ -4101,30 +4119,21 @@
           ctx.fillStyle = colorToRgba(nodeColor, isDark ? 0.18 : 0.14);
           ctx.fill();
 
-          // 2. コア球体グラデーション
-          const starGrad = ctx.createRadialGradient(
-            n.x - dotR * 0.30, n.y - dotR * 0.30, Math.max(0.4, dotR * 0.1),
-            n.x, n.y, dotR
-          );
-          starGrad.addColorStop(0, '#ffffff');
-          starGrad.addColorStop(0.42, nodeColor);
-          starGrad.addColorStop(1, colorToRgba(nodeColor, 0.85));
-
+          // 2. コアセル
           ctx.beginPath();
           ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = starGrad;
+          ctx.fillStyle = nodeColor;
           ctx.fill();
 
-          // 3. 薄いリム
+          // 3. 中心微光
           ctx.beginPath();
-          ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
-          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.40)' : 'rgba(255, 255, 255, 0.70)';
-          ctx.lineWidth = 0.6;
-          ctx.stroke();
+          ctx.arc(n.x, n.y, dotR * 0.38, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+          ctx.fill();
         }
       }
 
-      ctx.restore();
+      if (nodeAlpha !== 1.0) ctx.globalAlpha = 1.0;
     }
 
     // 3. スキル習得・覚醒時のパーティクル・光波エフェクト (RPG Particle Ripples)
@@ -4741,6 +4750,7 @@
     toggleGraphClusterOnly,
     updateGraphDataAndFit,
     drawGraph,
+    invalidateTreeBgCache,
     startGraphSimulation,
     wakeGraphSimulation,
     initGraphEvents,
