@@ -445,12 +445,55 @@
     return badges.join('') + typeBox;
   }
 
+  function calcLevenshtein(a, b) {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    const row = [];
+    for (let i = 0; i <= b.length; i++) row[i] = i;
+    for (let i = 1; i <= a.length; i++) {
+      let prev = i;
+      for (let j = 1; j <= b.length; j++) {
+        const val = a[i - 1] === b[j - 1] ? row[j - 1] : Math.min(row[j - 1] + 1, prev + 1, row[j] + 1);
+        row[j - 1] = prev;
+        prev = val;
+      }
+      row[b.length] = prev;
+    }
+    return row[b.length];
+  }
+
+  function getStemVariants(word) {
+    if (!word) return [];
+    const w = String(word).trim().toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    const set = new Set([w]);
+    if (w.endsWith('ing')) {
+      set.add(w.slice(0, -3));
+      set.add(w.slice(0, -3) + 'e');
+      if (w.length > 4 && w[w.length - 4] === w[w.length - 5]) set.add(w.slice(0, -4));
+    }
+    if (w.endsWith('ed')) {
+      set.add(w.slice(0, -2));
+      set.add(w.slice(0, -1));
+      if (w.length > 3 && w[w.length - 3] === w[w.length - 4]) set.add(w.slice(0, -3));
+    }
+    if (w.endsWith('es')) {
+      set.add(w.slice(0, -2));
+      set.add(w.slice(0, -2) + 'e');
+    }
+    if (w.endsWith('s') && !w.endsWith('ss')) set.add(w.slice(0, -1));
+    if (w.endsWith('ly')) set.add(w.slice(0, -2));
+    return Array.from(set).filter(s => s.length >= 2);
+  }
+
   function checkClozeTyping() {
     const inp = $('clozeTypeInput');
     const cur = global.VocabCore?.App?.aList?.[0];
     if (!inp || !cur) return;
-    const val = inp.value.trim().toLowerCase();
-    const target = String(cur.word || '').trim().toLowerCase();
+    const rawVal = inp.value.trim();
+    const val = rawVal.toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    const target = String(cur.word || '').trim().toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '');
+    const usedForm = cur.example?.used_form ? String(cur.example.used_form).trim().toLowerCase().replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '') : '';
     if (!val) {
       showAns();
       return;
@@ -458,9 +501,28 @@
     if (val === target) {
       inp.style.borderColor = 'var(--ok)';
       global.VocabModal?.showToast?.(`正解！「${cur.word}」を正確に産出できました。`, 'ok', 2500);
+    } else if (usedForm && val === usedForm) {
+      inp.style.borderColor = 'var(--ok)';
+      global.VocabModal?.showToast?.(`正解！文中の活用形「${cur.example.used_form}」（原形: ${cur.word}）を正確に産出できました。`, 'ok', 3000);
     } else {
-      inp.style.borderColor = 'var(--ng)';
-      global.VocabModal?.showToast?.(`惜しい！入力: ${inp.value} → 正解: ${cur.word}`, 'warn', 3500);
+      const valStems = getStemVariants(val);
+      const targetStems = getStemVariants(target);
+      const usedStems = usedForm ? getStemVariants(usedForm) : [];
+      const hasStemMatch = valStems.some(s => targetStems.includes(s) || usedStems.includes(s));
+      const distTarget = calcLevenshtein(val, target);
+      const distUsed = usedForm ? calcLevenshtein(val, usedForm) : 999;
+      const minDistance = Math.min(distTarget, distUsed);
+
+      if (hasStemMatch) {
+        inp.style.borderColor = 'var(--ok)';
+        global.VocabModal?.showToast?.(`ほぼ正解（ステミング・語根一致）！入力: ${rawVal} / 正解: ${cur.word}`, 'ok', 3500);
+      } else if (minDistance === 1 && (val.length >= 3 || target.length >= 3)) {
+        inp.style.borderColor = 'var(--ok)';
+        global.VocabModal?.showToast?.(`ほぼ正解（1文字タイポ）！入力: ${rawVal} → 正解: ${cur.word}`, 'ok', 3500);
+      } else {
+        inp.style.borderColor = 'var(--ng)';
+        global.VocabModal?.showToast?.(`惜しい！入力: ${rawVal} → 正解: ${cur.word}`, 'warn', 3500);
+      }
     }
     showAns();
   }
@@ -1171,6 +1233,8 @@
     buildClozeSentenceHtml,
     buildClozeHintsHtml,
     checkClozeTyping,
+    calcLevenshtein,
+    getStemVariants,
     getOverdueRatio,
     setDailyReviewCap,
     getStreakInfo,

@@ -555,6 +555,71 @@
     render();
   }
 
+  // --- 初回オンボーディング（ウェルカムガイドツアー）制御 ---
+  let currentTourStep = 1;
+  let selectedTourMode = 'simple';
+
+  function getTourStep() {
+    return currentTourStep;
+  }
+
+  function setTourStep(step) {
+    if (step < 1) step = 1;
+    if (step > 3) step = 3;
+    currentTourStep = step;
+    updateTourUi();
+  }
+
+  function selectTourMode(mode) {
+    selectedTourMode = mode === 'academic' ? 'academic' : 'simple';
+    const cardSimple = $('tourModeSimpleCard');
+    const cardAcademic = $('tourModeAcademicCard');
+    if (cardSimple) cardSimple.classList.toggle('selected', selectedTourMode === 'simple');
+    if (cardAcademic) cardAcademic.classList.toggle('selected', selectedTourMode === 'academic');
+  }
+
+  function updateTourUi() {
+    for (let s = 1; s <= 3; s++) {
+      const stepEl = $(`tourStep${s}`);
+      const dotEl = $(`tourDot${s}`);
+      if (stepEl) stepEl.classList.toggle('active', s === currentTourStep);
+      if (dotEl) dotEl.classList.toggle('active', s === currentTourStep);
+    }
+    const btnPrev = $('btnTourPrev');
+    const btnNext = $('btnTourNext');
+    const btnFinish = $('btnTourFinish');
+    if (btnPrev) btnPrev.style.display = currentTourStep === 1 ? 'none' : 'inline-flex';
+    if (btnNext) btnNext.style.display = currentTourStep === 3 ? 'none' : 'inline-flex';
+    if (btnFinish) btnFinish.style.display = currentTourStep === 3 ? 'inline-flex' : 'none';
+
+    if (currentTourStep === 3) {
+      selectTourMode(selectedTourMode);
+    }
+  }
+
+  function openWelcomeTour(step = 1) {
+    currentTourStep = step;
+    selectedTourMode = App.viewMode || 'simple';
+    updateTourUi();
+    toggleModal('welcomeTourModal', true);
+  }
+
+  function closeWelcomeTour() {
+    toggleModal('welcomeTourModal', false);
+    lsSet('vv_welcome_tour_done', '1');
+  }
+
+  function finishWelcomeTour() {
+    setViewMode(selectedTourMode);
+    closeWelcomeTour();
+    showToast(`表示モードを「${selectedTourMode === 'simple' ? 'シンプル' : '学術・詳細'}」に設定しました。`, 'ok', 3000);
+  }
+
+  function checkWelcomeTour() {
+    if (lsGet('vv_welcome_tour_done') === '1') return;
+    openWelcomeTour(1);
+  }
+
   function loadStarterPack(packType = 'academic') {
     if (!global.VocabStarterPack?.populateStarterPack) return;
     let actualPackType = packType;
@@ -1389,6 +1454,10 @@
     }
 
     setTimeout(() => {
+      checkWelcomeTour();
+    }, 600);
+
+    setTimeout(() => {
       checkOnboardingReviewTrigger();
     }, 1200);
 
@@ -1523,6 +1592,13 @@
     startStripeCheckout: p => global.VocabSync?.startStripeCheckout?.(p),
     openStripePortal: () => global.VocabSync?.openStripePortal?.(),
     setViewMode,
+    getTourStep,
+    setTourStep,
+    selectTourMode,
+    openWelcomeTour,
+    closeWelcomeTour,
+    finishWelcomeTour,
+    checkWelcomeTour,
     loadStarterPack,
     checkOnboardingReviewTrigger,
     showOnboardingReviewTour,

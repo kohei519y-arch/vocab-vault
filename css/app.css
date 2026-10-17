@@ -2464,3 +2464,122 @@ body.dark .detail-tab-btn.active {
 .report-ety-btn {
   display: none !important;
 }
+
+/* --- Service Worker 更新通知フローティングバナー --- */
+.sw-update-banner {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: calc(100% - 48px);
+  max-width: 420px;
+  background: var(--bg-side);
+  color: var(--t);
+  border: 1px solid var(--ac);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.48), 0 0 0 1px var(--ac-b);
+  padding: 14px 18px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: swSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes swSlideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sw-update-banner-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--t);
+}
+.sw-update-banner-bd {
+  font-size: 12px;
+  color: var(--s);
+  line-height: 1.55;
+}
+.sw-update-banner-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* --- 初回オンボーディングツアー --- */
+.tour-step {
+  display: none;
+}
+.tour-step.active {
+  display: block;
+  animation: tourFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes tourFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.tour-dots {
+  display: flex;
+  gap: 7px;
+  justify-content: center;
+  align-items: center;
+  margin: 18px 0 12px 0;
+}
+.tour-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--b);
+  transition: all 0.22s var(--ease-out);
+}
+.tour-dot.active {
+  width: 24px;
+  border-radius: 4px;
+  background: var(--ac);
+}
+.tour-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+@media (max-width: 600px) {
+  .tour-mode-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.tour-mode-card {
+  border: 2px solid var(--b);
+  border-radius: 10px;
+  padding: 14px;
+  cursor: pointer;
+  transition: all 0.18s var(--ease-out);
+  background: var(--bg-main);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  user-select: none;
+}
+.tour-mode-card:hover {
+  border-color: var(--ac-b);
+  background: var(--bg-hov);
+}
+.tour-mode-card.selected {
+  border-color: var(--ac);
+  background: var(--ac-bg);
+  box-shadow: 0 0 0 1px var(--ac);
+}
+.tour-concept-box {
+  background: var(--bg-main);
+  border: 1px solid var(--b);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.6;
+}
+

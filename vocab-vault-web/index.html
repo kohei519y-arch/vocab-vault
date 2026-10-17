@@ -17,24 +17,24 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vocab Vault">
-  <title>Vocab Vault — 語源・概念史・語根ネットワーク単語帳</title>
-  <meta name="description" content="英単語の丸暗記を終わらせる。印欧祖語（PIE）から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。Anki / Obsidian連携対応。">
-  <meta name="keywords" content="語源, 英単語, 単語帳, 印欧祖語, 語根, 暗記, Anki, Obsidian, SRS, 英語学習, 忘却曲線, フランス語, ドイツ語">
+  <title>Vocab Vault — 最難関大・英検1級・TOEFL突破のための語源概念史チート単語帳</title>
+  <meta name="description" content="東大・京大・早慶・英検1級・TOEFL・GRE突破のための語源概念史チート単語帳。印欧祖語（PIE）から繋がる語根ネットワークと、認知心理学に基づく適応型忘却曲線SRSで一生忘れないボキャブラリーを構築。Anki / Obsidian連携対応。">
+  <meta name="keywords" content="語源, 英単語, 単語帳, 印欧祖語, 語根, 暗記, Anki, Obsidian, SRS, 英語学習, 忘却曲線, 英検1級, TOEFL, GRE, 東大英語, 早慶英語, フランス語, ドイツ語">
   
   <link rel="canonical" href="https://kohei519y-arch.github.io/vocab-vault/">
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://kohei519y-arch.github.io/vocab-vault/">
-  <meta property="og:title" content="Vocab Vault — 語源・概念史・語根ネットワーク単語帳">
-  <meta property="og:description" content="印欧祖語から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。">
+  <meta property="og:title" content="Vocab Vault — 最難関大・英検1級・TOEFL突破のための語源概念史チート単語帳">
+  <meta property="og:description" content="東大・京大・早慶・英検1級・TOEFL・GRE突破のための語源概念史チート単語帳。印欧祖語から繋がる語根ネットワークと適応型忘却曲線SRSで一生忘れない記憶を。">
   <meta property="og:image" content="https://kohei519y-arch.github.io/vocab-vault/icons/ogp.jpg">
   
   <!-- Twitter Cards -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://kohei519y-arch.github.io/vocab-vault/">
-  <meta name="twitter:title" content="Vocab Vault — 語源・概念史・語根ネットワーク単語帳">
-  <meta name="twitter:description" content="印欧祖語から繋がる語根ネットワークと、認知心理学に基づく忘却曲線SRSで一生忘れない単語帳。">
+  <meta name="twitter:title" content="Vocab Vault — 最難関大・英検1級・TOEFL突破のための語源概念史チート単語帳">
+  <meta name="twitter:description" content="東大・京大・早慶・英検1級・TOEFL・GRE突破のための語源概念史チート単語帳。印欧祖語から繋がる語根ネットワークと適応型忘却曲線SRSで一生忘れない記憶を。">
   <meta name="twitter:image" content="https://kohei519y-arch.github.io/vocab-vault/icons/ogp.jpg">
 
   <!-- Schema.org WebApplication -->
@@ -527,6 +527,17 @@
             <option value="0.95" selected>速度: 0.95x (自然)</option>
             <option value="1.05">速度: 1.05x (やや速め)</option>
           </select>
+        </div>
+      </div>
+
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>初期オンボーディング・操作ガイド</span>
+          <span class="badge ok">いつでも再確認可能</span>
+        </div>
+        <p class="cfg-desc">印欧祖語（語根）による芋づる式暗記の基礎概念、FSRS-4.5科学的忘却曲線、および表示モードの選択ガイドツアーをいつでも再確認できます。</p>
+        <div style="margin-top:6px">
+          <button type="button" class="btn-o btn-sm" onclick="VocabCore.openWelcomeTour()">オンボーディングツアーを開く</button>
         </div>
       </div>
 
@@ -1187,7 +1198,8 @@
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">ドラッグ</kbd></td><td style="padding:6px 10px">キャンバスのパン移動 / ノードの牽引移動</td></tr>
       </table>
     </div>
-    <div style="display:flex;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--b);background:var(--bg-rib)">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:1px solid var(--b);background:var(--bg-rib)">
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('shortcutsModal',false);VocabCore.openWelcomeTour();">ガイドツアーを見る</button>
       <button type="button" class="btn-o btn-xs" onclick="toggleModal('shortcutsModal',false)">閉じる</button>
     </div>
   </div>
@@ -1241,6 +1253,137 @@
   </div>
 </div>
 
+<!-- 初回オンボーディングツアーモーダル -->
+<div id="welcomeTourModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="welcomeTourTitle" onclick="if(event.target===this) VocabCore.closeWelcomeTour()">
+  <div class="modal-box" style="max-width:540px;padding:24px 22px;">
+    <div class="modal-hd flx-sb" style="background:transparent;border:none;padding:0 0 12px 0;">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="badge ok">GUIDE</span>
+        <h2 id="welcomeTourTitle" style="font-size:16px;font-weight:700;">Vocab Vault ガイドツアー</h2>
+      </div>
+      <button type="button" class="modal-close" onclick="VocabCore.closeWelcomeTour()" aria-label="ツアーを閉じる">×</button>
+    </div>
+
+    <!-- Step 1: 印欧祖語（語根）による芋づる式記憶 -->
+    <div class="tour-step active" id="tourStep1">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--t)">
+        1. 印欧祖語（語根）による芋づる式暗記
+      </div>
+      <p style="font-size:12.5px;color:var(--s);line-height:1.6;margin:0 0 12px 0;">
+        単語を単体で丸暗記する非効率から脱却しましょう。英語・仏語・独語などの主要語彙は、数千年前の「印欧祖語（Proto-Indo-European）」の共通語根から派生しています。
+      </p>
+      <div class="tour-concept-box">
+        <div style="font-weight:700;color:var(--ac);margin-bottom:6px">例: 語根 *sta- (立つ・据える・固定する)</div>
+        <div style="display:flex;flex-direction:column;gap:4px;color:var(--t)">
+          <div>・<strong>stand</strong>: その場に立つ</div>
+          <div>・<strong>statue</strong>: 固定された彫像</div>
+          <div>・<strong>substance</strong>: sub(下で) + sta-(立つもの) → 実質・本質</div>
+          <div>・<strong>constant</strong>: con(共に) + sta-(立ち続ける) → 不変の</div>
+          <div>・<strong>destination</strong>: de(完全に) + sta-(据えられた先) → 目的地</div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--s);line-height:1.5;margin:0">
+        語根と形態素（接頭辞・接尾辞）を理解することで、最難関レベルの未知の単語に出会っても、核となる概念を瞬時に読み解くことが可能になります。
+      </p>
+    </div>
+
+    <!-- Step 2: 科学的忘却曲線（FSRS-4.5）と適応復習 -->
+    <div class="tour-step" id="tourStep2">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--t)">
+        2. 次世代忘却曲線（FSRS-4.5）と適応復習
+      </div>
+      <p style="font-size:12.5px;color:var(--s);line-height:1.6;margin:0 0 12px 0;">
+        旧来のSM-2アルゴリズムを超えた最新の4変数モデル（安定度・難易度・経過時間・忘却臨界点）を搭載。あなたの脳の想起リズムに完全に適応します。
+      </p>
+      <div class="tour-concept-box">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div>
+            <strong style="color:var(--ac)">・形態素・語根連動ボーナス:</strong><br>
+            同一語根の単語を連続して正解すると、ネットワーク全体の復習間隔が自動で延伸され、復習コストを科学的に圧縮します。
+          </div>
+          <div>
+            <strong style="color:var(--ac)">・認識 ＆ Cloze（穴埋め産出）モード:</strong><br>
+            意味の想起だけでなく、文脈の穴埋めタイピングで発信語彙力を鍛錬。タイポや活用形の揺らぎも自動判定します。
+          </div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:var(--s);line-height:1.5;margin:0">
+        「復習期日が近づいた語」のみを自動抽出するため、無駄な復習に時間を奪われることはありません。
+      </p>
+    </div>
+
+    <!-- Step 3: 表示モードの選択 -->
+    <div class="tour-step" id="tourStep3">
+      <div style="font-size:15px;font-weight:700;margin-bottom:6px;color:var(--t)">
+        3. あなたの好みに合わせた表示モード
+      </div>
+      <p style="font-size:12.5px;color:var(--s);line-height:1.6;margin:0 0 8px 0;">
+        単語帳の初期表示スタイルを選択してください。この設定はツールバーからいつでもワンタップで変更可能です。
+      </p>
+      <div class="tour-mode-grid">
+        <div class="tour-mode-card selected" id="tourModeSimpleCard" onclick="VocabCore.selectTourMode('simple')">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <strong style="font-size:13px;color:var(--t)">シンプルモード</strong>
+            <span class="badge ok">推奨</span>
+          </div>
+          <div style="font-size:11.5px;color:var(--s);line-height:1.5">
+            見出し語・語義・例文のみをスッキリ表示。語源や概念史はワンタップで自在に展開。認知負荷を抑えて素早く語彙をインプットできます。
+          </div>
+        </div>
+        <div class="tour-mode-card" id="tourModeAcademicCard" onclick="VocabCore.selectTourMode('academic')">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <strong style="font-size:13px;color:var(--t)">学術・詳細モード</strong>
+            <span class="badge" style="background:var(--bg-hov);color:var(--s)">深掘り</span>
+          </div>
+          <div style="font-size:11.5px;color:var(--s);line-height:1.5">
+            印欧祖語・音韻推移・概念史・歴史的ニュアンスを常時フルオープン。語源研究や知的好奇心を極限まで満たしたい方に最適です。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- インジケータードット -->
+    <div class="tour-dots">
+      <div class="tour-dot active" id="tourDot1" onclick="VocabCore.setTourStep(1)" style="cursor:pointer"></div>
+      <div class="tour-dot" id="tourDot2" onclick="VocabCore.setTourStep(2)" style="cursor:pointer"></div>
+      <div class="tour-dot" id="tourDot3" onclick="VocabCore.setTourStep(3)" style="cursor:pointer"></div>
+    </div>
+
+    <!-- アクションボタン -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+      <button type="button" class="btn-o btn-sm" onclick="VocabCore.closeWelcomeTour()">スキップ</button>
+      <div style="display:flex;gap:8px">
+        <button type="button" class="btn-o btn-sm" id="btnTourPrev" style="display:none" onclick="VocabCore.setTourStep(VocabCore.getTourStep() - 1)">前へ</button>
+        <button type="button" class="btn-ac btn-sm" id="btnTourNext" onclick="VocabCore.setTourStep(VocabCore.getTourStep() + 1)">次へ</button>
+        <button type="button" class="btn-ac btn-sm" id="btnTourFinish" style="display:none" onclick="VocabCore.finishWelcomeTour()">学習を開始する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Service Worker 更新通知フローティングバナー -->
+<div id="swUpdateBanner" class="sw-update-banner" style="display:none" role="alert" aria-live="assertive">
+  <div class="sw-update-banner-hd">
+    <div style="display:flex;align-items:center;gap:6px">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ac)">
+        <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+        <path d="M3 3v5h5"/>
+        <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+        <path d="M16 16h5v5"/>
+      </svg>
+      <span>最新バージョンが利用可能です</span>
+    </div>
+    <button type="button" class="btn-xs btn-o" onclick="document.getElementById('swUpdateBanner').style.display='none'" aria-label="閉じる" style="border:none;font-size:16px;line-height:1;padding:0 4px">×</button>
+  </div>
+  <div class="sw-update-banner-bd">
+    新機能・語根データ拡充および安定性向上のための新しい更新が届いています。
+  </div>
+  <div class="sw-update-banner-acts">
+    <button type="button" class="btn-xs btn-o" onclick="document.getElementById('swUpdateBanner').style.display='none'">あとで</button>
+    <button type="button" id="btnSwUpdateNow" class="btn-xs btn-ac">今すぐ更新して再読込</button>
+  </div>
+</div>
+
 <!-- スクリーンリーダー用不可視ライブリージョン (WCAG 2.1 AA 準拠) -->
 <div id="a11yAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
@@ -1268,9 +1411,28 @@
 <script src="js/events.js"></script>
 <script src="js/app.js"></script>
 <script>
-  // Service Worker 登録 ＆ 自動更新検知
+  // Service Worker 登録 ＆ 更新通知フローティングバナー検知
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
     let refreshing = false;
+    let waitingWorker = null;
+
+    function promptSwUpdate(worker) {
+      waitingWorker = worker;
+      const banner = document.getElementById('swUpdateBanner');
+      if (banner) {
+        banner.style.display = 'flex';
+        const btnUpdate = document.getElementById('btnSwUpdateNow');
+        if (btnUpdate) {
+          btnUpdate.onclick = () => {
+            if (waitingWorker) waitingWorker.postMessage('skipWaiting');
+            banner.style.display = 'none';
+          };
+        }
+      } else if (worker) {
+        worker.postMessage('skipWaiting');
+      }
+    }
+
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (!refreshing) {
         refreshing = true;
@@ -1279,13 +1441,13 @@
     });
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').then(reg => {
-        if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+        if (reg.waiting) promptSwUpdate(reg.waiting);
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                newWorker.postMessage('skipWaiting');
+                promptSwUpdate(newWorker);
               }
             });
           }

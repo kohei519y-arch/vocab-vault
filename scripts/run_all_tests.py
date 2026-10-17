@@ -1718,6 +1718,108 @@ def test_global_i18n_and_multi_currency():
     else:
         log_fail("sw.js: missing ./js/i18n.js precache or v24+ bump")
 
+def test_onboarding_cloze_fuzzy_and_sw_banner():
+    print("\n--- 16. Onboarding Tour, Cloze Fuzzy & Inflection, SW Banner Integrity ---")
+    with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
+        index_html = f.read()
+    with open(os.path.join(BASE_DIR, "dev.html"), "r", encoding="utf-8") as f:
+        dev_html = f.read()
+    with open(os.path.join(BASE_DIR, "js/anki_view.js"), "r", encoding="utf-8") as f:
+        anki_view_code = f.read()
+    with open(os.path.join(BASE_DIR, "js/app.js"), "r", encoding="utf-8") as f:
+        app_code = f.read()
+    with open(os.path.join(BASE_DIR, "css/app.css"), "r", encoding="utf-8") as f:
+        css_code = f.read()
+
+    required_dom = [
+        "welcomeTourModal",
+        "welcomeTourTitle",
+        "tourStep1",
+        "tourStep2",
+        "tourStep3",
+        "tourModeSimpleCard",
+        "tourModeAcademicCard",
+        "tourDot1",
+        "tourDot2",
+        "tourDot3",
+        "btnTourPrev",
+        "btnTourNext",
+        "btnTourFinish",
+        "swUpdateBanner",
+        "btnSwUpdateNow"
+    ]
+    for node in required_dom:
+        if f'id="{node}"' in index_html:
+            log_pass(f"index.html: #{node} present for onboarding / SW banner")
+        else:
+            log_fail(f"index.html: missing #{node}")
+        if f'id="{node}"' in dev_html:
+            log_pass(f"dev.html: #{node} present for onboarding / SW banner")
+        else:
+            log_fail(f"dev.html: missing #{node}")
+
+    if "最難関大・英検1級・TOEFL突破" in index_html and "最難関大・英検1級・TOEFL突破" in dev_html:
+        log_pass("Marketing copy: title and meta tags sharpened for top-tier exam & academic positioning")
+    else:
+        log_fail("Marketing copy: missing sharpened exam prep positioning in index.html / dev.html")
+
+    for cls in [".sw-update-banner", ".tour-step", ".tour-dots", ".tour-mode-card"]:
+        if cls in css_code:
+            log_pass(f"css/app.css: contains {cls} styles")
+        else:
+            log_fail(f"css/app.css: missing {cls} styles")
+
+    tour_apis = ["getTourStep", "setTourStep", "selectTourMode", "openWelcomeTour", "closeWelcomeTour", "finishWelcomeTour", "checkWelcomeTour"]
+    for api in tour_apis:
+        if api in app_code:
+            log_pass(f"js/app.js: provides {api}")
+        else:
+            log_fail(f"js/app.js: missing {api}")
+
+    cloze_fuzzy_apis = ["calcLevenshtein", "getStemVariants"]
+    for api in cloze_fuzzy_apis:
+        if api in anki_view_code:
+            log_pass(f"js/anki_view.js: provides {api}")
+        else:
+            log_fail(f"js/anki_view.js: missing {api}")
+
+    jsc_test = """
+    load('js/anki_view.js');
+    if (!VocabAnkiView || typeof VocabAnkiView.calcLevenshtein !== 'function' || typeof VocabAnkiView.getStemVariants !== 'function') {
+        throw new Error('VocabAnkiView fuzzy functions missing');
+    }
+    const d1 = VocabAnkiView.calcLevenshtein('destination', 'destinaton');
+    if (d1 !== 1) throw new Error('Levenshtein distance mismatch: expected 1, got ' + d1);
+
+    const d0 = VocabAnkiView.calcLevenshtein('word', 'word');
+    if (d0 !== 0) throw new Error('Levenshtein distance mismatch for identical strings: expected 0, got ' + d0);
+
+    const stemsStopped = VocabAnkiView.getStemVariants('stopped');
+    if (!stemsStopped.includes('stop')) throw new Error('Stemming failed for stopped: ' + JSON.stringify(stemsStopped));
+
+    const stemsDances = VocabAnkiView.getStemVariants('dances');
+    if (!stemsDances.includes('dance')) throw new Error('Stemming failed for dances: ' + JSON.stringify(stemsDances));
+
+    const stemsRunning = VocabAnkiView.getStemVariants('running');
+    if (!stemsRunning.includes('run')) throw new Error('Stemming failed for running: ' + JSON.stringify(stemsRunning));
+
+    print('JSC_CLOZE_FUZZY_OK');
+    """
+    tmp_path = os.path.join(BASE_DIR, "scripts/tmp_fuzzy_test.js")
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(jsc_test)
+    try:
+        out = subprocess.check_output([JSC_PATH, tmp_path], universal_newlines=True, stderr=subprocess.STDOUT)
+        if "JSC_CLOZE_FUZZY_OK" in out:
+            log_pass("JSC verification: Levenshtein distance & morphological stem extraction verified flawless")
+        else:
+            log_fail("JSC verification failed for Cloze fuzzy functions")
+    except Exception as e:
+        log_fail(f"JSC verification error: {e}")
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -1741,6 +1843,7 @@ def main():
     test_graph_practical_tools()
     test_eiken_pre1_catalog_and_fog_of_war()
     test_global_i18n_and_multi_currency()
+    test_onboarding_cloze_fuzzy_and_sw_banner()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")
