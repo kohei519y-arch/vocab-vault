@@ -258,11 +258,14 @@
         const cHeight = scrollContainer.clientHeight || cRect.height || (typeof window !== 'undefined' ? window.innerHeight : 600);
         const eHeight = el.clientHeight || eRect.height || 100;
 
+        const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+        const topSafeOffset = isMobile ? 22 : 16;
+
         let targetScrollTop;
-        // カードの高さが表示領域の75%を超える場合（モバイル画面や長文語源カード等）は、
-        // 中央揃えだと見出し語が画面上部に隠れてしまうため、上部に適度な余白(14px)を設けて上揃え配置
-        if (eHeight >= cHeight * 0.75) {
-          targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - 14;
+        // カードの高さが表示領域の65%を超える場合（モバイル画面や長文語源カード等）は、
+        // 中央揃えだと見出し語が画面上部に隠れてしまうため、上部に適度な余白を設けて上揃え配置
+        if (eHeight >= cHeight * 0.65) {
+          targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - topSafeOffset;
         } else {
           // それ以外の場合は視認性の高い中央揃え
           targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - (cHeight / 2) + (eHeight / 2);
@@ -273,16 +276,6 @@
           scrollContainer.scrollTo?.({ top: safeTop, behavior: smooth ? 'smooth' : 'auto' });
         } catch {
           scrollContainer.scrollTop = safeTop;
-        }
-
-        // ビューポート自体（window/body）のスクロールズレも解消
-        if (typeof el.scrollIntoView === 'function' && typeof window !== 'undefined') {
-          const updatedERect = el.getBoundingClientRect();
-          if (updatedERect.top < 0 || updatedERect.bottom > window.innerHeight) {
-            try {
-              el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: (eHeight >= cHeight * 0.75) ? 'start' : 'center' });
-            } catch {}
-          }
         }
       } else if (typeof el.scrollIntoView === 'function') {
         try {

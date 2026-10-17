@@ -21,6 +21,34 @@
     mastered: '#10b981'
   };
 
+  /**
+   * 16進数またはRGBカラーを透過RGBA文字列へ安全に変換
+   */
+  function colorToRgba(c, alpha) {
+    if (!c) return `rgba(255, 255, 255, ${alpha})`;
+    if (c.startsWith('rgba')) {
+      return c.replace(/[\d\.]+\)$/g, `${alpha})`);
+    }
+    if (c.startsWith('rgb(')) {
+      const parts = c.replace(/rgb\((.*)\)/, '$1').split(',').map(s => s.trim());
+      if (parts.length >= 3) {
+        return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+      }
+    }
+    if (c.startsWith('#')) {
+      let hex = c.slice(1);
+      if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
+      const num = parseInt(hex, 16);
+      if (!Number.isNaN(num)) {
+        const r = (num >> 16) & 255;
+        const g = (num >> 8) & 255;
+        const b = num & 255;
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+      }
+    }
+    return c;
+  }
+
   let graphState = {
     canvas: null,
     ctx: null,
@@ -634,7 +662,7 @@
       // 星系アイランド初期配置（適切な間隔で重なりを防止）
       const totalRoots = activeRoots.length;
       const cols = Math.max(1, Math.ceil(Math.sqrt(totalRoots * 1.55)));
-      const spacing = 340;
+      const spacing = 460;
 
       activeRoots.forEach((rNode, idx) => {
         const row = Math.floor(idx / cols);
@@ -654,7 +682,7 @@
           if (!placedWords.has(wNode.id)) {
             placedWords.add(wNode.id);
             const angle = (cIdx / Math.max(1, cCount)) * Math.PI * 2;
-            const dist = 75 + (cIdx % 4) * 18;
+            const dist = 100 + (cIdx % 5) * 24;
             wNode.x = rNode.x + Math.cos(angle) * dist;
             wNode.y = rNode.y + Math.sin(angle) * dist;
             wNode.vx = 0;
@@ -750,7 +778,7 @@
               level: 2,
               rootLabel: rNode.label,
               realm: realmInfo,
-              radius: 11.0,
+              radius: 9.5,
               x: 0,
               y: 0,
               vx: 0,
@@ -821,7 +849,7 @@
               type: 'branch',
               level: 2,
               rootLabel: rNode.label,
-              radius: 11.0,
+              radius: 9.5,
               x: 0,
               y: 0,
               vx: 0,
@@ -849,7 +877,7 @@
             stem: budStem.stem,
             stemLabel: budStem.label,
             realm: rNode.realm,
-            radius: 8.5,
+            radius: 8.0,
             x: 0,
             y: 0,
             vx: 0,
@@ -1021,24 +1049,29 @@
             const thetaB = (numB === 1) ? sDef.center : (currentTheta + branchSpan / 2);
             currentTheta += branchSpan;
 
-            // 第1軌道: 古典分岐ノード (r = 190〜370 4段階スタガー配置でブランチ同士のラベル接触・重合を完全解消)
-            const bRadius = (numB <= 2) ? 220 : (190 + (bIdx % 4) * 60);
+            // 第1軌道: 古典分岐ノード (r = 210〜470 5段階スタガー配置でブランチ同士の接触・重合を解消し、広々と配分)
+            const bRadius = (numB <= 2) ? 240 : (210 + (bIdx % 5) * 65);
             bNode.targetX = rNode.targetX + bRadius * Math.cos(thetaB);
             bNode.targetY = rNode.targetY + bRadius * Math.sin(thetaB);
             bNode.angle = thetaB;
 
-            // 第2軌道〜外周軌道: 現代語の学習済ノード (Multi-Orbit Staggering: 440px〜)
-            // 3,000単語の大規模データに対応する適応型オービット計算
-            // 単語数に応じてオービット層数を動的に最大18層まで拡張し、各軌道にハニカム千鳥配置
+            // 第2軌道〜外周軌道: 現代語の学習済ノード (Multi-Orbit Staggering: 560px〜)
+            // 単語同士の物理距離を十分に空けるため、ベース半径を560pxに拡張し、軌道間隔を広げ、オービット数を増やす
             const leaves = bNode.connectedWords || [];
             const leafCount = leaves.length;
-            const minSpanForLeaves = Math.min(Math.PI * 0.70, Math.max(0.20, leafCount * 0.075));
+
+            const baseLeafR = 560; // 440 -> 560 (周長が27%拡大し、外周にゆったりと展開)
+            const leafOrbitGap = leafCount > 80 ? 84 : (leafCount > 30 ? 96 : 110); // 軌道間隔を大幅拡大
+
+            // 1軌道あたりのノード密度を抑えるため、オービット数をより積極的に展開
+            const numLeafOrbits = Math.min(22, Math.max(2, Math.ceil(Math.sqrt(leafCount * 2.6))));
+
+            // 各軌道で最低64pxの周方向物理距離を保証するための必要スパン計算
+            const maxNodesPerBucket = Math.ceil(leafCount / Math.max(1, numLeafOrbits));
+            const neededArcSpan = (maxNodesPerBucket > 1) ? ((maxNodesPerBucket - 1) * (64 / baseLeafR)) : 0.10;
+            const minSpanForLeaves = Math.min(Math.PI * 0.85, Math.max(neededArcSpan, leafCount * 0.088));
             const lSpan = Math.max(branchSpan * 0.95, minSpanForLeaves);
             const lStart = thetaB - lSpan / 2;
-
-            const numLeafOrbits = Math.min(18, Math.max(2, Math.ceil(Math.sqrt(leafCount * 2.0))));
-            const baseLeafR = 440;
-            const leafOrbitGap = leafCount > 80 ? 66 : (leafCount > 30 ? 76 : 85);
 
             const orbitBuckets = Array.from({ length: numLeafOrbits }, () => []);
             leaves.forEach((lNode, lIdx) => {
@@ -1062,13 +1095,13 @@
                 lNode.targetY = rNode.targetY + leafR * Math.sin(thetaL);
                 lNode.angle = thetaL;
 
-                // 派生語・成句 (Twigs: 親単語から放射状に48px外側へ分岐)
+                // 派生語・成句 (Twigs: 親単語から放射状に56px外側へ分岐)
                 const myTwigs = twigs.filter(t => t.parentWord === lNode.label);
                 myTwigs.forEach((tNode, tIdx) => {
-                  const twigOffset = (myTwigs.length === 1) ? 0 : (tIdx === 0 ? -0.045 : 0.045);
+                  const twigOffset = (myTwigs.length === 1) ? 0 : (tIdx === 0 ? -0.050 : 0.050);
                   const thetaT = thetaL + twigOffset;
-                  tNode.targetX = lNode.targetX + 48 * Math.cos(thetaT);
-                  tNode.targetY = lNode.targetY + 48 * Math.sin(thetaT);
+                  tNode.targetX = lNode.targetX + 56 * Math.cos(thetaT);
+                  tNode.targetY = lNode.targetY + 56 * Math.sin(thetaT);
                   tNode.angle = thetaT;
                 });
               });
@@ -1077,13 +1110,16 @@
             // 第3軌道以降: 未開拓のつぼみ (Ghost Buds: 単語軌道の外側にゆったり同心配置)
             const buds = bNode.connectedBuds || [];
             const budCount = buds.length;
-            const bSpan = Math.max(0.16, branchSpan * 0.92);
-            const budStart = thetaB - bSpan / 2;
 
             const maxLeafOrbitR = baseLeafR + (numLeafOrbits - 1) * leafOrbitGap;
-            const budBaseR = Math.max(680, maxLeafOrbitR + 85);
-            const numBudOrbits = budCount > 15 ? 3 : (budCount > 6 ? 2 : 1);
-            const budOrbitGap = 65;
+            const budBaseR = Math.max(maxLeafOrbitR + 125, 820);
+            const numBudOrbits = budCount > 15 ? 4 : (budCount > 6 ? 3 : (budCount > 3 ? 2 : 1));
+            const budOrbitGap = 88;
+
+            const maxBudsPerBucket = Math.ceil(budCount / Math.max(1, numBudOrbits));
+            const neededBudSpan = (maxBudsPerBucket > 1) ? ((maxBudsPerBucket - 1) * (64 / budBaseR)) : 0.12;
+            const bSpan = Math.max(branchSpan * 0.92, neededBudSpan, 0.20);
+            const budStart = thetaB - bSpan / 2;
 
             const budBuckets = Array.from({ length: numBudOrbits }, () => []);
             buds.forEach((budNode, budIdx) => {
@@ -1119,16 +1155,16 @@
           if (parentNode && parentNode.targetX !== undefined) {
             const pAngle = parentNode.angle || 0;
             const thetaT = pAngle + (tIdx % 2 === 0 ? -0.040 : 0.040);
-            tNode.targetX = parentNode.targetX + 44 * Math.cos(thetaT);
-            tNode.targetY = parentNode.targetY + 44 * Math.sin(thetaT);
+            tNode.targetX = parentNode.targetX + 50 * Math.cos(thetaT);
+            tNode.targetY = parentNode.targetY + 50 * Math.sin(thetaT);
           }
         }
       });
 
-      // ノード間の空間的重複をゼロにする高速空間ハッシュ緩和パス (O(N) Relaxation Pass - 3,000単語規模でも数ミリ秒で完了)
+      // ノード間の空間的重複をゼロにし、十分な間隔（72px以上）を担保する高速空間ハッシュ緩和パス (O(N) Relaxation Pass)
       const placedNodes = nodes.filter(n => n.targetX !== undefined && n.type !== 'root');
-      const rCell = 70;
-      const passes = placedNodes.length > 800 ? 4 : (placedNodes.length > 200 ? 7 : 12);
+      const rCell = 96;
+      const passes = placedNodes.length > 800 ? 6 : (placedNodes.length > 200 ? 10 : 16);
 
       for (let pass = 0; pass < passes; pass++) {
         const sGrid = new Map();
@@ -1159,11 +1195,11 @@
                 const dy = nb.targetY - na.targetY;
                 const distSq = dx * dx + dy * dy;
                 const minDist = (na.type === 'branch' && nb.type === 'branch')
-                  ? 68
-                  : ((na.type === 'word' && nb.type === 'word') ? 56 : 46);
+                  ? 88
+                  : ((na.type === 'word' && nb.type === 'word') ? 72 : 62);
                 if (distSq < minDist * minDist && distSq > 0.001) {
                   const dist = Math.sqrt(distSq);
-                  const push = (minDist - dist) * 0.25;
+                  const push = (minDist - dist) * 0.38;
                   const px = (dx / dist) * push;
                   const py = (dy / dist) * push;
                   na.targetX -= px;
@@ -2043,11 +2079,65 @@
     smoothPanZoomRaf = requestAnimationFrame(step);
   }
 
+  /**
+   * キャンバス寸法のリアルタイム動的同期（画面リサイズ・オリエンテーション変更・モーダル展開時の狂いを根絶）
+   */
+  function syncCanvasDimensions() {
+    const wrap = document.getElementById('graphCanvasWrap');
+    const canvas = document.getElementById('graphCanvas');
+    if (!wrap || !canvas) return;
+    const realW = wrap.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
+    const realH = wrap.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
+    if (realW > 0 && realH > 0 && (graphState.width !== realW || graphState.height !== realH)) {
+      graphState.width = realW;
+      graphState.height = realH;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = realW * dpr;
+      canvas.height = realH * dpr;
+      canvas.style.width = realW + 'px';
+      canvas.style.height = realH + 'px';
+    }
+  }
+
+  /**
+   * 画面サイズおよび詳細Drawer開閉に応じた有効可視領域中心 (Effective Viewport Center) の動的計算
+   * - モバイル: 下部Drawerボトムシートを避けて上部可視エリアの中央へセンタリング
+   * - デスクトップ: 右側Drawerを避けて左側可視エリアの中央へセンタリング
+   */
+  function getEffectiveViewportCenter() {
+    syncCanvasDimensions();
+    const w = graphState.width || 800;
+    const h = graphState.height || 600;
+    const drawer = document.getElementById('graphDetailDrawer');
+    const isDrawerOpen = drawer && drawer.style.display !== 'none';
+
+    if (!isDrawerOpen) {
+      return { cx: w / 2, cy: h / 2 };
+    }
+
+    if (w <= 768) {
+      // モバイル: Drawerは画面下部のボトムシート
+      const drawerH = drawer.offsetHeight || (h * 0.45);
+      const visibleH = Math.max(120, h - drawerH);
+      return { cx: w / 2, cy: visibleH / 2 };
+    } else {
+      // デスクトップ/タブレット横: Drawerは画面右側のサイドパネル (幅340〜380px)
+      const drawerW = drawer.offsetWidth || 360;
+      const visibleW = Math.max(200, w - drawerW);
+      return { cx: visibleW / 2, cy: h / 2 };
+    }
+  }
+
   function centerOnNode(node, zoomLevel = 1.25, smooth = true) {
     if (!node) return;
-    const targetZoom = zoomLevel;
-    const targetPanX = graphState.width / 2 - node.x * targetZoom;
-    const targetPanY = graphState.height / 2 - node.y * targetZoom;
+    syncCanvasDimensions();
+    const { cx, cy } = getEffectiveViewportCenter();
+    const minZ = 0.55;
+    const maxZ = graphState.width <= 480 ? 1.35 : 1.65;
+    const targetZoom = Math.min(Math.max(zoomLevel, minZ), maxZ);
+
+    const targetPanX = cx - node.x * targetZoom;
+    const targetPanY = cy - node.y * targetZoom;
     if (smooth) {
       smoothPanZoomTo(targetPanX, targetPanY, targetZoom);
     } else {
@@ -2064,6 +2154,7 @@
       centerOnNode(rootNode, 1.4, smooth);
       return;
     }
+    syncCanvasDimensions();
     const clusterNodes = [rootNode, ...rootNode.connectedWords];
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     clusterNodes.forEach(n => {
@@ -2072,7 +2163,7 @@
       if (n.y < minY) minY = n.y;
       if (n.y > maxY) maxY = n.y;
     });
-    const pad = 90;
+    const pad = graphState.width <= 480 ? 50 : 90;
     const w = Math.max(70, maxX - minX);
     const h = Math.max(70, maxY - minY);
     const scaleX = (graphState.width - pad * 2) / w;
@@ -2081,8 +2172,9 @@
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
-    const targetPanX = graphState.width / 2 - centerX * targetZoom;
-    const targetPanY = graphState.height / 2 - centerY * targetZoom;
+    const { cx, cy } = getEffectiveViewportCenter();
+    const targetPanX = cx - centerX * targetZoom;
+    const targetPanY = cy - centerY * targetZoom;
     if (smooth) {
       smoothPanZoomTo(targetPanX, targetPanY, targetZoom);
     } else {
@@ -3032,23 +3124,23 @@
 
       // 語根数に応じたパラメータの適応調整
       const isLargeGraph = totalNodes > 100;
-      const kRepulsion = isLargeGraph ? 520 : 640;
-      const maxRepulseDist = isLargeGraph ? 165 : 195;
+      const kRepulsion = isLargeGraph ? 820 : 1050;
+      const maxRepulseDist = isLargeGraph ? 230 : 270;
       const maxRepulseDistSq = maxRepulseDist * maxRepulseDist;
-      const kSpring = 0.040;
-      const springLength = 76;
-      const damping = 0.84;
-      const maxSpeed = 3.4;
-      // 大域重力を以前の1/18に弱め、全クラスターが原点(0,0)に1つに凝縮して毛玉状になるのを完全に防止
-      const kGravity = 0.00010;
+      const kSpring = 0.035;
+      const springLength = 115;
+      const damping = 0.85;
+      const maxSpeed = 3.6;
+      // 大域重力を弱め、全クラスターが原点(0,0)に1つに凝縮するのを防ぎ広々と配置
+      const kGravity = 0.00008;
 
       // 0. ルートノード（語根）間の大域アイランド反発
-      //    異なる語根星団同士が十分な距離（最低320px）を保ち、銀河の星系のように独立した島として配置される
+      //    異なる語根星団同士が十分な距離（最低440px）を保ち、銀河の星系のように独立した島として配置される
       const rootNodes = [];
       for (let i = 0; i < totalNodes; i++) {
         if (nodes[i].type === 'root') rootNodes.push(nodes[i]);
       }
-      const minRootDist = 320;
+      const minRootDist = 440;
       for (let i = 0; i < rootNodes.length; i++) {
         const r1 = rootNodes[i];
         for (let j = i + 1; j < rootNodes.length; j++) {
@@ -3104,11 +3196,11 @@
               if (distSq > maxRepulseDistSq || distSq < 1) continue;
 
               const dist = Math.sqrt(distSq);
-              // 近接ノード間の衝突防止（重なり完全抑止）
-              const minDist = (n1.radius || 8) + (n2.radius || 8) + 14;
+              // 近接ノード間の衝突防止（重なり完全抑止・間隔拡大）
+              const minDist = (n1.radius || 8) + (n2.radius || 8) + 30;
               let force = 0;
               if (dist < minDist) {
-                force = ((minDist - dist) / minDist) * 4.2;
+                force = ((minDist - dist) / minDist) * 4.6;
               } else {
                 force = (kRepulsion / distSq) * (1 - dist / maxRepulseDist);
               }
@@ -3249,19 +3341,19 @@
         const cy = center.y;
 
         // 視野外カリング: 画面外の語根の重いセクターバンド計算・グラデーション描画を完全スキップ
-        if (cx + 1200 < viewLeft || cx - 1200 > viewRight || cy + 1200 < viewTop || cy - 1200 > viewBottom) {
+        if (cx + 1600 < viewLeft || cx - 1600 > viewRight || cy + 1600 < viewTop || cy - 1600 > viewBottom) {
           return;
         }
 
         // A. 語根コア後方の重厚で落ち着いたダークグラデーション（過剰発光を抑えたダークテーマ）
-        const bgGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 1180);
+        const bgGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 1550);
         bgGrad.addColorStop(0, isDark ? 'rgba(15, 23, 42, 0.40)' : 'rgba(241, 245, 249, 0.40)');
         bgGrad.addColorStop(0.35, isDark ? 'rgba(11, 17, 32, 0.25)' : 'rgba(248, 250, 252, 0.25)');
         bgGrad.addColorStop(0.80, isDark ? 'rgba(3, 7, 18, 0.12)' : 'rgba(255, 255, 255, 0.12)');
         bgGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = bgGrad;
         ctx.beginPath();
-        ctx.arc(cx, cy, 1180, 0, Math.PI * 2);
+        ctx.arc(cx, cy, 1550, 0, Math.PI * 2);
         ctx.fill();
 
         // 扇形アーク描画ヘルパー
@@ -3281,42 +3373,42 @@
           }
         }
 
-        // B. 第2階層 サンバースト扇状エリア (Tier 2: r = 90 〜 330)
+        // B. 第2階層 サンバースト扇状エリア (Tier 2: r = 100 〜 480)
         // ゲルマン語派 (黄〜緑系: 10時〜2時 / 上部)
-        drawSectorBand(90, 330, -3 * Math.PI / 4, -Math.PI / 4,
+        drawSectorBand(100, 480, -3 * Math.PI / 4, -Math.PI / 4,
           isDark ? 'rgba(132, 204, 22, 0.05)' : 'rgba(101, 163, 13, 0.04)',
           isDark ? 'rgba(163, 230, 53, 0.12)' : 'rgba(101, 163, 13, 0.10)'
         );
         // イタリック語派 (青〜紫系: 2時〜6時 / 右下)
-        drawSectorBand(90, 330, -Math.PI / 4, 3 * Math.PI / 5,
+        drawSectorBand(100, 480, -Math.PI / 4, 3 * Math.PI / 5,
           isDark ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.04)',
           isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.10)'
         );
         // ギリシャ古典・その他 (紫系: 6時〜10時 / 左下)
-        drawSectorBand(90, 330, 3 * Math.PI / 5, 5 * Math.PI / 4,
+        drawSectorBand(100, 480, 3 * Math.PI / 5, 5 * Math.PI / 4,
           isDark ? 'rgba(192, 132, 252, 0.04)' : 'rgba(147, 51, 234, 0.03)',
           isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(147, 51, 234, 0.08)'
         );
 
-        // C. 第3階層 サンバースト扇状エリア (Tier 3: r = 345 〜 520)
+        // C. 第3階層 サンバースト扇状エリア (Tier 3: r = 495 〜 780)
         // 西ゲルマン語群 (明るい緑)
-        drawSectorBand(345, 520, -3 * Math.PI / 4 + 0.03, -Math.PI / 4 - 0.03,
+        drawSectorBand(495, 780, -3 * Math.PI / 4 + 0.03, -Math.PI / 4 - 0.03,
           isDark ? 'rgba(34, 197, 94, 0.05)' : 'rgba(22, 163, 74, 0.04)',
           isDark ? 'rgba(74, 222, 128, 0.14)' : 'rgba(22, 163, 74, 0.10)'
         );
         // ロマンス諸語 (鮮やかな青)
-        drawSectorBand(345, 520, -Math.PI / 4 + 0.03, 3 * Math.PI / 5 - 0.03,
+        drawSectorBand(495, 780, -Math.PI / 4 + 0.03, 3 * Math.PI / 5 - 0.03,
           isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(79, 70, 229, 0.04)',
           isDark ? 'rgba(129, 140, 248, 0.14)' : 'rgba(79, 70, 229, 0.10)'
         );
         // ヘレニック・学術語群
-        drawSectorBand(345, 520, 3 * Math.PI / 5 + 0.03, 5 * Math.PI / 4 - 0.03,
+        drawSectorBand(495, 780, 3 * Math.PI / 5 + 0.03, 5 * Math.PI / 4 - 0.03,
           isDark ? 'rgba(168, 85, 247, 0.04)' : 'rgba(126, 34, 206, 0.03)',
           isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(126, 34, 206, 0.08)'
         );
 
-        // D. 第4階層 ガイドライン (Tier 4: r = 440, 610, 780, 950, 1100)
-        const guideOrbits = [440, 610, 780, 950, 1100];
+        // D. 第4階層 ガイドライン (Tier 4: r = 560, 750, 940, 1130, 1320)
+        const guideOrbits = [560, 750, 940, 1130, 1320];
         ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
         ctx.lineWidth = 1.0;
         ctx.setLineDash([3, 5]);
@@ -3336,39 +3428,39 @@
         ctx.beginPath();
         sectorDividers.forEach(angle => {
           ctx.moveTo(cx + 60 * Math.cos(angle), cy + 60 * Math.sin(angle));
-          ctx.lineTo(cx + 1100 * Math.cos(angle), cy + 1100 * Math.sin(angle));
+          ctx.lineTo(cx + 1450 * Math.cos(angle), cy + 1450 * Math.sin(angle));
         });
         ctx.stroke();
         ctx.setLineDash([]);
 
         // F. サンバースト各階層の文字ラベル（落ち着いた高コントラストタイポグラフィ）
-        if (zoom >= 0.40) {
+        if (zoom >= 0.35) {
           ctx.save();
           ctx.textAlign = 'center';
 
           // Tier 2 ラベル
           ctx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
           ctx.fillStyle = isDark ? '#bef264' : '#4d7c0f';
-          ctx.fillText('ゲルマン語派 / Germanic', cx, cy - 210);
+          ctx.fillText('ゲルマン語派 / Germanic', cx, cy - 260);
 
           ctx.fillStyle = isDark ? '#7dd3fc' : '#0369a1';
-          const itX = cx + 210 * Math.cos(Math.PI / 6);
-          const itY = cy + 210 * Math.sin(Math.PI / 6);
+          const itX = cx + 260 * Math.cos(Math.PI / 6);
+          const itY = cy + 260 * Math.sin(Math.PI / 6);
           ctx.fillText('イタリック語派 / Italic', itX, itY);
 
           ctx.fillStyle = isDark ? '#d8b4fe' : '#7e22ce';
-          const hlX = cx + 210 * Math.cos(11 * Math.PI / 12);
-          const hlY = cy + 210 * Math.sin(11 * Math.PI / 12);
+          const hlX = cx + 260 * Math.cos(11 * Math.PI / 12);
+          const hlY = cy + 260 * Math.sin(11 * Math.PI / 12);
           ctx.fillText('ギリシャ・古典諸派', hlX, hlY);
 
           // Tier 3 ラベル
           ctx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
           ctx.fillStyle = isDark ? '#86efac' : '#15803d';
-          ctx.fillText('西ゲルマン語群 / West Germanic', cx, cy - 430);
+          ctx.fillText('西ゲルマン語群 / West Germanic', cx, cy - 540);
 
           ctx.fillStyle = isDark ? '#a5b4fc' : '#4338ca';
-          const roX = cx + 430 * Math.cos(Math.PI / 6);
-          const roY = cy + 430 * Math.sin(Math.PI / 6);
+          const roX = cx + 540 * Math.cos(Math.PI / 6);
+          const roY = cy + 540 * Math.sin(Math.PI / 6);
           ctx.fillText('ロマンス諸語 / Romance', roX, roY);
 
           ctx.restore();
@@ -3615,9 +3707,18 @@
         ctx.lineWidth = 1.2;
         ctx.stroke();
 
+        // コア本体
+        const rootGrad = ctx.createRadialGradient(
+          n.x - drawRadius * 0.32, n.y - drawRadius * 0.32, Math.max(0.8, drawRadius * 0.1),
+          n.x, n.y, drawRadius
+        );
+        rootGrad.addColorStop(0, '#ffffff');
+        rootGrad.addColorStop(0.35, nodeColor);
+        rootGrad.addColorStop(1, isTree ? (isDark ? '#9a3412' : '#c2410c') : (isDark ? '#581c87' : '#6b21a8'));
+
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = nodeColor;
+        ctx.fillStyle = rootGrad;
         ctx.fill();
 
         if (isSelected) {
@@ -3720,17 +3821,36 @@
 
       } else if (n.type === 'branch') {
         // Level 2: 古典分岐 (Branch)
+        // 1. 周囲のソフトアンバーオーラ
+        const bAuraR = drawRadius * (isSelected ? 1.6 : (isHover ? 1.4 : 1.25));
         ctx.beginPath();
-        ctx.arc(n.x, n.y, drawRadius + 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(245, 158, 11, 0.10)';
+        ctx.arc(n.x, n.y, bAuraR, 0, Math.PI * 2);
+        ctx.fillStyle = isSelected
+          ? 'rgba(245, 158, 11, 0.32)'
+          : (isHover ? 'rgba(251, 191, 36, 0.24)' : (isDark ? 'rgba(245, 158, 11, 0.14)' : 'rgba(217, 119, 6, 0.09)'));
         ctx.fill();
+
+        // 2. コア本体: 3Dラジアル球体グラデーション（アンバー系）
+        const bGrad = ctx.createRadialGradient(
+          n.x - drawRadius * 0.32, n.y - drawRadius * 0.32, Math.max(0.5, drawRadius * 0.08),
+          n.x, n.y, drawRadius
+        );
+        bGrad.addColorStop(0, isDark ? '#fef3c7' : '#ffffff');
+        bGrad.addColorStop(0.35, isDark ? '#fbbf24' : '#f59e0b');
+        bGrad.addColorStop(1, isDark ? '#b45309' : '#92400e');
 
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = isDark ? 'rgba(217, 119, 6, 0.35)' : 'rgba(245, 158, 11, 0.25)';
+        ctx.fillStyle = bGrad;
         ctx.fill();
-        ctx.strokeStyle = isDark ? '#fbbf24' : '#d97706';
-        ctx.lineWidth = isSelected ? 2.5 : 1.8;
+
+        // 3. 繊細な外周リムリング
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = isSelected
+          ? '#fef08a'
+          : (isHover ? '#fbbf24' : (isDark ? 'rgba(254, 243, 199, 0.60)' : 'rgba(255, 255, 255, 0.85)'));
+        ctx.lineWidth = isSelected ? 2.2 : (isHover ? 1.6 : 1.0);
         ctx.stroke();
 
         if (zoom >= 0.40 || isSelected || isHover) {
@@ -3846,27 +3966,36 @@
         const meaningText = (isMask && !isHover && !isSelected) ? '[ ????? ]' : (n.meaning || '');
         const isFocusHighlight = isSelected || isHover;
 
-        // --- 美麗な多層発光ノード（Luminous Celestial Star Node）---
+        // --- 美麗な天体球体ノード（Celestial Sphere Node）---
         // 1. 周囲のソフトグロー（Soft Ambient Glow / 微光ハロー）
+        const auraRadius = drawRadius * (isSelected ? 1.6 : (isHover ? 1.4 : 1.25));
         ctx.beginPath();
-        ctx.arc(n.x, n.y, drawRadius + 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = isFocusHighlight
-          ? (isSelected ? 'rgba(56, 189, 248, 0.35)' : 'rgba(167, 139, 250, 0.30)')
-          : (isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)');
+        ctx.arc(n.x, n.y, auraRadius, 0, Math.PI * 2);
+        ctx.fillStyle = isSelected
+          ? 'rgba(56, 189, 248, 0.32)'
+          : (isHover ? 'rgba(167, 139, 250, 0.28)' : colorToRgba(nodeColor, isDark ? 0.16 : 0.12));
         ctx.fill();
 
-        // 2. コア本体
+        // 2. コア本体: 3Dラジアル球体グラデーション（光源は左上）
+        const sphereGrad = ctx.createRadialGradient(
+          n.x - drawRadius * 0.32, n.y - drawRadius * 0.32, Math.max(0.5, drawRadius * 0.08),
+          n.x, n.y, drawRadius
+        );
+        sphereGrad.addColorStop(0, '#ffffff');
+        sphereGrad.addColorStop(0.38, nodeColor);
+        sphereGrad.addColorStop(1, colorToRgba(nodeColor, 0.82));
+
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = nodeColor;
+        ctx.fillStyle = sphereGrad;
         ctx.fill();
 
         // 3. 繊細な外周リムリング（Glass Specular Rim）
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = isFocusHighlight
-          ? (isSelected ? '#38bdf8' : '#a78bfa')
-          : (isDark ? 'rgba(255, 255, 255, 0.40)' : 'rgba(255, 255, 255, 0.70)');
+        ctx.strokeStyle = isSelected
+          ? '#bae6fd'
+          : (isHover ? '#e9d5ff' : (isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(255, 255, 255, 0.75)'));
         ctx.lineWidth = isFocusHighlight ? 2.0 : 0.8;
         if (isFocusHighlight) {
           ctx.shadowColor = isSelected ? '#38bdf8' : '#a78bfa';
@@ -3874,12 +4003,6 @@
         }
         ctx.stroke();
         if (isFocusHighlight) ctx.shadowBlur = 0;
-
-        // 4. 中心スペキュラー輝点（Star Specular Point）: 星のように輝くハイライト
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, Math.max(1.0, drawRadius * 0.28), 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-        ctx.fill();
 
         // 見出し語ラベル描画（ズームイン時、ホバー・選択時、または検索マッチ時）
         if (zoom >= textThresholdZoom || isFocusHighlight || isMatch) {
@@ -3930,23 +4053,34 @@
           }
         } else {
           // --- 俯瞰・星辰モード: 軽快かつ美しい星屑レンダリング ---
-          const dotR = Math.max(3.0, drawRadius * 0.85);
+          const dotR = Math.max(2.8, drawRadius * 0.82);
+
+          // 1. 微光オーラ
           ctx.beginPath();
-          ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
-          ctx.fillStyle = nodeColor;
+          ctx.arc(n.x, n.y, dotR * 1.35, 0, Math.PI * 2);
+          ctx.fillStyle = colorToRgba(nodeColor, isDark ? 0.18 : 0.14);
           ctx.fill();
+
+          // 2. コア球体グラデーション
+          const starGrad = ctx.createRadialGradient(
+            n.x - dotR * 0.30, n.y - dotR * 0.30, Math.max(0.4, dotR * 0.1),
+            n.x, n.y, dotR
+          );
+          starGrad.addColorStop(0, '#ffffff');
+          starGrad.addColorStop(0.42, nodeColor);
+          starGrad.addColorStop(1, colorToRgba(nodeColor, 0.85));
 
           ctx.beginPath();
           ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
-          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.60)';
-          ctx.lineWidth = 0.7;
+          ctx.fillStyle = starGrad;
+          ctx.fill();
+
+          // 3. 薄いリム
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
+          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.40)' : 'rgba(255, 255, 255, 0.70)';
+          ctx.lineWidth = 0.6;
           ctx.stroke();
-
-          // 微細な中心ハイライト
-          ctx.beginPath();
-          ctx.arc(n.x, n.y, Math.max(1.0, dotR * 0.32), 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-          ctx.fill();
         }
       }
 
@@ -3992,43 +4126,61 @@
     // 4. 画面左下サンバースト言語系統凡例 (Sunburst Legend HUD)
     if (isTree) {
       ctx.save();
+      const legendW = 224;
+      const legendH = 106;
       const legendX = 20;
-      const legendY = (graphState.height || 600) - 100;
-      const legendW = 188;
-      const legendH = 82;
+      const legendY = Math.max(20, (graphState.height || 600) - legendH - 20);
 
-      ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.88)' : 'rgba(255, 255, 255, 0.92)';
-      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(15, 23, 42, 0.08)';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.94)';
+      ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.10)';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
       if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(legendX, legendY, legendW, legendH, 8);
+        ctx.roundRect(legendX, legendY, legendW, legendH, 10);
       } else {
         ctx.rect(legendX, legendY, legendW, legendH);
       }
       ctx.fill();
       ctx.stroke();
 
-      ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'left';
 
       // ■ 印欧祖語 / PIE
       ctx.fillStyle = isDark ? '#ea580c' : '#c2410c';
-      ctx.fillRect(legendX + 12, legendY + 12, 10, 10);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(legendX + 14, legendY + 16, 13, 13, 3);
+        ctx.fill();
+      } else {
+        ctx.fillRect(legendX + 14, legendY + 16, 13, 13);
+      }
       ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
-      ctx.fillText('印欧祖語 / PIE', legendX + 28, legendY + 21);
+      ctx.fillText('印欧祖語 / PIE', legendX + 35, legendY + 27);
 
       // ■ ゲルマン系 / Germanic
       ctx.fillStyle = '#84cc16';
-      ctx.fillRect(legendX + 12, legendY + 36, 10, 10);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(legendX + 14, legendY + 46, 13, 13, 3);
+        ctx.fill();
+      } else {
+        ctx.fillRect(legendX + 14, legendY + 46, 13, 13);
+      }
       ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
-      ctx.fillText('ゲルマン系 / Germanic', legendX + 28, legendY + 45);
+      ctx.fillText('ゲルマン系 / Germanic', legendX + 35, legendY + 57);
 
       // ■ ロマンス系 / Romance
       ctx.fillStyle = '#38bdf8';
-      ctx.fillRect(legendX + 12, legendY + 60, 10, 10);
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(legendX + 14, legendY + 76, 13, 13, 3);
+        ctx.fill();
+      } else {
+        ctx.fillRect(legendX + 14, legendY + 76, 13, 13);
+      }
       ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
-      ctx.fillText('ロマンス系 / Romance', legendX + 28, legendY + 69);
+      ctx.fillText('ロマンス系 / Romance', legendX + 35, legendY + 87);
 
       ctx.restore();
     }

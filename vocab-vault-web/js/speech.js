@@ -111,24 +111,48 @@
       try {
         const segLang = tLang === 'ja' ? 'ja' : tLang === 'fr' ? 'fr' : tLang === 'de' ? 'de' : 'en';
         const segmenter = new Intl.Segmenter(segLang, { granularity: 'word' });
-        const segments = Array.from(segmenter.segment(text));
+        const rawSegments = Array.from(segmenter.segment(text));
+
+        // フランス語エリジオン（l', d', c', j', n', s', qu' 等）や短縮形（don't, it's）の結合処理
+        const mergedWords = [];
+        let cur = 0;
+        while (cur < rawSegments.length) {
+          const seg = rawSegments[cur];
+          let wordStr = seg.segment;
+          const startIndex = seg.index;
+          let endIndex = startIndex + wordStr.length;
+
+          // 短縮前置詞・冠詞（l', d', etc.）と後続語の結合判定
+          if (seg.isWordLike && cur + 2 < rawSegments.length) {
+            const next1 = rawSegments[cur + 1];
+            const next2 = rawSegments[cur + 2];
+            if (next1 && (/^['’]$/.test(next1.segment)) && next2 && next2.isWordLike && (next1.index === endIndex)) {
+              wordStr = text.slice(startIndex, next2.index + next2.segment.length);
+              endIndex = startIndex + wordStr.length;
+              cur += 2;
+            }
+          }
+
+          const isWord = seg.isWordLike || (tLang === 'ja' && wordStr.trim() && !/^[、。！？\s]+$/.test(wordStr));
+          mergedWords.push({ word: wordStr, start: startIndex, end: endIndex, isWord });
+          cur++;
+        }
+
         const spansHtml = [];
         let curPos = 0;
+        let wordIdx = 0;
 
-        for (let i = 0; i < segments.length; i++) {
-          const seg = segments[i];
-          const word = seg.segment;
-          const start = seg.index;
-          const end = start + word.length;
-          if (start > curPos) {
-            spansHtml.push(esc(text.slice(curPos, start)));
+        for (let i = 0; i < mergedWords.length; i++) {
+          const m = mergedWords[i];
+          if (m.start > curPos) {
+            spansHtml.push(esc(text.slice(curPos, m.start)));
           }
-          if (seg.isWordLike || (tLang === 'ja' && word.trim() && !/^[、。！？\s]+$/.test(word))) {
-            spansHtml.push(`<span class="spk-word" data-start="${start}" data-end="${end}">${esc(word)}</span>`);
+          if (m.isWord) {
+            spansHtml.push(`<span class="spk-word" data-word-idx="${wordIdx++}" data-start="${m.start}" data-end="${m.end}">${esc(m.word)}</span>`);
           } else {
-            spansHtml.push(esc(word));
+            spansHtml.push(esc(m.word));
           }
-          curPos = end;
+          curPos = m.end;
         }
         if (curPos < text.length) spansHtml.push(esc(text.slice(curPos)));
         element.innerHTML = spansHtml.join('');
@@ -137,14 +161,14 @@
     }
 
     // B. 正規表現フォールバック（JSC環境やIntl.Segmenter非対応環境）
-    // œ/Œ/æ/Æ, アポストロフィ ' / ’, 結合文字 \p{M}, 各種アルファベット・数字
     const spansHtml = [];
     const wordRegex = tLang === 'ja'
       ? /[\u4E00-\u9FFF]+|[\u30A0-\u30FF]+|[\u3040-\u309F]+|[\p{L}\p{N}\p{M}œŒæÆ'-]+|[、。！？\n]/gu
-      : /[\p{L}\p{N}\p{M}œŒæÆ'’-]+/gu;
+      : /[\p{L}\p{N}\p{M}œŒæÆ]+(?:['’][\p{L}\p{N}\p{M}œŒæÆ]+)*|[\p{L}\p{N}\p{M}œŒæÆ'-]+/gu;
 
     let lastIndex = 0;
     let match;
+    let fallbackIdx = 0;
 
     while ((match = wordRegex.exec(text)) !== null) {
       const matchIndex = match.index;
@@ -152,7 +176,7 @@
       if (matchIndex > lastIndex) {
         spansHtml.push(esc(text.slice(lastIndex, matchIndex)));
       }
-      spansHtml.push(`<span class="spk-word" data-start="${matchIndex}" data-end="${matchIndex + matchWord.length}">${esc(matchWord)}</span>`);
+      spansHtml.push(`<span class="spk-word" data-word-idx="${fallbackIdx++}" data-start="${matchIndex}" data-end="${matchIndex + matchWord.length}">${esc(matchWord)}</span>`);
       lastIndex = matchIndex + matchWord.length;
     }
     if (lastIndex < text.length) {
@@ -164,7 +188,8 @@
   }
 
   /**
-   * 指定した文字インデックスの単語スパンをリアルタイムハイライト
+   * 指定した文字インデックスまたは単語インデックスの単語スパンをリアルタイムハイライト
+   * WebKit (word index) と Chromium (charIndex) の双方に完全適応
    */
   function highlightSpokenWord(container, charIndex) {
     if (!container || typeof container.querySelectorAll !== 'function') return;
@@ -172,27 +197,66 @@
     if (!spans || !spans.length) return;
 
     let targetSpan = null;
-    for (let i = 0; i < spans.length; i++) {
+    const numSpans = spans.length;
+
+    // A. WebKit / Safari 単語インデックス適応モード
+    // charIndex が小整数 (0 <= charIndex < numSpans) で、末尾単語の文字開始位置と大きく乖離している場合は word-idx と判定
+    const lastStart = parseInt(spans[numSpans - 1]?.getAttribute('data-start'), 10) || 0;
+    if (charIndex >= 0 && charIndex < numSpans && lastStart > numSpans * 2) {
+      targetSpan = spans[charIndex];
+    }
+
+    // B. 文字オフセット (UTF-16 offset) による厳密マッチ & 最近傍スナップ
+    if (!targetSpan) {
+      for (let i = 0; i < numSpans; i++) {
+        const s = spans[i];
+        const start = parseInt(s.getAttribute('data-start'), 10) || 0;
+        const end = parseInt(s.getAttribute('data-end'), 10) || 0;
+
+        if (charIndex >= start && charIndex < end) {
+          targetSpan = s;
+          break;
+        }
+
+        // 単語間の空白・約物にある場合は直前の発話単語を維持
+        if (i < numSpans - 1) {
+          const nextStart = parseInt(spans[i + 1].getAttribute('data-start'), 10) || 0;
+          if (charIndex >= start && charIndex < nextStart) {
+            targetSpan = s;
+            break;
+          }
+        } else if (charIndex >= start) {
+          targetSpan = s;
+        }
+      }
+    }
+
+    if (!targetSpan) return;
+
+    // 現在すでにアクティブな場合は不要なDOM再描画をスキップ
+    const isAlreadyActive = typeof targetSpan.classList?.contains === 'function'
+      ? targetSpan.classList.contains('spk-active-word')
+      : Boolean(targetSpan.className && targetSpan.className.indexOf('spk-active-word') !== -1);
+    if (isAlreadyActive) return;
+
+    for (let i = 0; i < numSpans; i++) {
       const s = spans[i];
-      const start = parseInt(s.getAttribute('data-start'), 10) || 0;
-      const end = parseInt(s.getAttribute('data-end'), 10) || 0;
-      if (charIndex >= start && charIndex < end) {
-        targetSpan = s;
-        break;
-      } else if (charIndex >= start) {
-        targetSpan = s;
+      if (s !== targetSpan) {
+        if (typeof s.classList?.remove === 'function') {
+          s.classList.remove('spk-active-word');
+        } else if (s.className) {
+          s.className = s.className.replace(/\bspk-active-word\b/g, '').trim();
+        }
       }
     }
 
-    for (let i = 0; i < spans.length; i++) {
-      spans[i].classList.remove('spk-active-word');
-    }
-
-    if (targetSpan) {
+    if (typeof targetSpan.classList?.add === 'function') {
       targetSpan.classList.add('spk-active-word');
-      if (typeof targetSpan.scrollIntoView === 'function' && container.scrollHeight > container.clientHeight) {
-        targetSpan.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-      }
+    } else {
+      targetSpan.className = ((targetSpan.className || '') + ' spk-active-word').trim();
+    }
+    if (typeof targetSpan.scrollIntoView === 'function' && container.scrollHeight > container.clientHeight) {
+      targetSpan.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
     }
   }
 
@@ -241,7 +305,7 @@
    * ネットワークオーディオ・フォールバック再生
    * Web Speech API が利用不可/失敗した場合のフェイルオーバー (Free Dictionary API & Google TTS)
    */
-  function tryPlayExternalAudio(clean, l, onEnd = null) {
+  function tryPlayExternalAudio(clean, l, onEnd = null, targetEl = null) {
     if (typeof Audio === 'undefined') {
       if (typeof onEnd === 'function') onEnd();
       return;
@@ -266,6 +330,16 @@
         const audio = new Audio(urls[idx]);
         audio.referrerPolicy = 'no-referrer';
         currentAudioEl = audio;
+        if (targetEl) {
+          prepareWordSpans(targetEl, clean, l);
+          audio.ontimeupdate = () => {
+            if (audio.duration && targetEl) {
+              const p = audio.currentTime / audio.duration;
+              const estIndex = Math.floor(p * clean.length);
+              highlightSpokenWord(targetEl, estIndex);
+            }
+          };
+        }
         audio.onended = () => {
           if (settled) return;
           settled = true;
@@ -310,7 +384,7 @@
     activeOnEnd = finish;
 
     if (typeof window === 'undefined' || !window.speechSynthesis) {
-      tryPlayExternalAudio(clean, l, finish);
+      tryPlayExternalAudio(clean, l, finish, targetEl);
       return;
     }
     try {
@@ -336,7 +410,7 @@
         if (thisSessionId !== currentSpeechSessionId) return;
         boundarySeen = true;
         lastBoundaryTime = Date.now();
-        if (targetEl && (event.name === 'word' || !event.name) && typeof event.charIndex === 'number') {
+        if (targetEl && typeof event.charIndex === 'number') {
           highlightSpokenWord(targetEl, event.charIndex);
         }
       };
@@ -348,8 +422,8 @@
 
       // 2. 時間補間ハイブリッドフォールバック（Watchdog方式: boundary未発火環境または途絶時のみ介入）
       if (targetEl && typeof setInterval === 'function') {
-        const msPerChar = l === 'ja' ? 120 : l === 'de' ? 75 : 65;
-        const totalEstimatedDuration = Math.max(800, (clean.length * msPerChar) / (Number(ttsRate) || 0.95));
+        const msPerChar = l === 'ja' ? 110 : l === 'fr' ? 52 : l === 'de' ? 68 : 58;
+        const totalEstimatedDuration = Math.max(700, (clean.length * msPerChar) / (Number(ttsRate) || 0.95));
 
         progressTimer = setInterval(() => {
           if (thisSessionId !== currentSpeechSessionId) {
@@ -357,14 +431,14 @@
             progressTimer = null;
             return;
           }
-          if (boundarySeen && (Date.now() - lastBoundaryTime < 450)) return;
+          if (boundarySeen && (Date.now() - lastBoundaryTime < 400)) return;
           if (!speechStartTime) return;
 
           const elapsed = Date.now() - speechStartTime;
           const progress = Math.min(0.98, elapsed / totalEstimatedDuration);
           const estIndex = Math.floor(progress * clean.length);
           highlightSpokenWord(targetEl, estIndex);
-        }, 120);
+        }, 80);
       }
 
       u.onend = () => {
@@ -390,7 +464,7 @@
           activeUtter = null;
           clearActiveWordHighlight();
           if (event && event.error !== 'canceled' && event.error !== 'interrupted') {
-            tryPlayExternalAudio(clean, l, finish);
+            tryPlayExternalAudio(clean, l, finish, targetEl);
           } else {
             finish();
           }
@@ -422,12 +496,12 @@
             retainedUtterances.delete(u);
             activeUtter = null;
             clearActiveWordHighlight();
-            tryPlayExternalAudio(clean, l, finish);
+            tryPlayExternalAudio(clean, l, finish, targetEl);
           }
         }, 1500);
       }
     } catch {
-      tryPlayExternalAudio(clean, l, finish);
+      tryPlayExternalAudio(clean, l, finish, targetEl);
     }
   }
 
@@ -471,6 +545,16 @@
         const audio = new Audio(cachedUrl);
         audio.referrerPolicy = 'no-referrer';
         currentAudioEl = audio;
+        if (targetEl) {
+          prepareWordSpans(targetEl, clean, l);
+          audio.ontimeupdate = () => {
+            if (audio.duration && targetEl) {
+              const p = audio.currentTime / audio.duration;
+              const estIndex = Math.floor(p * clean.length);
+              highlightSpokenWord(targetEl, estIndex);
+            }
+          };
+        }
         audio.onended = () => {
           if (currentAudioEl === audio) currentAudioEl = null;
           clearActiveWordHighlight();

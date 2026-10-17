@@ -559,7 +559,18 @@
       if (act === 'speak') {
         e.preventDefault(); e.stopPropagation();
         const curApp = ctx.appState || global.VocabCore?.App || global.App || appState;
-        if (global.VocabSpeech) global.VocabSpeech.speakText(el.dataset.text, el.dataset.lang || curApp?.lang);
+        // ターゲット要素（発話対象の例文・成句・見出し語テキスト）をボタンのコンテキストから安全に特定
+        let targetEl = null;
+        const exParent = typeof el.closest === 'function' ? el.closest('.ex-en, .anki-ex-foreign, .ph-line, .sub-p, .sub-h') : null;
+        if (exParent) {
+          targetEl = (typeof exParent.querySelector === 'function' ? exParent.querySelector('span:not(.spk-btn), strong') : null) || exParent;
+        } else {
+          const cardEl = typeof el.closest === 'function' ? el.closest('.card') : null;
+          if (cardEl && el.dataset?.text) {
+            targetEl = (typeof cardEl.querySelector === 'function' ? cardEl.querySelector('.hw') : null) || cardEl;
+          }
+        }
+        if (global.VocabSpeech) global.VocabSpeech.speakText(el.dataset.text, el.dataset.lang || curApp?.lang, null, targetEl);
       } else if (act === 'speak-current') {
         e.preventDefault(); e.stopPropagation();
         const curApp = ctx.appState || global.VocabCore?.App || global.App || appState;
