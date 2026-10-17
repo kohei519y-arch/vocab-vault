@@ -1876,18 +1876,69 @@
     drawGraph();
   }
 
-  function centerOnNode(node, zoomLevel = 1.25) {
-    if (!node) return;
-    graphState.zoom = zoomLevel;
-    graphState.panX = graphState.width / 2 - node.x * zoomLevel;
-    graphState.panY = graphState.height / 2 - node.y * zoomLevel;
-    updateZoomDisplay();
-    drawGraph();
+  let smoothPanZoomRaf = null;
+  let momentumRaf = null;
+
+  /**
+   * カメラの滑らかなイージング補間移動 (Smooth Pan & Zoom Transition)
+   */
+  function smoothPanZoomTo(targetPanX, targetPanY, targetZoom, onComplete) {
+    if (momentumRaf) { cancelAnimationFrame(momentumRaf); momentumRaf = null; }
+    if (smoothPanZoomRaf) { cancelAnimationFrame(smoothPanZoomRaf); smoothPanZoomRaf = null; }
+
+    const startPanX = graphState.panX;
+    const startPanY = graphState.panY;
+    const startZoom = graphState.zoom;
+    const finalZoom = Math.min(3.5, Math.max(0.35, targetZoom));
+    const totalFrames = 18;
+    let frame = 0;
+
+    function step() {
+      frame++;
+      const t = frame / totalFrames;
+      // easeOutCubic: 指数的な減速で心地よく着地
+      const ease = 1 - Math.pow(1 - t, 3);
+
+      graphState.panX = startPanX + (targetPanX - startPanX) * ease;
+      graphState.panY = startPanY + (targetPanY - startPanY) * ease;
+      graphState.zoom = startZoom + (finalZoom - startZoom) * ease;
+      updateZoomDisplay();
+      drawGraph();
+
+      if (frame < totalFrames) {
+        smoothPanZoomRaf = requestAnimationFrame(step);
+      } else {
+        graphState.panX = targetPanX;
+        graphState.panY = targetPanY;
+        graphState.zoom = finalZoom;
+        updateZoomDisplay();
+        drawGraph();
+        smoothPanZoomRaf = null;
+        if (typeof onComplete === 'function') onComplete();
+      }
+    }
+    smoothPanZoomRaf = requestAnimationFrame(step);
   }
 
-  function zoomToCluster(rootNode) {
+  function centerOnNode(node, zoomLevel = 1.25, smooth = true) {
+    if (!node) return;
+    const targetZoom = zoomLevel;
+    const targetPanX = graphState.width / 2 - node.x * targetZoom;
+    const targetPanY = graphState.height / 2 - node.y * targetZoom;
+    if (smooth) {
+      smoothPanZoomTo(targetPanX, targetPanY, targetZoom);
+    } else {
+      graphState.zoom = targetZoom;
+      graphState.panX = targetPanX;
+      graphState.panY = targetPanY;
+      updateZoomDisplay();
+      drawGraph();
+    }
+  }
+
+  function zoomToCluster(rootNode, smooth = true) {
     if (!rootNode || !rootNode.connectedWords || !rootNode.connectedWords.length) {
-      centerOnNode(rootNode, 1.4);
+      centerOnNode(rootNode, 1.4, smooth);
       return;
     }
     const clusterNodes = [rootNode, ...rootNode.connectedWords];
@@ -1907,11 +1958,17 @@
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
-    graphState.zoom = targetZoom;
-    graphState.panX = graphState.width / 2 - centerX * targetZoom;
-    graphState.panY = graphState.height / 2 - centerY * targetZoom;
-    updateZoomDisplay();
-    drawGraph();
+    const targetPanX = graphState.width / 2 - centerX * targetZoom;
+    const targetPanY = graphState.height / 2 - centerY * targetZoom;
+    if (smooth) {
+      smoothPanZoomTo(targetPanX, targetPanY, targetZoom);
+    } else {
+      graphState.zoom = targetZoom;
+      graphState.panX = targetPanX;
+      graphState.panY = targetPanY;
+      updateZoomDisplay();
+      drawGraph();
+    }
   }
 
   function openGraphModal(targetRoot = null) {
@@ -3003,6 +3060,19 @@
     graphState.animId = requestAnimationFrame(step);
   }
 
+  let graphDrawScheduled = false;
+  /**
+   * 描画フレーム統合（高ポーリングマウス・トラックパッドでの二重描画・コマ落ちを完全防止）
+   */
+  function scheduleGraphDraw() {
+    if (graphDrawScheduled) return;
+    graphDrawScheduled = true;
+    requestAnimationFrame(() => {
+      graphDrawScheduled = false;
+      drawGraph();
+    });
+  }
+
   /**
    * ビューポート・カリング & Semantic Zoom (LOD) 対応のCanvas描画
    */
@@ -3054,6 +3124,11 @@
       rootCenters.forEach(center => {
         const cx = center.x;
         const cy = center.y;
+
+        // 視野外カリング: 画面外の語根の重いセクターバンド計算・グラデーション描画を完全スキップ
+        if (cx + 1200 < viewLeft || cx - 1200 > viewRight || cy + 1200 < viewTop || cy - 1200 > viewBottom) {
+          return;
+        }
 
         // A. 語根コア後方の重厚で落ち着いたダークグラデーション（過剰発光を抑えたダークテーマ）
         const bgGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, 1180);
@@ -3181,6 +3256,17 @@
     }
 
     // 1. エッジ描画（発光エネルギー導管）
+    // ルートノードの O(1) 高速引き当てマップ（毎フレームの O(E*N) 線形探索を解消）
+    const rootMap = new Map();
+    for (let i = 0; i < graphState.nodes.length; i++) {
+      const nd = graphState.nodes[i];
+      if (nd.type === 'root') rootMap.set(nd.label, nd);
+    }
+
+    ctx.setLineDash([]);
+    let currentDashed = false;
+    let currentShadow = false;
+
     for (let i = 0; i < graphState.edges.length; i++) {
       const e = graphState.edges[i];
       if (
@@ -3213,53 +3299,58 @@
         continue;
       }
 
-      ctx.save();
-      if (isDimmedByEra) ctx.globalAlpha = 0.10;
+      ctx.globalAlpha = isDimmedByEra ? 0.10 : 1.0;
 
       const isBudEdge = (e.kind === 'bud_edge');
       const wordNode = (e.target?.type === 'word' ? e.target : (e.source?.type === 'word' ? e.source : null));
       const stability = wordNode ? (Number(wordNode.item?.stability) || Number(wordNode.item?.interval) || 1) : 1;
 
-      if (focusNode) {
-        ctx.strokeStyle = isConnectedToFocus ? highlightEdgeColor : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)');
-        ctx.lineWidth = isConnectedToFocus ? 2.4 : 0.5;
-        if (isConnectedToFocus && isTree) {
-          ctx.shadowColor = highlightEdgeColor;
-          ctx.shadowBlur = 6;
-        }
-      } else if (isBudEdge) {
-        // 未解放スキルへのミニマルな点線パス（鉄色・真鍮）
+      if (isBudEdge) {
+        if (!currentDashed) { ctx.setLineDash([4, 3]); currentDashed = true; }
         ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.40)' : 'rgba(100, 116, 139, 0.35)';
         ctx.lineWidth = 1.0;
-        ctx.setLineDash([4, 3]);
-      } else if (isTwigEdge) {
-        ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(100, 116, 139, 0.20)';
-        ctx.lineWidth = 0.8;
-      } else if (isTree && e.kind === 'root_to_branch') {
-        // 語根から古典枝への主幹エネルギー導管
-        ctx.strokeStyle = isDark ? 'rgba(192, 132, 252, 0.70)' : 'rgba(124, 58, 237, 0.60)';
-        ctx.lineWidth = 2.0;
-        ctx.shadowBlur = 0;
-      } else if (isTree && e.kind === 'branch_to_leaf') {
-        // 古典枝から現代見出し語への導管
-        ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.45)' : 'rgba(37, 99, 235, 0.40)';
-        ctx.lineWidth = 1.2;
-        ctx.shadowBlur = 0;
+        if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
       } else {
-        // FSRS Stability S 連動の枝の太さと光彩
-        const branchThickness = Math.min(3.5, Math.max(0.8, 0.8 + Math.log2(Math.max(1, stability)) * 0.55));
-        if (stability >= 21 && wordNode) {
-          ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.75)' : 'rgba(217, 119, 6, 0.70)';
-          ctx.shadowBlur = 0;
-          ctx.lineWidth = branchThickness;
-        } else if (stability >= 7 && wordNode) {
-          ctx.strokeStyle = isDark ? 'rgba(16, 185, 129, 0.65)' : 'rgba(5, 150, 105, 0.60)';
-          ctx.shadowBlur = 0;
-          ctx.lineWidth = branchThickness;
+        if (currentDashed) { ctx.setLineDash([]); currentDashed = false; }
+        if (focusNode) {
+          ctx.strokeStyle = isConnectedToFocus ? highlightEdgeColor : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)');
+          ctx.lineWidth = isConnectedToFocus ? 2.4 : 0.5;
+          if (isConnectedToFocus && isTree) {
+            ctx.shadowColor = highlightEdgeColor;
+            ctx.shadowBlur = 6;
+            currentShadow = true;
+          } else if (currentShadow) {
+            ctx.shadowBlur = 0;
+            currentShadow = false;
+          }
+        } else if (isTwigEdge) {
+          ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(100, 116, 139, 0.20)';
+          ctx.lineWidth = 0.8;
+          if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
+        } else if (isTree && e.kind === 'root_to_branch') {
+          // 語根から古典枝への主幹エネルギー導管
+          ctx.strokeStyle = isDark ? 'rgba(192, 132, 252, 0.70)' : 'rgba(124, 58, 237, 0.60)';
+          ctx.lineWidth = 2.0;
+          if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
+        } else if (isTree && e.kind === 'branch_to_leaf') {
+          // 古典枝から現代見出し語への導管
+          ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.45)' : 'rgba(37, 99, 235, 0.40)';
+          ctx.lineWidth = 1.2;
+          if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
         } else {
-          ctx.strokeStyle = baseEdgeColor;
-          ctx.shadowBlur = 0;
-          ctx.lineWidth = branchThickness;
+          // FSRS Stability S 連動の枝の太さと光彩
+          const branchThickness = Math.min(3.5, Math.max(0.8, 0.8 + Math.log2(Math.max(1, stability)) * 0.55));
+          if (stability >= 21 && wordNode) {
+            ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.75)' : 'rgba(217, 119, 6, 0.70)';
+            ctx.lineWidth = branchThickness;
+          } else if (stability >= 7 && wordNode) {
+            ctx.strokeStyle = isDark ? 'rgba(16, 185, 129, 0.65)' : 'rgba(5, 150, 105, 0.60)';
+            ctx.lineWidth = branchThickness;
+          } else {
+            ctx.strokeStyle = baseEdgeColor;
+            ctx.lineWidth = branchThickness;
+          }
+          if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
         }
       }
 
@@ -3267,8 +3358,9 @@
       ctx.moveTo(e.source.x, e.source.y);
       if (isTree) {
         // 放射状スキルツリー用 極座標ベジェ曲線 (Radial Polar Cubic Bezier)
-        const rx = e.source.rootLabel ? (graphState.nodes.find(n => n.type === 'root' && n.label === e.source.rootLabel)?.targetX || 0) : 0;
-        const ry = e.source.rootLabel ? (graphState.nodes.find(n => n.type === 'root' && n.label === e.source.rootLabel)?.targetY || 0) : 0;
+        const rNode = e.source.rootLabel ? rootMap.get(e.source.rootLabel) : null;
+        const rx = rNode ? (rNode.targetX !== undefined ? rNode.x : 0) : 0;
+        const ry = rNode ? (rNode.targetY !== undefined ? rNode.y : 0) : 0;
         const r1 = Math.hypot(e.source.x - rx, e.source.y - ry);
         const r2 = Math.hypot(e.target.x - rx, e.target.y - ry);
         const midR = (r1 + r2) / 2;
@@ -3289,8 +3381,10 @@
         ctx.lineTo(e.target.x, e.target.y);
       }
       ctx.stroke();
-      ctx.restore();
     }
+    if (currentDashed) ctx.setLineDash([]);
+    if (currentShadow) ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1.0;
 
     // 2. ノード描画 (Semantic Zoom LOD 対応 & 境界半径バッファ付きカリング)
     const totalWordsCount = graphState.nodes.filter(nd => nd.type === 'word').length;
@@ -3823,6 +3917,9 @@
     wrap._graphEventsAttached = true;
 
     let startClientX = 0, startClientY = 0;
+    let lastClientX = 0, lastClientY = 0;
+    let lastTime = 0;
+    let pointerVx = 0, pointerVy = 0;
 
     function getCanvasCoords(clientX, clientY) {
       const rect = wrap.getBoundingClientRect();
@@ -3846,9 +3943,18 @@
     }
 
     function handleStart(clientX, clientY) {
+      if (momentumRaf) { cancelAnimationFrame(momentumRaf); momentumRaf = null; }
+      if (smoothPanZoomRaf) { cancelAnimationFrame(smoothPanZoomRaf); smoothPanZoomRaf = null; }
+
       startClientX = clientX;
       startClientY = clientY;
+      lastClientX = clientX;
+      lastClientY = clientY;
+      lastTime = performance.now();
+      pointerVx = 0;
+      pointerVy = 0;
       graphState.dragMoved = false;
+
       const { rawX, rawY, x, y } = getCanvasCoords(clientX, clientY);
       const hit = findNodeAt(x, y);
       if (hit) {
@@ -3866,6 +3972,18 @@
       if (Math.hypot(clientX - startClientX, clientY - startClientY) > 6) {
         graphState.dragMoved = true;
       }
+      const now = performance.now();
+      const dt = now - lastTime;
+      if (dt > 4 && dt < 120) {
+        const vx = (clientX - lastClientX) / dt * 16.67;
+        const vy = (clientY - lastClientY) / dt * 16.67;
+        pointerVx = pointerVx * 0.35 + vx * 0.65;
+        pointerVy = pointerVy * 0.35 + vy * 0.65;
+      }
+      lastClientX = clientX;
+      lastClientY = clientY;
+      lastTime = now;
+
       const { rawX, rawY, x, y } = getCanvasCoords(clientX, clientY);
 
       if (graphState.dragNode) {
@@ -3873,21 +3991,21 @@
         graphState.dragNode.y = y;
         graphState.dragNode.vx = 0;
         graphState.dragNode.vy = 0;
-        drawGraph();
+        scheduleGraphDraw();
         return;
       }
 
       if (graphState.isDragging) {
         graphState.panX = rawX - graphState.dragStartX;
         graphState.panY = rawY - graphState.dragStartY;
-        drawGraph();
+        scheduleGraphDraw();
         return;
       }
 
       const hit = findNodeAt(x, y);
       if (hit !== graphState.hoverNode) {
         graphState.hoverNode = hit;
-        drawGraph();
+        scheduleGraphDraw();
       }
       wrap.style.cursor = hit ? 'pointer' : 'grab';
 
@@ -3921,6 +4039,30 @@
     }
 
     function handleEnd() {
+      // 慣性スクロール（Flick & Momentum Glide）: ドラッグ解除後も心地よく滑らかに減速
+      if (graphState.isDragging && Math.hypot(pointerVx, pointerVy) > 0.8) {
+        let curVx = pointerVx;
+        let curVy = pointerVy;
+        const maxV = 24;
+        const speed = Math.hypot(curVx, curVy);
+        if (speed > maxV) {
+          curVx = (curVx / speed) * maxV;
+          curVy = (curVy / speed) * maxV;
+        }
+        function glide() {
+          if (Math.hypot(curVx, curVy) < 0.2 || graphState.isDragging || graphState.dragNode) {
+            momentumRaf = null;
+            return;
+          }
+          graphState.panX += curVx;
+          graphState.panY += curVy;
+          curVx *= 0.925;
+          curVy *= 0.925;
+          drawGraph();
+          momentumRaf = requestAnimationFrame(glide);
+        }
+        momentumRaf = requestAnimationFrame(glide);
+      }
       graphState.dragNode = null;
       graphState.isDragging = false;
     }
@@ -3948,7 +4090,7 @@
           if (tt) tt.style.display = 'none';
           if (graphState.hoverNode) {
             graphState.hoverNode = null;
-            drawGraph();
+            scheduleGraphDraw();
           }
           return;
         }
@@ -3963,6 +4105,7 @@
       if (e.touches.length === 1) {
         handleStart(e.touches[0].clientX, e.touches[0].clientY);
       } else if (e.touches.length === 2) {
+        if (momentumRaf) { cancelAnimationFrame(momentumRaf); momentumRaf = null; }
         graphState.isDragging = false;
         graphState.dragNode = null;
         graphState.touchDist = Math.hypot(
@@ -3994,7 +4137,7 @@
         graphState.zoom = newZoom;
         graphState.touchDist = newDist;
         updateZoomDisplay();
-        drawGraph();
+        scheduleGraphDraw();
       }
     }, { passive: true });
 
@@ -4007,7 +4150,12 @@
     wrap.addEventListener('wheel', e => {
       if (shouldIgnoreCanvasEvent(e.target)) return;
       e.preventDefault();
-      const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+      if (momentumRaf) { cancelAnimationFrame(momentumRaf); momentumRaf = null; }
+      if (smoothPanZoomRaf) { cancelAnimationFrame(smoothPanZoomRaf); smoothPanZoomRaf = null; }
+
+      // Macトラックパッド（連続delta）とマウスホイール（離散delta）双方に対応した滑らかな連続指数ズーム
+      const delta = Math.max(-100, Math.min(100, e.deltaY));
+      const zoomFactor = Math.exp(-delta * 0.0022);
       const newZoom = Math.min(3.5, Math.max(0.35, graphState.zoom * zoomFactor));
 
       const rect = wrap.getBoundingClientRect();
@@ -4018,7 +4166,7 @@
       graphState.panY = mouseY - (mouseY - graphState.panY) * (newZoom / graphState.zoom);
       graphState.zoom = newZoom;
       updateZoomDisplay();
-      drawGraph();
+      scheduleGraphDraw();
     }, { passive: false });
 
     // ドロワー内のスムーズなスクロールを保証し、背景Canvasズームへの誤伝播のみを防ぐ
@@ -4288,6 +4436,8 @@
     adoptGhostBud,
     startBranchAnkiReview,
     updateZoomDisplay,
+    smoothPanZoomTo,
+    scheduleGraphDraw,
     // 新規実用機能
     switchViewMode,
     updateBreadcrumbUI,
