@@ -70,10 +70,24 @@ globalThis.URLSearchParams = function(init) {
   }
   this.get = function(k) { return this.params.hasOwnProperty(k) ? this.params[k] : null; };
   this.set = function(k, v) { this.params[k] = String(v); };
+  this.delete = function(k) { delete this.params[k]; };
 };
 
 globalThis.Blob = function(parts, opts) { this.parts = parts; this.opts = opts; };
-globalThis.URL = { createObjectURL: function() { return 'blob:test'; }, revokeObjectURL: function() {} };
+globalThis.URL = function(url) {
+  this.href = String(url || '');
+  const qStr = this.href.indexOf('?') !== -1 ? this.href.split('?')[1] : '';
+  this.searchParams = new globalThis.URLSearchParams(qStr);
+  this.toString = function() {
+    const q = [];
+    for (const k in this.searchParams.params) {
+      q.push(encodeURIComponent(k) + '=' + encodeURIComponent(this.searchParams.params[k]));
+    }
+    return (this.href.split('?')[0]) + (q.length ? '?' + q.join('&') : '');
+  };
+};
+globalThis.URL.createObjectURL = function() { return 'blob:test'; };
+globalThis.URL.revokeObjectURL = function() {};
 globalThis.window = globalThis;
 globalThis.document = documentMock;
 globalThis.localStorage = localStorageMock;
@@ -638,6 +652,17 @@ try {
   // Test Scenario D: scrollToCard & findCardElement helpers
   assert("scrollToCard helper is defined and callable", typeof VocabCore.scrollToCard === 'function');
   assert("findCardElement helper is defined and callable", typeof VocabCore.findCardElement === 'function');
+
+  // Test Scenario D-2: Browser URL synchronization & deep link state
+  var lastReplacedUrl = '';
+  window.location = { protocol: 'https:', href: 'https://example.com/vocab-vault/?test=1' };
+  window.history = {
+    replaceState: function(state, title, url) {
+      lastReplacedUrl = url;
+    }
+  };
+  VocabCore.jumpToWord('testword10');
+  assert("jumpToWord updates browser URL via replaceState", lastReplacedUrl.indexOf('w=testword10') !== -1);
 
   // Test Scenario E: VocabCardView isolated module verification
   assert("VocabCardView is defined on global scope", typeof VocabCardView === 'object' && VocabCardView !== null);

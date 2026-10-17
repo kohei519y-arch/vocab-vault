@@ -474,10 +474,12 @@
     if (typeof window !== 'undefined' && window.history && typeof window.history.replaceState === 'function' && window.location && window.location.protocol !== 'file:') {
       try {
         const u = new URL(window.location.href);
-        u.searchParams.set('w', targetWord);
-        if (sLang && sLang !== 'en') u.searchParams.set('lang', sLang);
-        else u.searchParams.delete('lang');
-        window.history.replaceState(null, '', u.toString());
+        if (u.searchParams && typeof u.searchParams.set === 'function') {
+          u.searchParams.set('w', targetWord);
+          if (sLang && sLang !== 'en') u.searchParams.set('lang', sLang);
+          else if (typeof u.searchParams.delete === 'function') u.searchParams.delete('lang');
+          window.history.replaceState(null, '', u.toString());
+        }
       } catch {}
     }
 
