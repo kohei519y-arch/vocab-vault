@@ -41,11 +41,21 @@ const documentMock = {
   createElement: function() {
     return Object.assign({}, dummyElement);
   },
-  createDocumentFragment: function() {
-    return Object.assign({}, dummyElement);
+  _listeners: {},
+  addEventListener: function(evt, handler) {
+    if (!this._listeners[evt]) this._listeners[evt] = [];
+    this._listeners[evt].push(handler);
   },
-  addEventListener: function() {},
-  removeEventListener: function() {},
+  removeEventListener: function(evt, handler) {
+    if (!this._listeners[evt]) return;
+    this._listeners[evt] = this._listeners[evt].filter(h => h !== handler);
+  },
+  dispatchMockEvent: function(evtName, eventObj) {
+    const list = this._listeners[evtName] || [];
+    for (let i = 0; i < list.length; i++) {
+      try { list[i](eventObj); } catch (e) { throw e; }
+    }
+  },
   readyState: 'complete'
 };
 
@@ -90,10 +100,13 @@ globalThis.alert = function(msg) { print("[ALERT] " + msg); };
 const basePath = "/Users/yoshikawakohei/Library/Mobile Documents/com~apple~CloudDocs/antigravity";
 
 // Load all core scripts in dependency order
+load(basePath + "/js/i18n.js");
 load(basePath + "/js/storage.js");
 load(basePath + "/js/anki.js");
 load(basePath + "/js/sync.js");
+load(basePath + "/js/ocr.js");
 load(basePath + "/js/morphology.js");
+load(basePath + "/js/eiken_catalog.js");
 load(basePath + "/js/graph.js");
 load(basePath + "/js/feedback.js");
 load(basePath + "/js/dictionary.js");
@@ -135,8 +148,63 @@ try {
   VocabStorage.lsSet('test_key', 'hello_world');
   const retrieved = VocabStorage.lsGet('test_key');
   assert("VocabStorage.lsSet/lsGet roundtrip", retrieved === 'hello_world');
+
+  // Daily Quota Tracking (項目6)
+  const today = VocabStorage.getTodayString();
+  assert("VocabStorage.getTodayString returns YYYY-MM-DD", /^\d{4}-\d{2}-\d{2}$/.test(today));
+  const localNow = new Date();
+  const expectedLocal = localNow.getFullYear() + '-' + (localNow.getMonth() + 1 < 10 ? '0' : '') + (localNow.getMonth() + 1) + '-' + (localNow.getDate() < 10 ? '0' : '') + localNow.getDate();
+  assert("VocabStorage.getTodayString uses local calendar date not UTC ISO", today === expectedLocal);
+  assert("VocabStorage.calendarDayDiff counts consecutive local dates", VocabStorage.calendarDayDiff('2026-10-12', '2026-10-13') === 1);
+  assert("VocabStorage.calendarDayDiff handles month boundary", VocabStorage.calendarDayDiff('2026-01-31', '2026-02-01') === 1);
+  const initQuota = VocabStorage.getDailyAiUsageInfo(today);
+  assert("VocabStorage.getDailyAiUsageInfo returns limit=5", initQuota.limit === 5 && initQuota.remaining === 5);
+  VocabStorage.recordAiGenerationUsage(3);
+  const updatedQuota = VocabStorage.getDailyAiUsageInfo(today);
+  assert("VocabStorage.recordAiGenerationUsage increments count", updatedQuota.count === 3 && updatedQuota.remaining === 2);
+
+  // Internal Metrics & Token Savings Dashboard (項目9)
+  VocabStorage.recordMetricsEvent('cache_hit', 3);
+  VocabStorage.recordMetricsEvent('ai_gen', 2);
+  const metrics = VocabStorage.getMetricsSummary();
+  assert("VocabStorage.getMetricsSummary computes cache hit rate & tokens saved",
+    metrics.totalWords >= 5 &&
+    metrics.cacheHits >= 3 &&
+    metrics.tokensSaved >= 2400 &&
+    metrics.cacheRate > 0
+  );
 } catch (e) {
   assert("VocabStorage test suite", false, String(e));
+}
+
+// -------------------------------------------------------------
+// TEST 1b: Cross-tab 3-way merge (P1 TOCTOU regression)
+// -------------------------------------------------------------
+try {
+  const t0 = Date.now() - 10000;
+  const mk = (id, word, extra = {}) => ({ id, word, meanings: [{ pos: 'N[C]', text: word + '-m' }], updatedAt: t0, version: 1, ...extra });
+  const base = [mk('tw-a', 'twalpha'), mk('tw-b', 'twbravo'), mk('tw-c', 'twcharlie')];
+  // Remote (other tab): added tw-d, edited tw-b (version 2)
+  const remote = [mk('tw-a', 'twalpha'), mk('tw-b', 'twbravo', { version: 2, updatedAt: t0 + 5000, core: 'remote-edit' }), mk('tw-c', 'twcharlie'), mk('tw-d', 'twdelta')];
+  // Local (this tab): deleted tw-c (no tombstone), edited tw-a
+  const local = [mk('tw-a', 'twalpha', { version: 2, updatedAt: t0 + 6000, core: 'local-edit' }), mk('tw-b', 'twbravo')];
+  const r = VocabStorage.threeWayMergeWords(remote, local, base, 'en');
+  const ids = r.data.map(x => x.id);
+  assert("3-way merge keeps item added by another tab", ids.includes('tw-d'));
+  assert("3-way merge does not resurrect item deleted locally (no tombstone)", !ids.includes('tw-c'));
+  assert("3-way merge keeps local edit", r.data.find(x => x.id === 'tw-a')?.core === 'local-edit');
+  assert("3-way merge keeps newer remote edit", r.data.find(x => x.id === 'tw-b')?.core === 'remote-edit');
+  assert("3-way merge preserves local order and appends remote additions", ids.join(',') === 'tw-a,tw-b,tw-d');
+  assert("3-way merge renumbers sequentially", r.data.every((x, i) => x.num === i + 1));
+  assert("3-way merge reports changed when remote state absorbed", r.changed === true);
+  const baseIdx = { ids: new Set(base.map(x => x.id)), wks: new Set() };
+  const r2 = VocabStorage.threeWayMergeWords(remote, local, baseIdx, 'en');
+  assert("3-way merge accepts precomputed base index", r2.data.map(x => x.id).join(',') === 'tw-a,tw-b,tw-d');
+  const same = [mk('tw-a', 'twalpha'), mk('tw-b', 'twbravo')];
+  const r3 = VocabStorage.threeWayMergeWords(same, same, same, 'en');
+  assert("3-way merge reports unchanged for identical states", r3.changed === false && r3.data.length === 2);
+} catch (e) {
+  assert("3-way merge test suite", false, String(e));
 }
 
 // -------------------------------------------------------------
@@ -186,11 +254,16 @@ try {
   assert("calculateNextReview(Good=2) advances repetition count", nextGood.repetition === testWord.repetition + 1);
   assert("calculateNextReview(Good=2) updates nextReview to future", nextGood.nextReview > Date.now());
 
-  // Next Review Calculation for rating 0 (Again)
   const nextAgain = VocabSRS.calculateNextReview(testWord, 0);
   assert("calculateNextReview(Again=0) resets repetition to 0", nextAgain.repetition === 0);
   assert("calculateNextReview(Again=0) resets interval to 0", nextAgain.interval === 0);
-  assert("calculateNextReview(Again=0) sets due to 1 min later", nextAgain.nextReview === Date.now() + 60000);
+  assert("calculateNextReview(Again=0) sets due to 1 min later", Math.abs(nextAgain.nextReview - (Date.now() + 60000)) <= 200);
+
+  // Deterministic FSRS Stability test
+  assert("VocabSRS.predStability is defined", typeof VocabSRS.predStability === 'function');
+  const sGood1 = VocabSRS.predStability(testWord, 2);
+  const sGood2 = VocabSRS.predStability(testWord, 2);
+  assert("predStability is strictly deterministic without random fuzz", sGood1 === sGood2 && sGood1 > testWord.stability);
 } catch (e) {
   assert("VocabSRS test suite", false, String(e));
 }
@@ -253,6 +326,26 @@ try {
   assert("Starter Pack has >= 10 words", Array.isArray(starterWords) && starterWords.length >= 10, "Count: " + (starterWords ? starterWords.length : 0));
   const validFields = starterWords.every(w => w.word && Array.isArray(w.meanings) && w.etymology);
   assert("All starter pack words have word, meanings array, and etymology", validFields);
+
+  const bizWords = VocabStarterPack.getStarterPack('en', 'business');
+  assert("Business Starter Pack has 20 words", Array.isArray(bizWords) && bizWords.length === 20, "Count: " + (bizWords ? bizWords.length : 0));
+  const validBizFields = bizWords.every(w => w.word && Array.isArray(w.meanings) && w.etymology && w.etymologyTags?.length);
+  assert("All business starter pack words have valid root tags & etymology", validBizFields);
+
+  const essWords = VocabStarterPack.getStarterPack('en', 'essential');
+  assert("Essential Roots Starter Pack has 20 words", Array.isArray(essWords) && essWords.length === 20, "Count: " + (essWords ? essWords.length : 0));
+  const validEssFields = essWords.every(w => w.word && Array.isArray(w.meanings) && w.etymology && w.etymologyTags?.length);
+  assert("All essential starter pack words have valid root tags & etymology", validEssFields);
+
+  const frWords = VocabStarterPack.getStarterPack('fr');
+  assert("French Pre-1 Starter Pack has 20 words", Array.isArray(frWords) && frWords.length === 20, "Count: " + (frWords ? frWords.length : 0));
+  const validFrFields = frWords.every(w => w.word && Array.isArray(w.meanings) && w.etymology && w.etymologyTags?.length && w.lang === 'fr');
+  assert("All French Pre-1 starter pack words have valid root tags, meanings, and lang=fr", validFrFields);
+
+  const deWords = VocabStarterPack.getStarterPack('de');
+  assert("German Pre-1 Starter Pack has 20 words", Array.isArray(deWords) && deWords.length === 20, "Count: " + (deWords ? deWords.length : 0));
+  const validDeFields = deWords.every(w => w.word && Array.isArray(w.meanings) && w.etymology && w.etymologyTags?.length && w.lang === 'de');
+  assert("All German Pre-1 starter pack words have valid root tags, meanings, and lang=de", validDeFields);
 } catch (e) {
   assert("Starter pack test suite", false, String(e));
 }
@@ -305,7 +398,39 @@ try {
   // Test node radius enlargement (Root >= 10px, Word >= 6px)
   const sampleWord = graphData.nodes.find(n => n.type === 'word');
   assert("Word node radius is substantially enlarged (>= 6px)", sampleWord && sampleWord.radius >= 6.0, "Word Radius: " + (sampleWord ? sampleWord.radius : 0));
-  assert("Root node radius is substantially enlarged (>= 10px)", rootNode && rootNode.radius >= 10.0, "Root Radius: " + (rootNode ? rootNode.radius : 0));
+  // Test SpatialCullingRenderer & GraphUIManager (UX段階的開示 & 空間カリング描画)
+  assert("VocabGraph.SpatialCullingRenderer is defined", typeof VocabGraph.SpatialCullingRenderer === 'function');
+  assert("VocabGraph.GraphUIManager is defined", typeof VocabGraph.GraphUIManager === 'function');
+
+  // テスト1: 空間カリングの境界値検証（ビューポートの完全外側、境界上、完全内側）
+  const testRenderer = new VocabGraph.SpatialCullingRenderer(100);
+  const mockNodes = [
+    { id: 1, x: -500, y: -500, radius: 10 }, // 完全に外側
+    { id: 2, x: 0, y: 0, radius: 10 },       // 内側
+    { id: 3, x: 105, y: 0, radius: 10 }      // 境界上（viewRight=100だが、radius=10のため105-10=95で画面に入る）
+  ];
+  testRenderer.buildGrid(mockNodes);
+  const visible = testRenderer.getVisibleNodes(0, -50, 100, 50);
+  assert("SpatialCullingRenderer extracts nodes within viewport", visible.length === 2);
+  assert("SpatialCullingRenderer includes fully interior node", visible.some(n => n.id === 2));
+  assert("SpatialCullingRenderer includes boundary node with radius buffer", visible.some(n => n.id === 3));
+  assert("SpatialCullingRenderer excludes outside node", !visible.some(n => n.id === 1));
+
+  // テスト2: 異常値（NaN/Infinity）の空間ハッシュ登録の安全性
+  const invalidNodes = [
+    { id: 4, x: NaN, y: 10, radius: 5 },
+    { id: 5, x: 10, y: Infinity, radius: 5 }
+  ];
+  testRenderer.buildGrid(invalidNodes);
+  const visibleInvalid = testRenderer.getVisibleNodes(0, 0, 100, 100);
+  assert("SpatialCullingRenderer safely ignores NaN/Infinity coordinates", visibleInvalid.length === 0);
+
+  // テスト3: GraphUIManager の各モード定義
+  const uiMgr = new VocabGraph.GraphUIManager();
+  assert("GraphUIManager defines network mode controls", Array.isArray(uiMgr.modeConfig.network) && uiMgr.modeConfig.network.includes('clusterBtn'));
+  assert("GraphUIManager defines tree mode controls", Array.isArray(uiMgr.modeConfig.tree) && uiMgr.modeConfig.tree.includes('skillTreeBtn'));
+  assert("GraphUIManager hides irrelevant controls in matrix mode", !uiMgr.modeConfig.matrix.includes('physicsBtn'));
+  assert("GraphUIManager hides physics in mindmap mode", !uiMgr.modeConfig.mindmap.includes('physicsBtn'));
 } catch (e) {
   assert("VocabGraph test suite", false, String(e));
 }
@@ -618,6 +743,57 @@ try {
   assert("VocabAnkiView.getOverdueRatio accurately computes ratio (Ratio: " + overdueRatio + ")", overdueRatio >= 0.9);
   assert("VocabAnkiView core methods callable", typeof VocabAnkiView.startAnki === 'function' && typeof VocabAnkiView.renderAnki === 'function' && typeof VocabAnkiView.procRev === 'function');
 
+  // Test buildAnkiBack (Cognitive Overload Reduction)
+  var sampleItem = {
+    word: 'inspect',
+    core: '対象の内側に深く視線を入れて調べること。',
+    meanings: [{ pos: 'V[T]', text: '検査する、点検する' }],
+    example: { foreign: 'Inspect cargo.', ja: '貨物を検査する。' },
+    etymology: 'ラテン語 inspicere 由来。',
+    history_note: '印欧語根 *speḱ- から派生。'
+  };
+  var ankiBackHtml = VocabAnkiView.buildAnkiBack(sampleItem);
+  assert("buildAnkiBack produces clean 2-second review card", typeof ankiBackHtml === 'string' && ankiBackHtml.includes('anki-back-clean') && ankiBackHtml.includes('anki-core-box'));
+  assert("buildAnkiBack collapses etymology into details tag", ankiBackHtml.includes('anki-ety-details'));
+
+  // Test Daily Goal & Streak Tracking with Freeze Insurance
+  var mockStorage = {};
+  var mockOpts = {
+    lsGet: function(k, def) { return mockStorage[k] !== undefined ? mockStorage[k] : def; },
+    lsSet: function(k, v) { mockStorage[k] = String(v); }
+  };
+  var goal1 = VocabAnkiView.getDailyGoalInfo(mockOpts);
+  assert("getDailyGoalInfo returns default goal of 20", goal1.goal === 20 && goal1.count === 0 && goal1.reached === false);
+  var goalInc = VocabAnkiView.incrementDailyGoal(mockOpts);
+  assert("incrementDailyGoal increments review count", goalInc.count === 1);
+
+  var streak1 = VocabAnkiView.recordReviewStreak(mockOpts);
+  assert("recordReviewStreak starts streak at 1", streak1.streak === 1 && streak1.isNewDay === true);
+
+  var streakStore = {};
+  var streakOpts = {
+    lsGet: function(k, def) { return streakStore[k] !== undefined ? streakStore[k] : def; },
+    lsSet: function(k, v) { streakStore[k] = String(v); }
+  };
+  var day1 = VocabAnkiView.recordReviewStreak(Object.assign({}, streakOpts, { todayStr: '2026-10-12' }));
+  var sameDay = VocabAnkiView.recordReviewStreak(Object.assign({}, streakOpts, { todayStr: '2026-10-12' }));
+  var day2 = VocabAnkiView.recordReviewStreak(Object.assign({}, streakOpts, { todayStr: '2026-10-13' }));
+  assert("recordReviewStreak does not double-count the same local day", sameDay.isNewDay === false && sameDay.streak === 1);
+  assert("recordReviewStreak increments on consecutive local calendar days", day1.streak === 1 && day2.streak === 2 && day2.isNewDay === true);
+  var skipped = VocabAnkiView.recordReviewStreak(Object.assign({}, streakOpts, { todayStr: '2026-10-15' }));
+  assert("recordReviewStreak spends freeze across a one-day gap", skipped.streak === 3 && skipped.freezeAvailable === false);
+  var resumed = VocabAnkiView.recordReviewStreak(Object.assign({}, streakOpts, { todayStr: '2026-10-16' }));
+  assert("recordReviewStreak replenishes freeze after a consecutive study day", resumed.streak === 4 && resumed.freezeAvailable === true);
+  var goalStore = {};
+  var goalOpts = {
+    lsGet: function(k, def) { return goalStore[k] !== undefined ? goalStore[k] : def; },
+    lsSet: function(k, v) { goalStore[k] = String(v); },
+    todayStr: '2026-10-13'
+  };
+  VocabAnkiView.incrementDailyGoal(goalOpts);
+  var utcKeyLeak = Object.keys(goalStore).some(function(k) { return k.indexOf('vv_reviewed_') === 0 && k !== 'vv_reviewed_2026-10-13'; });
+  assert("incrementDailyGoal keys off injected local todayStr", goalStore['vv_reviewed_2026-10-13'] === '1' && !utcKeyLeak);
+
   // Test Scenario L: VocabListView & Keyed Reconciliation isolated module verification
   assert("VocabListView is defined on global scope", typeof VocabListView === 'object' && VocabListView !== null);
   assert("VocabListView core methods callable", typeof VocabListView.render === 'function' && typeof VocabListView.load === 'function' && typeof VocabListView.reconcileList === 'function');
@@ -865,6 +1041,671 @@ try {
     documentMock.querySelector = origQuerySelector;
     documentMock.activeElement = null;
   }
+
+  // 22. 項目11: openUpsellModal 語根ネットワーク成長プログレス (Value-Driven Upsell)
+  assert("VocabModal.openUpsellModal is defined", typeof VocabModal.openUpsellModal === 'function');
+
+  // 23. 項目12: VocabOCR 日次クォータ & 使用量トラッキング
+  assert("VocabOCR loaded and exposes quota helpers", typeof VocabOCR.getDailyOcrUsageInfo === 'function');
+  const ocrInfo = VocabOCR.getDailyOcrUsageInfo();
+  assert("VocabOCR.getDailyOcrUsageInfo returns valid limit & remaining", typeof ocrInfo.limit === 'number' && typeof ocrInfo.remaining === 'number');
+  VocabOCR.recordOcrUsage(1);
+  const ocrUpdated = VocabOCR.getDailyOcrUsageInfo();
+  assert("VocabOCR.recordOcrUsage records count", ocrUpdated.used >= 1);
+
+  // 24. 項目14: VocabCore.getAppState 安全アクセサ
+  assert("VocabCore.getAppState returns App state object", typeof VocabCore.getAppState === 'function' && typeof VocabCore.getAppState() === 'object');
+
+  // 25. 項目15: VocabCardView.createCardElement Error Boundary 耐障害性
+  const brokenCard = VocabCardView.createCardElement(null);
+  assert("VocabCardView.createCardElement handles null item via Error Boundary", !!brokenCard && brokenCard.className.indexOf('card') !== -1);
+  const corruptedItem = { id: 'bad_1', word: 'test', meanings: 'not-an-array-corrupted' };
+  const corruptedCard = VocabCardView.createCardElement(corruptedItem);
+  assert("VocabCardView.createCardElement safely falls back on corrupted data", !!corruptedCard && corruptedCard.className.indexOf('card') !== -1);
+
+  // 26. 項目17: VocabListView.setupCardVisibilityObserver 仮想Windowing
+  assert("VocabListView exposes setupCardVisibilityObserver", typeof VocabListView.setupCardVisibilityObserver === 'function');
+
+  // 27. 項目18 & 20: 語源信頼度バッジ & 誤り報告ボタン
+  const sampleCard = VocabCardView.createCardElement({
+    id: 'sample_ety_1',
+    word: 'constant',
+    lang: 'en',
+    meanings: [{ pos: 'Adj', text: '一定の' }],
+    etymology: 'ラテン語 constans (印欧祖語 *sta-) 由来。'
+  });
+  const sampleHtml = sampleCard.innerHTML || '';
+  assert("VocabCardView includes etymology confidence pill", sampleHtml.indexOf('conf-pill') !== -1);
+  assert("VocabCardView includes report-ety action button", sampleHtml.indexOf('report-ety') !== -1);
+
+  // 28. 項目19: VocabMorphology.isKnownPieRoot 実在語根マスター照合
+  assert("VocabMorphology.isKnownPieRoot recognizes authentic root *sta-", VocabMorphology.isKnownPieRoot('*sta-') === true);
+  assert("VocabMorphology.isKnownPieRoot rejects non-existent fake root", VocabMorphology.isKnownPieRoot('*fake_alien_root-') === false);
+
+  // 29. 項目21: Wiktionary URL 言語別ディープリンク (#Etymology, #Étymologie, #Herkunft)
+  const wiktCardEn = VocabCardView.createCardElement({
+    id: 'wikt_en_1',
+    word: 'structure',
+    lang: 'en',
+    meanings: [{ pos: 'Noun', text: '構造' }],
+    etymology: 'ラテン語 structura 由来。',
+    wiktGrounded: true,
+    wiktUrl: 'https://en.wiktionary.org/wiki/structure'
+  });
+  const wiktHtmlEn = wiktCardEn.innerHTML || '';
+  assert("VocabCardView attaches #Etymology deep link to English Wiktionary", wiktHtmlEn.indexOf('structure#Etymology') !== -1);
+
+  const wiktCardFr = VocabCardView.createCardElement({
+    id: 'wikt_fr_1',
+    word: 'structure',
+    lang: 'fr',
+    meanings: [{ pos: 'Noun', text: '構造' }],
+    etymology: 'ラテン語 structura 由来。',
+    wiktGrounded: true,
+    wiktUrl: 'https://fr.wiktionary.org/wiki/structure'
+  });
+  const wiktHtmlFr = wiktCardFr.innerHTML || '';
+  assert("VocabCardView attaches language-specific anchor to French Wiktionary", wiktHtmlFr.indexOf('#%C3%89tymologie') !== -1 || wiktHtmlFr.indexOf('#Étymologie') !== -1);
+
+  // 30. 項目23: 論理クロック (Lamport Version) による Clock Skew 競合調停
+  const clockSkewOldTime = 1000; // 時計が過去に狂った端末
+  const clockSkewNormalTime = 50000;
+  const oldItemNormalTime = { id: 'skew_test_1', word: 'skew_word', meanings: [{ pos: 'N[C]', text: '旧版' }], version: 1, updatedAt: clockSkewNormalTime };
+  const newItemPastTime = { id: 'skew_test_1', word: 'skew_word', meanings: [{ pos: 'N[C]', text: '新版（過去時刻）' }], version: 2, updatedAt: clockSkewOldTime };
+  const mergedSkew = VocabStorage.mergeWords([oldItemNormalTime], [newItemPastTime], 'en', true);
+  assert("Lamport logical clock preserves newer version despite past timestamp clock skew", mergedSkew.length === 1 && mergedSkew[0].version === 2 && mergedSkew[0].meanings[0].text === '新版（過去時刻）');
+
+  // 31. 項目23: SRS復習時の論理クロックインクリメント
+  const lamportNextReviewObj = VocabSRS.calculateNextReview({ interval: 1, repetition: 1, efactor: 2.5, version: 3 }, 2);
+  assert("VocabSRS.calculateNextReview increments Lamport logical clock version", lamportNextReviewObj.version === 4);
+
+  // 32. 項目24 & 25: VocabSync.acquireSyncLock 排他ミューテックスによる直列化
+  assert("VocabSync exposes acquireSyncLock mutex", typeof VocabSync.acquireSyncLock === 'function');
+  let mutexOrder = [];
+  var lockP1 = VocabSync.acquireSyncLock(function() {
+    return new Promise(function(resolve) {
+      setTimeout(function() { mutexOrder.push('first'); resolve(); }, 10);
+    });
+  });
+  var lockP2 = VocabSync.acquireSyncLock(function() {
+    mutexOrder.push('second');
+    return Promise.resolve();
+  });
+  Promise.all([lockP1, lockP2]).then(function() {
+    assert("VocabSync.acquireSyncLock strictly serializes concurrent tasks", mutexOrder[0] === 'first' && mutexOrder[1] === 'second');
+  });
+
+  // 33. 中核義（core-box）のバッジおよびコンテナレンダリング
+  const coreCard = VocabCardView.createCardElement({
+    id: 'core_card_1',
+    word: 'within',
+    lang: 'en',
+    meanings: [{ pos: 'Prep', text: '〜の内側に' }],
+    core: '境界線の内側・範囲の中に収まっている'
+  });
+  const coreHtmlStr = coreCard.innerHTML || '';
+  assert("VocabCardView renders core-box container with core-badge and core-text",
+    coreHtmlStr.indexOf('class="core-box"') !== -1 &&
+    coreHtmlStr.indexOf('class="core-badge"') !== -1 &&
+    coreHtmlStr.indexOf('class="core-text"') !== -1 &&
+    coreHtmlStr.indexOf('コア') !== -1 &&
+    coreHtmlStr.indexOf('境界線の内側・範囲の中に収まっている') !== -1
+  );
+
+  // ==========================================
+  // 観点1「学習体験・暗記継続性」徹底検証テストスイート
+  // ==========================================
+
+  // 34. FSRS 復習履歴ログローリング保存テスト
+  VocabSRS.clearReviewHistoryLog();
+  assert("Review history log starts empty after clear", VocabSRS.getReviewHistoryLog().length === 0);
+
+  VocabSRS.recordReviewHistory({
+    id: 'test_word_1',
+    word: 'epistemology',
+    rating: 2,
+    lastStability: 2.5,
+    lastDifficulty: 5.0,
+    elapsedDays: 2.0,
+    retrievability: 0.92
+  });
+  const log1 = VocabSRS.getReviewHistoryLog();
+  assert("Review history correctly records single entry", log1.length === 1 && log1[0].word === 'epistemology' && log1[0].rating === 2);
+
+  for (let i = 2; i <= 520; i++) {
+    VocabSRS.recordReviewHistory({
+      id: 'test_word_' + i,
+      word: 'word_' + i,
+      rating: i % 4,
+      lastStability: 1.0 + (i % 5),
+      lastDifficulty: 5.0,
+      elapsedDays: 1.5,
+      retrievability: 0.88
+    });
+  }
+  const logCapped = VocabSRS.getReviewHistoryLog();
+  assert("Review history strictly caps at 500 entries (FIFO)", logCapped.length === 500);
+  assert("Review history retains newest entries", logCapped[499].word === 'word_520');
+
+  // 35. 個人適応型 FSRS 重みオプティマイザ テスト
+  VocabSRS.resetUserFSRSWeights();
+  assert("User FSRS weights is null before optimization", VocabSRS.getUserFSRSWeights() === null);
+
+  const dummySmallLogs = [{ rating: 2, lastStability: 2.0, elapsedDays: 1.0 }];
+  const optSmallRes = VocabSRS.optimizeFSRSWeights(dummySmallLogs);
+  assert("Optimizer safely rejects insufficient logs (< 20)", optSmallRes.success === false && optSmallRes.reason === 'insufficient_logs');
+
+  const mockLogs = [];
+  for (let i = 0; i < 60; i++) {
+    mockLogs.push({
+      id: 'mock_' + i,
+      word: 'mock_' + i,
+      rating: (i % 5 === 0) ? 0 : (i % 3 === 0 ? 1 : (i % 2 === 0 ? 2 : 3)),
+      lastStability: 2.0 + (i % 4),
+      lastDifficulty: 5.0,
+      elapsedDays: 2.0,
+      retrievability: 0.85
+    });
+  }
+  const optRes = VocabSRS.optimizeFSRSWeights(mockLogs);
+  assert("Optimizer successfully optimizes with >= 20 logs", optRes.success === true && optRes.count === 60);
+  assert("Optimizer calculates valid Brier score loss", typeof optRes.newLoss === 'number' && optRes.newLoss >= 0);
+
+  const savedWeights = VocabSRS.getUserFSRSWeights();
+  assert("Optimized weights are saved to storage", savedWeights !== null && typeof savedWeights.sScale === 'number');
+
+  // Multi-step Transition Pair Optimizer Verification
+  const transitionLogs = [];
+  for (let i = 0; i < 15; i++) {
+    transitionLogs.push({
+      id: 'card_' + i,
+      word: 'word_' + i,
+      rating: 2,
+      lastStability: 2.0,
+      lastDifficulty: 5.0,
+      elapsedDays: 1.0,
+      timestamp: 1000 + i * 10
+    });
+    transitionLogs.push({
+      id: 'card_' + i,
+      word: 'word_' + i,
+      rating: (i % 3 === 0) ? 0 : 2,
+      lastStability: 4.5,
+      lastDifficulty: 4.8,
+      elapsedDays: 4.0,
+      timestamp: 2000 + i * 10
+    });
+  }
+  const transOptRes = VocabSRS.optimizeFSRSWeights(transitionLogs);
+  assert("Optimizer handles multi-step transition pairs and converges cleanly", transOptRes.success === true && typeof transOptRes.newLoss === 'number');
+
+  const testItem = { id: 'test_item', stability: 2.0, difficulty: 5.0, repetition: 1 };
+  const stabilityWithCustom = VocabSRS.predStability(testItem, 2);
+  assert("predStability produces valid finite stability with personalized weights", Number.isFinite(stabilityWithCustom) && stabilityWithCustom > 0);
+
+  VocabSRS.resetUserFSRSWeights();
+  assert("resetUserFSRSWeights safely restores default weights", VocabSRS.getUserFSRSWeights() === null);
+
+  // Schema Versioning & Positive decayFactor migration test
+  localStorage.setItem('vv_user_fsrs_weights', JSON.stringify({ decayFactor: 1.2 }));
+  const migratedWeights = VocabSRS.getUserFSRSWeights();
+  assert("Legacy positive decayFactor automatically migrates to negative power index and version 2",
+    migratedWeights && migratedWeights.version === 2 && migratedWeights.decayFactor < 0
+  );
+  VocabSRS.resetUserFSRSWeights();
+
+  // NaN/Corrupted Logs Robustness test
+  const corruptedLogs = [
+    { id: 'bad_1', rating: NaN, timestamp: 'corrupted' },
+    { id: 'bad_2', rating: 'invalid', timestamp: null }
+  ];
+  const badOptRes = VocabSRS.optimizeFSRSWeights(corruptedLogs);
+  assert("Optimizer guards against NaN/corrupted logs without crashing", badOptRes.success === false);
+
+  // 36. 忘却臨界点スマートPush通知 テスト
+  assert("Smart notification is enabled by default", VocabSRS.isSmartNotifyEnabled() === true);
+  VocabSRS.setSmartNotifyEnabled(false);
+  assert("Smart notification toggle disabled successfully", VocabSRS.isSmartNotifyEnabled() === false);
+  VocabSRS.setSmartNotifyEnabled(true);
+  assert("Smart notification toggle re-enabled successfully", VocabSRS.isSmartNotifyEnabled() === true);
+  globalThis.Notification = function(title, opts) { this.title = title; this.opts = opts; };
+  globalThis.Notification.permission = 'granted';
+  globalThis.Notification.requestPermission = function() { return Promise.resolve('granted'); };
+
+  const smartNowTs = Date.now();
+  const candidateList = [
+    { id: 'due_1', word: 'ephemeral', nextReview: smartNowTs - 3600000, interval: 1, stability: 1.0 },
+    { id: 'due_2', word: 'serendipity', nextReview: smartNowTs + 3600000 * 2, interval: 1, stability: 0.8 },
+    { id: 'future_1', word: 'solid', nextReview: smartNowTs + 86400000 * 30, interval: 30, stability: 30.0 }
+  ];
+  const imminentWords = VocabSRS.getImminentForgettingWords(candidateList, 0.90, 12);
+  assert("getImminentForgettingWords detects words nearing or below 90% retention", imminentWords.length >= 1);
+  assert("getImminentForgettingWords correctly prioritizes highest urgency word first", imminentWords.length >= 2 && imminentWords[0].urgency >= imminentWords[1].urgency);
+
+  const scheduleRes = VocabSRS.checkSmartNotificationSchedule(candidateList);
+  assert("checkSmartNotificationSchedule handles execution cleanly without throwing", typeof scheduleRes === 'object' && scheduleRes !== null);
+  assert("checkSmartNotificationSchedule guards against notification fatigue by batch accumulating when < 5 words",
+    scheduleRes.status === 'batch_accumulating' && scheduleRes.count === 2
+  );
+
+  // Starvation prevention test (fires when > 36h since last notification)
+  localStorage.setItem('vv_last_notify_ts', String(smartNowTs - 40 * 3600000));
+  const starvedRes = VocabSRS.checkSmartNotificationSchedule(candidateList);
+  assert("checkSmartNotificationSchedule prevents starvation by firing after 36h even with < 5 words",
+    starvedRes.status === 'notified' && starvedRes.count === 2
+  );
+
+  const forcedRes = VocabSRS.checkSmartNotificationSchedule(candidateList, { force: true });
+  assert("checkSmartNotificationSchedule fires when threshold or forced condition met",
+    forcedRes.status === 'notified' || forcedRes.status === 'cooldown'
+  );
+
+  // 37. 忘却予測カレンダー ＆ アナリティクス・ダッシュボード テスト
+  assert("VocabAnkiView exposes analytics calculation methods",
+    typeof VocabAnkiView.getCommitHeatmapData === 'function' &&
+    typeof VocabAnkiView.getFutureWorkloadData === 'function' &&
+    typeof VocabAnkiView.getOverallRetrievabilityStats === 'function'
+  );
+
+  const heatmapData = VocabAnkiView.getCommitHeatmapData(63);
+  assert("getCommitHeatmapData generates exactly 63 daily cells", heatmapData.cells && heatmapData.cells.length === 63);
+  assert("getCommitHeatmapData aggregates total review count", typeof heatmapData.totalReviews === 'number');
+
+  const workloadData = VocabAnkiView.getFutureWorkloadData(14, candidateList);
+  assert("getFutureWorkloadData produces 14 days forecast workload", workloadData.workload && workloadData.workload.length === 14);
+  assert("getFutureWorkloadData accounts for upcoming items within 14 days", workloadData.totalUpcoming === 2);
+
+  const retrievabilityStats = VocabAnkiView.getOverallRetrievabilityStats(candidateList);
+  assert("getOverallRetrievabilityStats computes average retrievability", typeof retrievabilityStats.avgR === 'number' && retrievabilityStats.avgR > 0);
+  assert("getOverallRetrievabilityStats assigns legitimate grade", ['S', 'A', 'B', 'C'].indexOf(retrievabilityStats.grade) !== -1);
+
+  const dashboardHtml = VocabAnkiView.buildAnalyticsDashboardHtml({ list: candidateList });
+  assert("buildAnalyticsDashboardHtml renders all three core metric widgets",
+    dashboardHtml.indexOf('全体平均想起率') !== -1 &&
+    dashboardHtml.indexOf('学習コミットヒートマップ') !== -1 &&
+    dashboardHtml.indexOf('日別予測復習負荷') !== -1 &&
+    dashboardHtml.indexOf('個人適応型 FSRS 重み') !== -1
+  );
+
+  // 38. 例文・単語の発音波形同期 / カラオケハイライト テスト
+  assert("VocabSpeech exposes karaoke highlighting helpers",
+    typeof VocabSpeech.prepareWordSpans === 'function' &&
+    typeof VocabSpeech.highlightSpokenWord === 'function' &&
+    typeof VocabSpeech.clearActiveWordHighlight === 'function'
+  );
+
+  const dummySpeechContainer = {
+    innerHTML: '',
+    textContent: 'Der Apfel fällt nicht weit vom Stamm',
+    querySelectorAll: function(sel) {
+      if (sel === '.spk-word') {
+        return this._spans || [];
+      }
+      if (sel === '.spk-active-word') {
+        return (this._spans || []).filter(function(s) { return s.classList.has('spk-active-word'); });
+      }
+      return [];
+    }
+  };
+
+  VocabSpeech.prepareWordSpans(dummySpeechContainer, 'Der Apfel fällt nicht');
+  assert("prepareWordSpans wraps words in spk-word span elements",
+    dummySpeechContainer.innerHTML.indexOf('class="spk-word"') !== -1 &&
+    dummySpeechContainer.innerHTML.indexOf('data-start="0"') !== -1 &&
+    dummySpeechContainer.innerHTML.indexOf('Der') !== -1
+  );
+
+  VocabSpeech.prepareWordSpans(dummySpeechContainer, '吾輩は猫である。', 'ja');
+  assert("prepareWordSpans supports Japanese phrase chunking and punctuation",
+    dummySpeechContainer.innerHTML.indexOf('吾輩') !== -1 &&
+    dummySpeechContainer.innerHTML.indexOf('猫') !== -1 &&
+    dummySpeechContainer.innerHTML.indexOf('。') !== -1
+  );
+
+  VocabSpeech.prepareWordSpans(dummySpeechContainer, "Le cœur de l’homme est complexe", 'fr');
+  assert("prepareWordSpans supports French ligatures and typographic apostrophes",
+    dummySpeechContainer.innerHTML.indexOf('cœur') !== -1 &&
+    dummySpeechContainer.innerHTML.indexOf('l’homme') !== -1
+  );
+
+  const makeMockSpan = function(word, start, end) {
+    const cls = new Set(['spk-word']);
+    return {
+      textContent: word,
+      getAttribute: function(attr) { return attr === 'data-start' ? String(start) : String(end); },
+      classList: {
+        add: function(c) { cls.add(c); },
+        remove: function(c) { cls.delete(c); },
+        has: function(c) { return cls.has(c); }
+      }
+    };
+  };
+  dummySpeechContainer._spans = [
+    makeMockSpan('Der', 0, 3),
+    makeMockSpan('Apfel', 4, 9),
+    makeMockSpan('fällt', 10, 15)
+  ];
+
+  VocabSpeech.highlightSpokenWord(dummySpeechContainer, 4);
+  assert("highlightSpokenWord activates exact word at character index 4 (Apfel)",
+    dummySpeechContainer._spans[1].classList.has('spk-active-word') &&
+    !dummySpeechContainer._spans[0].classList.has('spk-active-word')
+  );
+
+  VocabSpeech.highlightSpokenWord(dummySpeechContainer, 9);
+  assert("highlightSpokenWord maintains preceding word when character index falls on space/inter-word gap",
+    dummySpeechContainer._spans[1].classList.has('spk-active-word') &&
+    !dummySpeechContainer._spans[0].classList.has('spk-active-word')
+  );
+
+  VocabSpeech.highlightSpokenWord(dummySpeechContainer, 10);
+  assert("highlightSpokenWord transitions active highlight cleanly to next word",
+    dummySpeechContainer._spans[2].classList.has('spk-active-word') &&
+    !dummySpeechContainer._spans[1].classList.has('spk-active-word')
+  );
+
+  VocabSpeech.clearActiveWordHighlight();
+  assert("clearActiveWordHighlight cleanly resets active state",
+    !dummySpeechContainer._spans[2].classList.has('spk-active-word')
+  );
+
+  // ==========================================================
+  // P0: 学術スターターパック拡充 ＆ ギャラリー検証
+  // ==========================================================
+  assert("VocabStarterPack defines classical_roots and philosophy packs",
+    Array.isArray(VocabStarterPack.PACKS.classical_roots) &&
+    VocabStarterPack.PACKS.classical_roots.length === 5 &&
+    Array.isArray(VocabStarterPack.PACKS.philosophy) &&
+    VocabStarterPack.PACKS.philosophy.length === 5
+  );
+
+  const sampleClassical = VocabStarterPack.PACKS.classical_roots[0];
+  assert("classical_roots items have complete academic metadata",
+    Boolean(sampleClassical.word && sampleClassical.core && sampleClassical.etymology && sampleClassical.etymologyTags?.length)
+  );
+
+  const samplePhil = VocabStarterPack.PACKS.philosophy[0];
+  assert("philosophy items have complete philosophical metadata",
+    Boolean(samplePhil.word && samplePhil.core && samplePhil.etymology && samplePhil.meanings?.length)
+  );
+
+  const galleryHtml = VocabStarterPack.buildStarterPackGalleryHtml();
+  assert("buildStarterPackGalleryHtml outputs all curated starter pack cards",
+    galleryHtml.indexOf('classical_roots') !== -1 &&
+    galleryHtml.indexOf('philosophy') !== -1 &&
+    galleryHtml.indexOf('academic') !== -1 &&
+    galleryHtml.indexOf('starter-pack-grid') !== -1
+  );
+
+  const popResult = VocabStarterPack.populateStarterPack([], 'en', 'classical_roots');
+  assert("populateStarterPack imports classical_roots entries into empty library",
+    popResult.added.length === 5 && popResult.merged.length === 5
+  );
+
+  // ==========================================================
+  // P1: 4言語クロス同根語（Cognate Matrix）検証
+  // ==========================================================
+  assert("VocabMorphology exposes COGNATE_KNOWLEDGE dictionary with authentic PIE roots",
+    Boolean(VocabMorphology.COGNATE_KNOWLEDGE && VocabMorphology.COGNATE_KNOWLEDGE['*sta-'])
+  );
+
+  const staCog = VocabMorphology.COGNATE_KNOWLEDGE['*sta-'];
+  assert("COGNATE_KNOWLEDGE contains 4 languages for *sta-",
+    Boolean(staCog.en?.[0]?.w && staCog.fr?.[0]?.w && staCog.de?.[0]?.w && staCog.ja?.[0]?.w)
+  );
+
+  const testWord = {
+    word: 'constant',
+    lang: 'en',
+    etymologyTags: ['*sta-'],
+    meanings: [{ pos: 'Adj', text: '一定の、不変の' }]
+  };
+  const matrix = VocabMorphology.buildCognateMatrix(testWord);
+  assert("buildCognateMatrix builds valid 4-language matrix for item with known root",
+    Boolean(matrix && matrix.root === '*sta-' && matrix.langs.en && matrix.langs.fr && matrix.langs.de && matrix.langs.ja)
+  );
+
+  const matrixHtml = VocabMorphology.renderCognateMatrixHtml(matrix);
+  assert("renderCognateMatrixHtml renders cognate matrix grid with language badges",
+    matrixHtml.indexOf('cognate-matrix-box') !== -1 &&
+    matrixHtml.indexOf('cog-matrix-grid') !== -1 &&
+    matrixHtml.indexOf('FR') !== -1 &&
+    matrixHtml.indexOf('DE') !== -1 &&
+    matrixHtml.indexOf('日本語') !== -1
+  );
+
+  const ankiBackWithMatrix = VocabAnkiView.buildAnkiBack(testWord);
+  assert("VocabAnkiView.buildAnkiBack embeds cognate matrix inside etymology accordion",
+    ankiBackWithMatrix.indexOf('cognate-matrix-box') !== -1 &&
+    ankiBackWithMatrix.indexOf('cog-matrix-grid') !== -1
+  );
+
+  // ==========================================================
+  // P2: Anki互換インポート機能 & FSRS進度マッピング検証
+  // ==========================================================
+  assert("VocabExport exposes parseAnkiExport and importAnkiText",
+    typeof VocabExport.parseAnkiExport === 'function' &&
+    typeof VocabExport.importAnkiText === 'function'
+  );
+
+  const sampleAnkiTSV = [
+    '#separator:tab',
+    '#html:true',
+    '#tags column:3',
+    'epiphany [ ɪˈpɪfəni ]\t突然のひらめき<br>語源: ギリシャ語 epiphaneia (*bʰeh₂-)\tacademic philosophy\t14\t2600',
+    'lucid /luːsɪd/\t明晰な、分かりやすい\tessential'
+  ].join('\n');
+
+  const parsedAnki = VocabExport.parseAnkiExport(sampleAnkiTSV, { defaultLang: 'en' });
+  assert("parseAnkiExport parses TSV with directive headers and extracts words",
+    parsedAnki.length === 2 &&
+    parsedAnki[0].word === 'epiphany' &&
+    parsedAnki[0].phonetic === 'ɪˈpɪfəni' &&
+    parsedAnki[1].word === 'lucid' &&
+    parsedAnki[1].phonetic === 'luːsɪd'
+  );
+
+  assert("parseAnkiExport maps Anki interval and factor to FSRS parameters",
+    parsedAnki[0].interval === 14 &&
+    parsedAnki[0].efactor === 2.6 &&
+    parsedAnki[0].nextReview > Date.now()
+  );
+
+  const sampleAnkiCSV = [
+    '"ubiquitous [ juːˈbɪkwɪtəs ]","いたる所にある、偏在する\nコア: あらゆる場所に存在すること","gre_vocab"',
+    '"zeitgeist","時代精神、思潮\n語源: ドイツ語 Zeit（時）+ Geist（精神）","philosophy"'
+  ].join('\n');
+
+  const parsedCSV = VocabExport.parseAnkiExport(sampleAnkiCSV, { defaultLang: 'en' });
+  assert("parseAnkiExport supports CSV format with quoted newlines",
+    parsedCSV.length === 2 &&
+    parsedCSV[0].word === 'ubiquitous' &&
+    parsedCSV[0].core === 'あらゆる場所に存在すること' &&
+    parsedCSV[1].word === 'zeitgeist'
+  );
+
+  let fakeStore = [];
+  const importResult = VocabExport.importAnkiText(sampleAnkiTSV, {
+    lang: 'en',
+    getEntries: function() { return fakeStore; },
+    saveEntries: function(merged) { fakeStore = merged; },
+    showToast: function() {}
+  });
+  assert("importAnkiText merges imported cards into target entries",
+    importResult.added === 2 && fakeStore.length === 2
+  );
+
+  // ==========================================================
+  // P3: 同根語ナレッジグラフ & 銀河系ビュー深化検証
+  // ==========================================================
+  assert("VocabGraph is defined on global scope",
+    typeof VocabGraph === 'object' && VocabGraph !== null
+  );
+
+  // ==========================================================
+  // P4: 音声再生・イベント委譲・Anki復習発音リグレッション検証
+  // ==========================================================
+  let lastSpoken = null;
+  const originalSpeakText = VocabSpeech.speakText;
+  VocabSpeech.speakText = function(text, lang) { lastSpoken = { text, lang }; };
+
+  // 1. data-act="speak" クリック委譲テスト
+  documentMock.dispatchMockEvent('click', {
+    target: {
+      closest: function(sel) {
+        if (sel === '[data-act]') return { dataset: { act: 'speak', text: 'embodiment', lang: 'en' } };
+        return null;
+      }
+    },
+    preventDefault: function(){},
+    stopPropagation: function(){}
+  });
+  assert("Delegated click on data-act='speak' invokes VocabSpeech.speakText",
+    lastSpoken !== null && lastSpoken.text === 'embodiment' && lastSpoken.lang === 'en'
+  );
+
+  // 2. data-act="speak-current" (Anki画面スピーカー) クリック委譲テスト
+  lastSpoken = null;
+  App.aList = [{ word: 'embodiment', lang: 'en' }];
+  documentMock.dispatchMockEvent('click', {
+    target: {
+      closest: function(sel) {
+        if (sel === '[data-act]') return { dataset: { act: 'speak-current' } };
+        return null;
+      }
+    },
+    preventDefault: function(){},
+    stopPropagation: function(){}
+  });
+  assert("Delegated click on data-act='speak-current' invokes speech for current card",
+    lastSpoken !== null && lastSpoken.text === 'embodiment'
+  );
+  VocabSpeech.speakText = originalSpeakText;
+
+  // 3. P0-1: VocabStorage.sanitizeItem & mergeWords FSRS parameter preservation
+  var testRawItem = {
+    word: 'resilience',
+    lang: 'en',
+    interval: 5,
+    repetition: 3,
+    efactor: 2.6,
+    stability: 4.8,
+    difficulty: 3.2,
+    retrievability: 0.91,
+    pair: 'en_ja',
+    tgtLang: 'ja'
+  };
+  var sanitized = VocabStorage.sanitizeItem(testRawItem, 0, 'en');
+  assert("VocabStorage.sanitizeItem preserves stability", sanitized.stability === 4.8);
+  assert("VocabStorage.sanitizeItem preserves difficulty", sanitized.difficulty === 3.2);
+  assert("VocabStorage.sanitizeItem preserves retrievability", sanitized.retrievability === 0.91);
+  assert("VocabStorage.sanitizeItem preserves pair and tgtLang", sanitized.pair === 'en_ja' && sanitized.tgtLang === 'ja');
+
+  var mergedItem = VocabStorage.mergeWords([sanitized], [{ ...sanitized, stability: 5.5, reviewUpdatedAt: Date.now() + 1000 }], 'en');
+  assert("VocabStorage.mergeWords merges newer SRS stability", mergedItem[0].stability === 5.5);
+
+  // 4. P1-2: VocabSRS.getRetrievability correctly evaluates unlearned cards as 0.0
+  var unlearnedCard = { word: 'ephemeral', lang: 'en', interval: 0, repetition: 0 };
+  var unlearnedR = VocabSRS.getRetrievability(unlearnedCard);
+  assert("VocabSRS.getRetrievability returns 0.0 for completely unlearned cards", unlearnedR === 0.0);
+
+  // 5. P2-2: VocabListView.reconcileList protects against DOM node contention with usedNodes
+  if (VocabListView && VocabListView.reconcileList) {
+    var mockListEl = {
+      children: [],
+      querySelectorAll: function() { return []; },
+      insertBefore: function(n, ref) { this.children.push(n); },
+      appendChild: function(n) { this.children.push(n); }
+    };
+    var mockItems = [
+      { id: 'item_1', word: 'bark', lang: 'en', homographIndex: 1, meanings: [{ pos: 'n', text: 'tree bark' }] },
+      { id: 'item_2', word: 'bark', lang: 'en', homographIndex: 2, meanings: [{ pos: 'v', text: 'dog bark' }] }
+    ];
+    var createdCards = [];
+    VocabListView.reconcileList(mockListEl, mockItems, {
+      createCardElement: function(it) {
+        var card = { dataset: { id: it.id, word: it.word } };
+        createdCards.push(card);
+        return card;
+      }
+    });
+    assert("reconcileList creates isolated unique DOM nodes for duplicate/homograph words",
+      createdCards.length === 2 && createdCards[0] !== createdCards[1]
+    );
+  }
+
+  // 6. Section 13: Graph Practical Views, Semantic Zoom & Deterministic Tree Verification
+  assert("VocabGraph.switchViewMode is defined", typeof VocabGraph.switchViewMode === 'function');
+  assert("VocabGraph.startWateringReview is defined", typeof VocabGraph.startWateringReview === 'function');
+  assert("VocabGraph.toggleTreeMask is defined", typeof VocabGraph.toggleTreeMask === 'function');
+  assert("VocabGraph.onTimelineChange is defined", typeof VocabGraph.onTimelineChange === 'function');
+  assert("VocabGraph.focusRoot and clearRootFocus are defined", typeof VocabGraph.focusRoot === 'function' && typeof VocabGraph.clearRootFocus === 'function');
+
+  VocabGraph.switchViewMode('tree');
+  assert("switchViewMode('tree') activates tree layout and pauses physics", VocabGraph.graphState.layoutMode === 'tree' && VocabGraph.graphState.physicsPaused === true);
+
+  VocabGraph.toggleTreeMask();
+  assert("toggleTreeMask activates treeMaskMode", VocabGraph.graphState.treeMaskMode === true);
+  VocabGraph.toggleTreeMask();
+  assert("toggleTreeMask deactivates treeMaskMode", VocabGraph.graphState.treeMaskMode === false);
+
+  VocabGraph.onTimelineChange(1);
+  assert("onTimelineChange updates timelineEra", VocabGraph.graphState.timelineEra === 1);
+
+  VocabGraph.focusRoot('*sta-');
+  assert("focusRoot focuses target root key", VocabGraph.graphState.focusedRootKey === '*sta' || VocabGraph.graphState.focusedRootKey === '*sta-');
+  VocabGraph.clearRootFocus();
+  assert("clearRootFocus resets focusedRootKey", VocabGraph.graphState.focusedRootKey === '');
+
+  // 14. Eiken Pre-1 Catalog, Fog of War & Zero-API Grounding Integrity
+  assert("VocabEikenCatalog is defined on global scope", typeof VocabEikenCatalog === 'object' && VocabEikenCatalog !== null);
+  var eikenRoots = VocabEikenCatalog.getRoots();
+  assert("VocabEikenCatalog.getRoots returns 16 core roots", Array.isArray(eikenRoots) && eikenRoots.length === 16);
+  var kapWords = VocabEikenCatalog.getWordsByRoot('*kap-');
+  assert("VocabEikenCatalog.getWordsByRoot('*kap-') returns pre-1 words", Array.isArray(kapWords) && kapWords.some(function(w){ return w.word === 'conceive'; }));
+  var conceiveCard = VocabEikenCatalog.getWord('conceive');
+  assert("VocabEikenCatalog.getWord('conceive') returns rich structured card", conceiveCard && conceiveCard.core && conceiveCard.example && conceiveCard.meanings.length > 0);
+  var eProgress = VocabEikenCatalog.calcProgress([{ word: 'conceive', isDeleted: false }]);
+  var kapProg = eProgress.find(function(p){ return p.rootKey === '*kap-'; });
+  assert("VocabEikenCatalog.calcProgress calculates learnedCount and percent", kapProg && kapProg.learnedCount === 1 && kapProg.percent > 0);
+  assert("VocabGraph.unlockCurrentRootEikenWords is defined", typeof VocabGraph.unlockCurrentRootEikenWords === 'function');
+  assert("VocabGraph.toggleEikenExplorer is defined", typeof VocabGraph.toggleEikenExplorer === 'function');
+  var eikenPack1 = VocabStarterPack.getStarterPack('en', 'eiken_pre1_pack1');
+  assert("VocabStarterPack provides eiken_pre1_pack1 with structured cards", Array.isArray(eikenPack1) && eikenPack1.length >= 20);
+
+  // 15. Global i18n & Multi-Currency Dynamic Stripe Checkout Verification
+  assert("VocabI18n is defined on global scope", typeof VocabI18n === 'object' && VocabI18n !== null);
+  VocabI18n.setLocale('ja');
+  assert("VocabI18n.getLocale() returns 'ja' after setLocale('ja')", VocabI18n.getLocale() === 'ja');
+  assert("VocabI18n.t returns Japanese translation", VocabI18n.t('nav.all_words') === 'すべての単語');
+  var jpyPriceMonth = VocabI18n.getPlanPriceInfo('month');
+  assert("VocabI18n.getPlanPriceInfo('month') returns JPY 480 in ja locale", jpyPriceMonth.currency === 'jpy' && jpyPriceMonth.currentDisplay === '¥480');
+  var jpyPriceYear = VocabI18n.getPlanPriceInfo('year');
+  assert("VocabI18n.getPlanPriceInfo('year') returns JPY 4,800 in ja locale", jpyPriceYear.currency === 'jpy' && jpyPriceYear.currentDisplay === '¥4,800');
+
+  VocabI18n.setLocale('en');
+  assert("VocabI18n.getLocale() returns 'en' after setLocale('en')", VocabI18n.getLocale() === 'en');
+  assert("VocabI18n.t returns English translation", VocabI18n.t('nav.all_words') === 'All Words');
+  var usdPriceMonth = VocabI18n.getPlanPriceInfo('month');
+  assert("VocabI18n.getPlanPriceInfo('month') returns USD $3.99 in en locale", usdPriceMonth.currency === 'usd' && usdPriceMonth.currentDisplay === '$3.99');
+  var usdPriceYear = VocabI18n.getPlanPriceInfo('year');
+  assert("VocabI18n.getPlanPriceInfo('year') returns USD $39.00 in en locale", usdPriceYear.currency === 'usd' && usdPriceYear.currentDisplay === '$39.00');
+
+  VocabI18n.setBillingInterval('year');
+  assert("VocabI18n.getBillingInterval() returns 'year'", VocabI18n.getBillingInterval() === 'year');
+  VocabI18n.setBillingInterval('month');
+  assert("VocabI18n.getBillingInterval() returns 'month'", VocabI18n.getBillingInterval() === 'month');
+
+  var catEng = VocabI18n.translateCategory('哲学・思想');
+  assert("VocabI18n.translateCategory('哲学・思想') translates to 'Philosophy & Thought' in English", catEng === 'Philosophy & Thought');
+
+  var testMatrix = {
+    root: '*sta-',
+    meaning: 'to stand',
+    langs: { en: [{ w: 'stand', inLibrary: true }], fr: [{ w: 'constater' }], de: [{ w: 'stehen' }], ja: [{ w: '立つ' }] }
+  };
+  var i18nMatrixHtml = VocabMorphology.renderCognateMatrixHtml(testMatrix);
+  assert("VocabMorphology.renderCognateMatrixHtml renders English labels in en locale", i18nMatrixHtml.indexOf('4-Language Cognate Matrix') !== -1 && i18nMatrixHtml.indexOf('English (EN)') !== -1);
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

@@ -78,6 +78,8 @@ export interface VocabEntry {
     at?: number;
   };
   updatedAt: number;
+  /** 論理クロック（Lamport Version: 端末時計狂い Clock Skew 耐性） */
+  version?: number;
 }
 
 export interface LanguagePairConfig {
@@ -109,4 +111,42 @@ export interface QueueTask {
   isDone?: boolean;
   isFailed?: boolean;
   card?: HTMLElement | any;
+}
+
+export interface DailyAiUsageInfo {
+  limit: number;
+  used: number;
+  count: number;
+  remaining: number;
+  isUnlimited: boolean;
+  isPro: boolean;
+  isDev: boolean;
+  today: string;
+}
+
+export interface DailyOcrUsageInfo {
+  limit: number;
+  used: number;
+  remaining: number;
+  isUnlimited: boolean;
+  isPro: boolean;
+  isDev: boolean;
+  today: string;
+}
+
+export interface RootTreeProgress {
+  totalWords: number;
+  totalRoots: number;
+  leadingRoot: string;
+  leadingCount: number;
+  remToCluster: number;
+}
+
+export interface MetricsSummary {
+  totalWords: number;
+  cacheHits: number;
+  onDevice: number;
+  cloudGen: number;
+  tokensSaved: number;
+  cacheRate: number;
 }

@@ -158,6 +158,8 @@
 
     if (rawItems.length === 1 && existingMatches.length === 1 && !newItems.length) {
       // 単一の既登録語を入力した場合: 重複AI通信や二重登録を抑止し、該当カードへ瞬時にスクロール・ハイライト
+      const inW = typeof document !== 'undefined' ? document.getElementById('inWord') : null;
+      if (inW) { inW.value = ''; try { inW.blur(); } catch {} }
       const match = existingMatches[0];
       const jumpKey = match.homographIndex > 1 ? `${match.word}#${match.homographIndex}` : match.word;
       if (global.jumpToWord) global.jumpToWord(jumpKey, sLang);
@@ -195,9 +197,10 @@
     App._lastSubmitTs = now;
 
     const getKeyFn = global.getKey || (() => '');
-    if (!App.isDev && App.quotaRemaining === 0 && !getKeyFn() && global.VocabSync?.isCloudReady?.()) {
+    const usageInfo = global.VocabStorage?.getDailyAiUsageInfo ? global.VocabStorage.getDailyAiUsageInfo({ appState: App }) : null;
+    if (usageInfo && !usageInfo.isUnlimited && usageInfo.remaining <= 0 && !getKeyFn()) {
       if (global.openUpsellModal) {
-        global.openUpsellModal('今月のクラウドAI生成無料枠（30語）を消費しました。Proプランにアップグレードするか、内部組み込みAIエンジン（完全機密保護）をご利用ください。');
+        global.openUpsellModal('本日のAI新規生成無料枠（5語/日）に達しました。Proプランにアップグレードすると無制限に生成できます。');
       }
       return;
     }
@@ -481,13 +484,32 @@ etymology:${eInst}`;
           }
         } catch (proxyErr) {
           if (typeof console !== 'undefined' && console.warn) {
-            console.warn('[Proxy Fallback] Switching to built-in knowledge engine:', proxyErr?.message || proxyErr);
+            console.warn('[Proxy Error]', proxyErr?.message || proxyErr);
           }
+          // [P0-4 解決] クォータ上限時は内蔵ダミー生成へ逃げず、直ちにアップセルモーダルを提示して安全に停止
           if (proxyErr.isQuotaExceeded || proxyErr.status === 429) {
-            if (global.showToast) global.showToast('クラウドAI枠上限のため、内蔵AIエンジン(完全機密・オフライン)で自動生成します', 'info', 4000);
+            if (typeof global.openUpsellModal === 'function') {
+              global.openUpsellModal(proxyErr.message || '本日のAI新規生成無料枠（5語/日）に達しました。Proプランにアップグレードすると無制限に生成できます。');
+            }
+            if (global.showToast) {
+              global.showToast('本日の無料AI新規生成枠の上限に達しました。Proプランで無制限にご利用いただけます。', 'warn', 5000);
+            }
+            if (card) {
+              card.className = 'card gen-err';
+              card.dataset.retryItems = JSON.stringify(items);
+              card.dataset.fName = fName || '';
+              card.dataset.useHist = useHist ? '1' : '0';
+              card.dataset.useWikt = useWikt ? '1' : '0';
+              card.dataset.srcLang = sLang;
+              card.dataset.tgtLang = tLang;
+              card.dataset.pairKey = saveKey;
+              card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成枠上限（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">本日の無料枠(5語/日)に達しました。Proプランで無制限に生成できます。</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" onclick="openUpsellModal('無料枠到達')">アップグレード</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
+            }
+            syncPersistedQueue();
+            return false;
           }
 
-          // クラウドプロキシ未稼働時・オフライン時・クォータ到達時は内蔵エンジン (Wiktionary & 組み込み語源ナレッジ & 形態素合成) へシームレスにフォールバック
+          // クラウド一時障害・オフライン時のみ内蔵エンジン (Wiktionary & 組み込み語源ナレッジ & 形態素合成) へフォールバック
           if (genInternalFn) {
             if (stEl) stEl.textContent = '内蔵AIエンジン (完全機密保護) で生成中...';
             const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
@@ -551,7 +573,9 @@ etymology:${eInst}`;
       const getJsonFn = global.VocabCore?.getJson || global.getJson || global.VocabStorage?.getJson;
       const cur = [...(getJsonFn ? getJsonFn(saveKey) : [])], tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(saveKey) : new Map();
       let maxNum = cur.reduce((m, i) => Math.max(m, i.num || 0), 0);
-      const now = Date.now(), gen = { model: usedModel, pv: global.PROMPT_VERSION || 1, at: now }, matchedIndices = new Set();
+      const clearedAt = global.VocabStorage?.getClearedAt ? global.VocabStorage.getClearedAt(saveKey) : 0;
+      const now = Math.max(Date.now(), (Number(clearedAt) || 0) + 1);
+      const gen = { model: usedModel, pv: global.PROMPT_VERSION || 1, at: now }, matchedIndices = new Set();
       const sanitizeItemFn = global.VocabStorage?.sanitizeItem || global.sanitizeItem || (x => x);
       const verifyWiktFn = global.VocabDictionary?.verifyWiktGrounding || global.verifyWiktGrounding;
       const validateEntryFn = global.VocabMorphology?.validateEntry || global.validateEntry || (() => []);
@@ -597,18 +621,35 @@ etymology:${eInst}`;
             interval: ex.interval,
             repetition: ex.repetition,
             efactor: ex.efactor,
+            stability: ex.stability,
+            difficulty: ex.difficulty,
+            retrievability: ex.retrievability,
             nextReview: ex.nextReview > now ? ex.nextReview : now,
+            version: (Number(ex.version) || 1) + 1,
             updatedAt: now,
             reviewUpdatedAt: ex.reviewUpdatedAt || now,
             isDeleted: false
           });
         } else {
-          cur.push({ ...a, num: ++maxNum, folder: fName || undefined, updatedAt: now, reviewUpdatedAt: now, isDeleted: false });
+          cur.push({ ...a, num: ++maxNum, folder: fName || undefined, version: Number(a.version) || 1, updatedAt: now, reviewUpdatedAt: now, isDeleted: false });
         }
       });
 
       if (global.VocabStorage) global.VocabStorage.saveTombstones(saveKey, tombMap);
       if (setJsonFn) setJsonFn(saveKey, cur.map((it, i) => ({ ...it, num: i + 1 })), false, true);
+
+      if (global.VocabStorage && matchedIndices.size > 0) {
+        if (usedModel === 'shared-cache') {
+          global.VocabStorage.recordMetricsEvent('cache_hit', matchedIndices.size);
+        } else if (usedModel.includes('builtin') || usedModel.includes('on-device')) {
+          global.VocabStorage.recordMetricsEvent('on_device', matchedIndices.size);
+          global.VocabStorage.recordAiGenerationUsage(matchedIndices.size);
+        } else {
+          global.VocabStorage.recordMetricsEvent('ai_gen', matchedIndices.size);
+          global.VocabStorage.recordAiGenerationUsage(matchedIndices.size);
+        }
+      }
+      if (global.updCloudUI) global.updCloudUI();
 
       const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
       const missingItems = items.filter((_, i) => !matchedIndices.has(i));
@@ -640,7 +681,7 @@ etymology:${eInst}`;
     } catch (err) {
       if (err.isQuotaExceeded || err.status === 429 || (err.message && (err.message.includes('上限') || err.message.includes('クォータ')))) {
         card?.remove?.();
-        if (global.openUpsellModal) global.openUpsellModal(err.message || '今月のAI新規生成無料枠（30語）に達しました。');
+        if (global.openUpsellModal) global.openUpsellModal(err.message || '本日のAI新規生成無料枠（5語/日）に達しました。');
         if (task) task.isDone = true;
         return true;
       }

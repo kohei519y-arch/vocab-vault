@@ -46,18 +46,23 @@
     const remoteUpdByWk = new Map();
     const remoteRevUpdById = new Map();
     const remoteRevUpdByWk = new Map();
+    const remoteVerById = new Map();
+    const remoteVerByWk = new Map();
     (Array.isArray(remoteEntries) ? remoteEntries : []).forEach(r => {
       if (!r) return;
       const wk = r.wordKey || makeWordKeyFn(r.word, lang, r.meanings?.[0]?.pos, r.homographIndex);
       const rUpd = Number(r.updatedAt) || 1;
       const rRevUpd = Number(r.reviewUpdatedAt) || 0;
+      const rVer = Number(r.version) || 1;
       if (r.id) {
         remoteUpdById.set(r.id, rUpd);
         remoteRevUpdById.set(r.id, rRevUpd);
+        remoteVerById.set(r.id, rVer);
       }
       if (wk) {
         remoteUpdByWk.set(wk, rUpd);
         remoteRevUpdByWk.set(wk, rRevUpd);
+        remoteVerByWk.set(wk, rVer);
       }
     });
 
@@ -74,13 +79,19 @@
       const localUpd = Number(it.updatedAt) || 1;
       const localRevUpd = Number(it.reviewUpdatedAt) || 0;
       const localMaxTs = Math.max(localUpd, localRevUpd);
-      if (localMaxTs <= lastSyncAt) return false;
+      const localVer = Number(it.version) || 1;
 
       const rUpd = Math.max(remoteUpdById.get(it.id) || 0, remoteUpdByWk.get(it.wordKey) || 0);
       const rRevUpd = Math.max(remoteRevUpdById.get(it.id) || 0, remoteRevUpdByWk.get(it.wordKey) || 0);
+      const rVer = Math.max(remoteVerById.get(it.id) || 1, remoteVerByWk.get(it.wordKey) || 1);
 
-      const hasContentUpdate = localUpd > rUpd;
+      // 項目23: 論理クロック (Lamport Version) がリモートより進んでいる場合も確実にPush
+      const hasVersionUpdate = localVer > rVer;
+      const hasContentUpdate = localUpd > rUpd || hasVersionUpdate;
       const hasReviewUpdate = localRevUpd > rRevUpd;
+
+      if (localMaxTs <= lastSyncAt && !hasVersionUpdate) return false;
+
       return (hasContentUpdate || hasReviewUpdate) && !isTombstonedFn(it, mergedTombMap, lang, mergedClearedAt);
     });
 
@@ -106,6 +117,23 @@
 
   const DEFAULT_SUPABASE_URL = 'https://adeujoftwnoognfnyfuw.supabase.co';
   const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_PrZyawrfpRMWWl03AeHsDg_zi04RgG2';
+
+  // 項目25: オフライン復習キューと定期同期の衝突を防ぐアトミックトランザクションロック
+  let _syncMutex = Promise.resolve();
+
+  async function acquireSyncLock(taskFn) {
+    let release;
+    const nextLock = new Promise(resolve => { release = resolve; });
+    const currentLock = _syncMutex;
+    _syncMutex = _syncMutex.then(() => nextLock);
+
+    await currentLock;
+    try {
+      return await taskFn();
+    } finally {
+      release();
+    }
+  }
 
   function getConfig() {
     const url = (safeLsGet(SUPABASE_URL_KEY, '') || DEFAULT_SUPABASE_URL).trim().replace(/\/+$/, '');
@@ -207,7 +235,7 @@
     setSession(null);
   }
 
-  async function syncLangWithSupabase(lang, appHooks) {
+  async function syncLangWithSupabase(targetKeyOrLang, appHooks) {
     const cfg = getConfig();
     const token = await ensureValidToken();
     const sess = getSession();
@@ -215,7 +243,25 @@
       throw new Error('クラウド未ログインです。');
     }
     const uid = sess.user.id;
-    const lastSyncKey = `${LAST_SYNC_PREFIX}${uid}_${lang}`;
+    const rawTarget = String(targetKeyOrLang || 'en_ja').trim();
+    // [P0-2 解決] PostgreSQL CHECK (lang IN ('en','ja','fr','de')) 制約遵守と異言語ペア (en_en, fr_de 等) の完全分離
+    let dbLang = 'en', dbPair = 'en_ja';
+    if (rawTarget.startsWith('distinction_entries') && global.VocabStorage?.keyToPair) {
+      const p = global.VocabStorage.keyToPair(rawTarget);
+      dbLang = p.srcLang || 'en';
+      dbPair = `${dbLang}_${p.tgtLang || 'ja'}`;
+    } else if (/^[a-z]{2}_[a-z]{2}$/i.test(rawTarget)) {
+      const parts = rawTarget.toLowerCase().split('_');
+      dbLang = (['en', 'ja', 'fr', 'de'].includes(parts[0])) ? parts[0] : 'en';
+      const tgt = (['en', 'ja', 'fr', 'de'].includes(parts[1])) ? parts[1] : 'ja';
+      dbPair = `${dbLang}_${tgt}`;
+    } else {
+      dbLang = (['en', 'ja', 'fr', 'de'].includes(rawTarget)) ? rawTarget : 'en';
+      dbPair = `${dbLang}_ja`;
+    }
+    const targetKey = dbPair;
+
+    const lastSyncKey = `${LAST_SYNC_PREFIX}${uid}_${targetKey}`;
     const lastSyncAt = Number(safeLsGet(lastSyncKey, '0')) || 0;
     const headers = {
       apikey: cfg.anonKey,
@@ -223,9 +269,35 @@
       'Content-Type': 'application/json'
     };
 
-    // [P0-5 解決] PostgREST 1000件リミット回避: 決定論的ソート & 重複排除による完全Pullループ
-    async function fetchAllPaginated(baseUrl, idField = 'id') {
-      const PAGE_SIZE = 1000;
+    // [P0-3 解決] クライアント時計依存を完全排除: pull 前にサーバー現在時刻を取得
+    let serverNow = Date.now();
+    try {
+      const snRes = await fetch(`${cfg.url}/rest/v1/rpc/server_now_ms`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      if (snRes.ok) {
+        const snData = await snRes.json();
+        if (Number.isFinite(Number(snData)) && Number(snData) > 0) {
+          serverNow = Number(snData);
+        }
+      }
+    } catch (e) {
+      console.warn('[Sync] Failed to fetch server_now_ms, falling back to local time:', e);
+    }
+
+    // [P0-3 解決] 90日以上オフラインだった端末は墓石パージ済みリスクがあるため全件再同期
+    const TOMBSTONE_TTL_MS = 90 * 86400 * 1000;
+    let effectiveLastSyncAt = lastSyncAt;
+    if (lastSyncAt > 0 && (serverNow - lastSyncAt) > TOMBSTONE_TTL_MS) {
+      console.warn(`[Sync] Last sync was > 90 days ago (${new Date(lastSyncAt).toISOString()}). Falling back to full sync.`);
+      effectiveLastSyncAt = 0;
+    }
+
+    // [P0-5 & 項目24] PostgREST チャンク分割 Pull & 進捗通知
+    async function fetchAllPaginated(baseUrl, idField = 'id', onPageProgress = null) {
+      const PAGE_SIZE = 100;
       let allRows = [];
       let offset = 0;
       const seenKeys = new Set();
@@ -244,17 +316,35 @@
             allRows.push(row);
           }
         }
+        if (typeof onPageProgress === 'function') {
+          onPageProgress(allRows.length);
+        }
         if (rows.length < PAGE_SIZE) break;
         offset += PAGE_SIZE;
+        // UIスレッドを解放してプログレス表示を確実に再描画
+        await new Promise(res => setTimeout(res, 0));
       }
       return allRows;
     }
 
-    const uveCols = 'id,lang,word_key,num,word,homograph_index,folder,category,interval,repetition,efactor,next_review,updated_at,review_updated_at,is_deleted,card_data,server_updated_at';
+    const reportProgress = (msg) => {
+      if (typeof appHooks?.onSyncProgress === 'function') {
+        appHooks.onSyncProgress(targetKey, msg);
+      } else if (typeof document !== 'undefined') {
+        const badge = document.getElementById('cloudSyncBadge');
+        if (badge) badge.textContent = `同期中 (${targetKey.toUpperCase()}: ${msg})...`;
+      }
+    };
+
+    // [P0-3 解決] 取得条件は server_updated_at.gt のみに統一（updated_at 系の不整合ORを排除）
+    const uveCols = 'id,lang,pair,word_key,num,word,homograph_index,folder,category,interval,repetition,efactor,next_review,updated_at,review_updated_at,is_deleted,card_data,server_updated_at';
+    const entryFilter = effectiveLastSyncAt > 0 ? `&server_updated_at=gt.${effectiveLastSyncAt}` : '';
+    const tombFilter = effectiveLastSyncAt > 0 ? `&deleted_at=gt.${effectiveLastSyncAt}` : '';
+
     const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&or=(server_updated_at.gt.${lastSyncAt},updated_at.gt.${lastSyncAt},review_updated_at.gt.${lastSyncAt})&select=${uveCols}`, 'id'),
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&deleted_at=gt.${lastSyncAt}&select=tomb_key,deleted_at`, 'tomb_key'),
-      fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(lang)}&select=cleared_at`, { headers })
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}${entryFilter}&select=${uveCols}&order=server_updated_at.asc,id.asc`, 'id', count => reportProgress(`受信中 ${count}件`)),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}${tombFilter}&select=tomb_key,deleted_at&order=deleted_at.asc,tomb_key.asc`, 'tomb_key'),
+      fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}&select=cleared_at`, { headers })
     ]);
 
     if (!wmRes.ok) {
@@ -270,12 +360,18 @@
         id: r.id || base.id,
         word: r.word || base.word,
         wordKey: r.word_key || base.wordKey,
-        folder: r.folder !== undefined && r.folder !== null ? r.folder : base.folder,
-        category: r.category !== undefined && r.category !== null ? r.category : base.category,
+        pair: r.pair || base.pair || dbPair,
+        folder: r.folder ? r.folder : undefined,
+        category: r.category !== undefined && r.category !== null ? r.category : (base.category || 'その他'),
         interval: Number(r.interval) || base.interval || 0,
         repetition: Number(r.repetition) || base.repetition || 0,
         efactor: Number(r.efactor) || base.efactor || 2.5,
         nextReview: Number(r.next_review) || base.nextReview || 0,
+        stability: Number(r.card_data?.stability !== undefined ? r.card_data.stability : base.stability) || 0,
+        difficulty: Number(r.card_data?.difficulty !== undefined ? r.card_data.difficulty : base.difficulty) || 0,
+        retrievability: Number(r.card_data?.retrievability !== undefined ? r.card_data.retrievability : base.retrievability) || 0,
+        // 項目23: リモートの論理クロック (Lamport Version) を復元
+        version: Number(r.card_data?.version || r.version) || 1,
         updatedAt: Number(r.updated_at) || base.updatedAt || 1,
         reviewUpdatedAt: Number(r.review_updated_at) || base.reviewUpdatedAt || 0,
         isDeleted: Boolean(r.is_deleted !== undefined ? r.is_deleted : base.isDeleted)
@@ -287,31 +383,31 @@
     }));
     const remoteClearedAt = (Array.isArray(remoteWmRows) && remoteWmRows[0]) ? Number(remoteWmRows[0].cleared_at) || 0 : 0;
 
-    const syncStartTs = Date.now();
+    const syncStartTs = serverNow;
     const delta = computeDeltaSyncState({
-      lang,
-      localEntries: appHooks.getLocalEntries(lang),
-      localTombMap: appHooks.getLocalTombMap(lang),
-      localClearedAt: appHooks.getLocalClearedAt(lang),
+      lang: targetKey,
+      localEntries: appHooks.getLocalEntries(targetKey),
+      localTombMap: appHooks.getLocalTombMap(targetKey),
+      localClearedAt: appHooks.getLocalClearedAt(targetKey),
       remoteEntries,
       remoteTombstones,
       remoteClearedAt,
-      lastSyncAt,
+      lastSyncAt: effectiveLastSyncAt,
       mergeWordsFn: appHooks.mergeWords,
       isTombstonedFn: appHooks.isTombstoned,
       makeWordKeyFn: appHooks.makeWordKey
     });
 
-    appHooks.applyMergedLangState(lang, delta.mergedEntries, delta.mergedTombMap, delta.mergedClearedAt);
+    appHooks.applyMergedLangState(targetKey, delta.mergedEntries, delta.mergedTombMap, delta.mergedClearedAt);
 
     const pushHeaders = { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' };
 
     // [P0-6 解決] Push処理の厳格検証（失敗時はlastSyncAtを進めず例外スロー）
     if (delta.watermarkNeedsPush) {
-      const wmPushRes = await fetch(`${cfg.url}/rest/v1/user_lang_watermarks?on_conflict=user_id,lang`, {
+      const wmPushRes = await fetch(`${cfg.url}/rest/v1/user_lang_watermarks?on_conflict=user_id,pair`, {
         method: 'POST',
         headers: pushHeaders,
-        body: JSON.stringify([{ user_id: uid, lang, cleared_at: delta.mergedClearedAt }])
+        body: JSON.stringify([{ user_id: uid, lang: dbLang, pair: dbPair, cleared_at: delta.mergedClearedAt }])
       });
       if (!wmPushRes.ok) throw new Error(`ウォーターマークPush失敗 (HTTP ${wmPushRes.status})`);
     }
@@ -319,11 +415,12 @@
     if (delta.tombstonesToPush.length > 0) {
       const tombPayload = delta.tombstonesToPush.map(t => ({
         user_id: uid,
-        lang,
+        lang: dbLang,
+        pair: dbPair,
         tomb_key: t.key,
         deleted_at: t.deletedAt
       }));
-      const tombPushRes = await fetch(`${cfg.url}/rest/v1/user_tombstones?on_conflict=user_id,lang,tomb_key`, {
+      const tombPushRes = await fetch(`${cfg.url}/rest/v1/user_tombstones?on_conflict=user_id,pair,tomb_key`, {
         method: 'POST',
         headers: pushHeaders,
         body: JSON.stringify(tombPayload)
@@ -336,48 +433,57 @@
       const CHUNK_SIZE = 50;
       for (let i = 0; i < delta.entriesToPush.length; i += CHUNK_SIZE) {
         const chunk = delta.entriesToPush.slice(i, i + CHUNK_SIZE);
-        const entryPayload = chunk.map(it => ({
-          user_id: uid,
-          id: it.id,
-          lang,
-          word_key: it.wordKey || appHooks.makeWordKey(it.word, lang, it.meanings?.[0]?.pos, it.homographIndex),
-          num: it.num || 1,
-          word: it.word,
-          homograph_index: it.homographIndex || 1,
-          folder: it.folder || null,
-          category: it.category || 'その他',
-          interval: Number(it.interval) || 0,
-          repetition: Number(it.repetition) || 0,
-          efactor: Number(it.efactor) || 2.5,
-          next_review: Number(it.nextReview) || syncStartTs,
-          card_data: it,
-          updated_at: Number(it.updatedAt) || syncStartTs,
-          review_updated_at: Number(it.reviewUpdatedAt || it.updatedAt) || syncStartTs,
-          is_deleted: Boolean(it.isDeleted)
-        }));
+        const pct = Math.min(100, Math.round(((i + chunk.length) / delta.entriesToPush.length) * 100));
+        reportProgress(`送信中 ${pct}%`);
+        const entryPayload = chunk.map(it => {
+          const cleanCard = {
+            ...it,
+            folder: it.folder || null,
+            grammar_forms: it.grammar_forms || null,
+            history_note: it.history_note || null,
+            contextSentence: it.contextSentence || null,
+            homographIndex: (it.homographIndex && it.homographIndex > 1) ? it.homographIndex : null
+          };
+          delete cleanCard.card_data; // 自己参照ネストによる肥大化を防止
+          return {
+            user_id: uid,
+            id: it.id,
+            lang: dbLang,
+            pair: it.pair || dbPair,
+            word_key: it.wordKey || appHooks.makeWordKey(it.word, dbLang, it.meanings?.[0]?.pos, it.homographIndex),
+            num: it.num || 1,
+            word: it.word,
+            homograph_index: it.homographIndex || 1,
+            folder: it.folder || null,
+            category: it.category || 'その他',
+            interval: Number(it.interval) || 0,
+            repetition: Number(it.repetition) || 0,
+            efactor: Number(it.efactor) || 2.5,
+            next_review: Number(it.nextReview) || syncStartTs,
+            card_data: cleanCard,
+            updated_at: Number(it.updatedAt) || syncStartTs,
+            review_updated_at: Number(it.reviewUpdatedAt || it.updatedAt) || syncStartTs,
+            is_deleted: Boolean(it.isDeleted)
+          };
+        });
 
+        // [P0-2 解決] RPC失敗時は生upsertにフォールバックせず明確に例外スロー（直書き禁止・LWW保護）
         const rpcRes = await fetch(`${cfg.url}/rest/v1/rpc/sync_vocab_entries_batch`, {
           method: 'POST',
           headers: { ...headers, 'Content-Type': 'application/json' },
           body: JSON.stringify({ p_entries: entryPayload })
         });
         if (!rpcRes.ok) {
-          const fallbackRes = await fetch(`${cfg.url}/rest/v1/user_vocab_entries?on_conflict=user_id,id`, {
-            method: 'POST',
-            headers: pushHeaders,
-            body: JSON.stringify(entryPayload)
-          });
-          if (!fallbackRes.ok) throw new Error(`単語データPush失敗 (HTTP ${fallbackRes.status})`);
+          const errText = await rpcRes.text().catch(() => '');
+          throw new Error(`同期RPC失敗 (HTTP ${rpcRes.status}): ${errText.slice(0, 200)}`);
         }
       }
     }
 
-    let maxServerTs = syncStartTs;
-    (Array.isArray(remoteEntryRows) ? remoteEntryRows : []).forEach(r => {
-      const sTs = Number(r.server_updated_at) || 0;
-      if (sTs > maxServerTs) maxServerTs = sTs;
-    });
-    safeLsSet(lastSyncKey, String(maxServerTs));
+    // [P0-3 解決] トランザクションコミット順のズレやPull中並行更新の欠落を防ぐ安全オーバーラップ（2分）
+    const SYNC_OVERLAP_MS = 120000;
+    const nextSyncCursor = Math.max(0, serverNow - SYNC_OVERLAP_MS);
+    safeLsSet(lastSyncKey, String(nextSyncCursor));
     return {
       pulled: remoteEntries.length,
       pushed: delta.entriesToPush.length,
@@ -435,7 +541,7 @@
     return false;
   }
 
-  async function startStripeCheckout(priceId = 'price_pro_monthly') {
+  async function startStripeCheckout(priceId = null, options = {}) {
     // [P0-5 解決] Google Play アプリ内直接課金規約の遵守 (リーダーアプリ要件)
     if (isAndroidPlayStoreApp()) {
       alert('【Google Play アプリをご利用のお客様へ】\nGoogle Playの決済規約に基づき、アプリ内からの直接Web決済は制限されています。\nProプランのご契約・管理は、SafariやChrome等のWebブラウザで公式サイト（Vocab Vault Web版）にアクセスし、本アカウントでログインの上お手続きください。\n（WebでPro化すると、本アプリでも即座にPro機能が自動反映されます）');
@@ -450,6 +556,11 @@
       else if (typeof openSettings === 'function') openSettings();
       return;
     }
+
+    const interval = options.interval || (global.VocabI18n?.getBillingInterval?.() || 'month');
+    const currency = options.currency || ((global.VocabI18n?.getLocale?.() || 'ja') === 'ja' ? 'jpy' : 'usd');
+    const targetPriceId = priceId || (interval === 'year' ? 'price_pro_yearly' : 'price_pro_monthly');
+
     const btn = document.getElementById('btnUpgradePro');
     const upsellBtn = document.getElementById('btnUpsellUpgrade');
     if (btn) { btn.disabled = true; btn.textContent = '決済ページへ移動中...'; }
@@ -462,7 +573,12 @@
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ priceId, returnUrl: window.location.href.split('?')[0] })
+        body: JSON.stringify({
+          priceId: targetPriceId,
+          currency,
+          interval,
+          returnUrl: window.location.href.split('?')[0]
+        })
       });
       if (r.status === 404) {
         throw new Error('決済サーバーが現在メンテナンス中または未接続です。開発者のStripe開通完了まで今しばらくお待ちください。');
@@ -475,15 +591,36 @@
     } catch (e) {
       alert(`決済のご案内: ${e.message}`);
     } finally {
-      if (btn) { btn.disabled = false; btn.textContent = 'Proにアップグレード (¥480/月)'; }
-      if (upsellBtn) { upsellBtn.disabled = false; upsellBtn.textContent = '今すぐProにアップグレード'; }
+      if (btn) btn.disabled = false;
+      if (upsellBtn) upsellBtn.disabled = false;
+      if (global.VocabI18n?.updatePricingUI) {
+        global.VocabI18n.updatePricingUI();
+      } else {
+        if (btn) btn.textContent = 'Proにアップグレード (¥480/月)';
+        if (upsellBtn) upsellBtn.textContent = '今すぐProにアップグレード';
+      }
     }
   }
 
   async function openStripePortal() {
     const cfg = getConfig();
+    const showToast = global.VocabModal?.showToast || global.showToast;
+    const btn = typeof document !== 'undefined' ? document.getElementById('btnManageSub') : null;
+    const origTxt = btn ? btn.textContent : '';
+
+    if (!isCloudReady()) {
+      showToast?.('Stripeポータルを開くにはログインが必要です。', 'warn');
+      return;
+    }
     const token = await ensureValidToken();
-    if (!cfg.configured || !token) return;
+    if (!cfg.configured || !token) {
+      showToast?.('クラウド同期が設定されていません。', 'warn');
+      return;
+    }
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'ポータルへ接続中...';
+    }
     try {
       const r = await fetch(`${cfg.url}/functions/v1/stripe-portal`, {
         method: 'POST',
@@ -492,12 +629,21 @@
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ returnUrl: window.location.href.split('?')[0] })
+        body: JSON.stringify({ returnUrl: typeof window !== 'undefined' ? window.location.href.split('?')[0] : '' })
       });
       const data = await r.json();
-      if (data.url) window.location.href = data.url;
+      if (data.url) {
+        if (typeof window !== 'undefined') window.location.href = data.url;
+      } else {
+        throw new Error(data.error || 'ポータルURLの取得に失敗しました');
+      }
     } catch (e) {
-      alert(`ポータル遷移エラー: ${e.message}`);
+      showToast?.(`ポータル遷移エラー: ${e.message}`, 'err');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = origTxt;
+      }
     }
   }
 
@@ -599,6 +745,7 @@
     deleteUserAccount,
     exportAllUserDataJson,
     syncLangWithSupabase,
+    acquireSyncLock,
     callVocabGenerateProxy,
     startStripeCheckout,
     openStripePortal,

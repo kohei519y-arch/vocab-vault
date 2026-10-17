@@ -24,6 +24,7 @@
   let bestVoiceMap = {};
   let speakTimer = null;
   let activeUtter = null;
+  const retainedUtterances = new Set();
   const audioCache = new Map();
   let currentAudioEl = null;
 
@@ -67,7 +68,149 @@
     return (bestVoiceMap[tLang] = cands[0]);
   }
 
+  let activeHighlightTarget = null;
+  let activeOriginalHtml = null;
+
+  function clearActiveWordHighlight() {
+    if (activeHighlightTarget) {
+      try {
+        const actives = activeHighlightTarget.querySelectorAll?.('.spk-active-word') || [];
+        for (let i = 0; i < actives.length; i++) {
+          actives[i].classList?.remove?.('spk-active-word');
+        }
+        if (activeOriginalHtml !== null && typeof activeHighlightTarget.innerHTML === 'string' && activeOriginalHtml !== '') {
+          activeHighlightTarget.innerHTML = activeOriginalHtml;
+        }
+      } catch {}
+      activeHighlightTarget = null;
+      activeOriginalHtml = null;
+    }
+  }
+
+  let progressTimer = null;
+  let speechStartTime = 0;
+  let lastBoundaryTime = 0;
+  let currentSpeechSessionId = 0;
+
+  /**
+   * テキスト要素を単語/文節スパン分割し、発音位置同期ハイライト用のDOM構造を構築
+   * 1. Intl.Segmenter（利用可能な場合）によるブラウザネイティブの形態素/単語分割
+   * 2. NFC正規化、œ/Œ/æ/Æ合字、タイポグラフィ用アポストロフィ’、結合文字\p{M}の完全対応
+   */
+  function prepareWordSpans(element, rawText, tLang = 'en') {
+    if (!element || typeof element !== 'object') return null;
+    clearActiveWordHighlight();
+    activeHighlightTarget = element;
+    activeOriginalHtml = element.innerHTML || '';
+
+    const text = String(rawText || element.textContent || '').normalize('NFC').trim();
+    if (!text) return null;
+
+    // A. Intl.Segmenter によるネイティブ言語処理（Safari 14.1+, Chrome 87+）
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      try {
+        const segLang = tLang === 'ja' ? 'ja' : tLang === 'fr' ? 'fr' : tLang === 'de' ? 'de' : 'en';
+        const segmenter = new Intl.Segmenter(segLang, { granularity: 'word' });
+        const segments = Array.from(segmenter.segment(text));
+        const spansHtml = [];
+        let curPos = 0;
+
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          const word = seg.segment;
+          const start = seg.index;
+          const end = start + word.length;
+          if (start > curPos) {
+            spansHtml.push(esc(text.slice(curPos, start)));
+          }
+          if (seg.isWordLike || (tLang === 'ja' && word.trim() && !/^[、。！？\s]+$/.test(word))) {
+            spansHtml.push(`<span class="spk-word" data-start="${start}" data-end="${end}">${esc(word)}</span>`);
+          } else {
+            spansHtml.push(esc(word));
+          }
+          curPos = end;
+        }
+        if (curPos < text.length) spansHtml.push(esc(text.slice(curPos)));
+        element.innerHTML = spansHtml.join('');
+        return element;
+      } catch {}
+    }
+
+    // B. 正規表現フォールバック（JSC環境やIntl.Segmenter非対応環境）
+    // œ/Œ/æ/Æ, アポストロフィ ' / ’, 結合文字 \p{M}, 各種アルファベット・数字
+    const spansHtml = [];
+    const wordRegex = tLang === 'ja'
+      ? /[\u4E00-\u9FFF]+|[\u30A0-\u30FF]+|[\u3040-\u309F]+|[\p{L}\p{N}\p{M}œŒæÆ'-]+|[、。！？\n]/gu
+      : /[\p{L}\p{N}\p{M}œŒæÆ'’-]+/gu;
+
+    let lastIndex = 0;
+    let match;
+
+    while ((match = wordRegex.exec(text)) !== null) {
+      const matchIndex = match.index;
+      const matchWord = match[0];
+      if (matchIndex > lastIndex) {
+        spansHtml.push(esc(text.slice(lastIndex, matchIndex)));
+      }
+      spansHtml.push(`<span class="spk-word" data-start="${matchIndex}" data-end="${matchIndex + matchWord.length}">${esc(matchWord)}</span>`);
+      lastIndex = matchIndex + matchWord.length;
+    }
+    if (lastIndex < text.length) {
+      spansHtml.push(esc(text.slice(lastIndex)));
+    }
+
+    element.innerHTML = spansHtml.join('');
+    return element;
+  }
+
+  /**
+   * 指定した文字インデックスの単語スパンをリアルタイムハイライト
+   */
+  function highlightSpokenWord(container, charIndex) {
+    if (!container || typeof container.querySelectorAll !== 'function') return;
+    const spans = container.querySelectorAll('.spk-word');
+    if (!spans || !spans.length) return;
+
+    let targetSpan = null;
+    for (let i = 0; i < spans.length; i++) {
+      const s = spans[i];
+      const start = parseInt(s.getAttribute('data-start'), 10) || 0;
+      const end = parseInt(s.getAttribute('data-end'), 10) || 0;
+      if (charIndex >= start && charIndex < end) {
+        targetSpan = s;
+        break;
+      } else if (charIndex >= start) {
+        targetSpan = s;
+      }
+    }
+
+    for (let i = 0; i < spans.length; i++) {
+      spans[i].classList.remove('spk-active-word');
+    }
+
+    if (targetSpan) {
+      targetSpan.classList.add('spk-active-word');
+      if (typeof targetSpan.scrollIntoView === 'function' && container.scrollHeight > container.clientHeight) {
+        targetSpan.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }
+
   function stopSpeech() {
+    currentSpeechSessionId++; // 世代トークンをインクリメントし過去発話の遅延イベントを無効化
+    clearActiveWordHighlight();
+    if (typeof document !== 'undefined') {
+      try {
+        const residual = document.querySelectorAll('.spk-active-word');
+        for (let i = 0; i < residual.length; i++) {
+          residual[i].classList?.remove?.('spk-active-word');
+        }
+      } catch {}
+    }
+    if (progressTimer) {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    }
     if (currentAudioEl) {
       try {
         currentAudioEl.pause();
@@ -83,31 +226,206 @@
         }
       } catch {}
     }
+    retainedUtterances.clear();
     activeUtter = null;
   }
 
-  function playSpeechFallback(clean, l, defTag, ttsRate = 0.95) {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  /**
+   * ネットワークオーディオ・フォールバック再生
+   * Web Speech API が利用不可/失敗した場合のフェイルオーバー (Free Dictionary API & Google TTS)
+   */
+  function tryPlayExternalAudio(clean, l, onEnd = null) {
+    if (typeof Audio === 'undefined') {
+      if (typeof onEnd === 'function') onEnd();
+      return;
+    }
+    const cacheKey = `${l}:${clean.toLowerCase()}`;
+    const cachedUrl = audioCache.get(cacheKey);
+    const urls = [];
+    if (cachedUrl) urls.push(cachedUrl);
+    if (l === 'en' && !clean.includes(' ')) {
+      urls.push(`https://api.dictionaryapi.dev/media/pronunciations/en/${encodeURIComponent(clean.toLowerCase())}-us.mp3`);
+    }
+    const cleanQuery = clean.length > 180 ? clean.slice(0, 180) : clean;
+    urls.push(`https://translate.google.com/translate_tts?ie=UTF-8&tl=${l}&client=tw-ob&q=${encodeURIComponent(cleanQuery)}`);
+
+    function tryNext(idx) {
+      if (idx >= urls.length) {
+        if (typeof onEnd === 'function') onEnd();
+        return;
+      }
+      try {
+        const audio = new Audio(urls[idx]);
+        audio.referrerPolicy = 'no-referrer';
+        currentAudioEl = audio;
+        audio.onended = () => {
+          if (currentAudioEl === audio) currentAudioEl = null;
+          clearActiveWordHighlight();
+          if (typeof onEnd === 'function') onEnd();
+        };
+        audio.onerror = () => {
+          if (currentAudioEl === audio) currentAudioEl = null;
+          tryNext(idx + 1);
+        };
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          playPromise.then(() => {
+            audioCache.set(cacheKey, urls[idx]);
+          }).catch(() => {
+            tryNext(idx + 1);
+          });
+        }
+      } catch {
+        tryNext(idx + 1);
+      }
+    }
+    tryNext(0);
+  }
+
+  function playSpeechFallback(clean, l, defTag, ttsRate = 0.95, targetEl = null, onEnd = null) {
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      if (typeof onEnd === 'function') onEnd();
+    };
+
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      tryPlayExternalAudio(clean, l, finish);
+      return;
+    }
     try {
-      if (window.speechSynthesis.paused) window.speechSynthesis.resume();
-      if (window.speechSynthesis.speaking || window.speechSynthesis.pending) window.speechSynthesis.cancel();
+      if (window.speechSynthesis.paused) {
+        try { window.speechSynthesis.resume(); } catch {}
+      }
       const v = pickBestVoice(l);
       const u = new SpeechSynthesisUtterance(clean);
       activeUtter = u;
-      u.onend = u.onerror = () => { if (activeUtter === u) activeUtter = null; };
+      retainedUtterances.add(u);
+      const thisSessionId = ++currentSpeechSessionId;
+
+      if (targetEl) {
+        prepareWordSpans(targetEl, clean, l);
+      }
+
+      speechStartTime = 0;
+      lastBoundaryTime = 0;
+      let boundarySeen = false;
+
+      // 1. Boundary イベント（Chrome等の高精度ミリ秒同期 ＆ 発話世代トークン検査 ＆ word境界厳密判定）
+      u.onboundary = event => {
+        if (thisSessionId !== currentSpeechSessionId) return;
+        boundarySeen = true;
+        lastBoundaryTime = Date.now();
+        if (targetEl && (event.name === 'word' || !event.name) && typeof event.charIndex === 'number') {
+          highlightSpokenWord(targetEl, event.charIndex);
+        }
+      };
+
+      u.onstart = () => {
+        if (thisSessionId !== currentSpeechSessionId) return;
+        speechStartTime = Date.now();
+      };
+
+      // 2. 時間補間ハイブリッドフォールバック（Watchdog方式: boundary未発火環境または途絶時のみ介入）
+      if (targetEl && typeof setInterval === 'function') {
+        const msPerChar = l === 'ja' ? 120 : l === 'de' ? 75 : 65;
+        const totalEstimatedDuration = Math.max(800, (clean.length * msPerChar) / (Number(ttsRate) || 0.95));
+
+        progressTimer = setInterval(() => {
+          if (thisSessionId !== currentSpeechSessionId) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+            return;
+          }
+          if (boundarySeen && (Date.now() - lastBoundaryTime < 450)) return;
+          if (!speechStartTime) return;
+
+          const elapsed = Date.now() - speechStartTime;
+          const progress = Math.min(0.98, elapsed / totalEstimatedDuration);
+          const estIndex = Math.floor(progress * clean.length);
+          highlightSpokenWord(targetEl, estIndex);
+        }, 120);
+      }
+
+      u.onend = () => {
+        retainedUtterances.delete(u);
+        if (thisSessionId === currentSpeechSessionId) {
+          if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+          }
+          activeUtter = null;
+          clearActiveWordHighlight();
+          finish();
+        }
+      };
+
+      u.onerror = event => {
+        retainedUtterances.delete(u);
+        if (thisSessionId === currentSpeechSessionId) {
+          if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+          }
+          activeUtter = null;
+          clearActiveWordHighlight();
+          if (event && event.error !== 'canceled' && event.error !== 'interrupted') {
+            tryPlayExternalAudio(clean, l, finish);
+          } else {
+            finish();
+          }
+        }
+      };
+
       if (v) u.voice = v;
       u.lang = v?.lang ? String(v.lang).replace('_', '-') : defTag;
       u.rate = Number(ttsRate) || 0.95;
       window.speechSynthesis.speak(u);
-    } catch {}
+
+      // [P1-4 解決] 2段階 Watchdog: Safari等の保留(pending)無音スタック対策 ＆ 1500ms未開始時の安全キャンセル・外部音声フェイルオーバー
+      if (typeof setTimeout === 'function') {
+        // 第1段階: 250msでスタックしたキューの resume()
+        setTimeout(() => {
+          if (thisSessionId === currentSpeechSessionId && !speechStartTime && window.speechSynthesis.pending) {
+            try { window.speechSynthesis.resume(); } catch {}
+          }
+        }, 250);
+
+        // 第2段階: 1500ms経過しても音声開始しない場合は永久スタックを遮断しタイマーリークを防ぐ
+        setTimeout(() => {
+          if (thisSessionId === currentSpeechSessionId && !speechStartTime) {
+            if (progressTimer) {
+              clearInterval(progressTimer);
+              progressTimer = null;
+            }
+            try { window.speechSynthesis.cancel(); } catch {}
+            retainedUtterances.delete(u);
+            activeUtter = null;
+            clearActiveWordHighlight();
+            tryPlayExternalAudio(clean, l, finish);
+          }
+        }, 1500);
+      }
+    } catch {
+      tryPlayExternalAudio(clean, l, finish);
+    }
   }
 
-  function speakText(text, tLang = 'en', ttsRate = 0.95) {
-    if (!text) return;
-    const clean = String(text).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-    if (!clean) return;
+  function speakText(text, tLang = 'en', ttsRate = null, targetElement = null, onEnd = null) {
+    if (!text) {
+      if (typeof onEnd === 'function') onEnd();
+      return;
+    }
+    const clean = String(text).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').normalize('NFC').trim();
+    if (!clean) {
+      if (typeof onEnd === 'function') onEnd();
+      return;
+    }
     const l = ['en', 'fr', 'de', 'ja'].includes(tLang) ? tLang : 'en';
     const defTag = l === 'fr' ? 'fr-FR' : l === 'de' ? 'de-DE' : l === 'ja' ? 'ja-JP' : 'en-US';
+
+    const effectiveRate = Number(ttsRate) || (typeof localStorage !== 'undefined' ? parseFloat(localStorage.getItem('vv_tts_rate') || '0.95') : 0.95) || 0.95;
 
     if (global.VocabSRS?.triggerHaptic) {
       global.VocabSRS.triggerHaptic('light');
@@ -115,18 +433,335 @@
 
     stopSpeech();
 
+    // ターゲット要素の自動解決（未指定時はカードの関連要素を探す）
+    let targetEl = targetElement;
+    if (!targetEl && typeof document !== 'undefined') {
+      const aWord = document.getElementById('aWord');
+      const aEx = document.querySelector('.anki-ex-foreign');
+      if (aEx && aEx.textContent && aEx.textContent.includes(clean.slice(0, 10))) {
+        targetEl = aEx;
+      } else if (aWord && aWord.textContent && aWord.textContent.trim().startsWith(clean.slice(0, 5))) {
+        targetEl = aWord;
+      }
+    }
+
     const cacheKey = `${l}:${clean.toLowerCase()}`;
     const cachedUrl = audioCache.get(cacheKey);
     if (cachedUrl && typeof Audio !== 'undefined') {
       try {
         const audio = new Audio(cachedUrl);
+        audio.referrerPolicy = 'no-referrer';
         currentAudioEl = audio;
-        audio.play().catch(() => playSpeechFallback(clean, l, defTag, ttsRate));
+        audio.onended = () => {
+          if (currentAudioEl === audio) currentAudioEl = null;
+          clearActiveWordHighlight();
+          if (typeof onEnd === 'function') onEnd();
+        };
+        audio.onerror = () => {
+          if (currentAudioEl === audio) currentAudioEl = null;
+          playSpeechFallback(clean, l, defTag, effectiveRate, targetEl, onEnd);
+        };
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch(() => playSpeechFallback(clean, l, defTag, effectiveRate, targetEl, onEnd));
+        }
         return;
       } catch {}
     }
 
-    playSpeechFallback(clean, l, defTag, ttsRate);
+    playSpeechFallback(clean, l, defTag, effectiveRate, targetEl, onEnd);
+  }
+
+  /**
+   * 非同期Promise版発話ヘルパー（Audio Playlist等の順次実行用）
+   */
+  function speakTextAsync(text, tLang = 'en', ttsRate = null, targetElement = null) {
+    return new Promise(resolve => {
+      let resolved = false;
+      const safeResolve = () => {
+        if (resolved) return;
+        resolved = true;
+        resolve();
+      };
+      // 安全フェイルセーフタイマー (文字数に応じた時間 + 4秒バッファ)
+      const cleanLen = String(text || '').length;
+      const msPerChar = tLang === 'ja' ? 140 : 85;
+      const safeTimeout = Math.max(3000, (cleanLen * msPerChar) + 4000);
+      const timer = setTimeout(safeResolve, safeTimeout);
+
+      speakText(text, tLang, ttsRate, targetElement, () => {
+        clearTimeout(timer);
+        safeResolve();
+      });
+    });
+  }
+
+  // --- 耳学・自動連続再生（Audio Playlist モード） ---
+  const playlistState = {
+    isRunning: false,
+    isPaused: false,
+    currentIndex: 0,
+    items: [],
+    sessionToken: 0,
+    stepTimer: null
+  };
+
+  function waitMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  function updatePlaylistUI() {
+    if (typeof document === 'undefined') return;
+    const bar = document.getElementById('audioPlaylistBar');
+    if (!bar) return;
+
+    if (!playlistState.isRunning) {
+      bar.classList.remove('active');
+      document.body?.classList.remove('audio-playlist-open');
+      const prevActive = document.querySelectorAll('.playlist-active-card');
+      prevActive.forEach(el => el.classList.remove('playlist-active-card'));
+      return;
+    }
+
+    bar.classList.add('active');
+    document.body?.classList.add('audio-playlist-open');
+
+    const curItem = playlistState.items[playlistState.currentIndex];
+    const apWord = document.getElementById('apWord');
+    const apPho = document.getElementById('apPho');
+    const apMeta = document.getElementById('apMeta');
+    const apProgFill = document.getElementById('apProgFill');
+    const apPlayIcon = document.getElementById('apPlayIcon');
+
+    if (curItem) {
+      if (apWord) apWord.textContent = curItem.word || '';
+      if (apPho) apPho.textContent = curItem.phonetic ? `[ ${curItem.phonetic} ]` : '';
+      if (apMeta) {
+        const meaning = curItem.meanings?.[0]?.text || '';
+        const curNum = playlistState.currentIndex + 1;
+        const totalNum = playlistState.items.length;
+        const stateTxt = playlistState.isPaused ? '（一時停止中）' : '';
+        apMeta.textContent = `${curNum}/${totalNum}語 ${meaning ? '・' + meaning : ''} ${stateTxt}`;
+      }
+      if (apProgFill) {
+        const pct = Math.round(((playlistState.currentIndex + 1) / Math.max(1, playlistState.items.length)) * 100);
+        apProgFill.style.width = `${pct}%`;
+      }
+
+      // リスト内の対応カードをハイライト＆スクロール
+      const prevActive = document.querySelectorAll('.playlist-active-card');
+      prevActive.forEach(el => el.classList.remove('playlist-active-card'));
+      if (curItem.id || curItem.word) {
+        const card = document.querySelector(`.card[data-id="${curItem.id}"]`) ||
+                     document.querySelector(`.card[data-raw-word="${curItem.word}"]`) ||
+                     document.querySelector(`.card[data-word="${curItem.word}"]`);
+        if (card) {
+          card.classList.add('playlist-active-card');
+          try {
+            card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } catch {
+            card.scrollIntoView();
+          }
+        }
+      }
+    }
+
+    if (apPlayIcon) {
+      if (playlistState.isPaused) {
+        // 再生アイコン (三角)
+        apPlayIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"/>';
+      } else {
+        // 一時停止アイコン (2本線)
+        apPlayIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+      }
+    }
+  }
+
+  async function runPlaylistLoop(token) {
+    while (playlistState.isRunning && token === playlistState.sessionToken) {
+      if (playlistState.currentIndex >= playlistState.items.length) {
+        // 全単語再生完了
+        stopAudioPlaylist();
+        if (global.VocabModal?.showToast) {
+          global.VocabModal.showToast('耳学プレイリストの再生が完了しました。', 'ok', 4000);
+        }
+        break;
+      }
+
+      if (playlistState.isPaused) {
+        await waitMs(300);
+        continue;
+      }
+
+      const item = playlistState.items[playlistState.currentIndex];
+      if (!item) {
+        playlistState.currentIndex++;
+        continue;
+      }
+
+      updatePlaylistUI();
+
+      const itemLang = item.lang || (global.VocabCore?.App?.lang) || 'en';
+      const targetLang = item.targetLang || item.tgtLang || (global.VocabCore?.App?.tgtLang) || 'ja';
+
+      // 1. 単語の発音（外国語）
+      if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+      await speakTextAsync(item.word, itemLang);
+      if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+
+      // 2. 想起ポーズ（ユーザーが意味を頭で思い出すインターバル: 1.5秒）
+      for (let i = 0; i < 15; i++) {
+        if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+        while (playlistState.isPaused && playlistState.isRunning && token === playlistState.sessionToken) {
+          await waitMs(200);
+        }
+        await waitMs(100);
+      }
+      if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+
+      // 3. 訳語の発音
+      const priMeaning = item.meanings?.[0]?.text;
+      if (priMeaning) {
+        await speakTextAsync(priMeaning, targetLang, 1.05);
+      }
+      if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+
+      // 短い息継ぎ (0.6秒)
+      await waitMs(600);
+      if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+
+      // 4. 例文の発音（もしあれば）
+      const exForeign = item.example?.foreign || item.example?.en || item.example?.f;
+      if (exForeign) {
+        await speakTextAsync(exForeign, itemLang, 0.92);
+        if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+
+        // 例文対訳があれば発音、なければ短いポーズ
+        const exTrans = item.example?.japanese || item.example?.ja || item.example?.trans;
+        if (exTrans) {
+          await waitMs(500);
+          if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+          await speakTextAsync(exTrans, targetLang, 1.05);
+        }
+      }
+
+      // 5. 単語間のインターバル (1.2秒)
+      for (let i = 0; i < 12; i++) {
+        if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+        while (playlistState.isPaused && playlistState.isRunning && token === playlistState.sessionToken) {
+          await waitMs(200);
+        }
+        await waitMs(100);
+      }
+
+      if (!playlistState.isRunning || token !== playlistState.sessionToken) break;
+      playlistState.currentIndex++;
+    }
+  }
+
+  function startAudioPlaylist(items = null, startIndex = 0) {
+    let playList = Array.isArray(items) && items.length ? items : null;
+    if (!playList) {
+      // 現在のアプリ状態または表示中リストから取得
+      const getFilteredFn = global.VocabCore?.getFiltered || global.getFiltered || (global.VocabSearch?.getFiltered ? () => global.VocabSearch.getFiltered(global.VocabCore?.App || global.App) : null);
+      if (typeof getFilteredFn === 'function') {
+        const filtered = getFilteredFn();
+        if (Array.isArray(filtered) && filtered.length) {
+          playList = filtered;
+        }
+      }
+      if (!playList) {
+        const app = global.VocabCore?.App || global.App;
+        if (app?.entries && app.entries.length) {
+          playList = app.entries;
+        }
+      }
+    }
+
+    if (!playList || !playList.length) {
+      if (global.VocabModal?.showToast) {
+        global.VocabModal.showToast('再生可能な単語が見つかりません。単語を登録またはフィルタを解除してください。', 'warn', 3500);
+      }
+      return;
+    }
+
+    playlistState.items = playList;
+    playlistState.currentIndex = Math.max(0, Math.min(startIndex, playList.length - 1));
+    playlistState.isRunning = true;
+    playlistState.isPaused = false;
+    playlistState.sessionToken++;
+
+    updatePlaylistUI();
+
+    if (global.VocabModal?.showToast) {
+      global.VocabModal.showToast(`耳学・連続リスニングを開始しました（全${playList.length}語）。`, 'ok', 3000);
+    }
+
+    runPlaylistLoop(playlistState.sessionToken);
+  }
+
+  function stopAudioPlaylist() {
+    playlistState.isRunning = false;
+    playlistState.isPaused = false;
+    playlistState.sessionToken++;
+    stopSpeech();
+    updatePlaylistUI();
+  }
+
+  function pauseAudioPlaylist() {
+    if (!playlistState.isRunning) return;
+    playlistState.isPaused = true;
+    stopSpeech();
+    updatePlaylistUI();
+  }
+
+  function resumeAudioPlaylist() {
+    if (!playlistState.isRunning) return;
+    playlistState.isPaused = false;
+    updatePlaylistUI();
+  }
+
+  function toggleAudioPlaylist() {
+    if (!playlistState.isRunning) {
+      startAudioPlaylist();
+    } else if (playlistState.isPaused) {
+      resumeAudioPlaylist();
+    } else {
+      pauseAudioPlaylist();
+    }
+  }
+
+  function nextPlaylistItem() {
+    if (!playlistState.isRunning) return;
+    if (playlistState.currentIndex < playlistState.items.length - 1) {
+      playlistState.currentIndex++;
+      playlistState.sessionToken++;
+      stopSpeech();
+      updatePlaylistUI();
+      runPlaylistLoop(playlistState.sessionToken);
+    } else {
+      stopAudioPlaylist();
+    }
+  }
+
+  function prevPlaylistItem() {
+    if (!playlistState.isRunning) return;
+    if (playlistState.currentIndex > 0) {
+      playlistState.currentIndex--;
+      playlistState.sessionToken++;
+      stopSpeech();
+      updatePlaylistUI();
+      runPlaylistLoop(playlistState.sessionToken);
+    }
+  }
+
+  function getPlaylistState() {
+    return {
+      isRunning: playlistState.isRunning,
+      isPaused: playlistState.isPaused,
+      currentIndex: playlistState.currentIndex,
+      totalItems: playlistState.items.length
+    };
   }
 
   // --- グローバルエクスポート ---
@@ -139,7 +774,20 @@
     loadVoices,
     pickBestVoice,
     speakText,
+    speakTextAsync,
     stopSpeech,
-    audioCache
+    prepareWordSpans,
+    highlightSpokenWord,
+    clearActiveWordHighlight,
+    audioCache,
+    // 耳学・連続再生
+    startAudioPlaylist,
+    stopAudioPlaylist,
+    pauseAudioPlaylist,
+    resumeAudioPlaylist,
+    toggleAudioPlaylist,
+    nextPlaylistItem,
+    prevPlaylistItem,
+    getPlaylistState
   };
 })(typeof window !== 'undefined' ? window : globalThis);

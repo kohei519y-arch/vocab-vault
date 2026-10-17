@@ -6,7 +6,7 @@
   'use strict';
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-  const cleanPho = p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim();
+  const cleanPho = global.VocabStorage?.cleanPho || (p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim());
   const $ = id => typeof document !== 'undefined' ? document.getElementById(id) : null;
 
   let lastFocus = null;
@@ -116,7 +116,7 @@
       try { localStorage.setItem('vv_theme_dark', isDark ? '1' : '0'); } catch {}
     }
     const themeBtn = $('btnTheme');
-    if (themeBtn) themeBtn.textContent = isDark ? '☀ ライト' : '☾ ダーク';
+    if (themeBtn) themeBtn.textContent = isDark ? 'ライト' : 'ダーク';
     if ($('chkDark')) $('chkDark').checked = isDark;
   }
 
@@ -187,6 +187,40 @@
   }
 
   // --- Proアップセル & 設定モーダル ---
+  function getRootTreeProgress() {
+    const App = global.App || {};
+    const entries = App.entries || [];
+    const rootCountMap = new Map();
+    let validCount = 0;
+    for (const e of entries) {
+      if (!e || e.isDeleted) continue;
+      validCount++;
+      const tags = Array.isArray(e.etymologyTags) ? e.etymologyTags : [];
+      for (const t of tags) {
+        if (t && typeof t === 'string' && t.startsWith('*')) {
+          rootCountMap.set(t, (rootCountMap.get(t) || 0) + 1);
+        }
+      }
+    }
+    let bestRoot = '*sta-';
+    let bestCount = 0;
+    for (const [r, c] of rootCountMap.entries()) {
+      if (c > bestCount) {
+        bestCount = c;
+        bestRoot = r;
+      }
+    }
+    const targetCluster = 5;
+    const remToCluster = Math.max(1, targetCluster - (bestCount % targetCluster || targetCluster));
+    return {
+      totalWords: validCount,
+      totalRoots: rootCountMap.size,
+      leadingRoot: bestRoot,
+      leadingCount: bestCount,
+      remToCluster
+    };
+  }
+
   function openUpsellModal(reason = '') {
     const App = global.App || {};
     if (App.isDev) {
@@ -194,12 +228,35 @@
       return;
     }
     const rEl = $('upsellModalReason') || $('upsellReason');
-    if (reason && rEl) {
-      rEl.textContent = reason;
+    const defaultReason = '本日のAI新規生成無料枠（5語/日）に達しました';
+    if (rEl) {
+      rEl.textContent = reason || defaultReason;
       rEl.style.display = 'block';
-    } else if (rEl) {
-      rEl.style.display = 'none';
     }
+
+    // 項目11: 語根ネットワーク成長プログレス (Value-Driven Upsell)
+    const progEl = $('upsellRootProgress');
+    if (progEl) {
+      const p = getRootTreeProgress();
+      progEl.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:11.5px;font-weight:700;color:var(--t)">
+            <span>あなたの語根ネットワーク成長度</span>
+          </div>
+          <span style="font-size:11px;font-weight:700;color:var(--ac);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px">
+            発掘済: ${p.totalRoots} 語根
+          </span>
+        </div>
+        <p style="font-size:11.5px;color:var(--s);margin:0 0 8px;line-height:1.5">
+          現在 <strong>${p.totalWords}語</strong> の知識が蓄積されています。主要語根 <code>${p.leadingRoot}</code> ファミリーは<strong>あと ${p.remToCluster} 語</strong>で次のクラスタが完成します！
+        </p>
+        <div style="background:var(--bg);height:6px;border-radius:3px;overflow:hidden;border:1px solid var(--b)">
+          <div style="background:var(--ac);height:100%;width:${Math.min(100, Math.max(15, (p.leadingCount % 5 || 5) * 20))}%;transition:width 0.3s ease"></div>
+        </div>
+      `;
+      progEl.style.display = 'block';
+    }
+
     toggleModal('upsellModal', true);
   }
 
@@ -239,9 +296,96 @@
     if (global.updStats) global.updStats();
     if (global.updKeyUI) global.updKeyUI();
     if (global.updCloudUI) global.updCloudUI();
+
+    // 観点1: FSRSオプティマイザおよびスマートPush通知のステータス同期
+    updateFSRSOptimizerUI();
+    updateSmartNotifyUI();
+
     const curQuota = global.App?.quotaRemaining ?? 30;
     if ($('quotaNum')) $('quotaNum').textContent = curQuota;
     toggleModal('settingsModal', true);
+  }
+
+  function updateFSRSOptimizerUI() {
+    const fsrsWeights = global.VocabSRS?.getUserFSRSWeights ? global.VocabSRS.getUserFSRSWeights() : null;
+    const historyLogs = global.VocabSRS?.getReviewHistoryLog ? global.VocabSRS.getReviewHistoryLog() : [];
+    const count = historyLogs.length;
+
+    const badge = $('fsrsOptBadge');
+    const desc = $('fsrsOptDesc');
+    if (badge) {
+      if (fsrsWeights) {
+        badge.textContent = `最適化稼働中 (+${fsrsWeights.improvement || '0'}%)`;
+        badge.className = 'badge ok';
+      } else if (count >= 20) {
+        badge.textContent = `最適化可能 (${count}件ログ)`;
+        badge.className = 'badge ok';
+      } else {
+        badge.textContent = `初期係数 (${count}/20件)`;
+        badge.className = 'badge';
+        badge.style.background = 'var(--b)';
+        badge.style.color = 'var(--s)';
+      }
+    }
+    if (desc) {
+      if (fsrsWeights) {
+        desc.textContent = `FSRSパーソナライズ学習: 有効（学習ログ ${fsrsWeights.logCount || count}件に基づき最適化中・精度改善 +${fsrsWeights.improvement || '0'}%）`;
+      } else {
+        desc.textContent = `FSRSパーソナライズ学習: 初期係数稼働中（学習ログ ${count}/20件。20件蓄積で自動最適化されます）`;
+      }
+    }
+  }
+
+  function updateSmartNotifyUI() {
+    const isEnabled = global.VocabSRS?.isSmartNotifyEnabled ? global.VocabSRS.isSmartNotifyEnabled() : true;
+    if ($('chkSmartNotify')) $('chkSmartNotify').checked = isEnabled;
+
+    const badge = $('smartNotifyBadge');
+    const desc = $('smartNotifyPermDesc');
+    const btn = $('btnReqNotify');
+
+    const perm = (typeof window !== 'undefined' && 'Notification' in window) ? Notification.permission : 'unsupported';
+    if (badge) {
+      if (!isEnabled) {
+        badge.textContent = '通知無効';
+        badge.className = 'badge';
+        badge.style.background = 'var(--b)';
+        badge.style.color = 'var(--s)';
+      } else if (perm === 'granted') {
+        badge.textContent = '通知稼働中';
+        badge.className = 'badge ok';
+      } else if (perm === 'denied') {
+        badge.textContent = '通知ブロック中';
+        badge.className = 'badge ng';
+      } else {
+        badge.textContent = '通知未許可';
+        badge.className = 'badge';
+        badge.style.background = 'var(--b)';
+        badge.style.color = 'var(--s)';
+      }
+    }
+    if (desc) {
+      if (perm === 'granted') desc.textContent = 'ブラウザ通知許可済み（記憶定着率90%直前で自動アラート）';
+      else if (perm === 'denied') desc.textContent = 'ブラウザ設定で通知がブロックされています。設定から許可してください。';
+      else desc.textContent = '通知ボタンを押してブラウザ通知を許可してください。';
+    }
+    if (btn) {
+      btn.style.display = perm === 'granted' ? 'none' : 'inline-block';
+    }
+  }
+
+  async function requestSmartNotifyPermission() {
+    if (global.VocabSRS?.requestNotificationPermission) {
+      const res = await global.VocabSRS.requestNotificationPermission();
+      updateSmartNotifyUI();
+      if (global.VocabModal?.showToast) {
+        if (res === 'granted') {
+          global.VocabModal.showToast('忘却臨界点スマートPush通知を許可しました。', 'ok');
+        } else {
+          global.VocabModal.showToast('通知は許可されませんでした。', 'info');
+        }
+      }
+    }
   }
 
   async function saveKeyFromModal() {
@@ -261,7 +405,7 @@
     }
     if (global.fetchModels) {
       try {
-        const m = await global.fetchModels(k);
+        const m = await global.fetchModels(k, true);
         if (global.updKeyUI) global.updKeyUI(true);
         if (global.showToast) global.showToast(`接続確認完了 (${m.length}モデル)`, 'ok');
         else alert(`接続確認完了 (${m.length}モデル)`);
@@ -284,19 +428,19 @@
     const targetLang = tL || App.lang || 'en';
     const activeCfg = global.getActivePairConfig ? global.getActivePairConfig() : { key: 'distinction_entries' };
     const curPairKey = activeCfg.key;
-    const preferKey = (targetLang && global.LANGS?.[targetLang]?.key && !App.crossLang) ? global.LANGS[targetLang].key : curPairKey;
+    const preferKey = (!App.crossLang || !tL || targetLang === App.srcLang) ? curPairKey : (global.LANGS?.[targetLang]?.key || curPairKey);
 
     let targetKey = preferKey;
     let list = [...(global.getJson ? global.getJson(preferKey) : [])];
     if (!list.length && App.entries?.length) list = [...App.entries];
 
-    let it = list.find(x => (typeof idOrNum === 'string' && x.id === idOrNum) || (x.word === idOrNum) || x.num === Number(idOrNum));
+    let it = list.find(x => x.id === idOrNum) || list.find(x => x.word === idOrNum || (typeof idOrNum === 'number' && x.num === idOrNum));
 
     if (!it && global.getAllKnownPairConfigs) {
       const allPairs = global.getAllKnownPairConfigs();
       for (const p of allPairs) {
         const otherList = [...(global.getJson ? global.getJson(p.key) : [])];
-        const found = otherList.find(x => (typeof idOrNum === 'string' && x.id === idOrNum) || (x.word === idOrNum) || x.num === Number(idOrNum));
+        const found = otherList.find(x => x.id === idOrNum) || otherList.find(x => x.word === idOrNum || (typeof idOrNum === 'number' && x.num === idOrNum));
         if (found) {
           it = found;
           targetKey = p.key;
@@ -336,8 +480,8 @@
   function saveEditCard() {
     const App = global.App || {};
     const id = $('editId')?.value;
-    const tL = $('editLang')?.value || App.lang || 'en';
-    const targetKey = $('editTargetKey')?.value || (global.getActivePairConfig ? global.getActivePairConfig().key : 'distinction_entries');
+    let tL = $('editLang')?.value || App.lang || 'en';
+    let targetKey = $('editTargetKey')?.value || (global.getActivePairConfig ? global.getActivePairConfig().key : 'distinction_entries');
     let list = [...(global.getJson ? global.getJson(targetKey) : [])];
     let idx = list.findIndex(x => x.id === id);
 
@@ -349,6 +493,8 @@
         if (foundIdx !== -1) {
           list = otherList;
           idx = foundIdx;
+          targetKey = p.key;
+          tL = p.srcLang || p.lang || tL;
           break;
         }
       }
@@ -374,7 +520,7 @@
     const exF = $('editExForeign')?.value?.trim() || '', exJ = $('editExJa')?.value?.trim() || '', exU = $('editExUsed')?.value?.trim() || '', now = Date.now();
 
     const oldWk = prev.wordKey || makeWordKeyFn(prev.word, tL, prev.meanings?.[0]?.pos, prev.homographIndex);
-    const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(tL) : new Map();
+    const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(targetKey) : new Map();
     if (oldWk && oldWk !== newWk) tombMap.set(`wk:${oldWk}`, now);
     tombMap.delete(`wk:${newWk}`);
     tombMap.delete(`id:${prev.id}`);
@@ -385,6 +531,7 @@
 
     const updated = sanitizeItemFn({
       ...prev, word: w, homographIndex: homoIdx, wordKey: newWk,
+      version: (Number(prev.version) || 1) + 1,
       phonetic: cleanPho($('editPho')?.value), grammar_forms: $('editGram')?.value?.trim() || undefined,
       category: $('editCat')?.value, folder: $('editFol')?.value?.trim() || undefined,
       meanings: finalMeanings, history_note: $('editHistNote')?.value?.trim() || undefined, core: $('editCore')?.value?.trim(),
@@ -399,16 +546,18 @@
     if (conflictIdx !== -1) {
       const [removed] = list.splice(conflictIdx, 1);
       if (removed?.id) tombMap.set(`id:${removed.id}`, now);
+      if (removed?.wordKey) tombMap.set(`wk:${removed.wordKey}`, now);
     }
-    if (global.VocabStorage) global.VocabStorage.saveTombstones(tL, tombMap);
+    if (global.VocabStorage) global.VocabStorage.saveTombstones(targetKey, tombMap);
 
     const nextList = list.map((it, i) => ({ ...it, num: i + 1 }));
-    if (global.setJson) global.setJson(targetKey, nextList, true, true);
-    if (targetKey === (global.getActivePairConfig ? global.getActivePairConfig().key : '')) {
-      App.entries = nextList;
-    }
-    if (global.VocabStorage) {
+    if (global.setJson) {
+      global.setJson(targetKey, nextList, true, true);
+    } else if (global.VocabStorage) {
       global.VocabStorage.state.mem[targetKey] = nextList;
+    }
+    if (targetKey === (global.getActivePairConfig ? global.getActivePairConfig().key : '')) {
+      App.entries = global.VocabStorage?.state?.mem?.[targetKey] || nextList;
     }
     toggleModal('editModal', false);
     if (global.load) global.load(App.page);
@@ -471,9 +620,10 @@
     _isCommittingExt = true;
     try {
       const getKeyFn = global.getKey || (() => '');
-      if (App.quotaRemaining === 0 && !getKeyFn()) {
+      const usageInfo = global.VocabStorage?.getDailyAiUsageInfo ? global.VocabStorage.getDailyAiUsageInfo({ appState: App }) : null;
+      if (usageInfo && !usageInfo.isUnlimited && usageInfo.remaining <= 0 && !getKeyFn()) {
         toggleModal('extractModal', false);
-        openUpsellModal('今月の無料枠（30語）をすべて消費しました。抽出した単語を一括登録するにはProプランをご利用ください。');
+        openUpsellModal('本日のAI新規生成無料枠（5語/日）をすべて消費しました。抽出した単語を一括登録するにはProプランをご利用いただくか、明日以降に再度お試しください。');
         return;
       }
       const f = $('extFolInput')?.value?.trim() || $('inFol')?.value?.trim() || '';
@@ -486,6 +636,146 @@
     } finally {
       setTimeout(() => { _isCommittingExt = false; }, 600);
     }
+  }
+
+  // --- スターターパック ギャラリーモーダル ---
+  function openStarterPackModal() {
+    const modal = $('starterPackModal');
+    if (!modal) return;
+    const body = $('starterPackModalBody');
+    const currentLang = global.App?.srcLang || global.App?.lang || 'en';
+    if (body && global.VocabStarterPack?.buildStarterPackGalleryHtml) {
+      body.innerHTML = global.VocabStarterPack.buildStarterPackGalleryHtml(currentLang);
+    }
+    toggleModal('starterPackModal', true);
+  }
+
+  function installStarterPackFromModal(packId) {
+    if (!packId || !global.VocabStarterPack?.populateStarterPack) return;
+    const App = global.App || {};
+    const meta = global.VocabStarterPack.PACK_METADATA?.[packId];
+    const packLang = meta?.lang || 'en';
+
+    // パックの対象言語と現在の選択言語が異なる場合は自動同期切り替え
+    if (meta?.lang && App.srcLang && meta.lang !== App.srcLang) {
+      if (typeof global.VocabCore?.setLanguagePair === 'function') {
+        global.VocabCore.setLanguagePair(meta.lang, 'ja');
+      } else if (typeof global.setLanguagePair === 'function') {
+        global.setLanguagePair(meta.lang, 'ja');
+      }
+    }
+
+    const curPairKey = global.VocabCore?.getActivePairConfig?.()?.key || (meta?.lang ? (meta.lang === 'en' ? 'distinction_entries' : `distinction_entries_${meta.lang}`) : 'distinction_entries');
+    const curEntries = (typeof global.VocabCore?.getJson === 'function' ? global.VocabCore.getJson(curPairKey) : (global.VocabStorage?.state?.mem?.[curPairKey] || []));
+    const lang = App.srcLang || App.lang || packLang;
+    const { added, merged } = global.VocabStarterPack.populateStarterPack(curEntries, lang, packId, curPairKey);
+
+    if (added.length === 0) {
+      showToast('このスターターパックの単語はすべて既にライブラリに存在します。', 'info');
+      return;
+    }
+
+    if (global.setJson) {
+      global.setJson(curPairKey, merged, true, true);
+    } else if (global.VocabStorage) {
+      global.VocabStorage.state.mem[curPairKey] = merged;
+    }
+    App.entries = global.VocabStorage?.state?.mem?.[curPairKey] || merged;
+    const activePairId = global.VocabCore?.getActivePairConfig?.()?.pairId || `${lang}_ja`;
+    try { localStorage.setItem(`vv_starter_loaded_${activePairId}`, '1'); } catch {}
+
+    toggleModal('starterPackModal', false);
+    if (global.load) global.load(1);
+
+    const packName = global.VocabStarterPack.PACK_METADATA?.[packId]?.name || packId;
+    showToast(`「${packName}」（${added.length}語）をライブラリに取り込みました。`, 'ok', 4000);
+  }
+
+  // --- Anki インポートモーダル ---
+  function openAnkiImportModal() {
+    const modal = $('ankiImportModal');
+    if (!modal) return;
+    const textEl = $('ankiImportText');
+    if (textEl) textEl.value = '';
+    const fileEl = $('ankiFileInput');
+    if (fileEl) fileEl.value = '';
+    const previewEl = $('ankiImportPreview');
+    if (previewEl) previewEl.innerHTML = '<span style="color:var(--m)">TSV/CSVテキストを貼り付けるか、ファイルを選択してください</span>';
+    toggleModal('ankiImportModal', true);
+  }
+
+  function handleAnkiFileSelect(ev) {
+    const f = ev.target?.files?.[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = e => {
+      const text = e.target.result;
+      const textEl = $('ankiImportText');
+      if (textEl) textEl.value = text;
+      previewAnkiImport(text);
+    };
+    r.readAsText(f);
+  }
+
+  function previewAnkiImport(text = null) {
+    const raw = text !== null ? text : ($('ankiImportText')?.value || '');
+    const previewEl = $('ankiImportPreview');
+    if (!previewEl) return;
+
+    if (!raw.trim()) {
+      previewEl.innerHTML = '<span style="color:var(--m)">テキストを入力するか、ファイルを選択してください</span>';
+      return;
+    }
+
+    const items = global.VocabExport?.parseAnkiExport ? global.VocabExport.parseAnkiExport(raw) : [];
+    if (!items.length) {
+      previewEl.innerHTML = '<span style="color:var(--err)">有効な単語が検出されませんでした。フォーマットをご確認ください。</span>';
+      return;
+    }
+
+    const sample = items.slice(0, 3).map(i => `
+      <div style="padding:4px 8px;background:var(--bg-card);border:1px solid var(--b);border-radius:4px;margin-top:4px;font-size:11.5px">
+        <strong>${esc(i.word)}</strong> ${i.phonetic ? `<em>[${esc(i.phonetic)}]</em>` : ''} - <span>${esc(i.meanings?.[0]?.text || '')}</span>
+      </div>
+    `).join('');
+
+    previewEl.innerHTML = `
+      <div style="font-size:12px;font-weight:700;color:var(--ok)">検出された単語: ${items.length} 語</div>
+      <div style="margin-top:4px">${sample}</div>
+      ${items.length > 3 ? `<div style="font-size:11px;color:var(--m);margin-top:4px">他 ${items.length - 3} 語...</div>` : ''}
+    `;
+  }
+
+  function executeAnkiImport() {
+    const raw = $('ankiImportText')?.value || '';
+    if (!raw.trim()) {
+      showToast('インポートするAnkiデータがありません。', 'warn');
+      return;
+    }
+
+    try {
+      if (global.VocabExport?.importAnkiText) {
+        global.VocabExport.importAnkiText(raw);
+        toggleModal('ankiImportModal', false);
+      }
+    } catch (err) {
+      showToast(`インポートに失敗しました: ${err.message}`, 'err');
+    }
+  }
+
+  // グローバルクリックハンドラ（starter pack install 等のデリゲーション）
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', e => {
+      const btn = e.target?.closest?.('[data-act="install-starter-pack"]');
+      if (btn) {
+        const packId = btn.getAttribute('data-pack');
+        if (packId) installStarterPackFromModal(packId);
+      }
+      const starterBtn = e.target?.closest?.('[data-act="open-starter-modal"]');
+      if (starterBtn) {
+        openStarterPackModal();
+      }
+    });
   }
 
   // --- グローバルエクスポート ---
@@ -508,6 +798,15 @@
     updateExtCounts,
     renderExtCandidates,
     toggleAllExtChecks,
-    commitExtractedWords
+    commitExtractedWords,
+    updateFSRSOptimizerUI,
+    updateSmartNotifyUI,
+    requestSmartNotifyPermission,
+    openStarterPackModal,
+    installStarterPackFromModal,
+    openAnkiImportModal,
+    handleAnkiFileSelect,
+    previewAnkiImport,
+    executeAnkiImport
   };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -149,16 +149,23 @@
     if (!cards || focusedIndex < 0 || focusedIndex >= cards.length) return null;
     const targetCard = cards[focusedIndex];
     if (!targetCard) return null;
+    const cardId = targetCard.dataset?.id;
     const lk = targetCard.dataset?.word;
     const tL = targetCard.dataset?.lang || currentLang;
     const list = typeof getListFn === 'function' ? getListFn(tL) : [];
     if (!Array.isArray(list)) return null;
 
+    if (cardId) {
+      const byId = list.find(i => i && i.id === cardId);
+      if (byId) return byId;
+    }
+
     const mkLk = makeLkFn || ((w, l, idx) => {
-      if (global.VocabMorphology && typeof global.VocabMorphology.makeWordKey === 'function') {
-        return global.VocabMorphology.makeWordKey(w, l, idx);
+      if (global.VocabMorphology && typeof global.VocabMorphology.makeLookupKey === 'function') {
+        return global.VocabMorphology.makeLookupKey(w, l, idx);
       }
-      return `${String(w || '').toLowerCase()}_${l}${idx > 1 ? '#' + idx : ''}`;
+      const base = l === 'de' ? String(w || '').trim() : String(w || '').trim().toLowerCase();
+      return Number(idx) > 1 ? `${base}#${Number(idx)}` : base;
     });
 
     return list.find(i => mkLk(i.word, tL, i.homographIndex) === lk) || null;
@@ -209,14 +216,12 @@
       const type = el.dataset?.type;
       const word = el.dataset?.word;
       box.style.display = 'none';
+      input.value = '';
+      try { input.blur(); } catch {}
       if (type === 'word') {
         if (typeof options.onJumpWord === 'function') options.onJumpWord(word);
-        input.value = '';
-        input.blur();
       } else if (type === 'root') {
         if (typeof options.onOpenRootGraph === 'function') options.onOpenRootGraph(word);
-        input.value = '';
-        input.blur();
       }
     }
 
@@ -363,11 +368,15 @@
       return true;
     } else if (isAnkiOpen && !inInput) {
       if (e.ctrlKey || e.metaKey || e.altKey) return false;
-      if (e.code === 'KeyR' || e.key === 's') {
+      if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        if (typeof ctx.ankiToggleMode === 'function') ctx.ankiToggleMode();
+        return true;
+      } else if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R' || e.key === 's' || e.key === 'S') {
         e.preventDefault();
         if (typeof ctx.ankiSpeak === 'function') ctx.ankiSpeak();
         return true;
-      } else if (e.code === 'KeyZ') {
+      } else if (e.code === 'KeyZ' || e.key === 'z' || e.key === 'Z') {
         e.preventDefault();
         if (typeof ctx.ankiUndo === 'function') ctx.ankiUndo();
         return true;
@@ -383,6 +392,25 @@
     } else if (!inInput && !anyModalOpen && !isAnkiOpen) {
       // OS標準ショートカット（Cmd+S, Cmd+D, Ctrl+R等）との衝突防止
       if (e.ctrlKey || e.metaKey || e.altKey) return false;
+
+      // 耳学モード実行中の専用キー操作（Space: 一時停止/再開, J: 前へ, L: 次へ）
+      const playlistState = global.VocabSpeech?.getPlaylistState ? global.VocabSpeech.getPlaylistState() : null;
+      if (playlistState && playlistState.isRunning) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          if (typeof ctx.togglePlaylist === 'function') ctx.togglePlaylist();
+          return true;
+        } else if (e.key === 'j' || e.key === 'J') {
+          e.preventDefault();
+          if (global.VocabSpeech?.prevPlaylistItem) global.VocabSpeech.prevPlaylistItem();
+          return true;
+        } else if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault();
+          if (global.VocabSpeech?.nextPlaylistItem) global.VocabSpeech.nextPlaylistItem();
+          return true;
+        }
+      }
+
       if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
         if (typeof ctx.moveCardFocus === 'function') ctx.moveCardFocus(1);
@@ -390,6 +418,10 @@
       } else if (e.key === 'k' || e.key === 'ArrowUp') {
         e.preventDefault();
         if (typeof ctx.moveCardFocus === 'function') ctx.moveCardFocus(-1);
+        return true;
+      } else if (e.key === 'l' || e.key === 'L' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        if (typeof ctx.togglePlaylist === 'function') ctx.togglePlaylist();
         return true;
       } else if (e.key === 's') {
         e.preventDefault();
@@ -410,6 +442,10 @@
       } else if (e.key === 'r') {
         e.preventDefault();
         if (typeof ctx.startAnki === 'function') ctx.startAnki();
+        return true;
+      } else if (e.key === 'a') {
+        e.preventDefault();
+        if (typeof ctx.openAnalyticsModal === 'function') ctx.openAnalyticsModal();
         return true;
       } else if (e.key === 'g') {
         e.preventDefault();

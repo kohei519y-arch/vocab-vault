@@ -173,16 +173,31 @@
     App.rootIndexMap.clear();
 
     const rootBuckets = new Map();
-    const langKeys = global.LANG_KEYS || (global.VocabStorage ? global.VocabStorage.LANG_KEYS : ['en', 'ja', 'fr', 'de']);
-    const langs = global.LANGS || {};
     const getJsonFn = global.getJson || (global.VocabStorage ? global.VocabStorage.getJson : (() => []));
+    const activePairKey = global.getActivePairConfig ? global.getActivePairConfig().key : '';
 
-    langKeys.forEach(l => {
-      const list = (l === App.lang ? App.entries : getJsonFn(langs[l]?.key || `distinction_entries_${l}`)) || [];
+    // 基本4言語キー + 保存されている全言語ペアキーを統合走査
+    const allPairs = getAllKnownPairConfigs(App);
+    const keysToScan = new Map();
+    const langs = global.LANGS || {};
+    ['en', 'fr', 'de', 'ja'].forEach(l => {
+      const k = langs[l]?.key || (l === 'en' ? 'distinction_entries' : `distinction_entries_${l}`);
+      keysToScan.set(k, l);
+    });
+    allPairs.forEach(p => {
+      if (p.key) keysToScan.set(p.key, p.src || 'en');
+    });
+
+    keysToScan.forEach((srcLang, storageKey) => {
+      const list = (storageKey === activePairKey && Array.isArray(App.entries) && App.entries.length)
+        ? App.entries
+        : (getJsonFn(storageKey) || []);
       list.forEach(it => {
         if (!it?.word) return;
-        it.lang = it.lang || l;
-        const uKey = `${l}:${it.id || it.num}`, ref = { word:it.word, lang:l, num:it.num, id:it.id, homographIndex:it.homographIndex };
+        const l = it.lang || srcLang || 'en';
+        it.lang = l;
+        const uKey = `${storageKey}:${it.id || it.num}`;
+        const ref = { word: it.word, lang: l, num: it.num, id: it.id, homographIndex: it.homographIndex };
         getMeta(it, App).roots.forEach(k => {
           let rm = rootBuckets.get(k);
           if (!rm) rootBuckets.set(k, rm = new Map());
@@ -199,8 +214,18 @@
   function matchPos(it, targetGroup) {
     if (!targetGroup || targetGroup === 'all') return true;
     return (it.meanings || []).some(m => {
-      const p = String(m.pos || '');
-      return targetGroup === 'Other' ? !['N', 'V', 'Adj', 'Adv'].some(pre => p.startsWith(pre)) : p.startsWith(targetGroup);
+      const p = String(m.pos || '').trim();
+      const low = p.toLowerCase();
+      const isN = p.startsWith('N') || low.startsWith('n.') || low.startsWith('subst') || p.includes('名詞');
+      const isV = p.startsWith('V') || low.startsWith('v.') || p.includes('動詞');
+      const isAdj = p.startsWith('Adj') || low.startsWith('adj') || p.includes('形容詞');
+      const isAdv = p.startsWith('Adv') || low.startsWith('adv') || p.includes('副詞');
+      if (targetGroup === 'N') return isN;
+      if (targetGroup === 'V') return isV;
+      if (targetGroup === 'Adj') return isAdj;
+      if (targetGroup === 'Adv') return isAdv;
+      if (targetGroup === 'Other') return !(isN || isV || isAdj || isAdv);
+      return p.startsWith(targetGroup);
     });
   }
 

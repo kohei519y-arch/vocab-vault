@@ -3,18 +3,27 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v18-network-first';
+const CACHE_NAME = 'vocab-vault-v42-url-jump-responsive';
+
+// [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
+function fetchWithTimeout(request, timeoutMs = 3000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(request, { signal: controller.signal })
+    .finally(() => clearTimeout(timeoutId));
+}
 
 const PRECACHE_ASSETS = [
   './',
   './index.html',
-  './dev.html',
   './css/app.css',
+  './js/i18n.js',
   './js/storage.js',
   './js/anki.js',
   './js/sync.js',
   './js/ocr.js',
   './js/morphology.js',
+  './js/eiken_catalog.js',
   './js/graph.js',
   './js/feedback.js',
   './js/dictionary.js',
@@ -44,11 +53,17 @@ self.addEventListener('message', event => {
   }
 });
 
-// インストール時にコアアセットをプリキャッシュ
+// インストール時にコアアセットを耐障害プリキャッシュ (単一アセット欠落でも全体アボートを防止)
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(PRECACHE_ASSETS);
+    caches.open(CACHE_NAME).then(async cache => {
+      await Promise.allSettled(
+        PRECACHE_ASSETS.map(url =>
+          cache.add(url).catch(err => {
+            console.warn('[SW] Precache skipped for:', url, err);
+          })
+        )
+      );
     }).then(() => self.skipWaiting())
   );
 });
@@ -76,12 +91,14 @@ self.addEventListener('fetch', event => {
 
   const url = new URL(event.request.url);
 
-  // 外部API (Supabase, Gemini, Wiktionary, Stripe) はキャッシュせず常にネットワーク優先
+  // 外部API (Supabase, Gemini, Wiktionary, Stripe, 外部TTS音声) はキャッシュせず常にブラウザネイティブ通信に委ねる
   if (
     url.hostname.includes('supabase.co') ||
     url.hostname.includes('generativelanguage.googleapis.com') ||
     url.hostname.includes('wiktionary.org') ||
-    url.hostname.includes('stripe.com')
+    url.hostname.includes('stripe.com') ||
+    url.hostname.includes('translate.google.com') ||
+    url.hostname.includes('dictionaryapi.dev')
   ) {
     return;
   }
@@ -93,10 +110,10 @@ self.addEventListener('fetch', event => {
                  url.pathname === '/vocab-vault/' ||
                  url.pathname === '/vocab-vault';
 
-  // 1. HTML (ページ遷移): Network-First (オンラインなら常に最新のHTMLを取得し、キャッシュ汚染を100%防止)
+  // 1. HTML (ページ遷移): Network-First (タイムアウト3秒で弱電波ハングを防ぎキャッシュへフォールバック)
   if (isHtml) {
     event.respondWith(
-      fetch(event.request)
+      fetchWithTimeout(event.request, 3000)
         .then(res => {
           if (res && res.status === 200) {
             const clone = res.clone();
@@ -108,21 +125,17 @@ self.addEventListener('fetch', event => {
           const cache = await caches.open(CACHE_NAME);
           const cached = await cache.match(event.request, { ignoreSearch: true });
           if (cached) return cached;
-          if (url.pathname.includes('dev.html')) {
-            const devFallback = await cache.match('./dev.html');
-            if (devFallback) return devFallback;
-          }
           return (await cache.match('./index.html')) || (await cache.match('./')) || new Response('Offline', { status: 503 });
         })
     );
     return;
   }
 
-  // 2. CSS / JS: Network-First (最新スタイル・コードを即座に反映)
+  // 2. CSS / JS: Network-First (タイムアウト3秒でキャッシュへフォールバック)
   const isCode = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
   if (isCode) {
     event.respondWith(
-      fetch(event.request)
+      fetchWithTimeout(event.request, 3000)
         .then(res => {
           if (res && res.status === 200) {
             const clone = res.clone();
@@ -158,3 +171,51 @@ self.addEventListener('fetch', event => {
     })
   );
 });
+
+// --- 観点1: 忘却臨界点スマートPush通知 ＆ タップハンドラ ---
+self.addEventListener('push', event => {
+  let data = {
+    title: '【Vocab Vault】忘却臨界点アラート',
+    body: '記憶保持率が90%を下回ろうとしている単語があります。今すぐ1分復習しましょう！'
+  };
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      if (parsed && typeof parsed === 'object') data = Object.assign(data, parsed);
+    } catch {
+      data.body = event.data.text() || data.body;
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: './icons/icon-192.png',
+    badge: './icons/favicon-32.png',
+    tag: 'vocab-forgetting-alert',
+    renotify: true,
+    data: { url: './?mode=anki' }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (const client of windowClients) {
+        if (client.url.includes('vocab-vault') || client.url.includes('localhost') || client.url.includes('127.0.0.1')) {
+          if ('focus' in client) return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

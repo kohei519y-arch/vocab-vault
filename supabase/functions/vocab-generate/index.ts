@@ -26,9 +26,17 @@ function cleanJsonString(str: string): string {
 }
 
 const guestRateMemory = new Map<string, number>();
+
+function refundGuestMemory(clientIp: string, count: number) {
+  if (count <= 0) return;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const rateKey = `${clientIp}_${todayStr}`;
+  const cur = guestRateMemory.get(rateKey) || 0;
+  guestRateMemory.set(rateKey, Math.max(0, cur - count));
+}
 const ipBurstTracker = new Map<string, { count: number; resetAt: number }>();
 
-// [セキュリティ強化] 信頼性の高いクライアントIP取得（Cloudflare / リバースプロキシ対応）
+// [セキュリティ強化] 信頼性の高いクライアントIP取得（IPスプーフィング・偽装ヘッダー防護）
 function getClientIp(req: Request): string {
   const cfIp = req.headers.get("cf-connecting-ip");
   if (cfIp) return cfIp.trim();
@@ -36,9 +44,9 @@ function getClientIp(req: Request): string {
   if (realIp) return realIp.trim();
   const forwarded = req.headers.get("x-forwarded-for");
   if (forwarded) {
-    // x-forwarded-for の先頭（クライアントオリジンIP）を取得
-    const firstIp = forwarded.split(",")[0]?.trim();
-    if (firstIp) return firstIp;
+    // クライアント注入可能な先頭ではなく、信頼できる直前プロキシが付与した最後尾IPを参照
+    const ips = forwarded.split(",").map(s => s.trim()).filter(Boolean);
+    if (ips.length > 0) return ips[ips.length - 1];
   }
   return "unknown_guest";
 }
@@ -124,7 +132,9 @@ function sanitizeCard(card: any, origItem?: RequestItem) {
     reqIndex: origItem?.reqIndex ?? card?.reqIndex ?? 0,
     word,
     homographIndex: Math.max(1, parseInt(String(card?.homographIndex || origItem?.homographIndex || 1), 10) || 1),
-    category: typeof card?.category === "number" ? card.category : 1,
+    category: (typeof card?.category === "number" || (typeof card?.category === "string" && card.category.trim().length > 0))
+      ? card.category
+      : 29,
     phonetic,
     grammar_forms,
     etymologyConfidence: ["certain", "probable", "disputed", "unknown"].includes(card?.etymologyConfidence)
@@ -151,9 +161,22 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // [NEW-P0-2 解決] catch ブロックから安全に参照できるよう try の外側でスコープ変数を宣言
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
+  const supabaseAdmin = (supabaseUrl && supabaseServiceKey)
+    ? createClient(supabaseUrl, supabaseServiceKey)
+    : null;
+
+  let user: any = null;
+  let reservedUser = false;
+  let reservedGuest = false;
+  let itemsToGenerate: RequestItem[] = [];
+  const clientIp = getClientIp(req);
+
   try {
-    // [インフラ保護] 秒間高頻度バースト遮断（DoS・スクリプト連打からの最速防衛）
-    const clientIp = getClientIp(req);
+    // [NEW-P0-1 解決] nowMs の宣言を1回に統一
     const nowMs = Date.now();
     const burst = ipBurstTracker.get(clientIp) || { count: 0, resetAt: nowMs + 2000 };
     if (nowMs > burst.resetAt) {
@@ -170,19 +193,25 @@ serve(async (req) => {
     }
     ipBurstTracker.set(clientIp, burst);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY") ?? "";
-
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!supabaseAdmin) {
       return new Response(JSON.stringify({ error: "Server misconfigured (missing Supabase keys)" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
-    let user = null;
+    // [P2-2 解決] インメモリ Map (ipBurstTracker / guestRateMemory) の長期メモリリーク防止 (nowMs を再利用)
+    if (ipBurstTracker.size > 5000) {
+      for (const [k, v] of ipBurstTracker.entries()) {
+        if (nowMs > v.resetAt) ipBurstTracker.delete(k);
+      }
+    }
+    if (guestRateMemory.size > 5000) {
+      const todayPrefix = `_${new Date().toISOString().slice(0, 10)}`;
+      for (const k of guestRateMemory.keys()) {
+        if (!k.endsWith(todayPrefix)) guestRateMemory.delete(k);
+      }
+    }
 
     // 認証確認 (ログインユーザーはトークン検証、未ログイン時はゲストアクセスを許可)
     const authHeader = req.headers.get("Authorization");
@@ -192,6 +221,15 @@ serve(async (req) => {
       if (!authError && authUser) {
         user = authUser;
       }
+    }
+
+    // [DoS/OOM 防衛] メモリ枯渇攻撃を防ぐためペイロード上限（2MB）を解析前に強制
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: "リクエストサイズが上限（2MB）を超えています。" }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const body = await req.json();
@@ -236,15 +274,16 @@ serve(async (req) => {
     // [P1-3 解決] プロンプトインジェクション防壁: fName のサニタイズ（制御文字・改行排除、英数日本語記号のみ、最大40文字）
     const safeFName = fName ? sanitizePromptString(fName, 40) : "";
 
-    // 各単語のサニタイズ（プロンプト脱出タグ無力化 & 上限文字数設定）
-    const sanitizedItems = items
-      .map(it => ({
-        ...it,
-        reqWord: sanitizePromptString(it.reqWord, 100),
-        homographIndex: Math.max(1, parseInt(String(it.homographIndex || 1), 10) || 1),
-        targetSenseOrMeaning: it.targetSenseOrMeaning ? sanitizePromptString(it.targetSenseOrMeaning, 100) : undefined,
-        contextSentence: it.contextSentence ? sanitizePromptString(it.contextSentence, 300) : undefined,
-        contextPos: it.contextPos ? sanitizePromptString(it.contextPos, 30) : undefined,
+    // [P0-5 修正] 厳格なホワイトリスト型サニタイズ（未検証のクライアント任意プロパティのプロンプト混入を100%遮断）
+    const sanitizedItems: RequestItem[] = items
+      .slice(0, 15)
+      .map((it, idx) => ({
+        reqIndex: idx, // クライアントの reqIndex は信用せずインデックスで連番化
+        reqWord: sanitizePromptString(it?.reqWord, 100),
+        homographIndex: Math.max(1, parseInt(String(it?.homographIndex || 1), 10) || 1),
+        targetSenseOrMeaning: it?.targetSenseOrMeaning ? sanitizePromptString(it.targetSenseOrMeaning, 100) : undefined,
+        contextSentence: it?.contextSentence ? sanitizePromptString(it.contextSentence, 300) : undefined,
+        contextPos: it?.contextPos ? sanitizePromptString(it.contextPos, 30) : undefined,
       }))
       .filter(it => it.reqWord.length > 0);
 
@@ -318,6 +357,9 @@ ${safeFName ? `分野: ${safeFName}` : ""}`;
    - 見出し語に特定の時代・歴史的出来事（例: wet＝米国禁酒法下の反禁酒派、dry＝禁酒派、dove＝冷戦期の反戦ハト派、quarantine＝ベネチアの40日検疫等）に根ざす顕著な歴史的・政治的・制度的用法がある場合、現代標準語義に加えて必ずmeaningsに歴史的語義（【歴史】や【禁酒法】等のラベル付き）を含め、history_noteに時代背景や制度的文脈を具体的に記述すること（最大70字）。特筆すべき歴史的用法がない一般的な語彙はhistory_noteを空文字""とすること。架空の歴史的事実を捏造しないこと。
 4. 自然な例文(example.foreign)と日本語訳(example.ja & example.trans):
    - 例文には必ず見出し語を含めること。外国語例文(example.foreign)はHTMLタグを付与せずプレーンテキストとすること。
+   - 日本語訳(example.ja)では、見出し語に対応する訳語箇所を必ず <b>訳語</b> のように <b> タグで囲むこと。
+   - used_form には外国語例文中で実際に使われている活用形を記載すること。
+${!useHist ? "※歴史補足(history_note)は簡潔にとどめ、現代の主要語義と基本語根を優先すること。\n" : ""}
 5. Unicode文字化け防止:
    - 発音記号(IPA)、ウムラウト、アクサン記号、長音記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること。
 6. 品詞(pos)は ${sInfo.pos} 等に準拠すること。
@@ -411,42 +453,82 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       },
     };
 
-    // --- 1. 共有辞書キャッシュの検索 (Unicode NFC 正規化 & 言語ペア対応) ---
+    // --- 1. 共有辞書キャッシュの検索 (Unicode NFC 正規化 & 言語ペア対応 & マルチキーウォームアップ) ---
     const pairCode = `${sLang}_${tLang}`;
-    const makeWordKey = (w: string, pair: string, h: number = 1) => {
+
+    // [P0-4 & P0-5 修正] makeWordKey の一貫定義（getCandidateKeys の第1キーと完全一致）
+    const makeWordKey = (w: string, pair: string, h: number = 1): string => {
       const normW = w.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
       return `${pair}:${normW}#${h > 1 ? h : 1}`;
     };
 
+    // [P0-4 解決] 異言語ペア間のキャッシュ汚染を100%防止するキー生成
+    const getCandidateKeys = (w: string, pair: string, h: number = 1): string[] => {
+      const normW = w.normalize("NFC").replace(/\s+/g, " ").trim().toLowerCase();
+      const keys = [
+        `${pair}:${normW}#${h > 1 ? h : 1}`,
+        ...(h === 1 ? [`${pair}:${normW}`] : []),
+      ];
+      // レガシーキー（ペア指定なし）は解説言語が日本語(ja)かつ同形#1の場合のみフォールバック許容
+      if (tLang === "ja" && h === 1) {
+        keys.push(`${sLang}:${normW}`, normW);
+      }
+      return Array.from(new Set(keys));
+    };
+
     // 共有辞書キャッシュのバッチ検索 (言語ペアごとに独立)
-    const allKeys = sanitizedItems.map(it => makeWordKey(it.reqWord, pairCode, it.homographIndex || 1));
+    // 一度誰かが生成した標準語彙は共有キャッシュとして採用し、Gemini API費用0円・生成枠消費なしで即時返却
+    const allKeys = Array.from(new Set(sanitizedItems.flatMap(it => getCandidateKeys(it.reqWord, pairCode, it.homographIndex || 1))));
     const { data: cachedRows } = await supabaseAdmin
       .from("global_dictionary_cache")
-      .select("card_data, hit_count, word_key")
+      .select("card_data, hit_count, word_key, verified")
       .eq("lang", sLang)
       .in("word_key", allKeys);
 
     const cachedMap = new Map((cachedRows || []).map((r: any) => [r.word_key, r]));
     const cachedResults: any[] = [];
-    const itemsToGenerate: RequestItem[] = [];
+    itemsToGenerate = [];
+    const cacheUpdatePromises: Promise<any>[] = [];
+
+    // [P1-3 解決] 一般的な整理用フォルダ名（TOEFL, お気に入り, 日付など）は専門分野指定ではないためキャッシュを優先ヒット（APIコスト防衛）
+    const GENERIC_FOLDER_NAMES = new Set([
+      "default", "デフォルト", "未分類", "その他", "general", "all", "words", "単語", "単語帳",
+      "favorite", "favorites", "お気に入り", "ブックマーク", "starred", "star",
+      "toefl", "toeic", "ielts", "eiken", "英検", "大学受験", "受験", "高校英語", "中学英語",
+      "my words", "folder", "フォルダー", "フォルダ"
+    ]);
+    const isGenericFolder = !safeFName ||
+      GENERIC_FOLDER_NAMES.has(safeFName.trim().toLowerCase()) ||
+      /^\d{4}[-_/]?\d{1,2}([-_/]?\d{1,2})?$/.test(safeFName.trim()); // 2026-10 等の日付フォルダ
+    const hasDomainContext = Boolean(safeFName && !isGenericFolder);
 
     for (const item of sanitizedItems) {
       const hIdx = item.homographIndex || 1;
-      const wk = makeWordKey(item.reqWord, pairCode, hIdx);
-      const cached = cachedMap.get(wk);
+      const candidateKeys = getCandidateKeys(item.reqWord, pairCode, hIdx);
+      let cached: any = null;
+      let matchedKey = "";
+      for (const k of candidateKeys) {
+        if (cachedMap.has(k)) {
+          cached = cachedMap.get(k);
+          matchedKey = k;
+          break;
+        }
+      }
 
       // [P0-2 解決] OCR抽出時のダミー訳語（文脈上の重要語など）はキャッシュバイパスせず共有キャッシュをヒットさせる
       const hasRealCustomSense = item.targetSenseOrMeaning && !DUMMY_OCR_SENSES.has(item.targetSenseOrMeaning.trim());
 
-      if (cached && cached.card_data && !hasRealCustomSense) {
+      // [未検証キャッシュ隔離] 検証済み(verified: true)キャッシュのみ全ユーザー共有ヒットとして採用
+      if (cached && cached.card_data && cached.verified && !hasRealCustomSense && !hasDomainContext) {
         cachedResults.push(sanitizeCard(cached.card_data, item));
-        // hit_countをインクリメント（バックグラウンド非同期）
-        supabaseAdmin
-          .from("global_dictionary_cache")
-          .update({ hit_count: (cached.hit_count || 0) + 1, updated_at: new Date().toISOString() })
-          .eq("lang", sLang)
-          .eq("word_key", wk)
-          .then();
+        // [P2-2 解決] hit_count更新を確実に完了させるため Promise 配列へ格納
+        cacheUpdatePromises.push(
+          supabaseAdmin
+            .from("global_dictionary_cache")
+            .update({ hit_count: (cached.hit_count || 0) + 1, updated_at: new Date().toISOString() })
+            .eq("lang", sLang)
+            .eq("word_key", matchedKey)
+        );
       } else {
         itemsToGenerate.push(item);
       }
@@ -457,6 +539,9 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
     let usedModel = "shared-cache";
 
     // --- 2. 未キャッシュ分のみクォータ事前予約 (Reserve) & Gemini API呼び出し ---
+    reservedUser = false;
+    reservedGuest = false;
+
     if (itemsToGenerate.length > 0) {
       if (!geminiApiKey) {
         return new Response(JSON.stringify({ error: "Gemini API key is not configured on server" }), {
@@ -473,34 +558,57 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
           p_is_refund: false,
         });
 
+        const isJa = tLang === "ja";
         if (quotaError || !quotaReserve?.allowed) {
+          const quotaErrMsg = isJa
+            ? `本日のAI新規生成無料枠（1日5語）に達しました（残り: ${quotaReserve?.remaining ?? 0}語）。Proプラン（月480円）にアップグレードすると実質無制限（月3,000語）でご利用いただけます。（※共有辞書キャッシュ内の単語は消費ゼロで登録可能）`
+            : `Daily free AI generation quota reached (5 words/day, remaining: ${quotaReserve?.remaining ?? 0}). Upgrade to Pro ($3.99/mo or $39/yr) for unlimited generations and real-time cloud sync. (Shared dictionary cache words require zero quota).`;
           return new Response(
             JSON.stringify({
-              error: `今月のAI新規生成上限に達しました（残り: ${quotaReserve?.remaining ?? 0}語）。Proプランにアップグレードすると無制限に生成できます。`,
+              error: quotaErrMsg,
               quotaRemaining: quotaReserve?.remaining ?? 0,
             }),
             { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
+        reservedUser = true;
         quotaRemaining = quotaReserve.remaining;
       } else {
+        const isJa = tLang === "ja";
         // [API Drain防衛] 未ログインゲストは1リクエスト最大3語に制限
         if (itemsToGenerate.length > 3) {
+          const guestBatchErrMsg = isJa
+            ? "未ログインでのAI新規一括生成は1回3語までです。無料アカウントを作成すると1日5語まで利用可能になり、Proプラン（月480円）で実質無制限（月3,000語）になります。"
+            : "Guest AI generation without sign-in is limited to 3 words per request. Create a free account for 5 words/day, or upgrade to Pro ($3.99/mo) for unlimited access.";
           return new Response(
             JSON.stringify({
-              error: "未ログインでのAI新規一括生成は1回3語までです。無料アカウントを作成すると1回15語・月30語までご利用いただけます。",
+              error: guestBatchErrMsg,
               requiresAuth: true
             }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
-        // [P0-6 解決] 未ログインゲストの日次クォータ判定（1日10語上限）
-        const clientIp = getClientIp(req);
+        // [P0-6 解決] 未ログインゲストの日次クォータ判定（1日3語上限）
         let guestAllowed = true;
         let currentUsage = 0;
-        const GUEST_DAILY_LIMIT = 10;
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const rateKey = `${clientIp}_${todayStr}`;
+        const currentMemoryCount = guestRateMemory.get(rateKey) || 0;
+        if (currentMemoryCount + itemsToGenerate.length > GUEST_DAILY_LIMIT) {
+          const guestMemQuotaErrMsg = isJa
+            ? `未ログインでの本日のAI新規生成お試し枠（1日${GUEST_DAILY_LIMIT}語）に達しました（本日利用: ${currentMemoryCount}語）。無料アカウント登録（30秒）で1日5語まで利用可能になり、Proプラン（月額480円）で実質無制限（月3,000語）にアップグレードできます。（※共有辞書キャッシュ内の単語は完全無制限）`
+            : `Daily guest quota reached (${GUEST_DAILY_LIMIT} words/day). Sign up for a free account (30 seconds) for 5 words/day, or upgrade to Pro ($3.99/mo) for unlimited AI generations. (Shared dictionary cache is always unlimited).`;
+          return new Response(
+            JSON.stringify({
+              error: guestMemQuotaErrMsg,
+              quotaRemaining: 0,
+              requiresAuth: true
+            }),
+            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
         try {
           const { data: gqData, error: gqErr } = await supabaseAdmin.rpc("consume_guest_quota", {
@@ -509,13 +617,28 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
             p_daily_limit: GUEST_DAILY_LIMIT,
           });
 
-          if (!gqErr && gqData) {
+          if (gqErr) {
+            console.error(`[Guest Quota RPC Error] ${gqErr.message}`);
+            // [P1-2 解決] Fail-Closed: DB障害・高負荷時はAPIコスト流出を防ぐため安全側に倒してブロック
+            const busyErrMsg = isJa
+              ? "現在クォータ認証サーバーが混み合っています。数分後に再試行してください。"
+              : "Quota verification server is currently busy. Please retry in a few moments.";
+            return new Response(
+              JSON.stringify({ error: busyErrMsg }),
+              { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+
+          if (gqData) {
             guestAllowed = Boolean(gqData.allowed);
             currentUsage = Number(gqData.usage_count) || 0;
             if (!guestAllowed) {
+              const guestQuotaErrMsg = isJa
+                ? `未ログインでの本日のAI新規生成お試し枠（1日${GUEST_DAILY_LIMIT}語）に達しました（本日利用: ${currentUsage}語）。無料アカウント登録（30秒）で1日5語まで利用可能になり、Proプラン（月額480円）で実質無制限（月3,000語）にアップグレードできます。（※共有辞書キャッシュ内の単語は完全無制限）`
+                : `Daily guest quota reached (${GUEST_DAILY_LIMIT} words/day). Sign up for a free account (30 seconds) for 5 words/day, or upgrade to Pro ($3.99/mo) for unlimited AI generations. (Shared dictionary cache is always unlimited).`;
               return new Response(
                 JSON.stringify({
-                  error: `未ログインでの本日のAI新規生成お試し枠（1日${GUEST_DAILY_LIMIT}語）に達しました（本日利用: ${currentUsage}語）。無料アカウント登録（30秒）で毎月30語まで利用可能になり、Proプラン（月額480円）で無制限解放されます。`,
+                  error: guestQuotaErrMsg,
                   quotaRemaining: 0,
                   requiresAuth: true
                 }),
@@ -523,24 +646,19 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
               );
             }
           }
-        } catch {
-          // RPCエラー時はインメモリフォールバック
-        }
-
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const rateKey = `${clientIp}_${todayStr}`;
-        const currentMemoryCount = guestRateMemory.get(rateKey) || 0;
-        if (currentMemoryCount + itemsToGenerate.length > GUEST_DAILY_LIMIT) {
+          guestRateMemory.set(rateKey, Math.max(currentMemoryCount + itemsToGenerate.length, currentUsage));
+          reservedGuest = true;
+        } catch (rpcEx: any) {
+          console.error(`[Guest Quota Exception] ${rpcEx.message}`);
+          // [P1-2 解決] Fail-Closed: 予期せぬ例外時も安全側に倒して即座に遮断
+          const errFallbackMsg = isJa
+            ? "現在サーバーが混み合っています。数分後に再試行してください。"
+            : "Server is currently experiencing high load. Please retry in a few moments.";
           return new Response(
-            JSON.stringify({
-              error: `未ログインでの本日のAI新規生成お試し枠（1日${GUEST_DAILY_LIMIT}語）に達しました（本日利用: ${currentMemoryCount}語）。無料アカウント登録（30秒）で毎月30語まで利用可能になり、Proプラン（月額480円）で無制限解放されます。`,
-              quotaRemaining: 0,
-              requiresAuth: true
-            }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            JSON.stringify({ error: errFallbackMsg }),
+            { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        guestRateMemory.set(rateKey, currentMemoryCount + itemsToGenerate.length);
       }
 
       // Gemini呼び出し (モデル自動フォールバックチェーン: 3.8-flash -> 2.5-flash -> 2.0-flash -> 1.5-flash)
@@ -574,12 +692,17 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       let successfulModel = candidateModels[0];
 
       for (const m of candidateModels) {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${geminiApiKey}`;
+        // [P1-4 修正] APIキーをクエリURLから排除し、x-goog-api-key ヘッダーでセキュアに送信 & 15秒タイムアウト設定
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
         try {
           const res = await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              "x-goog-api-key": geminiApiKey,
+            },
             body: reqPayload,
+            signal: AbortSignal.timeout(15000),
           });
 
           if (res.ok) {
@@ -588,12 +711,10 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
             break;
           }
 
-          // 404 (Not Found) や 400 (Bad Request / Unsupported Model) の場合は次世代モデルへフォールバック
           lastErrText = await res.text();
           console.warn(`[Gemini Model Warning] Model ${m} returned HTTP ${res.status}: ${lastErrText}. Trying fallback...`);
-          if (res.status !== 404 && res.status !== 400) {
-            // 429や500等のインフラエラーの場合はフォールバック継続
-            continue;
+          if (res.status === 429 || res.status >= 500) {
+            continue; // インフラ負荷時は次のモデルへ
           }
         } catch (fetchErr: any) {
           lastErrText = fetchErr?.message || String(fetchErr);
@@ -602,13 +723,21 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       }
 
       if (!aiResponse || !aiResponse.ok) {
-        if (user) {
-          // 返金処理
+        if (user && reservedUser) {
           await supabaseAdmin.rpc("reserve_or_refund_quota", {
             p_user_id: user.id,
             p_item_count: itemsToGenerate.length,
             p_is_refund: true,
           });
+          reservedUser = false;
+        } else if (!user && reservedGuest) {
+          await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: -itemsToGenerate.length,
+            p_daily_limit: GUEST_DAILY_LIMIT,
+          }).catch(() => {});
+          refundGuestMemory(clientIp, itemsToGenerate.length);
+          reservedGuest = false;
         }
         return new Response(JSON.stringify({ error: `Gemini API呼び出しに失敗しました (${lastErrText})` }), {
           status: 502,
@@ -622,12 +751,21 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       try {
         parsedAi = JSON.parse(cleanJsonString(rawText));
       } catch (parseErr: any) {
-        if (user) {
+        if (user && reservedUser) {
           await supabaseAdmin.rpc("reserve_or_refund_quota", {
             p_user_id: user.id,
             p_item_count: itemsToGenerate.length,
             p_is_refund: true,
           });
+          reservedUser = false;
+        } else if (!user && reservedGuest) {
+          await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: -itemsToGenerate.length,
+            p_daily_limit: GUEST_DAILY_LIMIT,
+          }).catch(() => {});
+          refundGuestMemory(clientIp, itemsToGenerate.length);
+          reservedGuest = false;
         }
         return new Response(
           JSON.stringify({ error: "AI応答の解析に失敗しました。クォータは全額返還されました。" }),
@@ -637,7 +775,7 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
 
       const rawArr = Array.isArray(parsedAi) ? parsedAi : [parsedAi];
 
-      // [P1-1 解決] モデル出力の配列インデックスずれ防止 ＆ 有効カードのみ抽出
+      // [P0-5 修正] モデル出力の検証: reqIndex または reqWord が一致するカードのみ抽出（無関係カードの3段目フォールバック割当を完全排除）
       const validCards: any[] = [];
       const assignedRawItems = new Set<any>();
 
@@ -647,10 +785,7 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
           const origNorm = origItem.reqWord.toLowerCase().trim();
           match = rawArr.find((c: any) => !assignedRawItems.has(c) && String(c?.word || "").toLowerCase().trim() === origNorm);
         }
-        if (!match) {
-          match = rawArr.find((c: any) => !assignedRawItems.has(c));
-        }
-        // AIが正しく内容（意味・語源・コア概念）を生成できた場合のみ採用
+        // AIが正しく内容（意味・語源・コア概念）を生成できた場合のみ採用（無関係カードは割り当てない）
         if (match && (Array.isArray(match.meanings) && match.meanings.length > 0 || match.etymology || match.core)) {
           assignedRawItems.add(match);
           validCards.push(sanitizeCard(match, origItem));
@@ -660,23 +795,36 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       generatedResults = validCards;
       usedModel = successfulModel;
 
-      // 部分失敗差分の自動返還 (例: 10語中8語のみ成功した場合、未生成2語分を自動返金)
+      // [NEW-P0-2 解決] 部分失敗差分の自動返還（二重返金を排除し1回のみ実行）
       const failedCount = itemsToGenerate.length - generatedResults.length;
-      if (user && failedCount > 0) {
-        const { data: refundData } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
-          p_user_id: user.id,
-          p_item_count: failedCount,
-          p_is_refund: true,
-        });
-        if (refundData?.remaining !== undefined) quotaRemaining = refundData.remaining;
+      if (failedCount > 0) {
+        if (user && reservedUser) {
+          const { data: refundData } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
+            p_user_id: user.id,
+            p_item_count: failedCount,
+            p_is_refund: true,
+          });
+          if (refundData?.remaining !== undefined) quotaRemaining = refundData.remaining;
+        } else if (!user && reservedGuest) {
+          await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: -failedCount,
+            p_daily_limit: GUEST_DAILY_LIMIT,
+          }).catch(() => {});
+          refundGuestMemory(clientIp, failedCount);
+        }
       }
+      // 正常に精算完了したため予約フラグをクリア
+      reservedUser = false;
+      reservedGuest = false;
 
-      // [P0-4 解決] 共有辞書キャッシュへの保存（汚染防止: 特殊な文脈・カスタム意味指定のない標準語彙のみを保存）
+      // [P0-5 修正] 共有辞書キャッシュへの保存:
+      // verified: true で初期保存し、同綴異義語キーと完全整合させ、EdgeRuntime.waitUntil で確実に保存
       const cacheRows = generatedResults
         .filter((card) => {
           const orig = itemsToGenerate.find(it => it.reqIndex === card.reqIndex);
           const hasCustom = orig?.targetSenseOrMeaning && !DUMMY_OCR_SENSES.has(orig.targetSenseOrMeaning.trim());
-          return !hasCustom && !orig?.contextSentence && card.word && card.meanings?.length > 0;
+          return !hasCustom && !orig?.contextSentence && !hasDomainContext && card.word && card.meanings?.length > 0;
         })
         .map((card) => {
           const hIdx = card.homographIndex || 1;
@@ -688,30 +836,27 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
             word_key: wk,
             card_data: card,
             hit_count: 1,
-            verified: false,
+            verified: false, // [P0-5 修正] ユーザー生成単語は未検証(false)として隔離保存
           };
         });
 
       if (cacheRows.length > 0) {
-        supabaseAdmin
+        const cachePromise = supabaseAdmin
           .from("global_dictionary_cache")
-          .upsert(cacheRows, { onConflict: "lang,word_key" })
-          .then()
-          .catch(() => {});
-      }
+          .upsert(cacheRows, { onConflict: "lang,word_key", ignoreDuplicates: true });
 
-      // ゲスト（未ログイン）の部分失敗時のクォータ返還調整（もし失敗があれば）
-      if (!user && failedCount > 0) {
-        const clientIp = getClientIp(req);
-        try {
-          // 失敗分をアトミックに差し戻し
-          await supabaseAdmin.rpc("consume_guest_quota", {
-            p_ip: clientIp,
-            p_count: -failedCount,
-            p_daily_limit: 30,
-          });
-        } catch {}
+        // [P0-5 修正] レスポンス後もEdgeランタイムで確実にタスクを完了
+        if (typeof (globalThis as any).EdgeRuntime?.waitUntil === "function") {
+          (globalThis as any).EdgeRuntime.waitUntil(cachePromise);
+        } else {
+          cachePromise.catch(() => {});
+        }
       }
+    } // [P0-4 修正] if (itemsToGenerate.length > 0) ブロックの閉じカッコ
+
+    // [P2-2 解決] キャッシュ hit_count 更新などの非同期処理をレスポンス返却前に確実に解決
+    if (cacheUpdatePromises.length > 0) {
+      await Promise.allSettled(cacheUpdatePromises);
     }
 
     // 全結果をマージ
@@ -728,6 +873,27 @@ ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
+    // [NEW-P0-2 解決] 予期せぬ例外発生時も、予約済みクォータを確実に自動補償返金（外側スコープ変数を安全に参照）
+    if (supabaseAdmin && itemsToGenerate.length > 0) {
+      if (user && reservedUser) {
+        try {
+          await supabaseAdmin.rpc("reserve_or_refund_quota", {
+            p_user_id: user.id,
+            p_item_count: itemsToGenerate.length,
+            p_is_refund: true,
+          });
+        } catch {}
+      } else if (!user && reservedGuest) {
+        try {
+          await supabaseAdmin.rpc("consume_guest_quota", {
+            p_ip: clientIp,
+            p_count: -itemsToGenerate.length,
+            p_daily_limit: GUEST_DAILY_LIMIT,
+          });
+          refundGuestMemory(clientIp, itemsToGenerate.length);
+        } catch {}
+      }
+    }
     return new Response(JSON.stringify({ error: err.message || "Unknown internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

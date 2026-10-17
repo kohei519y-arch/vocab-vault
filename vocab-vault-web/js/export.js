@@ -8,16 +8,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   const cleanPho = p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim();
   const fmtPho = p => { const c = cleanPho(p); return c ? `[ ${c} ]` : ''; };
-  const normRootKey = r => {
-    if (global.VocabMorphology && typeof global.VocabMorphology.normRootKey === 'function') {
-      return global.VocabMorphology.normRootKey(r);
-    }
-    let s = String(r || '').trim().toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '');
-    s = s.replace(/[₁-₉]/g, m => ({ '₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7','₈':'8','₉':'9' }[m] || m));
-    s = s.replace(/[hḫḥ]1/g, 'h1').replace(/[hḫḥ]2/g, 'h2').replace(/[hḫḥ]3/g, 'h3');
-    s = s.replace(/[\(\)\[\]\{\}]/g, '');
-    return s.startsWith('*') ? s : `*${s}`;
-  };
+  const normRootKey = r => global.VocabMorphology?.normRootKey?.(r) || global.normRootKey?.(r) || (String(r || '').startsWith('*') ? String(r || '').trim().toLowerCase() : `*${String(r || '').trim().toLowerCase()}`);
 
   /**
    * ブラウザ上でBlobデータをファイルとして即時ダウンロード
@@ -34,9 +25,12 @@
   }
 
   /**
-   * 意味・語源・歴史文脈のコンパクト整形
+   * 意味・語源・歴史文脈のコンパクト整形（js/card_view.js へ委譲）
    */
   function formatMeaningAndEty(d) {
+    if (global.VocabCardView?.formatMeaningAndEty) {
+      return global.VocabCardView.formatMeaningAndEty(d);
+    }
     const raw = String(d.etymology || '').trim(), meanings = d.meanings || [];
     const hn = String(d.history_note || '').trim();
     const histDigest = hn ? (hn.startsWith('（') ? hn : `（${hn}）`) : '';
@@ -184,8 +178,8 @@
           const cur = ctx.getJson ? ctx.getJson(storageKey) : [];
           const makeWordKey = global.VocabMorphology?.makeWordKey || ((word, lang, pos, hIdx) => `${lang}:${word}`);
           const curMap = new Map(cur.map(it => [it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex), it]));
-          const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(l) : new Map();
-          const clearedAt = global.VocabStorage ? global.VocabStorage.getClearedAt(l) : 0;
+          const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(storageKey) : new Map();
+          const clearedAt = global.VocabStorage ? global.VocabStorage.getClearedAt(storageKey) : 0;
 
           incoming.forEach(it => {
             if (!it || typeof it !== 'object' || Array.isArray(it)) return;
@@ -201,13 +195,17 @@
             else skipped++;
           });
 
-          if (global.VocabStorage) global.VocabStorage.saveTombstones(l, tombMap);
+          if (global.VocabStorage) global.VocabStorage.saveTombstones(storageKey, tombMap);
           const mergeFn = global.VocabStorage?.mergeWords || global.mergeWords;
-          const merged = mergeFn ? mergeFn(cur, incoming, l, true) : incoming;
-          if (ctx.setJson) ctx.setJson(storageKey, merged, true, true);
-          if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = merged;
+          const merged = mergeFn ? mergeFn(cur, incoming, storageKey, true) : incoming;
+          if (ctx.setJson) {
+            ctx.setJson(storageKey, merged, true, true);
+          } else if (global.VocabStorage) {
+            global.VocabStorage.state.mem[storageKey] = merged;
+          }
+          const finalList = global.VocabStorage?.state?.mem?.[storageKey] || merged;
           if (storageKey === ctx.activePairKey && typeof ctx.setActiveEntries === 'function') {
-            ctx.setActiveEntries(merged);
+            ctx.setActiveEntries(finalList);
           }
         });
 
@@ -223,6 +221,321 @@
     r.readAsText(f);
   }
 
+  /**
+   * Anki エクスポート（TSV / CSV / タブ区切りテキスト）パーサー & FSRS進度マッピング
+   */
+  function parseAnkiExport(text, options = {}) {
+    if (typeof text !== 'string' || !text.trim()) return [];
+
+    const defaultLang = options.defaultLang || global.App?.lang || 'en';
+    const defaultFolder = options.defaultFolder || 'Ankiインポート';
+    const now = Date.now();
+
+    // 1. ディレクティブヘッダーの解析（#separator, #html, #tags column 等）
+    let separator = '\t'; // デフォルトはタブ
+    let htmlMode = true;
+    let tagsCol = -1;
+
+    const rawLines = text.split(/\r?\n/);
+    const contentLines = [];
+
+    for (let i = 0; i < rawLines.length; i++) {
+      const line = rawLines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith('#')) {
+        const lower = trimmed.toLowerCase();
+        if (lower.startsWith('#separator:')) {
+          const sepVal = trimmed.slice(11).trim().toLowerCase();
+          if (sepVal === 'comma') separator = ',';
+          else if (sepVal === 'semicolon') separator = ';';
+          else if (sepVal === 'tab') separator = '\t';
+          else if (sepVal === 'space') separator = ' ';
+        } else if (lower.startsWith('#html:')) {
+          htmlMode = trimmed.slice(6).trim().toLowerCase() === 'true';
+        } else if (lower.startsWith('#tags column:')) {
+          const col = parseInt(trimmed.slice(13).trim(), 10);
+          if (Number.isFinite(col)) tagsCol = col - 1;
+        }
+        continue;
+      }
+      contentLines.push(line);
+    }
+
+    const joinedSample = contentLines.slice(0, 10).join('\n');
+    if (separator === '\t' && !joinedSample.includes('\t') && joinedSample.includes(',')) {
+      separator = ',';
+    }
+
+    // 2. クォート対応の行・フィールド分割 (TSV / CSV RFC 4180準拠)
+    const records = [];
+    let curRecord = [];
+    let curField = '';
+    let inQuotes = false;
+    const fullContent = contentLines.join('\n');
+
+    for (let i = 0; i < fullContent.length; i++) {
+      const char = fullContent[i];
+      const nextChar = fullContent[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          curField += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === separator && !inQuotes) {
+        curRecord.push(curField);
+        curField = '';
+      } else if ((char === '\r' || char === '\n') && !inQuotes) {
+        if (char === '\r' && nextChar === '\n') {
+          i++;
+        }
+        curRecord.push(curField);
+        if (curRecord.some(f => f.trim().length > 0)) {
+          records.push(curRecord);
+        }
+        curRecord = [];
+        curField = '';
+      } else {
+        curField += char;
+      }
+    }
+    if (curField || curRecord.length > 0) {
+      curRecord.push(curField);
+      if (curRecord.some(f => f.trim().length > 0)) {
+        records.push(curRecord);
+      }
+    }
+
+    // 3. 各レコードの構造化
+    const items = [];
+    let autoNum = 1;
+
+    records.forEach(fields => {
+      if (fields.length === 0) return;
+      const frontRaw = fields[0] || '';
+      const backRaw = fields[1] || '';
+      if (!frontRaw.trim() && !backRaw.trim()) return;
+
+      const cleanFront = frontRaw.replace(/\[sound:[^\]]+\]/gi, '').trim();
+      const cleanBack = backRaw.replace(/\[sound:[^\]]+\]/gi, '').trim();
+
+      const stripHtml = s => s.replace(/<br\s*[\/]?>/gi, '\n')
+                               .replace(/<\/p>/gi, '\n')
+                               .replace(/<\/div>/gi, '\n')
+                               .replace(/<[^>]+>/g, '')
+                               .replace(/&nbsp;/g, ' ')
+                               .replace(/&amp;/g, '&')
+                               .replace(/&lt;/g, '<')
+                               .replace(/&gt;/g, '>')
+                               .replace(/&quot;/g, '"')
+                               .trim();
+
+      let word = stripHtml(cleanFront).split(/[\n\r]/)[0].trim();
+      let phonetic = '';
+      const phoMatch = word.match(/[\/\[]([^\/\]]+)[\/\]]/);
+      if (phoMatch) {
+        phonetic = phoMatch[1].trim();
+        word = word.replace(/[\/\[][^\/\]]+[\/\]]/, '').trim();
+      }
+
+      if (!word) return;
+
+      const backPlain = stripHtml(cleanBack);
+      const backLines = backPlain.split(/\n+/).map(l => l.trim()).filter(Boolean);
+
+      const meanings = [];
+      let example = null;
+      let etymology = '';
+      const etymologyTags = [];
+      let core = '';
+
+      backLines.forEach(line => {
+        if (/^(語源|Ety|Etymology|由来)[:：]/i.test(line)) {
+          etymology = line.replace(/^(語源|Ety|Etymology|由来)[:：]\s*/i, '').trim();
+          const tagMatches = etymology.match(/\*([a-zāēīōūáéíóúh₁₂₃₂₃h]+(?:-[a-zāēīōūáéíóúh₁₂₃]*)?)/gi);
+          if (tagMatches) tagMatches.forEach(t => etymologyTags.push(t.toLowerCase()));
+          return;
+        }
+        if (/^(コア|中核|Core)[:：]/i.test(line)) {
+          core = line.replace(/^(コア|中核|Core)[:：]\s*/i, '').trim();
+          return;
+        }
+        if (/^(Ex|例|例文|Example)[:：]/i.test(line)) {
+          const exText = line.replace(/^(Ex|例|例文|Example)[:：]\s*/i, '').trim();
+          if (!example) example = { foreign: exText, ja: '', trans: '' };
+          else example.ja = exText;
+          return;
+        }
+
+        const posMatch = line.match(/^\[([A-Za-zぁ-んァ-ヶ亜-黑]+)\]\s*(.+)$/);
+        if (posMatch) {
+          meanings.push({ pos: posMatch[1], text: posMatch[2] });
+        } else if (meanings.length < 3) {
+          meanings.push({ pos: 'All', text: line });
+        }
+      });
+
+      if (!meanings.length) {
+        meanings.push({ pos: 'All', text: backPlain || word });
+      }
+
+      let tags = [];
+      if (tagsCol >= 0 && fields[tagsCol]) {
+        tags = fields[tagsCol].trim().split(/\s+/).filter(Boolean);
+      } else if (fields[2] && !fields[2].includes('http') && fields[2].length < 100) {
+        tags = fields[2].trim().split(/\s+/).filter(Boolean);
+      }
+
+      // 4. FSRS / SM-2 学習進度パラメータの抽出
+      let interval = 0;
+      let repetition = 0;
+      let efactor = 2.5;
+      let nextReview = now;
+
+      for (let fIdx = 2; fIdx < fields.length; fIdx++) {
+        if (fIdx === tagsCol) continue;
+        const val = fields[fIdx].trim();
+        const numVal = parseFloat(val);
+        if (Number.isFinite(numVal)) {
+          if (interval === 0 && numVal >= 1 && numVal <= 3650) {
+            interval = Math.round(numVal);
+            repetition = Math.max(1, Math.round(Math.log2(interval + 1)));
+            nextReview = now + (interval * 86400000);
+          } else if (efactor === 2.5 && numVal >= 1300 && numVal <= 3500) {
+            efactor = Number((numVal / 1000).toFixed(2));
+          } else if (efactor === 2.5 && numVal >= 1.3 && numVal <= 3.5) {
+            efactor = Number(numVal.toFixed(2));
+          }
+        }
+      }
+
+      const item = {
+        id: `anki_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}_${autoNum}`,
+        num: autoNum++,
+        word: word,
+        homographIndex: 1,
+        phonetic: phonetic,
+        lang: defaultLang,
+        meanings: meanings,
+        core: core,
+        etymology: etymology,
+        etymologyTags: etymologyTags,
+        example: example,
+        folder: defaultFolder,
+        category: tags[0] || 'Anki',
+        interval: interval,
+        repetition: repetition,
+        efactor: efactor,
+        nextReview: nextReview,
+        createdAt: now,
+        updatedAt: now,
+        reviewUpdatedAt: now,
+        isDeleted: false
+      };
+
+      items.push(item);
+    });
+
+    return items;
+  }
+
+  /**
+   * Anki エクスポートデータのインポート実行と単語帳マージ
+   */
+  function importAnkiText(text, ctx = {}) {
+    try {
+      const items = parseAnkiExport(text, {
+        defaultLang: ctx.lang || global.App?.lang || 'en',
+        defaultFolder: ctx.folder || 'Ankiインポート'
+      });
+      if (!items.length) {
+        throw new Error('Ankiデータから有効な単語レコードを検出できませんでした。');
+      }
+
+      const targetLang = ctx.lang || global.App?.lang || 'en';
+      const curPairKey = global.VocabCore?.getActivePairConfig?.()?.key || 'distinction_entries';
+      const cur = ctx.getEntries ? ctx.getEntries() : (global.App?.entries || []);
+      const makeLookupKey = global.VocabMorphology?.makeLookupKey || ((w, l, h) => w);
+      const makeWordKey = global.VocabMorphology?.makeWordKey || ((w, l) => `${l}:${w.toLowerCase()}`);
+      const sanitizeFn = global.VocabStorage?.sanitizeItem || global.sanitizeItem || (x => x);
+      const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(curPairKey) : new Map();
+      const clearedAt = global.VocabStorage ? global.VocabStorage.getClearedAt(curPairKey) : 0;
+      const now = Math.max(Date.now(), (Number(clearedAt) || 0) + 1);
+      const existingMap = new Map(cur.map(x => [makeLookupKey(x.word, x.lang || targetLang, x.homographIndex), x]));
+
+      let added = 0;
+      let updated = 0;
+      let maxNum = cur.reduce((m, x) => Math.max(m, Number(x.num) || 0), 0);
+      const toAdd = [];
+
+      items.forEach((rawItem, idx) => {
+        if ((rawItem.updatedAt || 0) <= clearedAt) rawItem.updatedAt = now;
+        const item = sanitizeFn(rawItem, maxNum + idx, targetLang);
+        if (!item) return;
+        item.wordKey = item.wordKey || makeWordKey(item.word, targetLang, item.meanings?.[0]?.pos, item.homographIndex);
+        item.updatedAt = Math.max(Number(item.updatedAt) || 0, now);
+        item.reviewUpdatedAt = Math.max(Number(item.reviewUpdatedAt) || 0, now);
+        const k = makeLookupKey(item.word, item.lang, item.homographIndex);
+        // 過去に削除していた単語を再インポートした場合に墓石を解除
+        tombMap.delete(`id:${item.id}`);
+        tombMap.delete(`wk:${item.wordKey}`);
+        const normW = String(item.word || '').trim().toLowerCase();
+        if (normW) tombMap.delete(`word:${normW}`);
+        if (existingMap.has(k)) {
+          const ex = existingMap.get(k);
+          Object.assign(ex, {
+            meanings: item.meanings?.length ? item.meanings : ex.meanings,
+            phonetic: item.phonetic || ex.phonetic,
+            etymology: item.etymology || ex.etymology,
+            etymologyTags: item.etymologyTags?.length ? item.etymologyTags : ex.etymologyTags,
+            core: item.core || ex.core,
+            example: item.example || ex.example,
+            interval: item.interval || ex.interval,
+            repetition: item.repetition || ex.repetition,
+            efactor: item.efactor || ex.efactor,
+            nextReview: item.nextReview || ex.nextReview,
+            version: (Number(ex.version) || 1) + 1,
+            updatedAt: now
+          });
+          updated++;
+        } else {
+          maxNum++;
+          item.num = maxNum;
+          toAdd.push(item);
+          existingMap.set(k, item);
+          added++;
+        }
+      });
+
+      if (global.VocabStorage) global.VocabStorage.saveTombstones(curPairKey, tombMap);
+
+      const merged = [...cur, ...toAdd];
+      if (typeof ctx.saveEntries === 'function') {
+        ctx.saveEntries(merged, targetLang);
+      } else {
+        if (global.setJson) {
+          global.setJson(curPairKey, merged, true, true);
+        } else if (global.VocabStorage) {
+          global.VocabStorage.state.mem[curPairKey] = merged;
+        }
+        if (global.App) global.App.entries = global.VocabStorage?.state?.mem?.[curPairKey] || merged;
+      }
+
+      if (global.load) global.load(1);
+      const showToast = ctx.showToast || global.VocabModal?.showToast || (typeof alert === 'function' ? alert : null);
+      if (showToast) {
+        showToast(`Ankiインポート完了: ${added} 語を新規追加（${updated} 語は既存登録済）`, 'ok');
+      }
+      return { added, updated, total: items.length };
+    } catch (err) {
+      const showToast = ctx.showToast || global.VocabModal?.showToast || (typeof alert === 'function' ? alert : null);
+      if (showToast) showToast(`Ankiインポート失敗: ${err.message}`, 'err');
+      throw err;
+    }
+  }
+
   // --- グローバルエクスポート ---
   global.VocabExport = {
     dlBlob,
@@ -230,6 +543,8 @@
     exportAnkiTSV,
     exportObsidianMarkdown,
     exportFullJSON,
-    importJSON
+    importJSON,
+    parseAnkiExport,
+    importAnkiText
   };
 })(typeof window !== 'undefined' ? window : globalThis);

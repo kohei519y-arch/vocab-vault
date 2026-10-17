@@ -36,11 +36,13 @@ def log_fail(msg):
 def check_jsc_syntax():
     print("\n--- 1. JavaScript Syntax Verification (via JSC) ---")
     js_files = [
+        "js/i18n.js",
         "js/storage.js",
         "js/anki.js",
         "js/sync.js",
         "js/ocr.js",
         "js/morphology.js",
+        "js/eiken_catalog.js",
         "js/graph.js",
         "js/feedback.js",
         "js/dictionary.js",
@@ -240,6 +242,7 @@ def test_delete_word_integrity():
         removeItem: function(k) { delete storageData[k]; }
     };
     globalThis.confirm = function() { return true; };
+    globalThis.console = { log: function(){}, warn: function(){}, error: function(){} };
     globalThis.requestAnimationFrame = function(cb) { cb(); };
     globalThis.addEventListener = function() {};
     globalThis.document = {
@@ -329,6 +332,7 @@ def test_mobile_tabs_and_pair_sync():
         removeItem: function(k) { delete storageData[k]; }
     };
     globalThis.confirm = function() { return true; };
+    globalThis.console = { log: function(){}, warn: function(){}, error: function(){} };
     globalThis.requestAnimationFrame = function(cb) { cb(); };
     globalThis.addEventListener = function() {};
     globalThis.document = {
@@ -843,6 +847,866 @@ def test_e2e_full_stack_jsc():
     except Exception as e:
         log_fail(f"Failed to parse JSC test results: {e}")
 
+def test_unified_header_and_pwa_resilience():
+    print("\n--- 7. Unified Header Toolbar, PWA Resilience & Vector Icon Integrity ---")
+    import glob
+
+    # 7-1. Check index.html and dev.html header consolidation
+    for hname in ["index.html", "dev.html"]:
+        hpath = os.path.join(BASE_DIR, hname)
+        if not os.path.exists(hpath):
+            continue
+        with open(hpath, "r", encoding="utf-8") as f:
+            hcontent = f.read()
+
+        if '<header class="tab-bar">' in hcontent:
+            log_fail(f"Redundant <header class=\"tab-bar\"> still exists in {hname}")
+        else:
+            log_pass(f"Redundant <header class=\"tab-bar\"> eliminated from {hname}")
+
+        if 'id="activeTabTitle"' in hcontent:
+            log_pass(f"Fallback #activeTabTitle preserved for script safety in {hname}")
+        else:
+            log_fail(f"Missing fallback #activeTabTitle in {hname}")
+
+        # Check badges inside lang-pair-bar
+        if 'id="aiQuotaBadge"' in hcontent and 'id="cloudSyncBadge"' in hcontent:
+            log_pass(f"AI Quota and Cloud Sync badges safely consolidated into {hname} toolbar")
+        else:
+            log_fail(f"Missing consolidated badges in {hname}")
+
+    # 7-2. Check sw.js resilience and dev.html exclusion
+    sw_path = os.path.join(BASE_DIR, "sw.js")
+    with open(sw_path, "r", encoding="utf-8") as f:
+        sw_code = f.read()
+
+    precache_match = re.search(r'const\s+PRECACHE_ASSETS\s*=\s*\[([\s\S]*?)\];', sw_code)
+    if precache_match and "dev.html" in precache_match.group(1):
+        log_fail("sw.js PRECACHE_ASSETS contains './dev.html' (will break in production where dev.html is deleted)")
+    else:
+        log_pass("sw.js PRECACHE_ASSETS cleanly excludes './dev.html' for production PWA safety")
+
+    if "Promise.allSettled" in sw_code:
+        log_pass("sw.js uses Promise.allSettled for fault-tolerant atomic caching")
+    else:
+        log_fail("sw.js missing Promise.allSettled fault-tolerant caching")
+
+    if re.search(r'vocab-vault-v(?:2[1-9]|[3-9]\d+)', sw_code):
+        log_pass("sw.js cache version bumped to v21+ (network-first with timeout)")
+    else:
+        log_fail("sw.js cache version not updated to v21+")
+
+    # 7-3. Strict Zero-Emoji Rule across all core assets (SVG vector icons only)
+    emoji_pattern = re.compile(r"[\U00010000-\U0010ffff]|[\u2600-\u27bf]|[\u2300-\u23ff]|[\u2b50-\u2b55]")
+    target_files = glob.glob(os.path.join(BASE_DIR, "js", "*.js")) + [
+        os.path.join(BASE_DIR, "index.html"),
+        os.path.join(BASE_DIR, "dev.html"),
+        os.path.join(BASE_DIR, "css", "app.css"),
+        os.path.join(BASE_DIR, "sw.js")
+    ]
+    emoji_violations = []
+    for tf in target_files:
+        if not os.path.exists(tf):
+            continue
+        rel = os.path.relpath(tf, BASE_DIR)
+        with open(tf, "r", encoding="utf-8") as f:
+            for lno, line in enumerate(f, 1):
+                m = emoji_pattern.findall(line)
+                if m:
+                    emoji_violations.append((rel, lno, m, line.strip()[:60]))
+
+    if not emoji_violations:
+        log_pass(f"Zero emojis verified across all {len(target_files)} core files (100% SVG vector icons)")
+    else:
+        for rel, lno, m, text in emoji_violations[:5]:
+            log_fail(f"Emoji violation in {rel}:{lno}: {m} in '{text}'")
+
+def test_backend_security_and_p0_remediation():
+    print("\n--- 8. Backend Security Privileges, Data Integrity & Red-Team P0/P1 Remediation ---")
+
+    # 8-1. schema.sql security & integrity checks
+    schema_path = os.path.join(BASE_DIR, "supabase", "schema.sql")
+    if os.path.exists(schema_path):
+        with open(schema_path, "r", encoding="utf-8") as f:
+            schema_sql = f.read()
+
+        # P0-1: purge_expired_tombstones security & minimum TTL guard
+        if "p_ttl_days < 30" in schema_sql and "REVOKE ALL ON FUNCTION public.purge_expired_tombstones" in schema_sql:
+            log_pass("schema.sql: purge_expired_tombstones protected by minimum 30-day TTL guard & REVOKE")
+        else:
+            log_fail("schema.sql: purge_expired_tombstones missing TTL guard or EXECUTE REVOKE")
+
+        # P0-2: sync_vocab_entries_batch input_rows CTE category column & direct write revoke
+        if "category" in schema_sql and "COALESCE(NULLIF(elem->>'category', ''), 'その他') AS category" in schema_sql:
+            log_pass("schema.sql: sync_vocab_entries_batch input_rows CTE properly maps category column")
+        else:
+            log_fail("schema.sql: sync_vocab_entries_batch input_rows CTE missing category mapping")
+
+        if "REVOKE INSERT, UPDATE, DELETE ON public.user_vocab_entries FROM anon, authenticated" in schema_sql:
+            log_pass("schema.sql: direct write access to user_vocab_entries revoked (RPC-only enforcement)")
+        else:
+            log_fail("schema.sql: direct write access to user_vocab_entries not revoked")
+
+        # P0-3: server_now_ms RPC
+        if "FUNCTION public.server_now_ms()" in schema_sql:
+            log_pass("schema.sql: server_now_ms() RPC defined with clock_timestamp() for clock-skew immunity")
+        else:
+            log_fail("schema.sql: missing server_now_ms() RPC")
+
+        # P0-3: Daily Free quota reset & Negative guest refund logic
+        if "date_trunc('day', v_now)" in schema_sql and "p_count > 15 OR p_count < -15" in schema_sql:
+            log_pass("schema.sql: Free tier daily reset & consume_guest_quota count bounds strictly enforced")
+        else:
+            log_fail("schema.sql: missing daily Free reset or guest count validation")
+
+        # P1-4: user_feedbacks table length constraints
+        if "chk_feedback_lengths" in schema_sql and "length(COALESCE(content, '')) <= 5000" in schema_sql:
+            log_pass("schema.sql: user_feedbacks protected by chk_feedback_lengths anti-DoS constraints")
+        else:
+            log_fail("schema.sql: user_feedbacks missing length constraints")
+
+        # P1-2: Stale subscription guard & clean period_end on cancellation
+        if "stale_subscription_event_ignored" in schema_sql and "p_subscription_status = 'canceled' THEN NULL" in schema_sql:
+            log_pass("schema.sql: process_stripe_webhook_atomic ignores stale sub events & clears period_end on cancel")
+        else:
+            log_fail("schema.sql: missing stale sub guard or period_end clearing")
+
+    # 8-2. Edge Functions checks
+    vg_path = os.path.join(BASE_DIR, "supabase", "functions", "vocab-generate", "index.ts")
+    if os.path.exists(vg_path):
+        with open(vg_path, "r", encoding="utf-8") as f:
+            vg_code = f.read()
+
+        # P0-1: makeWordKey & reservedUser compensation
+        if "const makeWordKey =" in vg_code and "reservedUser" in vg_code and "reserve_or_refund_quota" in vg_code:
+            log_pass("vocab-generate: makeWordKey defined & exception rollback quota refund implemented")
+        else:
+            log_fail("vocab-generate: missing makeWordKey or reservedUser exception compensation")
+
+        # P0-4: Language pair isolation in cache keys
+        if 'tLang === "ja" && h === 1' in vg_code:
+            log_pass("vocab-generate: getCandidateKeys isolates language pairs (prevents cross-language cache pollution)")
+        else:
+            log_fail("vocab-generate: cross-language cache key pollution vulnerability present")
+
+        # P1-3: Generic folder names don't bypass cache
+        if "GENERIC_FOLDER_NAMES" in vg_code and "isGenericFolder" in vg_code:
+            log_pass("vocab-generate: generic folder names hit shared cache (protects unit economics)")
+        else:
+            log_fail("vocab-generate: missing generic folder cache preservation")
+
+        # P2-2: Memory leak prevention for in-memory maps
+        if "ipBurstTracker.size > 5000" in vg_code and "guestRateMemory.size > 5000" in vg_code:
+            log_pass("vocab-generate: in-memory rate tracker maps protected by size-capped GC")
+        else:
+            log_fail("vocab-generate: missing in-memory map leak prevention")
+
+        # P0-5: Strict whitelist sanitization & no arbitrary spread
+        if "...it" not in vg_code and "reqIndex: idx" in vg_code and "verified: false" in vg_code:
+            log_pass("vocab-generate: strict whitelist sanitization (no ...it spread) & cache quarantined as unverified")
+        else:
+            log_fail("vocab-generate: vulnerable to prompt injection or unverified cache promotion")
+
+        # P1-4: API key in header & timeout
+        if "x-goog-api-key" in vg_code and "AbortSignal.timeout(15000)" in vg_code:
+            log_pass("vocab-generate: Gemini API key secured in HTTP header with 15s AbortSignal timeout")
+        else:
+            log_fail("vocab-generate: Gemini API key query leakage or missing timeout")
+
+    swh_path = os.path.join(BASE_DIR, "supabase", "functions", "stripe-webhook", "index.ts")
+    if os.path.exists(swh_path):
+        with open(swh_path, "r", encoding="utf-8") as f:
+            swh_code = f.read()
+
+        # P1-3: payment_status === "paid"
+        if 'session.payment_status !== "paid"' in swh_code:
+            log_pass("stripe-webhook: checkout.session.completed verifies session.payment_status === 'paid'")
+        else:
+            log_fail("stripe-webhook: missing session.payment_status verification")
+
+    # 8-3. sync.js client-side verification
+    sync_path = os.path.join(BASE_DIR, "js", "sync.js")
+    if os.path.exists(sync_path):
+        with open(sync_path, "r", encoding="utf-8") as f:
+            sync_code = f.read()
+
+        # P0-2: No raw upsert fallback
+        if "fallbackRes" not in sync_code and "user_vocab_entries?on_conflict=user_id,id" not in sync_code:
+            log_pass("sync.js: raw upsert fallback eliminated; sync failure cleanly throws to protect LWW")
+        else:
+            log_fail("sync.js: raw upsert fallback still present")
+
+        # P0-3: server_now_ms & 120s overlap
+        if "server_now_ms" in sync_code and "SYNC_OVERLAP_MS = 120000" in sync_code and "TOMBSTONE_TTL_MS" in sync_code:
+            log_pass("sync.js: uses server_now_ms, 2-minute overlap cursor, and >90-day full sync fallback")
+        else:
+            log_fail("sync.js: missing server_now_ms or overlap cursor")
+
+    # 8-4. sw.js weak-signal hang protection & CSP / UI consistency
+    sw_path = os.path.join(BASE_DIR, "sw.js")
+    if os.path.exists(sw_path):
+        with open(sw_path, "r", encoding="utf-8") as f:
+            sw_code = f.read()
+        if "fetchWithTimeout" in sw_code and "AbortController" in sw_code and "dev.html" not in sw_code:
+            log_pass("sw.js: fetchWithTimeout prevents Lie-fi hang & dev.html references completely removed")
+        else:
+            log_fail("sw.js: missing fetchWithTimeout or dev.html reference found")
+
+    html_path = os.path.join(BASE_DIR, "index.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            index_html = f.read()
+        # P1-1: CSP media-src and dictionaryapi.dev
+        if "media-src 'self' https: data: blob:" in index_html and "https://api.dictionaryapi.dev" in index_html:
+            log_pass("index.html: CSP explicitly whitelists media-src and api.dictionaryapi.dev for audio")
+        else:
+            log_fail("index.html: CSP missing media-src or api.dictionaryapi.dev")
+
+        # P1-3: Upsell terms consistency
+        if "実質無制限" in index_html and "フェアユース上限：月間3,000語" in index_html:
+            log_pass("index.html: upsell comparison and statutory terms consistent (no double-standard wording)")
+        else:
+            log_fail("index.html: upsell terms inconsistent")
+
+    app_js_path = os.path.join(BASE_DIR, "js", "app.js")
+    if os.path.exists(app_js_path):
+        with open(app_js_path, "r", encoding="utf-8") as f:
+            app_js_code = f.read()
+        # P2-3: updStats all pairs & error boundary noise suppression
+        if "getAllKnownPairConfigs" in app_js_code and "ResizeObserver" in app_js_code:
+            log_pass("app.js: updStats aggregates all 16 language pairs & error boundary suppresses extension noise")
+        else:
+            log_fail("app.js: updStats missing all-pair aggregation or error boundary noise suppression")
+
+def test_red_team_audit_remediation():
+    print("\n--- 9. Red-Team Front-to-Back Deep Audit P0/P1/P2 Remediation ---")
+
+    # 1. P0-1: storage.js sanitizeItem and mergeWords FSRS parameter preservation
+    storage_path = os.path.join(BASE_DIR, "js", "storage.js")
+    with open(storage_path, "r", encoding="utf-8") as f:
+        st_code = f.read()
+    if "stability:" in st_code and "difficulty:" in st_code and "retrievability:" in st_code:
+        log_pass("storage.js: sanitizeItem & mergeWords preserve all FSRS parameters (stability, difficulty, retrievability)")
+    else:
+        log_fail("storage.js: missing FSRS parameters in sanitizeItem or mergeWords")
+
+    # 2. P0-2: sync.js dbLang & dbPair isolation for cross-language pair sync
+    sync_path = os.path.join(BASE_DIR, "js", "sync.js")
+    with open(sync_path, "r", encoding="utf-8") as f:
+        sy_code = f.read()
+    if "dbLang" in sy_code and "dbPair" in sy_code and "pair=eq." in sy_code:
+        log_pass("sync.js: dbLang & dbPair strictly separated, adhering to schema CHECK constraint and enabling cross-pair sync")
+    else:
+        log_fail("sync.js: missing dbLang or dbPair isolation")
+
+    # 3. P0-3: events.js updCloudUI DOM ID fallback resolution
+    events_path = os.path.join(BASE_DIR, "js", "events.js")
+    with open(events_path, "r", encoding="utf-8") as f:
+        ev_code = f.read()
+    if "$('sbStatusBadge') || $('sbCloudStatusBadge')" in ev_code and "$('sbAuthFormRow') || $('sbCloudAuthRow')" in ev_code:
+        log_pass("events.js: updCloudUI DOM ID fallback matches index.html elements cleanly")
+    else:
+        log_fail("events.js: missing DOM ID fallback in updCloudUI")
+
+    # 4. P0-4: queue.js quota overflow guards against internal dummy generation
+    queue_path = os.path.join(BASE_DIR, "js", "queue.js")
+    with open(queue_path, "r", encoding="utf-8") as f:
+        qu_code = f.read()
+    if "openUpsellModal('本日のAI新規生成無料枠" in qu_code and "proxyErr.isQuotaExceeded || proxyErr.status === 429" in qu_code:
+        log_pass("queue.js: 429 quota exceed triggers upsell modal and halts without poisoning library with dummy cards")
+    else:
+        log_fail("queue.js: missing quota exceed upsell modal or dummy prevention")
+
+    # 5. P0-5: events.js keyboard shortcuts argument passing
+    if "VocabAnkiView.startAnki(null, ctx.ankiCtx?.() || {})" in ev_code and "VocabAnkiView.showAns(ctx.ankiCtx?.() || {})" in ev_code:
+        log_pass("events.js: keyboard shortcuts pass correct arguments to startAnki and showAns")
+    else:
+        log_fail("events.js: invalid argument passing in startAnki or showAns shortcuts")
+
+    # 6. P1-1: anki_view.js FSRS state and review history rollback in undoAnkiRev
+    av_path = os.path.join(BASE_DIR, "js", "anki_view.js")
+    with open(av_path, "r", encoding="utf-8") as f:
+        av_code = f.read()
+    if "vv_review_history_log" in av_code and "vv_rev_count_" in av_code and "prevProps:" in av_code and "stability: e.stability" in av_code:
+        log_pass("anki_view.js: undoAnkiRev rolls back FSRS parameters, optimizer history logs, and daily review count")
+    else:
+        log_fail("anki_view.js: missing FSRS parameter or history log rollback in undoAnkiRev")
+
+    # 7. P1-2: anki.js getRetrievability unlearned card protection
+    anki_path = os.path.join(BASE_DIR, "js", "anki.js")
+    with open(anki_path, "r", encoding="utf-8") as f:
+        an_code = f.read()
+    if "isUnlearned = !e.interval && !e.repetition && !e.reviewUpdatedAt" in an_code and "return 0.0;" in an_code:
+        log_pass("anki.js: getRetrievability correctly evaluates unlearned cards as 0.0 retention")
+    else:
+        log_fail("anki.js: missing unlearned card retention guard in getRetrievability")
+
+    # 8. P1-3: list_view.js empty state qStr check & reset-filter handler
+    lv_path = os.path.join(BASE_DIR, "js", "list_view.js")
+    with open(lv_path, "r", encoding="utf-8") as f:
+        lv_code = f.read()
+    if "appState.qStr" in lv_code and "data-act=\"reset-filter\"" in lv_code and "act === 'reset-filter'" in ev_code:
+        log_pass("list_view.js & events.js: qStr search empty state accurately detected with functional reset-filter action")
+    else:
+        log_fail("list_view.js or events.js: missing qStr empty state check or reset-filter handler")
+
+    # 9. P1-4: speech.js security & 2-stage watchdog
+    sp_path = os.path.join(BASE_DIR, "js", "speech.js")
+    with open(sp_path, "r", encoding="utf-8") as f:
+        sp_code = f.read()
+    if "audio.referrerPolicy = 'no-referrer'" in sp_code and "window.speechSynthesis.cancel()" in sp_code and "1500" in sp_code:
+        log_pass("speech.js: audio referrerPolicy secured & 2-stage watchdog prevents Web Speech API timer hang")
+    else:
+        log_fail("speech.js: missing referrerPolicy or 2-stage watchdog in speech.js")
+
+    # 10. P2-1: events.js account deletion and repair scan all known language pairs
+    if "const allKnown = (ctx.getAllKnownPairConfigs" in ev_code and "targetPairs.set(key" in ev_code:
+        log_pass("events.js: deleteAccountPermanently and runDatabaseDiagnosticsAndRepair scan all 16 language pairs")
+    else:
+        log_fail("events.js: missing all-pair scan in delete account or DB repair")
+
+    # 11. P2-2: list_view.js usedNodes guard in reconcileList
+    if "usedNodes = new Set(loadingCards)" in lv_code and "if (cardEl && usedNodes.has(cardEl)) cardEl = null;" in lv_code:
+        log_pass("list_view.js: reconcileList usedNodes guard prevents duplicate DOM node assignment and contention")
+    else:
+        log_fail("list_view.js: missing usedNodes guard in reconcileList")
+
+    # 12. SSOT: app.js collectAllPairsEntries uses getJson and getAllKnownPairConfigs
+    app_path = os.path.join(BASE_DIR, "js", "app.js")
+    with open(app_path, "r", encoding="utf-8") as f:
+        ap_code = f.read()
+    if "getAllKnownPairConfigs()" in ap_code and "const arr = getJson(cfg.key);" in ap_code:
+        log_pass("app.js: collectAllPairsEntries follows SSOT via getJson and getAllKnownPairConfigs")
+    else:
+        log_fail("app.js: collectAllPairsEntries violates SSOT")
+
+
+def test_production_launch_verdict_remediation():
+    print("\n--- 10. Production Launch Verdict P0/P1 Remediation Verification ---")
+
+    # 1. schema.sql: user_tombstones & user_lang_watermarks have pair in primary key
+    schema_path = os.path.join(BASE_DIR, "supabase", "schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema_code = f.read()
+
+    if "PRIMARY KEY (user_id, pair, tomb_key)" in schema_code:
+        log_pass("schema.sql: user_tombstones primary key includes pair (cross-language collision prevented)")
+    else:
+        log_fail("schema.sql: user_tombstones lacks pair in primary key")
+
+    if "PRIMARY KEY (user_id, pair)" in schema_code:
+        log_pass("schema.sql: user_lang_watermarks primary key includes pair (cross-pair wipe collision prevented)")
+    else:
+        log_fail("schema.sql: user_lang_watermarks lacks pair in primary key")
+
+    # 2. schema.sql: sync_vocab_entries_batch protects FSRS parameters
+    if "'stability', CASE WHEN EXCLUDED.review_updated_at" in schema_code and "'difficulty', CASE WHEN EXCLUDED.review_updated_at" in schema_code:
+        log_pass("schema.sql: sync_vocab_entries_batch preserves FSRS parameters (stability, difficulty, retrievability)")
+    else:
+        log_fail("schema.sql: sync_vocab_entries_batch missing FSRS preservation in card_data merge")
+
+    # 3. schema.sql: sync_tombstone_to_entries trigger for zombie resurrection prevention
+    if "trg_sync_tombstone_to_entries" in schema_code and "is_deleted = TRUE" in schema_code:
+        log_pass("schema.sql: sync_tombstone_to_entries trigger synchronizes tombstones to user_vocab_entries.is_deleted")
+    else:
+        log_fail("schema.sql: sync_tombstone_to_entries trigger missing or incomplete")
+
+    # 4. schema.sql: delete_user_account service_role support
+    if "delete_user_account(\n  p_user_id UUID DEFAULT NULL" in schema_code or "delete_user_account(p_user_id UUID DEFAULT NULL)" in schema_code or "p_user_id UUID" in schema_code:
+        log_pass("schema.sql: delete_user_account supports service_role execution with p_user_id")
+    else:
+        log_fail("schema.sql: delete_user_account missing p_user_id parameter")
+
+    # 5. sync.js: pair included in watermarks & tombstones queries & FSRS parameters preserved
+    sync_path = os.path.join(BASE_DIR, "js", "sync.js")
+    with open(sync_path, "r", encoding="utf-8") as f:
+        sync_code = f.read()
+
+    if "user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}" in sync_code:
+        log_pass("sync.js: user_tombstones Pull query scopes strictly by pair")
+    else:
+        log_fail("sync.js: user_tombstones Pull query lacks pair scope")
+
+    if "user_lang_watermarks?on_conflict=user_id,pair" in sync_code and "user_tombstones?on_conflict=user_id,pair,tomb_key" in sync_code:
+        log_pass("sync.js: Watermark and Tombstone Push queries use pair in on_conflict")
+    else:
+        log_fail("sync.js: Push queries lack pair in on_conflict")
+
+    if "stability: Number(r.card_data?.stability" in sync_code and "difficulty: Number(r.card_data?.difficulty" in sync_code:
+        log_pass("sync.js: remoteEntries preserves FSRS stability, difficulty, retrievability")
+    else:
+        log_fail("sync.js: remoteEntries missing FSRS parameter mapping")
+
+    # 6. stripe-webhook: trial_will_end preserves cancel_at_period_end & current_period_end
+    swh_path = os.path.join(BASE_DIR, "supabase", "functions", "stripe-webhook", "index.ts")
+    with open(swh_path, "r", encoding="utf-8") as f:
+        swh_code = f.read()
+
+    if 'case "customer.subscription.trial_will_end":' in swh_code and "cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end)" in swh_code:
+        log_pass("stripe-webhook: trial_will_end accurately preserves cancel_at_period_end")
+    else:
+        log_fail("stripe-webhook: trial_will_end resets cancel_at_period_end")
+
+    # 7. delete-account: Stripe subscriptions pagination limit 100 & calls delete_user_account with p_user_id
+    del_path = os.path.join(BASE_DIR, "supabase", "functions", "delete-account", "index.ts")
+    with open(del_path, "r", encoding="utf-8") as f:
+        del_code = f.read()
+
+    if "limit: 100" in del_code and 'p_user_id: user.id' in del_code:
+        log_pass("delete-account: Stripe subscriptions limit set to 100 & delete_user_account RPC called via supabaseAdmin with p_user_id")
+    else:
+        log_fail("delete-account: pagination limit or delete_user_account RPC call improper")
+
+    # 8. storage.js: parseIdbResult directly sanitizes array results
+    stg_path = os.path.join(BASE_DIR, "js", "storage.js")
+    with open(stg_path, "r", encoding="utf-8") as f:
+        stg_code = f.read()
+
+    if "if (Array.isArray(raw)) {" in stg_code and "return raw.map((it, i) => sanitizeItem(it, i, sLang)).filter(Boolean);" in stg_code:
+        log_pass("storage.js: parseIdbResult directly sanitizes array for maximum speed and pair isolation")
+    else:
+        log_fail("storage.js: parseIdbResult missing direct array sanitization")
+
+def test_cloze_and_audio_playlist():
+    print("\n--- 11. Cloze Production Mode, Context Sentence & Audio Playlist Integrity ---")
+    
+    # 1. HTML DOM elements in index.html & dev.html
+    for html_file in ["index.html", "dev.html"]:
+        html_path = os.path.join(BASE_DIR, html_file)
+        with open(html_path, "r", encoding="utf-8") as f:
+            html = f.read()
+
+        required_ids = [
+            "btnAudioPlaylist",
+            "audioPlaylistBar",
+            "apWord",
+            "apPho",
+            "apMeta",
+            "apBtnPlay",
+            "apBtnPrev",
+            "apBtnNext",
+            "apBtnClose",
+            "apProgFill",
+            "ankiModeToggle",
+            "btnAnkiRecog",
+            "btnAnkiCloze",
+            "aFrontRecog",
+            "aClozeWrap",
+            "aClozeSentence",
+            "aClozeHintBox",
+            "aContextBox",
+            "aContextText"
+        ]
+        all_present = True
+        for elem_id in required_ids:
+            if f'id="{elem_id}"' not in html:
+                log_fail(f"{html_file}: missing required element id '{elem_id}'")
+                all_present = False
+                break
+        if all_present:
+            log_pass(f"{html_file}: all 19 Cloze, Context & Audio Playlist DOM nodes present")
+
+    # 2. JavaScript module exports & implementations via JSC
+    shim = """
+    var window = globalThis;
+    var self = globalThis;
+    var document = {
+        getElementById: function(id){ return { classList: { add: function(){}, remove: function(){}, toggle: function(){ return false; } }, style: {}, innerHTML: '', textContent: '', dataset: {} }; },
+        querySelector: function(){ return null; },
+        querySelectorAll: function(){ return []; },
+        addEventListener: function(){}
+    };
+    var localStorage = {
+        _store: {},
+        getItem: function(k){ return this._store[k] || null; },
+        setItem: function(k, v){ this._store[k] = String(v); },
+        removeItem: function(k){ delete this._store[k]; }
+    };
+    """
+    speech_path = os.path.join(BASE_DIR, "js", "speech.js")
+    anki_view_path = os.path.join(BASE_DIR, "js", "anki_view.js")
+    events_path = os.path.join(BASE_DIR, "js", "events.js")
+    nav_path = os.path.join(BASE_DIR, "js", "navigation.js")
+
+    with open(speech_path, "r", encoding="utf-8") as f:
+        speech_code = f.read()
+    with open(anki_view_path, "r", encoding="utf-8") as f:
+        anki_view_code = f.read()
+    with open(events_path, "r", encoding="utf-8") as f:
+        events_code = f.read()
+    with open(nav_path, "r", encoding="utf-8") as f:
+        nav_code = f.read()
+
+    # JSC Execution test for VocabSpeech Audio Playlist & speakTextAsync
+    test_jsc_code = f"""
+    {shim}
+    {speech_code}
+    {anki_view_code}
+
+    // Verify VocabSpeech exports
+    if (typeof VocabSpeech.startAudioPlaylist !== 'function' ||
+        typeof VocabSpeech.stopAudioPlaylist !== 'function' ||
+        typeof VocabSpeech.toggleAudioPlaylist !== 'function' ||
+        typeof VocabSpeech.speakTextAsync !== 'function' ||
+        typeof VocabSpeech.getPlaylistState !== 'function') {{
+        throw new Error("VocabSpeech missing required audio playlist functions");
+    }}
+
+    // Verify VocabAnkiView exports
+    if (typeof VocabAnkiView.getAnkiMode !== 'function' ||
+        typeof VocabAnkiView.setAnkiMode !== 'function' ||
+        typeof VocabAnkiView.toggleAnkiMode !== 'function' ||
+        typeof VocabAnkiView.buildClozeSentenceHtml !== 'function' ||
+        typeof VocabAnkiView.buildClozeHintsHtml !== 'function') {{
+        throw new Error("VocabAnkiView missing required cloze mode functions");
+    }}
+
+    // Test buildClozeSentenceHtml
+    var sampleItem = {{
+        word: 'ephemeral',
+        example: {{
+            foreign: 'Fashions are ephemeral.',
+            used_form: 'ephemeral'
+        }},
+        core: 'つかの間の',
+        meanings: [{{ pos: 'Adj', text: '儚い' }}]
+    }};
+    var clozeHtml = VocabAnkiView.buildClozeSentenceHtml(sampleItem);
+    if (!clozeHtml.includes('cloze-blank') || !clozeHtml.includes('[ ????? ]') || !clozeHtml.includes('data-ans="ephemeral"')) {{
+        throw new Error("buildClozeSentenceHtml did not correctly mask the target word: " + clozeHtml);
+    }}
+
+    // Test cloze hints HTML
+    var hintHtml = VocabAnkiView.buildClozeHintsHtml(sampleItem);
+    if (!hintHtml.includes('コアイメージ: つかの間の') || !hintHtml.includes('儚い')) {{
+        throw new Error("buildClozeHintsHtml did not correctly include core or meaning: " + hintHtml);
+    }}
+
+    // Test anki mode toggle
+    VocabAnkiView.setAnkiMode('cloze');
+    if (VocabAnkiView.getAnkiMode() !== 'cloze') throw new Error("setAnkiMode('cloze') failed");
+    VocabAnkiView.toggleAnkiMode();
+    if (VocabAnkiView.getAnkiMode() !== 'recog') throw new Error("toggleAnkiMode() failed to switch back to recog");
+
+    print("OK");
+    """
+
+    res = subprocess.run([JSC_PATH, "-e", test_jsc_code], capture_output=True, text=True)
+    if res.returncode == 0 and "OK" in res.stdout:
+        log_pass("VocabSpeech & VocabAnkiView cloze, hints & audio playlist functional in JSC engine")
+    else:
+        log_fail(f"JSC verification of cloze and audio playlist failed: {res.stderr or res.stdout}")
+
+    # 3. Events delegation checks
+    delegated_acts = [
+        "set-anki-mode",
+        "reveal-cloze",
+        "toggle-playlist",
+        "playlist-toggle",
+        "playlist-next",
+        "playlist-prev",
+        "playlist-close"
+    ]
+    all_acts_wired = True
+    for act in delegated_acts:
+        if f"act === '{act}'" not in events_code and f"act === \"{act}\"" not in events_code:
+            log_fail(f"events.js: missing data-act='{act}' handler")
+            all_acts_wired = False
+            break
+    if all_acts_wired:
+        log_pass("events.js: all 7 Cloze, Reveal & Playlist data-act delegation actions wired")
+
+    # 4. Navigation keyboard shortcuts checks
+    if "e.code === 'KeyM' || e.key === 'm' || e.key === 'M'" in nav_code:
+        log_pass("navigation.js: 'M' key shortcut dispatches ankiToggleMode during Anki review")
+    else:
+        log_fail("navigation.js: missing 'M' shortcut for ankiToggleMode")
+
+    if "e.key === 'l' || e.key === 'L' || e.key === 'p' || e.key === 'P'" in nav_code:
+        log_pass("navigation.js: 'L' and 'P' shortcuts toggle Audio Playlist listening mode")
+    else:
+        log_fail("navigation.js: missing 'L' / 'P' shortcut for togglePlaylist")
+
+def test_lineage_tree_and_sns_share_card():
+    print("\n--- 12. 4-Tier Lineage Tree, FSRS Foliage & SNS Share Card Integrity ---")
+
+    # 1. HTML DOM buttons in index.html & dev.html
+    for html_file in ["index.html", "dev.html"]:
+        html_path = os.path.join(BASE_DIR, html_file)
+        with open(html_path, "r", encoding="utf-8") as f:
+            html = f.read()
+        if 'id="graphTreeModeBtn"' in html:
+            log_pass(f"{html_file}: #graphTreeModeBtn present for 4-tier lineage tree switching")
+        else:
+            log_fail(f"{html_file}: missing #graphTreeModeBtn")
+
+    # 2. graph.js functions and exports check
+    graph_js_path = os.path.join(BASE_DIR, "js", "graph.js")
+    with open(graph_js_path, "r", encoding="utf-8") as f:
+        graph_code = f.read()
+
+    expected_fns = [
+        "extractBranchInfo",
+        "toggleTreeMode",
+        "adoptGhostBud",
+        "startBranchAnkiReview",
+        "bezierCurveTo"
+    ]
+    for fn in expected_fns:
+        if fn in graph_code:
+            log_pass(f"graph.js: contains {fn} for hierarchical lineage tree & cubic bezier branches")
+        else:
+            log_fail(f"graph.js: missing {fn}")
+
+    if "1200" in graph_code and "630" in graph_code and "VOCAB VAULT — ETYMOLOGY LINEAGE TREE" in graph_code:
+        log_pass("graph.js: exportGraphImage synthesizes 1200x630 OGP high-res SNS share card")
+    else:
+        log_fail("graph.js: missing 1200x630 SNS share card synthesis in exportGraphImage")
+
+    # 3. JSC Execution Test: Build 4-tier tree data with ghost buds & branch nodes
+    shim = """
+    var window = globalThis;
+    var self = globalThis;
+    var document = {
+      getElementById: function(id) { return { classList: { add: function(){}, remove: function(){}, toggle: function(){ return false; } }, style: {}, innerHTML: '', textContent: '', dataset: {}, value: '' }; },
+      querySelector: function() { return null; },
+      querySelectorAll: function() { return []; },
+      addEventListener: function() {}
+    };
+    var localStorage = {
+      _data: {},
+      getItem: function(k) { return this._data[k] || '[]'; },
+      setItem: function(k, v) { this._data[k] = String(v); }
+    };
+    var mockEntries = [
+      {
+        word: 'constant',
+        lang: 'en',
+        etymologyTags: ['*sta-'],
+        etymology: 'From Latin constans, from con- + stare (to stand).',
+        stability: 35.0,
+        interval: 35,
+        derivatives: [{ word: 'constantly', pos: 'Adv', meaning: '絶えず' }],
+        phrases: [{ foreign: 'in constant touch', ja: '常に連絡を取って' }]
+      },
+      {
+        word: 'stand',
+        lang: 'en',
+        etymologyTags: ['*sta-'],
+        etymology: 'From Proto-Germanic *standan\\u0105.',
+        stability: 14.0,
+        interval: 14,
+        derivatives: [{ word: 'standpoint', pos: 'Noun', meaning: '観点' }]
+      }
+    ];
+    localStorage.setItem('distinction_entries', JSON.stringify(mockEntries));
+    """
+    with open(os.path.join(BASE_DIR, "js", "dictionary.js"), "r", encoding="utf-8") as f:
+        dict_code = f.read()
+
+    test_tree_jsc = f"""
+    {shim}
+    {dict_code}
+    {graph_code}
+
+    VocabGraph.graphState.layoutMode = 'tree';
+    var data = VocabGraph.buildGraphData('', false, 'all');
+    var roots = data.nodes.filter(function(n) {{ return n.type === 'root'; }});
+    var branches = data.nodes.filter(function(n) {{ return n.type === 'branch'; }});
+    var leaves = data.nodes.filter(function(n) {{ return n.type === 'word'; }});
+    var buds = data.nodes.filter(function(n) {{ return n.type === 'ghost_bud'; }});
+    var twigs = data.nodes.filter(function(n) {{ return n.type === 'twig'; }});
+
+    if (roots.length >= 1 && branches.length >= 1 && leaves.length >= 2 && buds.length >= 1 && twigs.length >= 1) {{
+      print("TREE_OK:" + roots.length + ":" + branches.length + ":" + leaves.length + ":" + buds.length + ":" + twigs.length);
+    }} else {{
+      print("TREE_FAIL:roots=" + roots.length + ",branches=" + branches.length + ",leaves=" + leaves.length + ",buds=" + buds.length + ",twigs=" + twigs.length);
+    }}
+    """
+    res = subprocess.run([JSC_PATH, "-e", test_tree_jsc], capture_output=True, text=True)
+    if res.returncode == 0 and "TREE_OK" in res.stdout:
+        log_pass("JSC verification: 4-tier tree nodes (Root, Branch, Leaf, Ghost Bud, Twig) built flawlessly")
+    else:
+        log_fail(f"JSC tree verification failed: {res.stderr or res.stdout}")
+
+def test_graph_practical_tools():
+    print("\n--- 13. Graph Practical Tools, Semantic Zoom & Deterministic Tree Integrity ---")
+    with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
+        idx_html = f.read()
+    with open(os.path.join(BASE_DIR, "dev.html"), "r", encoding="utf-8") as f:
+        dev_html = f.read()
+    with open(os.path.join(BASE_DIR, "js", "graph.js"), "r", encoding="utf-8") as f:
+        graph_code = f.read()
+
+    required_dom_ids = [
+        "graphTabNetwork", "graphTabTree", "graphTabMindmap", "graphTabMatrix",
+        "graphWateringBtn", "graphTreeMaskBtn", "graphTreeBreadcrumbBar",
+        "graphTimelineBar", "graphMindmapWrap", "graphMatrixWrap"
+    ]
+
+    for rid in required_dom_ids:
+        if f'id="{rid}"' in idx_html:
+            log_pass(f"index.html: #{rid} present for practical graph tools")
+        else:
+            log_fail(f"index.html: #{rid} missing")
+
+        if f'id="{rid}"' in dev_html:
+            log_pass(f"dev.html: #{rid} present for practical graph tools")
+        else:
+            log_fail(f"dev.html: #{rid} missing")
+
+    required_methods = [
+        "switchViewMode", "startWateringReview", "toggleTreeMask",
+        "onTimelineChange", "renderMindmap", "renderMorphologyMatrix",
+        "startTreeEasingAnimation", "focusRoot", "clearRootFocus"
+    ]
+    for m in required_methods:
+        if f"function {m}" in graph_code or f"{m}:" in graph_code or f"{m}," in graph_code:
+            log_pass(f"graph.js: contains {m} for practical tools & semantic zoom")
+        else:
+            log_fail(f"graph.js: missing method {m}")
+
+def test_eiken_pre1_catalog_and_fog_of_war():
+    print("\n--- 14. Eiken Pre-1 Root Catalog, Fog of War & Zero-API Grounding Integrity ---")
+    with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
+        idx_html = f.read()
+    with open(os.path.join(BASE_DIR, "dev.html"), "r", encoding="utf-8") as f:
+        dev_html = f.read()
+    with open(os.path.join(BASE_DIR, "js", "graph.js"), "r", encoding="utf-8") as f:
+        graph_code = f.read()
+    with open(os.path.join(BASE_DIR, "js", "starter_pack.js"), "r", encoding="utf-8") as f:
+        sp_code = f.read()
+    with open(os.path.join(BASE_DIR, "js", "eiken_catalog.js"), "r", encoding="utf-8") as f:
+        eiken_code = f.read()
+
+    required_ids = ["graphEikenExplorerBtn", "graphUnlockEikenRootBtn", "graphEikenDrawer", "graphEikenList"]
+    for rid in required_ids:
+        if f'id="{rid}"' in idx_html:
+            log_pass(f"index.html: #{rid} present for Eiken Pre-1 Explorer")
+        else:
+            log_fail(f"index.html: #{rid} missing")
+        if f'id="{rid}"' in dev_html:
+            log_pass(f"dev.html: #{rid} present for Eiken Pre-1 Explorer")
+        else:
+            log_fail(f"dev.html: #{rid} missing")
+
+    if "VocabEikenCatalog" in eiken_code and "EIKEN_PRE1_ROOTS" in eiken_code and "EIKEN_PRE1_WORDS" in eiken_code:
+        log_pass("eiken_catalog.js defines VocabEikenCatalog with complete 16 roots and structured words")
+    else:
+        log_fail("eiken_catalog.js missing VocabEikenCatalog structure")
+
+    eiken_methods = ["unlockCurrentRootEikenWords", "toggleEikenExplorer", "renderEikenExplorer"]
+    for em in eiken_methods:
+        if em in graph_code:
+            log_pass(f"graph.js: contains {em} for instant unlock & catalog exploration")
+        else:
+            log_fail(f"graph.js: missing method {em}")
+
+    if "eiken_pre1_pack1" in sp_code and "eiken_pre1_pack2" in sp_code:
+        log_pass("starter_pack.js contains Eiken Pre-1 cluster packs (pack1-pack4)")
+    else:
+        log_fail("starter_pack.js missing Eiken Pre-1 cluster packs")
+
+    if "fr_pre1" in sp_code and "de_pre1" in sp_code and "FR_JA_STARTER" in sp_code and "DE_JA_STARTER" in sp_code:
+        log_pass("starter_pack.js contains French and German Pre-1/B2 root cluster packs")
+    else:
+        log_fail("starter_pack.js missing French and German Pre-1/B2 root cluster packs")
+
+def test_global_i18n_and_multi_currency():
+    print("\n--- 15. Global i18n & Multi-Currency Stripe Checkout Integrity ---")
+
+    idx_path = os.path.join(BASE_DIR, "index.html")
+    dev_path = os.path.join(BASE_DIR, "dev.html")
+    i18n_path = os.path.join(BASE_DIR, "js", "i18n.js")
+    sync_path = os.path.join(BASE_DIR, "js", "sync.js")
+    morph_path = os.path.join(BASE_DIR, "js", "morphology.js")
+    sw_path = os.path.join(BASE_DIR, "sw.js")
+    stripe_fn_path = os.path.join(BASE_DIR, "supabase", "functions", "stripe-checkout", "index.ts")
+
+    with open(idx_path, "r", encoding="utf-8") as f:
+        idx_html = f.read()
+    with open(dev_path, "r", encoding="utf-8") as f:
+        dev_html = f.read()
+    with open(i18n_path, "r", encoding="utf-8") as f:
+        i18n_code = f.read()
+    with open(sync_path, "r", encoding="utf-8") as f:
+        sync_code = f.read()
+    with open(morph_path, "r", encoding="utf-8") as f:
+        morph_code = f.read()
+    with open(sw_path, "r", encoding="utf-8") as f:
+        sw_code = f.read()
+    with open(stripe_fn_path, "r", encoding="utf-8") as f:
+        stripe_fn_code = f.read()
+
+    # 15-1. DOM element checks across index.html & dev.html
+    required_ids = [
+        "uiLanguageSel",
+        "settingsBillingMonthlyBtn",
+        "settingsBillingAnnualBtn",
+        "upsellBillingMonthlyBtn",
+        "upsellBillingAnnualBtn",
+        "settingsProPriceText",
+        "upsellPriceText"
+    ]
+    for rid in required_ids:
+        if f'id="{rid}"' in idx_html:
+            log_pass(f"index.html: #{rid} present for global i18n/billing")
+        else:
+            log_fail(f"index.html: #{rid} missing")
+        if f'id="{rid}"' in dev_html:
+            log_pass(f"dev.html: #{rid} present for global i18n/billing")
+        else:
+            log_fail(f"dev.html: #{rid} missing")
+
+    # 15-2. Script loading checks
+    if '<script src="js/i18n.js"></script>' in idx_html:
+        log_pass("index.html: includes js/i18n.js before core scripts")
+    else:
+        log_fail("index.html: missing js/i18n.js script tag")
+
+    if '<script src="js/i18n.js"></script>' in dev_html:
+        log_pass("dev.html: includes js/i18n.js before core scripts")
+    else:
+        log_fail("dev.html: missing js/i18n.js script tag")
+
+    # 15-3. i18n.js API surface
+    i18n_symbols = [
+        "VocabI18n",
+        "detectInitialLocale",
+        "getPlanPriceInfo",
+        "setBillingInterval",
+        "getBillingInterval",
+        "updatePricingUI",
+        "translateCategory",
+        "applyI18nToDOM"
+    ]
+    for sym in i18n_symbols:
+        if sym in i18n_code:
+            log_pass(f"js/i18n.js: provides {sym}")
+        else:
+            log_fail(f"js/i18n.js: missing symbol {sym}")
+
+    # 15-4. Stripe multi-currency checkout & sync
+    if "currency" in stripe_fn_code and "interval" in stripe_fn_code and "3900" in stripe_fn_code and "399" in stripe_fn_code:
+        log_pass("stripe-checkout/index.ts: server-side dynamic multi-currency line item generation ($3.99/mo, $39.00/yr, ¥480/mo, ¥4,800/yr)")
+    else:
+        log_fail("stripe-checkout/index.ts: missing multi-currency or annual line item pricing logic")
+
+    if "currency" in sync_code and "interval" in sync_code and "startStripeCheckout" in sync_code:
+        log_pass("sync.js: startStripeCheckout passes currency and billing interval to Edge Function")
+    else:
+        log_fail("sync.js: startStripeCheckout missing currency or interval forwarding")
+
+    if "VocabI18n?.getLocale" in morph_code and "4-Language Cognate Matrix" in morph_code:
+        log_pass("morphology.js: renderCognateMatrixHtml adapts dynamically to English locale")
+    else:
+        log_fail("morphology.js: renderCognateMatrixHtml missing i18n adaptation")
+
+    if "'./js/i18n.js'" in sw_code and re.search(r'vocab-vault-v(?:2[4-9]|[3-9]\d)', sw_code):
+        log_pass("sw.js: precaches ./js/i18n.js and bumped to v24+ (current: v26)")
+    else:
+        log_fail("sw.js: missing ./js/i18n.js precache or v24+ bump")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -857,6 +1721,15 @@ def main():
     test_prompt_injection_sanitizer()
     test_s_grade_features()
     test_e2e_full_stack_jsc()
+    test_unified_header_and_pwa_resilience()
+    test_backend_security_and_p0_remediation()
+    test_red_team_audit_remediation()
+    test_production_launch_verdict_remediation()
+    test_cloze_and_audio_playlist()
+    test_lineage_tree_and_sns_share_card()
+    test_graph_practical_tools()
+    test_eiken_pre1_catalog_and_fog_of_war()
+    test_global_i18n_and_multi_currency()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")

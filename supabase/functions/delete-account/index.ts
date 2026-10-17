@@ -61,12 +61,12 @@ serve(async (req) => {
           httpClient: Stripe.createFetchHttpClient(),
         });
 
-        // 顧客IDが存在する場合は、アクティブ・トライアル中の全サブスクリプションを走査して解約
+        // 顧客IDが存在する場合は、アクティブ・トライアル中の全サブスクリプションを走査して解約（limit 100で解約漏れ防止）
         if (profile?.stripe_customer_id) {
           const subs = await stripe.subscriptions.list({
             customer: profile.stripe_customer_id,
             status: "all",
-            limit: 10,
+            limit: 100,
           });
           for (const sub of subs.data) {
             if (["active", "trialing", "past_due", "unpaid"].includes(sub.status)) {
@@ -103,14 +103,20 @@ serve(async (req) => {
     }
 
     // 4. Supabase DB データおよび auth.users の完全抹消
-    // トランザクション・整合性保護: ユーザー権限での delete_user_account または admin による完全クリーンアップ
+    // トランザクション・整合性保護: service_role 権限でアトミックな delete_user_account RPC を実行
     let dbWiped = false;
     try {
-      const { error: rpcErr } = await supabaseUserClient.rpc("delete_user_account");
+      const { error: rpcErr } = await supabaseAdmin.rpc("delete_user_account", {
+        p_user_id: user.id,
+      });
       if (!rpcErr) {
         dbWiped = true;
+      } else {
+        console.warn(`[Account Deletion RPC Warning] ${rpcErr.message}`);
       }
-    } catch {}
+    } catch (e: any) {
+      console.warn(`[Account Deletion RPC Exception] ${e.message}`);
+    }
 
     if (!dbWiped) {
       // フォールバック: service_role による全テーブルの確実な抹消

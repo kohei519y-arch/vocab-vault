@@ -6,12 +6,38 @@
   'use strict';
 
   let currentOcrFile = null;
+  const DAILY_OCR_FREE_LIMIT = 5;
+
+  /**
+   * OCR / 長文抽出の日次クォータ情報
+   */
+  function getDailyOcrUsageInfo() {
+    const today = global.VocabStorage?.getTodayString ? global.VocabStorage.getTodayString() : (function(){ const d = new Date(); const p = n => n < 10 ? '0' + n : String(n); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); })();
+    const lsGetFn = global.lsGet || (k => (typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null));
+    const used = parseInt(lsGetFn(`vv_ocr_daily_${today}`, '0'), 10) || 0;
+    const isPro = Boolean(global.App?.isPro);
+    const isDev = Boolean(global.App?.isDev);
+    const hasCustomKey = Boolean(global.getKey ? global.getKey() : false);
+    const isUnlimited = isPro || isDev || hasCustomKey;
+    const limit = isUnlimited ? Infinity : DAILY_OCR_FREE_LIMIT;
+    const remaining = isUnlimited ? 999 : Math.max(0, limit - used);
+    return { limit, used, remaining, isUnlimited, isPro, isDev, today };
+  }
+
+  function recordOcrUsage(count = 1) {
+    const today = global.VocabStorage?.getTodayString ? global.VocabStorage.getTodayString() : (function(){ const d = new Date(); const p = n => n < 10 ? '0' + n : String(n); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); })();
+    const lsGetFn = global.lsGet || (k => (typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null));
+    const lsSetFn = global.lsSet || ((k, v) => { try { localStorage.setItem(k, v); } catch {} });
+    const cur = parseInt(lsGetFn(`vv_ocr_daily_${today}`, '0'), 10) || 0;
+    lsSetFn(`vv_ocr_daily_${today}`, String(cur + count));
+    return getDailyOcrUsageInfo();
+  }
 
   /**
    * 画像の高速圧縮 & Web Safe JPEG 変換
-   * createImageBitmap（低メモリ・メインスレッド非同期）を優先し、フォールバックで HTMLImageElement を使用
+   * 最大長辺1200px / JPEG 80% でトークン消費量と転送遅延を極小化
    */
-  async function compressImage(file, maxDimension = 1600) {
+  async function compressImage(file, maxDimension = 1200) {
     if (!file || !file.type || !file.type.startsWith('image/')) {
       throw new Error('有効な画像ファイルではありません。');
     }
@@ -48,7 +74,7 @@
         ctx.fillRect(0, 0, w, h);
         ctx.drawImage(bitmap, 0, 0, w, h);
         bitmap.close();
-        const b64 = cv.toDataURL('image/jpeg', 0.85).split(',')[1];
+        const b64 = cv.toDataURL('image/jpeg', 0.80).split(',')[1];
         cv.width = cv.height = 0;
         return b64;
       } catch (bmpErr) {
@@ -91,8 +117,18 @@
     });
   }
 
+  let currentThumbObjectUrl = null;
+
+  function revokeThumbUrl() {
+    if (currentThumbObjectUrl) {
+      try { URL.revokeObjectURL(currentThumbObjectUrl); } catch {}
+      currentThumbObjectUrl = null;
+    }
+  }
+
   function clearOcrPreview() {
     currentOcrFile = null;
+    revokeThumbUrl();
     const thumb = document.getElementById('ocrThumbImg');
     const prevSec = document.getElementById('ocrPreviewSec');
     const promptSec = document.getElementById('ocrApiKeyPrompt');
@@ -117,7 +153,9 @@
 
     if (thumb) {
       try {
-        thumb.src = URL.createObjectURL(file);
+        revokeThumbUrl();
+        currentThumbObjectUrl = URL.createObjectURL(file);
+        thumb.src = currentThumbObjectUrl;
       } catch {}
     }
     if (fName) {
@@ -201,6 +239,17 @@
       return;
     }
 
+    // 項目12: OCR日次クォータガード (Free: 1日5回まで)
+    const ocrQuota = getDailyOcrUsageInfo();
+    if (!ocrQuota.isUnlimited && ocrQuota.remaining <= 0) {
+      if (global.VocabModal?.openUpsellModal) {
+        global.VocabModal.openUpsellModal('本日の画像OCR・長文抽出無料枠（5回/日）に達しました');
+      } else if (typeof openUpsellModal === 'function') {
+        openUpsellModal('本日の画像OCR・長文抽出無料枠（5回/日）に達しました');
+      }
+      return;
+    }
+
     if (loadBox) loadBox.style.display = 'flex';
     if (loadText) loadText.textContent = 'Gemini Vision で文字起こし中...';
     if (btnExtract) btnExtract.disabled = true;
@@ -242,6 +291,8 @@
         const cur = textarea.value.trim();
         textarea.value = cur ? `${cur}\n\n${txt}` : txt;
       }
+      // [P1-B 修正] OCR成功時に日次利用回数を確実に記録
+      recordOcrUsage(1);
       if (fMeta) fMeta.textContent += '（文字起こし完了）';
       if (typeof toastFn === 'function') toastFn(`文字起こしが完了しました（${txt.length}字抽出）`, 'ok', 3500);
     } catch (e) {
@@ -330,6 +381,19 @@
       return;
     }
     if (rawText.length > 12000 && !confirm(`文字数が ${rawText.length} 字あります。先頭 12,000 字のみを解析対象としますがよろしいですか？`)) return;
+
+    // 項目12: 長文抽出日次クォータガード (Free: 1日5回まで)
+    const ocrQuota = getDailyOcrUsageInfo();
+    if (!ocrQuota.isUnlimited && ocrQuota.remaining <= 0) {
+      if (typeof ctx.showToast === 'function') ctx.showToast('本日の画像OCR・長文抽出無料枠（5回/日）に達しました。', 'warn', 4000);
+      if (global.VocabModal?.openUpsellModal) {
+        global.VocabModal.openUpsellModal('本日の画像OCR・長文抽出無料枠（5回/日）に達しました');
+      } else if (typeof openUpsellModal === 'function') {
+        openUpsellModal('本日の画像OCR・長文抽出無料枠（5回/日）に達しました');
+      }
+      return;
+    }
+
     const text = rawText.slice(0, 12000);
     const lang = appState?.lang || 'en';
     const cfg = (global.VocabCore?.LANGS?.[lang]) || { ja: '英語', levels: [{ prompt: '重要単語' }] };
@@ -421,6 +485,10 @@
           } else if (rawData && typeof rawData === 'object') {
             arr = rawData.words || rawData.items || rawData.candidates || Object.values(rawData).find(Array.isArray) || [rawData];
           }
+          if (arr && arr.length > 0) {
+            // [P1-B 修正] AI長文抽出成功時に日次利用回数を記録
+            recordOcrUsage(1);
+          }
         } catch (apiErr) {
           console.warn('Gemini API extraction failed, using fallback engine:', apiErr);
           if (typeof ctx.showToast === 'function') {
@@ -481,6 +549,8 @@
     saveOcrKeyAndExecute,
     initOcrEvents,
     runPassageExtract,
+    getDailyOcrUsageInfo,
+    recordOcrUsage,
     getCurrentOcrFile: () => currentOcrFile
   };
 

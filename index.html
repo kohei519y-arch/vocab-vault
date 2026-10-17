@@ -12,7 +12,7 @@
     });
   </script>
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://*.wiktionary.org https://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' https: data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://*.wiktionary.org https://*.supabase.co https://api.dictionaryapi.dev https://translate.google.com https://api.stripe.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
   <meta name="theme-color" content="#1b1b1c">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -64,6 +64,7 @@
       <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="rib-lbl">一覧</span></button>
       <button class="rib-btn" id="ribExtBtn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg><span class="rib-lbl">抽出</span></button>
       <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="rib-lbl">復習</span></button>
+      <button class="rib-btn" id="ribAnalyticsBtn" onclick="openAnalyticsModal()" title="学習分析・忘却予測ダッシュボード" aria-label="学習分析"><svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg><span class="rib-lbl">分析</span></button>
       <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span class="rib-lbl">語根</span></button>
       <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span class="rib-lbl">赤シート</span></button>
       <button class="rib-btn" onclick="window.print()" title="フィルタ結果の全件をA4・2段組でPDF印刷" aria-label="PDF印刷"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
@@ -129,15 +130,9 @@
   </aside>
 
   <main class="main-pane">
-    <header class="tab-bar">
-      <div class="tab" id="activeTabTitle">English — すべての単語</div>
-      <div class="tab-acts">
-        <span id="storageWarnBanner" class="storage-warn-banner" onclick="openSettings()" title="ストレージ状態"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>保存状態を確認</span>
-        <span id="cloudSyncBadge" class="badge ok" style="cursor:pointer" onclick="openSettings()" title="AIエンジン稼働・機密保護状態">内蔵AI: 稼働中 (完全機密保護)</span>
-      </div>
-    </header>
+    <span id="activeTabTitle" style="display:none">English — すべての単語</span>
 
-    <!-- スマート言語ペア・ファイルタブバー -->
+    <!-- スマート言語ペア・単語帳ツールバー (統合ヘッダー) -->
     <div class="lang-pair-bar" id="langPairBar">
       <div class="pair-bar-left">
         <span class="pair-bar-meta">単語帳</span>
@@ -147,6 +142,12 @@
       </div>
 
       <div class="pair-bar-right">
+        <div class="tab-acts" id="tabActs">
+          <span id="storageWarnBanner" class="storage-warn-banner" onclick="openSettings()" title="ストレージ状態"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>保存状態を確認</span>
+          <span id="aiQuotaBadge" class="badge ok" style="cursor:pointer" onclick="openUpsellModal()" title="本日のAI新規生成クォータ">AI残: 5/5語</span>
+          <span id="cloudSyncBadge" class="badge ok" style="cursor:pointer" onclick="openSettings()" title="AIエンジン稼働・機密保護状態">内蔵AI: 稼働中 (完全機密保護)</span>
+        </div>
+
         <div class="compact-pair-picker" title="新規ペアの作成・切り替え">
           <select id="srcLangSel" class="compact-sel" onchange="onLanguagePairChange()" aria-label="学習言語">
             <option value="en">英語 (EN)</option>
@@ -204,10 +205,16 @@
         <div id="listView">
           <h1 class="doc-title">
             <span id="docHeading">すべての単語</span>
-            <div class="doc-title-right" style="display:flex;align-items:center;gap:8px">
-              <div class="view-mode-toggle" role="group" aria-label="表示モード切替">
-                <button type="button" id="btnModeAcademic" class="btn-xs btn-mode active" onclick="setViewMode('academic')" title="語源・概念史・コアイメージを常時フル表示">学術・詳細</button>
-                <button type="button" id="btnModeSimple" class="btn-xs btn-mode" onclick="setViewMode('simple')" title="意味と例文のみをスッキリ表示（タップで語源展開）">シンプル</button>
+            <div class="doc-title-right">
+              <div class="list-toolbar-actions">
+                <button type="button" id="btnAudioPlaylist" class="list-toolbar-btn" data-act="toggle-playlist" title="表示中の単語を音声で自動連続再生 (L)">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
+                  <span>耳学</span>
+                </button>
+                <div class="view-mode-toggle" role="group" aria-label="表示モード切替">
+                  <button type="button" id="btnModeAcademic" class="btn-mode active" onclick="setViewMode('academic')" title="語源・概念史・コアイメージを常時フル表示">学術・詳細</button>
+                  <button type="button" id="btnModeSimple" class="btn-mode" onclick="setViewMode('simple')" title="意味と例文のみをスッキリ表示（タップで語源展開）">シンプル</button>
+                </div>
               </div>
               <select id="sortSel" class="sort-sel" onchange="setSortOrder(this.value)" aria-label="並び順">
                 <option value="new">並び順: 新しい順</option>
@@ -228,6 +235,10 @@
           </div>
           <div class="flx-sb" style="margin-bottom:8px">
             <span id="offlineSyncBadge" class="offline-sync-badge"><span class="badge-dot"></span><span id="offlineSyncText">未同期の復習: 0件</span></span>
+            <div class="anki-mode-toggle" id="ankiModeToggle">
+              <button type="button" id="btnAnkiRecog" class="anki-mode-btn active" data-act="set-anki-mode" data-mode="recog" title="単語から意味を想起 (M)">認識</button>
+              <button type="button" id="btnAnkiCloze" class="anki-mode-btn" data-act="set-anki-mode" data-mode="cloze" title="例文穴埋めから単語を想起 (M)">産出 (Cloze)</button>
+            </div>
           </div>
           <div class="a-card" id="aCard">
             <!-- スワイプ判定インジケータ -->
@@ -242,8 +253,26 @@
 
             <div style="position:absolute;top:14px;left:18px"><button type="button" id="btnUndoAnki" class="btn-o btn-xs" data-act="undo-anki" style="display:none;align-items:center;gap:4px" title="直前の判定を取り消す (Z)"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>元に戻す (Z)</button></div>
             <div style="position:absolute;top:14px;right:18px;font-size:13px;color:var(--m)" id="aProg"></div>
-            <div class="a-front"><span id="aWord"></span><button type="button" class="spk-btn" data-act="speak-current" title="ネイティブ発音 (R)" aria-label="発音"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button></div>
+            
+            <!-- 認識モード用表示 -->
+            <div class="a-front" id="aFrontRecog"><span id="aWord"></span><button type="button" class="spk-btn" data-act="speak-current" title="ネイティブ発音 (R)" aria-label="発音"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button></div>
             <div class="a-pho" id="aPho"></div>
+
+            <!-- 産出・穴埋め (Cloze) モード用表示 -->
+            <div class="cloze-wrap" id="aClozeWrap">
+              <div class="cloze-sentence" id="aClozeSentence"></div>
+              <div class="cloze-hint-box" id="aClozeHintBox"></div>
+            </div>
+
+            <!-- 出会った文脈ヒントカード（OCR・長文抽出元） -->
+            <div class="a-context-box" id="aContextBox">
+              <div class="a-context-lbl">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <span>出会った文脈 (Episode Context)</span>
+              </div>
+              <div class="a-context-text" id="aContextText"></div>
+            </div>
+
             <div class="a-div" id="aDiv"></div>
             <div class="a-back" id="aBack"></div>
             <div class="flx-c" style="margin-top:28px">
@@ -257,6 +286,25 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- リスニング・耳学モード（Audio Playlist Bar） -->
+<div id="audioPlaylistBar" class="audio-playlist-bar" role="region" aria-label="耳学・連続再生プレイヤー">
+  <div class="ap-top">
+    <div class="ap-info">
+      <div class="ap-word"><span id="apWord"></span> <small id="apPho" style="font-size:12px;color:var(--s);font-family:var(--mono)"></small></div>
+      <div class="ap-meta" id="apMeta">再生待機中</div>
+    </div>
+    <div class="ap-controls">
+      <button type="button" class="ap-btn" id="apBtnPrev" data-act="playlist-prev" title="前の単語 (J)" aria-label="前へ"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"/></svg></button>
+      <button type="button" class="ap-btn play" id="apBtnPlay" data-act="playlist-toggle" title="再生 / 一時停止 (K / Space)" aria-label="再生"><svg id="apPlayIcon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></button>
+      <button type="button" class="ap-btn" id="apBtnNext" data-act="playlist-next" title="次の単語 (L)" aria-label="次へ"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"/></svg></button>
+      <button type="button" class="ap-btn" id="apBtnClose" data-act="playlist-close" title="耳学モードを終了 (Esc)" aria-label="閉じる" style="margin-left:4px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+  </div>
+  <div class="ap-prog-wrap">
+    <div id="apProgFill" class="ap-prog-fill"></div>
+  </div>
 </div>
 
 <!-- 需要検証・フィードバック用モーダル (ステップ0) -->
@@ -309,6 +357,22 @@
         <button type="submit" id="btnSubmitFb">フィードバックを送信</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- 忘却予測カレンダー ＆ 学習アナリティクス・ダッシュボード (観点1) -->
+<div id="analyticsModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="analyticsModalTitle" onclick="if(event.target===this) toggleModal('analyticsModal',false)">
+  <div class="modal-box wide" style="max-width:780px">
+    <div class="modal-hd flx-sb">
+      <h2 id="analyticsModalTitle"><span>忘却予測カレンダー ＆ アナリティクス・ダッシュボード</span></h2>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('analyticsModal',false)" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-bd" id="analyticsDashboardBody">
+      <!-- 動的レンダリング -->
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid var(--b)">
+      <button type="button" class="btn-o" onclick="toggleModal('analyticsModal',false)">閉じる</button>
+    </div>
   </div>
 </div>
 
@@ -383,8 +447,8 @@
           </div>
         </div>
         <div style="display:flex;gap:6px">
-          <button type="button" class="btn-o btn-xs" onclick="$('ocrCameraInput').click()" title="カメラで本・書類を直接撮影">📸 撮影</button>
-          <button type="button" class="btn-o btn-xs" onclick="$('ocrFileInput').click()" title="アルバムまたはファイルから選択">📁 選択</button>
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrCameraInput').click()" title="カメラで本・書類を直接撮影">撮影</button>
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrFileInput').click()" title="アルバムまたはファイルから選択">選択</button>
         </div>
       </div>
       <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageFile(this.files[0])">
@@ -402,7 +466,7 @@
           </div>
         </div>
         <div id="ocrApiKeyPrompt" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--b)">
-          <div style="font-size:11.5px;color:var(--t);font-weight:600">★ 高精度 AI 文字起こし (Gemini Vision OCR)</div>
+          <div style="font-size:11.5px;color:var(--t);font-weight:600">高精度 AI 文字起こし (Gemini Vision OCR)</div>
           <div style="font-size:11px;color:var(--s);margin-top:2px;line-height:1.5">
             画像・スクショを自動文字起こしするには、無料のGoogle Gemini APIキーを入力してください（Google AI Studioで1分で取得可能・完全無料）。
           </div>
@@ -443,9 +507,20 @@
     <div class="modal-hd flx-sb"><h2 id="cfgModalTitle">設定・クラウド同期・データ管理</h2><button type="button" class="btn-o btn-xs" onclick="toggleModal('settingsModal',false)" aria-label="閉じる">×</button></div>
     <div class="modal-bd">
       <div class="cfg-sec">
-        <div class="cfg-title">表示・音声設定</div>
+        <div class="cfg-title flx-sb">
+          <span data-i18n="settings.lang_heading">表示言語 (Display Language)</span>
+          <span class="badge ok" id="uiLangBadge">i18n Global</span>
+        </div>
+        <div class="flx-sb" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <label style="font-size:12px;color:var(--s)" data-i18n="settings.lang_desc">UIおよびメニューの表示言語を選択します:</label>
+          <select id="uiLanguageSel" onchange="VocabI18n.setLocale(this.value)" style="font-size:12px;padding:4px 8px;border-radius:4px;border:1px solid var(--b);background:var(--bg-card);color:var(--t)">
+            <option value="en">English (Default / Global)</option>
+            <option value="ja">日本語 (Japanese)</option>
+          </select>
+        </div>
+        <div class="cfg-title" data-i18n="settings.theme_heading">表示・音声設定</div>
         <div class="flx-sb" style="flex-wrap:wrap">
-          <label class="chk-lbl"><input type="checkbox" id="chkDark" onchange="toggleDarkMode(this.checked)">ダークモード</label>
+          <label class="chk-lbl"><input type="checkbox" id="chkDark" onchange="toggleDarkMode(this.checked)"><span data-i18n="settings.theme_dark">ダークモード</span></label>
           <label class="chk-lbl" title="暗記復習(Anki)モードでカード表示時に自動発音"><input type="checkbox" id="chkAutoSpeak" checked onchange="lsSet('vv_tts_auto_anki',this.checked?'1':'0')">復習時に自動発音</label>
           <select id="ttsRateSel" onchange="lsSet('vv_tts_rate',this.value)" title="読み上げ速度">
             <option value="0.85">速度: 0.85x (ゆっくり)</option>
@@ -470,12 +545,8 @@
 
       <div class="cfg-sec">
         <div class="cfg-title flx-sb">
-          <span>クラウド同期 ＆ 共有キャッシュAIプロキシ (Supabase)</span>
+          <span>アカウント管理 ＆ クラウド同期</span>
           <span id="sbStatusBadge" class="badge ng">未ログイン</span>
-        </div>
-        <div class="f-row">
-          <input type="text" id="sbUrlInput" class="f1" placeholder="Supabase URL (https://xxx.supabase.co)" autocomplete="off">
-          <input type="password" id="sbAnonInput" class="f1" placeholder="Supabase Anon Public Key" autocomplete="off">
         </div>
         <div class="f-row" id="sbAuthFormRow">
           <input type="email" id="sbEmailInput" class="f1" placeholder="メールアドレス" autocomplete="username">
@@ -489,41 +560,57 @@
             <span><button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">利用規約</button> および <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px">プライバシーポリシー</button> に同意する</span>
           </label>
         </div>
-        <div class="flx-sb" id="sbLoggedInRow" style="display:none">
+        <details class="cfg-details" style="margin-top:10px;border:1px solid var(--b);border-radius:6px;padding:6px 10px;background:var(--bg-card)">
+          <summary style="font-size:11.5px;font-weight:600;color:var(--s);cursor:pointer;user-select:none">上級者向け: 独自のSupabaseサーバー（セルフホスト）を使用する場合</summary>
+          <div class="f-row" style="margin-top:8px">
+            <input type="text" id="sbUrlInput" class="f1" placeholder="Supabase URL (https://xxx.supabase.co)" autocomplete="off">
+            <input type="password" id="sbAnonInput" class="f1" placeholder="Supabase Anon Public Key" autocomplete="off">
+          </div>
+          <p class="cfg-desc" style="font-size:10.5px;margin:4px 0 0">※通常は入力不要です。公式クラウドサーバー（TLS/SSL完全暗号化）に自動接続されます。</p>
+        </details>
+        <div class="flx-sb" id="sbLoggedInRow" style="display:none;margin-top:8px">
           <span id="sbUserText" style="font-size:12px;font-weight:600;color:var(--ok)"></span>
           <div class="f-row">
             <button type="button" class="btn-ac-o btn-xs" onclick="syncCloudNow(true)">今すぐ差分同期</button>
             <button type="button" class="btn-o btn-xs" onclick="cloudLogout()">ログアウト</button>
           </div>
         </div>
-        <p class="cfg-desc" id="sbQuotaText">※ログインすると複数端末間で単語・SRS履歴・削除情報が自動同期され、共有辞書キャッシュによりAI生成コストと待機時間が削減されます。</p>
+        <p class="cfg-desc" id="sbQuotaText" style="margin-top:8px">※無料アカウント登録で1日5語までAI新規生成可能（共有キャッシュは無制限）。複数端末間のクラウド自動同期はProプラン（月480円）でご利用いただけます。</p>
       </div>
 
       <!-- ステップ6: Stripe 課金・プラン管理 -->
+      <!-- ステップ6: Stripe 課金・プラン管理 -->
       <div class="cfg-sec">
         <div class="cfg-title flx-sb">
-          <span>プラン ＆ サブスクリプション (Stripe決済)</span>
+          <span data-i18n="settings.plan_heading">プラン ＆ サブスクリプション (Stripe決済)</span>
           <span id="curPlanBadge" class="badge ok">Free プラン</span>
+        </div>
+        <!-- 課金サイクル切替 (Monthly / Annual) -->
+        <div style="display:flex;justify-content:center;margin:8px 0 14px">
+          <div style="display:inline-flex;align-items:center;background:var(--bg-hov);padding:3px;border-radius:20px;border:1px solid var(--b);gap:4px">
+            <button type="button" class="btn-xs active" id="settingsBillingMonthlyBtn" onclick="VocabI18n.setBillingInterval('month')" style="border-radius:16px;padding:3px 12px;font-size:11px;font-weight:700" data-i18n="settings.plan_monthly">月払い</button>
+            <button type="button" class="btn-xs btn-o" id="settingsBillingAnnualBtn" onclick="VocabI18n.setBillingInterval('year')" style="border-radius:16px;padding:3px 12px;font-size:11px;font-weight:700;border:none">年払い <span style="color:var(--ok);font-size:10px">(2ヶ月無料)</span></button>
+          </div>
         </div>
         <div class="plan-grid">
           <div class="plan-card current" id="planCardFree">
             <div>
-              <div style="font-weight:700;font-size:13px">Free プラン</div>
-              <div class="plan-price">¥0 <small>/ 月</small></div>
+              <div style="font-weight:700;font-size:13px" data-i18n="settings.free_plan">Free プラン</div>
+              <div class="plan-price" id="settingsFreePriceText">¥0 <small>/ 月</small></div>
               <ul class="plan-features" style="margin-top:8px">
-                <li>月 30 語までのAI新規生成</li>
+                <li>1日 5 語までのAI新規生成</li>
                 <li>共有辞書キャッシュの利用（無制限）</li>
-                <li>SM-2暗記復習・スワイプUI</li>
-                <li>オフライン復習・印刷対応</li>
+                <li>1端末ローカル保持（手動JSON保存対応）</li>
+                <li>SM-2/FSRS暗記復習・スワイプUI</li>
               </ul>
             </div>
-            <div style="font-size:11px;color:var(--m)">現在のプラン</div>
+            <div style="font-size:11px;color:var(--m)" data-i18n="settings.current_plan">現在のプラン</div>
           </div>
           <div class="plan-card pro" id="planCardPro">
-            <span class="plan-badge">おすすめ</span>
+            <span class="plan-badge" data-i18n="settings.recommended">おすすめ</span>
             <div>
-              <div style="font-weight:700;font-size:13px">Pro プラン</div>
-              <div class="plan-price">¥480 <small>/ 月 (年額 ¥4,800)</small></div>
+              <div style="font-weight:700;font-size:13px" data-i18n="settings.pro_plan">Pro プラン</div>
+              <div class="plan-price" id="settingsProPriceText">¥480 <small>/ 月 (年額 ¥4,800)</small></div>
               <ul class="plan-features" style="margin-top:8px">
                 <li>AI新規生成・概念史深掘り 無制限</li>
                 <li>長文・画像OCR抽出 無制限</li>
@@ -534,12 +621,12 @@
             <div style="display:flex;flex-direction:column;gap:6px">
               <div style="font-size:10px;line-height:1.4;color:var(--m);background:var(--bg);padding:6px 8px;border-radius:4px;border:1px solid var(--bd)">
                 <strong>【定期課金・解約に関する法定明示】</strong><br>
-                ・月額480円（税込）/ 1ヶ月ごとの自動更新<br>
+                ・月額480円（税込）または年額4,800円（税込）の自動更新<br>
                 ・次回更新日の前日までに設定画面（またはStripeポータル）よりいつでも解約可能<br>
                 ・解約後も次回更新日まではPro機能を利用可能（日割り精算なし）
               </div>
-              <button type="button" id="btnUpgradePro" onclick="startStripeCheckout('price_pro_monthly')" style="width:100%">Proにアップグレード (¥480/月)</button>
-              <button type="button" id="btnManageSub" class="btn-o btn-xs" onclick="openStripePortal()" style="display:none;width:100%">契約管理・領収書 (Stripe)</button>
+              <button type="button" id="btnUpgradePro" onclick="startStripeCheckout()" style="width:100%" data-i18n="settings.upgrade_btn">Proにアップグレード (¥480/月)</button>
+              <button type="button" id="btnManageSub" class="btn-o btn-xs" onclick="openStripePortal()" style="display:none;width:100%" data-i18n="settings.portal_btn">契約管理・領収書 (Stripe)</button>
             </div>
           </div>
         </div>
@@ -551,6 +638,33 @@
             <button type="button" class="btn-link" onclick="openLegalModal('tokusho')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline">特定商取引法</button>
           </div>
         </div>
+      </div>
+
+      <!-- 項目9: AI生成・トークン消費メトリクス & キャッシュ節約可視化 -->
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>AI生成・トークン消費メトリクス ＆ 節約量</span>
+          <span id="metricsEfficiencyBadge" class="badge ok">高効率キャッシュ稼働中</span>
+        </div>
+        <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:10px 0;">
+          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:11px;color:var(--s)">総生成リクエスト</div>
+            <div id="metricTotalWords" style="font-size:18px;font-weight:700;color:var(--t);margin-top:2px">0 <small style="font-size:11px">語</small></div>
+          </div>
+          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:11px;color:var(--s)">共有キャッシュヒット率</div>
+            <div id="metricCacheRate" style="font-size:18px;font-weight:700;color:var(--ok);margin-top:2px">0%</div>
+          </div>
+          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+            <div style="font-size:11px;color:var(--s)">削減トークン推定</div>
+            <div id="metricTokensSaved" style="font-size:18px;font-weight:700;color:var(--ac);margin-top:2px">0 <small style="font-size:11px">tok</small></div>
+          </div>
+          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+            <div class="f-lbl">本日AI新規生成残枠</div>
+            <div id="metricDailyQuota" style="font-size:18px;font-weight:700;color:var(--t);margin-top:2px">5 <small style="font-size:11px">/ 5語</small></div>
+          </div>
+        </div>
+        <p class="cfg-desc" style="font-size:11px;margin:0">※共有辞書キャッシュから即時展開された単語は、Gemini APIトークンを消費せず待ち時間ゼロ(0ms)で高速登録されます。</p>
       </div>
 
       <div class="cfg-sec">
@@ -592,15 +706,58 @@
           <button type="button" class="cfg-card" onclick="$('fileIn').click()"><span>JSON復元</span><small>バックアップを統合</small></button>
           <button type="button" class="cfg-card" onclick="exportAnkiTSV()"><span>Anki / TSV出力</span><small>表示中リストを出力</small></button>
           <button type="button" class="cfg-card" onclick="exportObsidianMarkdown()"><span>Obsidian出力</span><small>Wikiリンク・語根付き.md</small></button>
+          <button type="button" class="cfg-card" onclick="VocabModal.openStarterPackModal()"><span>スターターパック</span><small>厳選学術パックを導入</small></button>
+          <button type="button" class="cfg-card" onclick="VocabModal.openAnkiImportModal()"><span>Ankiインポート</span><small>TSV/CSVから取り込み</small></button>
           <button type="button" class="cfg-card" onclick="salvageAll(true)" style="border-color:var(--ac-b)"><span>全ストレージ救出</span><small>退避スナップショットを含め復元</small></button>
         </div>
         <input type="file" id="fileIn" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
       </div>
 
+      <!-- 暗記復習 (FSRS / SM-2) 個人適応＆学習継続設定 -->
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>個人適応型 FSRS 重みオプティマイザ (Personalized FSRS)</span>
+          <span id="fsrsOptBadge" class="badge ok">FSRS-4.5 最適化済</span>
+        </div>
+        <p class="cfg-desc" id="fsrsOptDesc">復習履歴ログに基づき、想起予測誤差（MSE）を最小化する個人専用の忘却曲線係数を動的に適用します。</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b);flex-wrap:wrap">
+          <div>
+            <div style="font-size:12px;font-weight:700">FSRS重み手動最適化</div>
+            <p class="cfg-desc" style="margin:2px 0 0">直近500件の復習ログから忘却速度を再計算し、係数を最新化します。</p>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()">今すぐ最適化</button>
+            <button type="button" class="btn-o btn-xs" onclick="VocabAnkiView.triggerResetWeights()">初期値にリセット</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 忘却臨界点スマートPush通知 -->
+      <div class="cfg-sec">
+        <div class="cfg-title flx-sb">
+          <span>忘却臨界点スマートPush通知 (Smart Retention Reminder)</span>
+          <span id="smartNotifyBadge" class="badge ok">スマート待機中</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+          <div>
+            <div style="font-size:12px;font-weight:700">臨界点（記憶定着率 90% 直前）自動介入</div>
+            <p class="cfg-desc" style="margin:2px 0 0">固定時間アラームではなく、登録単語の想起率が90%を下回る直前に自動通知します。</p>
+          </div>
+          <label class="chk-lbl" style="margin:0"><input type="checkbox" id="chkSmartNotify" checked onchange="VocabSRS.setSmartNotifyEnabled(this.checked); if(window.updateSmartNotifyUI) window.updateSmartNotifyUI();">有効</label>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
+          <div>
+            <div style="font-size:12px;font-weight:700">ブラウザ通知の許可状態</div>
+            <p class="cfg-desc" style="margin:2px 0 0" id="smartNotifyPermDesc">Web Notification API によるデスクトップ・スマホ通知</p>
+          </div>
+          <button type="button" class="btn-o btn-xs" id="btnReqNotify" onclick="requestSmartNotifyPermission()">通知を許可する</button>
+        </div>
+      </div>
+
       <!-- 暗記復習 (SM-2 SRS) キャッチアップ設定 -->
       <div class="cfg-sec">
         <div class="cfg-title flx-sb">
-          <span>暗記復習・学習継続設定 (SM-2 SRS)</span>
+          <span>復習上限 ＆ スヌーズ均等再配分 (SM-2 SRS)</span>
           <span class="badge ok">最適化済</span>
         </div>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
@@ -709,7 +866,7 @@
       <div style="background:rgba(124,58,237,0.12);border:1px solid rgba(139,92,246,0.3);padding:14px;border-radius:10px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
         <div>
           <div style="font-weight:700;color:var(--t);font-size:14px;display:flex;align-items:center;gap:6px">
-            <span>🍎 macOS専用スタンドアロンアプリ (v2.0)</span>
+            <span>macOS専用スタンドアロンアプリ (v2.0)</span>
           </div>
           <div style="font-size:12px;color:var(--m);margin-top:2px">新公式アイコン付属・URLバーなし独立ウィンドウ・完全オフライン</div>
         </div>
@@ -720,7 +877,7 @@
       </div>
 
       <div style="background:var(--bg-hov);padding:10px 14px;border-radius:8px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div style="font-size:12px;color:var(--s)">📦 全OS・完全オフラインWebパッケージ</div>
+        <div style="font-size:12px;color:var(--s)">全OS・完全オフラインWebパッケージ</div>
         <a href="vocab-vault-web.zip" download="vocab-vault-web.zip" class="btn-o btn-xs" style="text-decoration:none">ZIPダウンロード</a>
       </div>
 
@@ -773,8 +930,33 @@
     </div>
     <div style="flex:1;overflow-y:auto;padding:12px 2px;font-size:13px;line-height:1.6;color:var(--t)">
       <div style="background:var(--bg-hov);padding:12px 14px;border-radius:8px;margin-bottom:14px;border-left:4px solid var(--ac)">
-        <div style="font-weight:700;color:var(--t);margin-bottom:4px" id="upsellModalReason">今月のAI新規生成無料枠（30語）に達しました</div>
+        <div style="font-weight:700;color:var(--t);margin-bottom:4px" id="upsellModalReason">本日のAI新規生成無料枠（5語/日）に達しました</div>
         <div style="font-size:12px;color:var(--s)">Proプランにアップグレードすると、AI生成制限が解除され、すべての専門機能が無制限で使い放題になります。</div>
+      </div>
+
+      <!-- 項目11: 語根ネットワーク成長プログレス (Value-Driven Upsell) -->
+      <div id="upsellRootProgress" style="background:var(--bg-card);border:1px solid var(--b);border-radius:8px;padding:12px;margin-bottom:14px;display:none"></div>
+
+      <!-- Free vs Pro 機能比較テーブル -->
+      <div style="margin-bottom:14px;border:1px solid var(--b);border-radius:8px;overflow:hidden;font-size:11.5px">
+        <div style="display:grid;grid-template-columns:1fr 85px 85px;background:var(--bg-card);padding:8px 10px;font-weight:700;border-bottom:1px solid var(--b)">
+          <span>機能比較</span><span style="text-align:center;color:var(--s)">Free</span><span style="text-align:center;color:var(--ac)">Pro</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 85px 85px;padding:7px 10px;border-bottom:1px dashed var(--b)">
+          <span>AI新規生成 (Gemini 3.8)</span><span style="text-align:center">1日5語</span><span style="text-align:center;font-weight:700;color:var(--ok)">実質無制限*</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 85px 85px;padding:7px 10px;border-bottom:1px dashed var(--b)">
+          <span>印欧祖語・語根ネットワーク</span><span style="text-align:center">基本表示</span><span style="text-align:center;font-weight:700;color:var(--ok)">全グラフ</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 85px 85px;padding:7px 10px;border-bottom:1px dashed var(--b)">
+          <span>長文・画像OCR瞬時抽出</span><span style="text-align:center">制限あり</span><span style="text-align:center;font-weight:700;color:var(--ok)">無制限</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 85px 85px;padding:7px 10px;border-bottom:1px dashed var(--b)">
+          <span>Mac / iPhone / PC 端末同期</span><span style="text-align:center">1端末 (手動)</span><span style="text-align:center;font-weight:700;color:var(--ok)">全自動 (クラウド)</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 85px 85px;padding:7px 10px;background:rgba(99,102,241,0.04)">
+          <span style="font-weight:700">利用料金</span><span style="text-align:center">¥0</span><span style="text-align:center;font-weight:800;color:var(--ac)">¥480/月</span>
+        </div>
       </div>
 
       <div style="margin-bottom:16px">
@@ -782,7 +964,7 @@
         <ul style="margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:8px;font-size:12.5px">
           <li style="display:flex;align-items:flex-start;gap:8px">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
-            <div><strong>AI新規生成・語源解析 無制限</strong><br><span style="font-size:11.5px;color:var(--s)">月間上限なし。大量の読書や論文、試験対策の単語を一気に登録可能。</span></div>
+            <div><strong>AI新規生成・語源解析 実質無制限</strong><br><span style="font-size:11.5px;color:var(--s)">※フェアユース上限：月間3,000語（共有辞書キャッシュは完全無制限）。大量の読書や論文、試験対策の単語を一気に登録可能。</span></div>
           </li>
           <li style="display:flex;align-items:flex-start;gap:8px">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><polyline points="20 6 9 17 4 12"/></svg>
@@ -799,10 +981,18 @@
         </ul>
       </div>
 
+      <!-- 課金サイクル切替 (Monthly / Annual) -->
+      <div style="display:flex;justify-content:center;margin:8px 0 12px">
+        <div style="display:inline-flex;align-items:center;background:var(--bg-hov);padding:3px;border-radius:20px;border:1px solid var(--b);gap:4px">
+          <button type="button" class="btn-xs active" id="upsellBillingMonthlyBtn" onclick="VocabI18n.setBillingInterval('month')" style="border-radius:16px;padding:3px 12px;font-size:11px;font-weight:700" data-i18n="settings.plan_monthly">月払い</button>
+          <button type="button" class="btn-xs btn-o" id="upsellBillingAnnualBtn" onclick="VocabI18n.setBillingInterval('year')" style="border-radius:16px;padding:3px 12px;font-size:11px;font-weight:700;border:none">年払い <span style="color:var(--ok);font-size:10px">(2ヶ月無料)</span></button>
+        </div>
+      </div>
+
       <div style="background:var(--bg);border:1.5px solid var(--ac);border-radius:10px;padding:14px;text-align:center;margin-bottom:12px">
-        <div style="font-size:12px;color:var(--s);margin-bottom:2px">いつでもワンクリックで解約可能（縛りなし）</div>
-        <div style="font-size:24px;font-weight:800;color:var(--ac);margin-bottom:8px">¥480 <span style="font-size:13px;font-weight:normal;color:var(--s)">/ 月 (税込)</span></div>
-        <button type="button" id="btnUpsellUpgrade" onclick="startStripeCheckout('price_pro_monthly')" style="width:100%;padding:10px 16px;font-size:14px;font-weight:700">今すぐProにアップグレード</button>
+        <div style="font-size:12px;color:var(--s);margin-bottom:2px" id="upsellCancelNotice">いつでもワンクリックで解約可能（縛りなし）</div>
+        <div style="font-size:24px;font-weight:800;color:var(--ac);margin-bottom:8px" id="upsellPriceText">¥480 <span style="font-size:13px;font-weight:normal;color:var(--s)">/ 月 (税込)</span></div>
+        <button type="button" id="btnUpsellUpgrade" onclick="startStripeCheckout()" style="width:100%;padding:10px 16px;font-size:14px;font-weight:700" data-i18n="upsell.upgrade_now">今すぐProプランで始める</button>
         <div style="font-size:11px;color:var(--m);margin-top:6px">※安全なStripe SSL暗号化決済ページへ移動します</div>
       </div>
 
@@ -810,7 +1000,7 @@
       <div style="background:var(--bg-hov);padding:10px 12px;border-radius:6px;font-size:11px;line-height:1.5;color:var(--s);margin-bottom:12px;text-align:left">
         <div style="font-weight:bold;color:var(--t);margin-bottom:4px">【定期課金・ご契約条件に関する表記】</div>
         <div>・<strong>販売価格</strong>: 月額 480 円（税込）</div>
-        <div>・<strong>サービス提供内容</strong>: AI新規生成（月間3,000語上限）、語源・概念史無制限、端末間クラウド同期</div>
+        <div>・<strong>サービス提供内容</strong>: AI新規生成（実質無制限・フェアユース上限：月間3,000語 / 共有辞書キャッシュは無制限）、語源・概念史無制限、端末間クラウド同期</div>
         <div>・<strong>お支払時期・方法</strong>: 初回申込み時および毎月同日の自動更新（Stripe クレジットカード決済）</div>
         <div>・<strong>契約期間</strong>: 1ヶ月単位（自動更新）</div>
         <div>・<strong>解約方法・条件</strong>: 設定モーダル内の「契約管理」ボタン（Stripeポータル）より次回更新日前日までに解約手続きを行うことで、次回以降の請求は発生しません。解約後も現在の課金期間満了までPro機能をご利用いただけます（日割り返金は不可）。</div>
@@ -834,13 +1024,21 @@
 <div id="graphModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="graphModalTitle" onclick="if(event.target===this) toggleModal('graphModal',false)">
   <div class="modal graph-modal" style="width:96vw;max-width:1240px;height:92vh;max-height:920px;display:flex;flex-direction:column;padding:0;overflow:hidden">
     <div class="modal-hd flx-sb" style="padding:8px 14px;border-bottom:1px solid var(--b);background:var(--bg-side);flex-wrap:wrap;gap:8px">
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-        <span class="modal-title" id="graphModalTitle" style="font-size:13.5px;font-weight:700">語根・語源ネットワーク (Graph View)</span>
+        <span class="modal-title" id="graphModalTitle" style="font-size:13.5px;font-weight:700">語根・語源ネットワーク</span>
         <span id="graphMetaCount" style="font-size:11px;color:var(--m);font-family:var(--mono)"></span>
+        
+        <!-- ビューモード切り替えタブ -->
+        <div class="graph-view-tabs" role="tablist">
+          <button type="button" class="graph-view-tab active" id="graphTabNetwork" onclick="VocabGraph.switchViewMode('network')" role="tab" title="全体俯瞰・星系力学シミュレーション">ネットワーク</button>
+          <button type="button" class="graph-view-tab" id="graphTabTree" onclick="VocabGraph.switchViewMode('tree')" role="tab" title="1語根フォーカス・カチッと静止・段階的ズーム">系統樹ツリー</button>
+          <button type="button" class="graph-view-tab" id="graphTabMindmap" onclick="VocabGraph.switchViewMode('mindmap')" role="tab" title="DOMアウトライナー・超高速スクロール・印刷対応">マインドマップ</button>
+          <button type="button" class="graph-view-tab" id="graphTabMatrix" onclick="VocabGraph.switchViewMode('matrix')" role="tab" title="接頭辞×語根の周期表パズルグリッド">接頭辞×語根</button>
+        </div>
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <input type="text" id="graphFilterInput" placeholder="語根・単語で検索..." style="font-size:11.5px;padding:3px 8px;width:130px;height:26px" autocomplete="off">
+        <input type="text" id="graphFilterInput" placeholder="語根・単語で検索..." style="font-size:11.5px;padding:3px 8px;width:120px;height:26px" autocomplete="off">
         <select id="graphLangFilterSel" style="font-size:11px;padding:2px 6px;height:26px;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="言語でフィルタ">
           <option value="all">全言語</option>
           <option value="en">英語のみ</option>
@@ -851,23 +1049,56 @@
         <select id="graphRootJumpSel" style="font-size:11px;padding:2px 6px;height:26px;max-width:130px;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="主要語根へ直接フォーカス">
           <option value="">主要語根へ飛ぶ...</option>
         </select>
+        <button type="button" class="btn-o btn-xs" id="graphTreeModeBtn" onclick="VocabGraph.toggleTreeMode()" title="通常ネットワーク / 4階層系統樹 (Lineage Tree) を切替">系統樹</button>
+        <button type="button" class="btn-ac-o btn-xs" id="graphEikenExplorerBtn" onclick="VocabGraph.toggleEikenExplorer()" title="語源スキルツリー (語彙アビリティの覚醒・習得)" style="font-weight:700">スキルツリー</button>
         <button type="button" class="btn-o btn-xs" id="graphColorModeBtn" onclick="VocabGraph.toggleColorMode()" title="言語別色分け / 記憶定着度(SRS)色分け を切替">言語色</button>
         <button type="button" class="btn-o btn-xs" id="graphClusterFilterBtn" onclick="VocabGraph.toggleGraphClusterOnly()" title="2単語以上つながる重要語根クラスタのみ表示">星団のみ</button>
         <button type="button" class="btn-o btn-xs" id="graphPhysicsBtn" onclick="VocabGraph.togglePhysics()" title="力学シミュレーションの固定/稼働を切替">停止</button>
-        <div style="display:inline-flex;align-items:center;border:1px solid var(--b);border-radius:4px;overflow:hidden;background:var(--bg-card);height:26px">
+        <button type="button" class="btn-ac btn-xs" id="graphWateringBtn" onclick="VocabGraph.startWateringReview()" title="定着率の低い単語（赤・黄）を一括で集中復習" style="font-weight:700;color:#ffffff !important">水やり復習</button>
+        <button type="button" class="btn-o btn-xs" id="graphTreeMaskBtn" onclick="VocabGraph.toggleTreeMask()" title="意味を伏せて想起テスト（赤シート）">赤シート:OFF</button>
+        <div id="graphZoomWrap" style="display:inline-flex;align-items:center;border:1px solid var(--b);border-radius:4px;overflow:hidden;background:var(--bg-card);height:26px">
           <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomOut()" title="縮小 (または - キー)" style="border:none;border-radius:0;padding:2px 7px;font-weight:700;height:100%">－</button>
           <span id="graphZoomVal" style="font-size:11px;padding:0 6px;color:var(--t);font-family:var(--mono);min-width:38px;text-align:center;user-select:none">100%</span>
           <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomIn()" title="拡大 (または + キー)" style="border:none;border-radius:0;padding:2px 7px;font-weight:700;height:100%">＋</button>
         </div>
-        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.fitGraphToView()" title="全ノードが画面に収まるよう自動調整 (Fキー)">全体表示</button>
-        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.resetGraphZoom()" title="等倍(1.0x)・中心に戻す (0キー)">100%</button>
-        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.exportGraphImage()" title="高解像度PNG画像として保存">画像保存</button>
+        <button type="button" class="btn-o btn-xs" id="graphFitBtn" onclick="VocabGraph.fitGraphToView()" title="画面に収まるよう自動調整 (Fキー)">全体表示</button>
+        <button type="button" class="btn-o btn-xs" id="graphResetZoomBtn" onclick="VocabGraph.resetGraphZoom()" title="等倍(1.0x)・中心に戻す (0キー)">100%</button>
+        <button type="button" class="btn-o btn-xs" id="graphExportBtn" onclick="VocabGraph.exportGraphImage()" title="高解像度PNG画像として保存">画像保存</button>
         <button type="button" class="modal-close" onclick="toggleModal('graphModal',false)" aria-label="閉じる" title="閉じる">&times;</button>
       </div>
     </div>
-    <div id="graphCanvasWrap" style="position:relative;flex:1;width:100%;height:100%;overflow:hidden;background:var(--bg-main);cursor:grab">
+
+    <!-- 語根パンくずリスト & クイックピルバー -->
+    <div id="graphTreeBreadcrumbBar" class="graph-breadcrumb-bar" style="display:none">
+      <span class="graph-bc-crumb" onclick="VocabGraph.clearRootFocus()">全系統樹</span>
+      <span class="graph-bc-sep">&gt;</span>
+      <span class="graph-bc-crumb current" id="graphBcCurrentRoot">*sta-</span>
+      <button type="button" class="btn-ac-o btn-xs" id="graphUnlockEikenRootBtn" onclick="VocabGraph.unlockCurrentRootEikenWords()" style="display:none;font-weight:700;margin-left:8px;padding:1px 7px" title="この系統樹の未習得語彙を一括習得">この系統樹を一括習得</button>
+      <div style="display:inline-flex;align-items:center;gap:4px;margin-left:auto" id="graphQuickPills"></div>
+    </div>
+
+    <!-- 1. Canvas 描画エリア (ネットワーク & 系統樹ツリー) -->
+    <div id="graphCanvasWrap" style="position:relative;flex:1;min-height:0;width:100%;height:100%;overflow:hidden;background:var(--bg-main);cursor:grab">
       <canvas id="graphCanvas" style="display:block;width:100%;height:100%"></canvas>
       <div id="graphTooltip" class="graph-tooltip" style="display:none"></div>
+
+      <!-- 語源スキルツリー目次ドロワー 背景バックドロップ -->
+      <div id="graphEikenBackdrop" class="graph-drawer-backdrop" style="display:none" onclick="VocabGraph.toggleEikenExplorer(false)"></div>
+
+      <!-- 語源スキルツリー目次ドロワー (Explorer) -->
+      <aside id="graphEikenDrawer" class="graph-eiken-drawer" style="display:none" aria-label="語源スキルツリー目次">
+        <div class="graph-drawer-hd">
+          <div style="display:flex;align-items:center;gap:6px;min-width:0">
+            <span class="graph-drawer-type-badge" style="background:rgba(234, 88, 12, 0.15);color:#ea580c">語源ツリー</span>
+            <h3 class="graph-drawer-title" style="font-size:13px;font-weight:700">重要語根スキルツリー目次 (200語)</h3>
+          </div>
+          <button type="button" class="graph-drawer-close" onclick="VocabGraph.toggleEikenExplorer(false)" aria-label="閉じる">&times;</button>
+        </div>
+        <div style="padding:8px 12px;background:var(--bg-card);border-bottom:1px solid var(--b);font-size:11px;color:var(--s)">
+          印欧祖語から古典語（ラテン・ギリシャ）を経て進化した重要語彙の系統樹。クリックで該当ブランチへジャンプし、語彙スキルを習得できます。
+        </div>
+        <div class="graph-eiken-list" id="graphEikenList"></div>
+      </aside>
 
       <!-- 語根・単語詳細インスペクター (Drawer) -->
       <aside id="graphDetailDrawer" class="graph-detail-drawer" style="display:none" aria-label="語根・単語詳細インスペクター">
@@ -891,6 +1122,13 @@
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#10b981"></span>日本語</span>
       </div>
 
+      <!-- 年代タイムトラベルスライダーバー -->
+      <div id="graphTimelineBar" class="graph-timeline-bar" style="display:none">
+        <span style="font-weight:700;color:var(--ac)">時代伝播:</span>
+        <input type="range" id="graphTimelineSlider" class="graph-timeline-slider" min="0" max="3" step="1" value="3" oninput="VocabGraph.onTimelineChange(this.value)">
+        <span id="graphTimelineLabel" style="font-family:var(--mono);font-weight:600">近代・現代 (すべて)</span>
+      </div>
+
       <!-- キャンバス上フローティングズーム操作 (Floating Zoom FAB) -->
       <div style="position:absolute;bottom:12px;right:12px;display:flex;flex-direction:column;gap:5px;z-index:30">
         <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomIn()" title="拡大 (+)" style="width:32px;height:32px;padding:0;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center;background:var(--bg-side);box-shadow:0 2px 8px rgba(0,0,0,0.15);border-radius:6px">＋</button>
@@ -898,6 +1136,12 @@
         <button type="button" class="btn-o btn-xs" onclick="VocabGraph.fitGraphToView()" title="全体表示 (F)" style="width:32px;height:32px;padding:0;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;background:var(--bg-side);box-shadow:0 2px 8px rgba(0,0,0,0.15);border-radius:6px">FIT</button>
       </div>
     </div>
+
+    <!-- 2. DOM マインドマップ (アウトライナー) エリア -->
+    <div id="graphMindmapWrap" style="display:none"></div>
+
+    <!-- 3. 接頭辞×語根 パズルマトリクス エリア -->
+    <div id="graphMatrixWrap" style="display:none"></div>
   </div>
 </div>
 
@@ -922,16 +1166,22 @@
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">/</kbd></td><td style="padding:6px 10px">検索バーに即座にフォーカス</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">n</kbd> / <kbd class="kbd-hint">Alt+K</kbd></td><td style="padding:6px 10px">新規単語入力欄へフォーカス</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">r</kbd></td><td style="padding:6px 10px">暗記復習 (Anki) モードを開始</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">l</kbd> / <kbd class="kbd-hint">p</kbd></td><td style="padding:6px 10px">耳学モード（Audio Playlist 連続自動リスニング）を開始 / 停止</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">a</kbd></td><td style="padding:6px 10px">忘却予測 ＆ 学習アナリティクスを開く</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">g</kbd></td><td style="padding:6px 10px">語根ネットワーク (Graph View) を表示</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">?</kbd></td><td style="padding:6px 10px">このショートカット一覧を開く</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Esc</kbd></td><td style="padding:6px 10px">モーダルを閉じる / フォーカス解除</td></tr>
         <tr style="border-top:2px solid var(--b);border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">機能（Anki復習モード）</th></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">m</kbd></td><td style="padding:6px 10px">復習モード切替（認識 ⇄ 産出 Cloze穴埋め）</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Space</kbd> / <kbd class="kbd-hint">Enter</kbd></td><td style="padding:6px 10px">解答・裏面を表示</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">1</kbd> / <kbd class="kbd-hint">2</kbd> / <kbd class="kbd-hint">3</kbd> / <kbd class="kbd-hint">4</kbd></td><td style="padding:6px 10px">復習評価（1:もう一度 / 2:難しい / 3:普通 / 4:簡単）</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">s</kbd> / <kbd class="kbd-hint">r</kbd></td><td style="padding:6px 10px">音声を再発音</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">z</kbd></td><td style="padding:6px 10px">直前の回答を取り消し (Undo)</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Esc</kbd></td><td style="padding:6px 10px">復習モードを終了して一覧へ戻る</td></tr>
         <tr style="border-top:2px solid var(--b);border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">機能（語根ネットワーク Graph View）</th></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">1</kbd> / <kbd class="kbd-hint">2</kbd> / <kbd class="kbd-hint">3</kbd> / <kbd class="kbd-hint">4</kbd></td><td style="padding:6px 10px">ビュー切替（1:ネットワーク / 2:系統樹ツリー / 3:マインドマップ / 4:接頭辞マトリクス）</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">w</kbd></td><td style="padding:6px 10px">枯れ枝の一括水やり復習（赤・黄色の要復習単語を即時Anki復習）</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">m</kbd></td><td style="padding:6px 10px">赤シート穴埋め暗記テスト（意味を伏せて想起テスト）</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">+</kbd> / <kbd class="kbd-hint">-</kbd></td><td style="padding:6px 10px">グラフの拡大 / 縮小</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">0</kbd></td><td style="padding:6px 10px">等倍(100%)表示・中央配置</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">f</kbd> / <kbd class="kbd-hint">ダブルクリック</kbd></td><td style="padding:6px 10px">全ノードが画面に収まるよう自動調整 (Fit)</td></tr>
@@ -944,15 +1194,65 @@
   </div>
 </div>
 
+<!-- 学術キュレーション・スターターパック ギャラリーモーダル -->
+<div id="starterPackModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="starterPackModalTitle" onclick="if(event.target===this) toggleModal('starterPackModal',false)">
+  <div class="modal-box wide" style="max-width:860px">
+    <div class="modal-hd flx-sb">
+      <h2 id="starterPackModalTitle" style="font-size:15px;display:flex;align-items:center;gap:6px">
+        <span>学術キュレーション・スターターパック</span>
+      </h2>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('starterPackModal',false)" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-bd" id="starterPackModalBody" style="max-height:75vh;overflow-y:auto;padding:16px">
+      <!-- buildStarterPackGalleryHtml により動的描画 -->
+    </div>
+  </div>
+</div>
+
+<!-- Anki互換インポートモーダル (TSV / CSV / JSON) -->
+<div id="ankiImportModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="ankiImportModalTitle" onclick="if(event.target===this) toggleModal('ankiImportModal',false)">
+  <div class="modal-box" style="max-width:620px">
+    <div class="modal-hd flx-sb">
+      <h2 id="ankiImportModalTitle" style="font-size:15px;display:flex;align-items:center;gap:6px">
+        <span>Ankiデッキ・TSV/CSVインポート (FSRSマッピング)</span>
+      </h2>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('ankiImportModal',false)" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-bd">
+      <p class="cfg-desc" style="line-height:1.5">
+        Ankiからエクスポートしたテキスト（TSV / CSV / タブ区切り）を直接読み込みます。見出し語、発音、訳語、語源タグを自動認識し、復習間隔（Interval）が存在する場合はFSRS安定度パラメータへ自動マッピングします。
+      </p>
+      <div style="margin:12px 0">
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--s);margin-bottom:4px">TSV / CSV ファイルを選択:</label>
+        <input type="file" id="ankiFileInput" accept=".tsv,.csv,.txt" onchange="VocabModal.handleAnkiFileSelect(event)">
+      </div>
+      <div style="margin:12px 0">
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--s);margin-bottom:4px">またはテキストを貼り付け:</label>
+        <textarea id="ankiImportText" style="width:100%;height:120px;font-family:var(--mono);font-size:11.5px;padding:8px;border:1px solid var(--b);border-radius:6px;background:var(--bg);color:var(--t);resize:vertical" placeholder="#separator:tab&#10;epiphany&#9;突然のひらめき&#9;philosophy" oninput="VocabModal.previewAnkiImport(this.value)"></textarea>
+      </div>
+      <div style="margin:10px 0;padding:10px;background:var(--bg-sub, rgba(0,0,0,0.02));border-radius:6px;border:1px solid var(--b)">
+        <div style="font-size:11px;font-weight:700;color:var(--s);margin-bottom:4px">インポートプレビュー:</div>
+        <div id="ankiImportPreview" style="font-size:12px;color:var(--m)">TSV/CSVテキストを入力するかファイルを選択してください</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+        <button type="button" class="btn-o" onclick="toggleModal('ankiImportModal',false)">キャンセル</button>
+        <button type="button" class="btn-ac" onclick="VocabModal.executeAnkiImport()">インポート実行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- スクリーンリーダー用不可視ライブリージョン (WCAG 2.1 AA 準拠) -->
 <div id="a11yAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
 <!-- スクリプトの読み込み（モジュール順序） -->
+<script src="js/i18n.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/anki.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/ocr.js"></script>
 <script src="js/morphology.js"></script>
+<script src="js/eiken_catalog.js"></script>
 <script src="js/graph.js"></script>
 <script src="js/feedback.js"></script>
 <script src="js/dictionary.js"></script>

@@ -36,51 +36,71 @@
    * クラウド差分同期を手動または自動で即時実行
    */
   async function syncCloudNow(manual = false, ctx = {}) {
-    const appState = ctx.appState || global.VocabCore?.App;
-    if (!global.VocabSync?.isCloudReady?.()) {
-      if (manual && typeof ctx.openSettings === 'function') ctx.openSettings();
-      return;
-    }
-    const now = Date.now();
-    if (manual && now - lastManualSyncTime < 4000) {
-      showToast('同期が完了したばかりです。数秒後に再度お試しください。', 'info', 2500);
-      return;
-    }
-    if (appState && appState.isSyncing) return;
-    if (appState) appState.isSyncing = true;
-    if (manual) lastManualSyncTime = now;
-
-    const topBadge = $('cloudSyncBadge');
-    if (topBadge) topBadge.textContent = '同期中...';
-
-    try {
-      const hooks = typeof ctx.getAppSyncHooks === 'function' ? ctx.getAppSyncHooks() : (global.VocabCore?.getAppSyncHooks?.());
-      let totalPulled = 0, totalPushed = 0;
-      const getPairsFn = ctx.getAllKnownPairConfigs || global.VocabCore?.getAllKnownPairConfigs || (() => []);
-      const allKnown = getPairsFn();
-      const syncTargets = new Set(global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja']);
-      allKnown.forEach(p => {
-        const id = p.pairId || p.key;
-        if (id) syncTargets.add(id);
-      });
-      for (const l of syncTargets) {
-        const res = await global.VocabSync.syncLangWithSupabase(l, hooks);
-        totalPulled += res.pulled;
-        totalPushed += res.pushed;
+    const lockFn = global.VocabSync?.acquireSyncLock || (fn => fn());
+    return lockFn(async () => {
+      const appState = ctx.appState || global.VocabCore?.App;
+      if (!global.VocabSync?.isCloudReady?.()) {
+        if (manual && typeof ctx.openSettings === 'function') ctx.openSettings();
+        return;
       }
-      if ($('anki')?.style.display !== 'block' && typeof ctx.load === 'function' && appState) {
-        ctx.load(appState.page);
-      } else if (typeof ctx.renderSidebarTree === 'function') {
-        ctx.renderSidebarTree();
+
+      // [Pro限定 Paywall] 複数端末クラウド自動差分同期は Proプラン専用機能
+      if (!appState?.isPro) {
+        if (manual) {
+          const upsellMsg = '複数端末間のクラウド自動差分同期は Proプラン（月480円）限定機能です。スマホ・PC・タブレット間で学習履歴や復習スケジュールを完全自動同期できます。\n（※Freeプランでは「JSON保存/復元」による手動バックアップを永久無料でご利用いただけます）';
+          if (typeof ctx.openUpsellModal === 'function') {
+            ctx.openUpsellModal(upsellMsg);
+          } else if (global.VocabModal?.openUpsellModal) {
+            global.VocabModal.openUpsellModal(upsellMsg);
+          } else {
+            alert(upsellMsg);
+          }
+        }
+        return;
       }
-      updCloudUI(ctx);
-      if (manual) alert(`クラウド差分同期完了\n・受信(Pull): ${totalPulled} 件\n・送信(Push): ${totalPushed} 件`);
-    } catch (e) {
-      if (manual) alert(`同期エラー: ${e.message}`);
-      updCloudUI(ctx);
-    } finally {
-      if (appState) appState.isSyncing = false;
-    }
+
+      const now = Date.now();
+      if (manual && now - lastManualSyncTime < 4000) {
+        showToast('同期が完了したばかりです。数秒後に再度お試しください。', 'info', 2500);
+        return;
+      }
+      if (appState && appState.isSyncing) return;
+      if (appState) appState.isSyncing = true;
+      if (manual) lastManualSyncTime = now;
+
+      const topBadge = $('cloudSyncBadge');
+      if (topBadge) topBadge.textContent = '同期中...';
+
+      try {
+        const hooks = typeof ctx.getAppSyncHooks === 'function' ? ctx.getAppSyncHooks() : (global.VocabCore?.getAppSyncHooks?.());
+        let totalPulled = 0, totalPushed = 0;
+        const getPairsFn = ctx.getAllKnownPairConfigs || global.VocabCore?.getAllKnownPairConfigs || (() => []);
+        const allKnown = getPairsFn();
+        // デフォルト4ペアと既存ペアを正規のペアID（src_tgt）で一意に統合
+        const syncTargets = new Set(['en_ja', 'fr_ja', 'de_ja', 'ja_ja']);
+        allKnown.forEach(p => {
+          const pairId = p.pairId || (p.src && p.tgt ? `${p.src}_${p.tgt}` : null);
+          if (pairId) syncTargets.add(pairId);
+        });
+        for (const l of syncTargets) {
+          const res = await global.VocabSync.syncLangWithSupabase(l, hooks);
+          totalPulled += res.pulled;
+          totalPushed += res.pushed;
+        }
+        if ($('anki')?.style.display !== 'block' && typeof ctx.load === 'function' && appState) {
+          ctx.load(appState.page);
+        } else if (typeof ctx.renderSidebarTree === 'function') {
+          ctx.renderSidebarTree();
+        }
+        updCloudUI(ctx);
+        if (manual) alert(`クラウド差分同期完了\n・受信(Pull): ${totalPulled} 件\n・送信(Push): ${totalPushed} 件`);
+      } catch (e) {
+        if (manual) alert(`同期エラー: ${e.message}`);
+        updCloudUI(ctx);
+      } finally {
+        if (appState) appState.isSyncing = false;
+      }
+    });
   }
 
   /**
@@ -92,22 +112,64 @@
     const ready = Boolean(syncMod?.isCloudReady?.());
     const sess = syncMod?.getSession?.();
     const topBadge = $('cloudSyncBadge');
-    const sbBadge = $('sbCloudStatusBadge');
-    const authRow = $('sbCloudAuthRow');
-    const loggedRow = $('sbCloudLoggedRow');
-    const userTxt = $('sbCloudUserText');
-    const quotaTxt = $('sbCloudQuotaText');
+    const sbBadge = $('sbStatusBadge') || $('sbCloudStatusBadge');
+    const authRow = $('sbAuthFormRow') || $('sbCloudAuthRow');
+    const loggedRow = $('sbLoggedInRow') || $('sbCloudLoggedRow');
+    const userTxt = $('sbUserText') || $('sbCloudUserText');
+    const quotaTxt = $('sbQuotaText') || $('sbCloudQuotaText');
+    const aiQuotaBadge = $('aiQuotaBadge');
+
+    const usageInfo = global.VocabStorage?.getDailyAiUsageInfo ? global.VocabStorage.getDailyAiUsageInfo({ appState }) : null;
+    if (aiQuotaBadge && usageInfo) {
+      if (usageInfo.isUnlimited) {
+        aiQuotaBadge.className = 'badge ok';
+        aiQuotaBadge.textContent = 'AI生成: 無制限';
+        aiQuotaBadge.title = 'AI生成: 無制限 (Pro / 開発者 / BYOK)';
+      } else {
+        const rem = usageInfo.remaining;
+        aiQuotaBadge.textContent = `AI残: ${rem}/${usageInfo.limit}語`;
+        if (rem === 0) {
+          aiQuotaBadge.className = 'badge ng';
+          aiQuotaBadge.title = '本日の無料AI生成枠（5語/日）に達しました。Proで無制限';
+        } else if (rem <= 2) {
+          aiQuotaBadge.className = 'badge warn';
+          aiQuotaBadge.title = `残り${rem}語。Proで無制限解放`;
+        } else {
+          aiQuotaBadge.className = 'badge ok';
+          aiQuotaBadge.title = `本日のAI新規生成残り枠: ${rem}語 (キャッシュ時は消費なし)`;
+        }
+      }
+    }
+
+    // メトリクス表示更新
+    if (global.VocabStorage?.getMetricsSummary) {
+      const summary = global.VocabStorage.getMetricsSummary();
+      const mTotal = $('metricTotalWords');
+      const mCache = $('metricCacheRate');
+      const mTokens = $('metricTokensSaved');
+      const mQuota = $('metricDailyQuota');
+      if (mTotal) mTotal.innerHTML = `${summary.totalWords} <small style="font-size:11px">語</small>`;
+      if (mCache) mCache.textContent = `${summary.cacheRate}%`;
+      if (mTokens) mTokens.innerHTML = `${summary.tokensSaved.toLocaleString()} <small style="font-size:11px">tok</small>`;
+      if (mQuota && usageInfo) {
+        if (usageInfo.isUnlimited) {
+          mQuota.innerHTML = `無制限 <small style="font-size:11px">(Pro)</small>`;
+        } else {
+          mQuota.innerHTML = `${usageInfo.remaining} <small style="font-size:11px">/ ${usageInfo.limit}語</small>`;
+        }
+      }
+    }
 
     if (topBadge) {
       if (ready) {
         const email = sess?.user?.email || '';
         const shortMail = email ? email.split('@')[0] : '';
         topBadge.className = 'badge ok';
-        topBadge.textContent = shortMail ? `クラウド: ${shortMail}` : 'クラウド同期: 有効';
+        topBadge.textContent = appState?.isPro ? 'クラウド: Pro会員' : (shortMail ? `クラウド: Free (${shortMail})` : 'クラウド: Free');
         topBadge.style.cursor = 'pointer';
         topBadge.onclick = () => {
           if (appState && appState.quotaRemaining === 0 && typeof ctx.openUpsellModal === 'function') {
-            ctx.openUpsellModal('今月の無料枠（30語）をすべて消費しました。');
+            ctx.openUpsellModal('本日のAI新規生成無料枠（5語/日）をすべて消費しました。Proプラン（月480円）で実質無制限（月3,000語）にアップグレードできます。');
           } else if (typeof ctx.openSettings === 'function') {
             ctx.openSettings();
           }
@@ -126,17 +188,21 @@
     }
     if (sbBadge) {
       sbBadge.className = `badge ${ready ? 'ok' : 'ng'}`;
-      sbBadge.textContent = ready ? 'ログイン済・同期有効' : '未ログイン';
+      sbBadge.textContent = ready ? (appState?.isPro ? 'ログイン済・同期有効 (Pro)' : 'ログイン中 (Free: 1端末ローカル保持)') : '未ログイン';
     }
     if (authRow && loggedRow) {
       authRow.style.display = ready ? 'none' : 'flex';
       loggedRow.style.display = ready ? 'flex' : 'none';
     }
     if (userTxt && sess?.user?.email) {
-      userTxt.textContent = `ログイン中: ${sess.user.email}`;
+      userTxt.textContent = `ログイン中: ${sess.user.email} (${appState?.isPro ? 'Proプラン' : 'Freeプラン'})`;
     }
-    if (quotaTxt && appState && appState.quotaRemaining !== null) {
-      quotaTxt.textContent = `本日のAI新規生成クォータ残り: ${appState.quotaRemaining} 語（共有キャッシュヒット時は消費されません）`;
+    if (quotaTxt && usageInfo) {
+      if (usageInfo.isUnlimited) {
+        quotaTxt.textContent = 'AI新規生成クォータ: 無制限（Pro・BYOK・開発者モード）';
+      } else {
+        quotaTxt.textContent = `本日のAI新規生成クォータ残り: ${usageInfo.remaining} / ${usageInfo.limit} 語（共有辞書キャッシュ・スターターパックは無制限。全自動クラウド同期はPro限定）`;
+      }
     }
     if ($('cfgDot')) {
       const canGen = typeof ctx.canGenerateWords === 'function' ? ctx.canGenerateWords() : true;
@@ -150,6 +216,7 @@
       syncMod.fetchUserProfile().then(p => {
         if (!p) return;
         const isPro = (p.plan === 'pro' || p.plan === 'academic');
+        if (appState) appState.isPro = isPro;
         const planBadge = $('curPlanBadge');
         if (planBadge) {
           if (p.grace_period_until && new Date(p.grace_period_until) > new Date()) {
@@ -187,7 +254,7 @@
         devNotice = document.createElement('div');
         devNotice.id = 'devEditionNotice';
         devNotice.style.cssText = 'margin-top:8px;padding:8px 10px;background:var(--bg-hov);border-radius:6px;font-size:11.5px;color:var(--ac);font-weight:600;text-align:center';
-        devNotice.innerHTML = '★ 開発者マスター権限により全機能が無制限解放されています（課金不要）';
+        devNotice.innerHTML = '開発者マスター権限により全機能が無制限解放されています（課金不要）';
         $('planCardPro').appendChild(devNotice);
       }
     }
@@ -198,8 +265,9 @@
    */
   async function cloudLogin(isSignUp = false, ctx = {}) {
     if (!global.VocabSync) return alert('VocabSyncモジュールが読み込まれていません。');
-    const url = $('sbUrlInput')?.value.trim() || '';
-    const anon = $('sbAnonInput')?.value.trim() || '';
+    const defCfg = global.VocabSync.getConfig ? global.VocabSync.getConfig() : {};
+    const url = $('sbUrlInput')?.value.trim() || defCfg.url || '';
+    const anon = $('sbAnonInput')?.value.trim() || defCfg.anonKey || '';
     const email = $('sbEmailInput')?.value.trim() || '';
     const pass = $('sbPassInput')?.value || '';
     if (!url || !anon) return alert('Supabase URL と Anon Key を入力してください。');
@@ -263,18 +331,22 @@
 
     try {
       await global.VocabSync.deleteUserAccount();
-      const langKeys = global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja'];
-      langKeys.forEach(l => {
-        if (global.VocabStorage) {
-          global.VocabStorage.state.mem[l] = [];
-          global.VocabStorage.saveClearedAt(l, Date.now());
-          global.VocabStorage.saveTombstones(l, new Map());
+      // IndexedDB の全ストアおよび LocalStorage の全関連データを完全物理消去
+      if (global.VocabStorage?.idbClearAll) {
+        await global.VocabStorage.idbClearAll();
+      }
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const keysToWipe = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('distinction_entries') || k.startsWith('vocab_snapshot') || k.startsWith('vv_'))) {
+              keysToWipe.push(k);
+            }
+          }
+          keysToWipe.forEach(k => localStorage.removeItem(k));
         }
-        const storageKey = global.VocabStorage?.resolveConfig?.(l)?.key;
-        if (storageKey) {
-          try { localStorage.removeItem(storageKey); } catch {}
-        }
-      });
+      } catch {}
       if (appState) {
         appState.entries = [];
         appState.aList = [];
@@ -302,11 +374,21 @@
     let tombstonesPruned = 0;
     const reportDetails = [];
 
-    const langKeys = global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja'];
-
-    for (const l of langKeys) {
+    const allKnown = (ctx.getAllKnownPairConfigs || global.VocabCore?.getAllKnownPairConfigs || (() => []))();
+    const targetPairs = new Map();
+    (global.VocabStorage?.LANG_KEYS || ['en', 'fr', 'de', 'ja']).forEach(l => {
       const cfg = global.VocabStorage?.resolveConfig ? global.VocabStorage.resolveConfig(l) : null;
       const key = cfg ? cfg.key : `distinction_entries_${l}`;
+      targetPairs.set(key, { key, srcLang: l });
+    });
+    allKnown.forEach(p => {
+      const key = p.key || (p.pairId ? `distinction_entries_${p.pairId}` : null);
+      if (key && !targetPairs.has(key)) {
+        targetPairs.set(key, { key, srcLang: p.srcLang || p.lang || 'en' });
+      }
+    });
+
+    for (const [key, pairMeta] of targetPairs.entries()) {
       const getJsonFn = ctx.getJson || global.VocabCore?.getJson;
       const setJsonFn = ctx.setJson || global.VocabCore?.setJson;
       const list = typeof getJsonFn === 'function' ? getJsonFn(key) : [];
@@ -332,7 +414,7 @@
         }
         seenIds.add(item.id);
 
-        // 2. タイムスタンプの正規化
+        // 2. タイムスタンプ・SRS状態の正規化
         if (!Number.isFinite(item.updatedAt) || item.updatedAt <= 0 || item.updatedAt > now + 86400000 * 365) {
           item.updatedAt = now;
           itemModified = true;
@@ -351,12 +433,17 @@
         }
 
         // 3. wordKey の補完
-        if (!item.wordKey && global.VocabCore?.makeWordKey) {
-          item.wordKey = global.VocabCore.makeWordKey(item.word, cfg?.srcLang || l, item.meanings?.[0]?.pos, item.homographIndex);
-          itemModified = true;
+        if (!item.wordKey) {
+          const mkWk = global.VocabMorphology?.makeWordKey || global.VocabCore?.makeWordKey;
+          if (mkWk) {
+            item.wordKey = mkWk(item.word, pairMeta.srcLang, item.meanings?.[0]?.pos, item.homographIndex);
+            itemModified = true;
+          }
         }
 
         if (itemModified) {
+          item.version = (Number(item.version) || 1) + 1;
+          item.updatedAt = now;
           langFixed++;
           issuesFixed++;
         }
@@ -365,17 +452,17 @@
 
       if (langFixed > 0 && typeof setJsonFn === 'function') {
         setJsonFn(key, validEntries, true);
-        reportDetails.push(`${l.toUpperCase()}: ${langFixed}件の不整合を修復`);
+        reportDetails.push(`${key}: ${langFixed}件の不整合を修復`);
       }
 
       // 4. Tombstone バキューム
       if (global.VocabStorage?.vacuumOldTombstones) {
-        const preTombCount = global.VocabStorage.getTombstones(l).size;
-        const cleaned = global.VocabStorage.vacuumOldTombstones(l);
+        const preTombCount = global.VocabStorage.getTombstones(key).size;
+        const cleaned = global.VocabStorage.vacuumOldTombstones(key);
         const pruned = preTombCount - cleaned.size;
         if (pruned > 0) {
           tombstonesPruned += pruned;
-          reportDetails.push(`${l.toUpperCase()}: ${pruned}件の期限切れTombstoneをパージ`);
+          reportDetails.push(`${key}: ${pruned}件の期限切れTombstoneをパージ`);
         }
       }
     }
@@ -391,15 +478,15 @@
   }
 
   /**
-   * 期日超過カードを今後7日間に均等スヌーズ再分散
+   * 期日超過カードを今後7日間に均等スヌーズ再分散（SSOT統一処理）
    */
   function rescheduleOverdueReviews(ctx = {}) {
     const now = Date.now();
     const activeCfg = typeof ctx.getActivePairConfig === 'function' ? ctx.getActivePairConfig() : (global.VocabCore?.getActivePairConfig?.());
-    if (!activeCfg) return;
     const getJsonFn = ctx.getJson || global.VocabCore?.getJson;
     const setJsonFn = ctx.setJson || global.VocabCore?.setJson;
-    const list = typeof getJsonFn === 'function' ? getJsonFn(activeCfg.key) : [];
+    const pairKey = activeCfg ? activeCfg.key : (ctx.pairKey || 'distinction_entries');
+    const list = typeof ctx.getList === 'function' ? ctx.getList() : (typeof getJsonFn === 'function' ? getJsonFn(pairKey) : []);
     const overdue = list.filter(i => (i.nextReview || 0) <= now);
     if (!overdue.length) return alert('期日超過の復習単語はありません。');
 
@@ -409,13 +496,25 @@
       const dayOffset = (idx % 7) + 1;
       const jitterMs = Math.floor(Math.random() * 3600000 * 3);
       item.nextReview = now + dayOffset * 86400000 + jitterMs;
+      item.version = (Number(item.version) || 1) + 1;
       item.updatedAt = now;
       item.reviewUpdatedAt = now;
     });
 
-    if (typeof setJsonFn === 'function') setJsonFn(activeCfg.key, list, true);
-    if (typeof ctx.load === 'function' && ctx.appState) ctx.load(ctx.appState.page);
-    showToast(`${overdue.length} 語の復習スケジュールを今後7日間に均等再配分しました。`, 'ok');
+    if (typeof ctx.saveList === 'function') {
+      ctx.saveList(list);
+    } else if (typeof setJsonFn === 'function') {
+      setJsonFn(pairKey, list, true);
+    }
+    if (typeof ctx.onReload === 'function') {
+      ctx.onReload();
+    } else if (typeof ctx.load === 'function' && ctx.appState) {
+      ctx.load(ctx.appState.page);
+    }
+    const showToast = ctx.showToast || (global.VocabModal ? global.VocabModal.showToast : null);
+    if (showToast) {
+      showToast(`${overdue.length} 語の復習スケジュールを今後7日間に均等再配分しました。`, 'ok');
+    }
   }
 
   /**
@@ -430,12 +529,15 @@
     showToast(`1日の最大復習数を ${cap >= 99999 ? '無制限' : cap + ' 語'} に設定しました`, 'ok');
   }
 
+  let _delegatedEventsBound = false;
+
   /**
-   * DOMイベント委譲の一括バインド
+   * DOMイベント委譲の一括バインド (二重登録防止ガード付き)
    */
   function bindDelegatedEvents(ctx = {}) {
-    const appState = ctx.appState || global.VocabCore?.App;
-    if (typeof document === 'undefined') return;
+    if (_delegatedEventsBound || typeof document === 'undefined') return;
+    _delegatedEventsBound = true;
+    const appState = ctx.appState || global.VocabCore?.App || global.App;
 
     document.addEventListener('click', e => {
       const el = e.target.closest?.('[data-act]');
@@ -444,10 +546,29 @@
 
       if (act === 'speak') {
         e.preventDefault(); e.stopPropagation();
-        if (global.VocabSpeech) global.VocabSpeech.speakText(el.dataset.text, el.dataset.lang || appState?.lang);
+        const curApp = ctx.appState || global.VocabCore?.App || global.App || appState;
+        if (global.VocabSpeech) global.VocabSpeech.speakText(el.dataset.text, el.dataset.lang || curApp?.lang);
       } else if (act === 'speak-current') {
-        const c = appState?.aList?.[0];
-        if (c && global.VocabSpeech) global.VocabSpeech.speakText(c.word, c.lang || appState?.lang);
+        e.preventDefault(); e.stopPropagation();
+        const curApp = ctx.appState || global.VocabCore?.App || global.App || appState;
+        const c = curApp?.aList?.[0];
+        const cardWord = c?.word || el.dataset.text || $('aWord')?.textContent?.replace(/\s*#\d+$/, '').trim();
+        const cardLang = c?.lang || el.dataset.lang || curApp?.lang || 'en';
+        if (cardWord && global.VocabSpeech) global.VocabSpeech.speakText(cardWord, cardLang);
+      } else if (act === 'set-anki-mode') {
+        const targetMode = el.dataset.mode;
+        if (global.VocabAnkiView) global.VocabAnkiView.setAnkiMode(targetMode, ctx.ankiCtx?.() || {});
+      } else if (act === 'reveal-cloze') {
+        el.classList.add('revealed');
+        if (el.dataset.ans) el.textContent = el.dataset.ans;
+      } else if (act === 'toggle-playlist' || act === 'playlist-toggle') {
+        if (global.VocabSpeech) global.VocabSpeech.toggleAudioPlaylist();
+      } else if (act === 'playlist-next') {
+        if (global.VocabSpeech) global.VocabSpeech.nextPlaylistItem();
+      } else if (act === 'playlist-prev') {
+        if (global.VocabSpeech) global.VocabSpeech.prevPlaylistItem();
+      } else if (act === 'playlist-close') {
+        if (global.VocabSpeech) global.VocabSpeech.stopAudioPlaylist();
       } else if (act === 'undo-anki') {
         if (global.VocabAnkiView) global.VocabAnkiView.undoAnkiRev(ctx.ankiCtx?.() || {});
         else if (typeof ctx.undoAnkiRev === 'function') ctx.undoAnkiRev();
@@ -462,6 +583,14 @@
       } else if (act === 'open-graph') {
         if (global.VocabGraph && typeof global.VocabGraph.openGraphModal === 'function') global.VocabGraph.openGraphModal(el.dataset.root);
         else if (typeof ctx.openGraphModal === 'function') ctx.openGraphModal(el.dataset.root);
+      } else if (act === 'load-starter') {
+        const packType = el.dataset.pack || 'academic';
+        if (typeof global.VocabCore?.loadStarterPack === 'function') global.VocabCore.loadStarterPack(packType);
+        else if (typeof global.loadStarterPack === 'function') global.loadStarterPack(packType);
+      } else if (act === 'open-starter-modal') {
+        if (global.VocabModal && typeof global.VocabModal.openStarterPackModal === 'function') global.VocabModal.openStarterPackModal();
+      } else if (act === 'open-anki-import') {
+        if (global.VocabModal && typeof global.VocabModal.openAnkiImportModal === 'function') global.VocabModal.openAnkiImportModal();
       } else if (act === 'jump') {
         const jw = el.dataset.word;
         const jl = el.dataset.lang || appState?.lang;
@@ -475,6 +604,20 @@
         const num = parseInt(el.dataset.num, 10);
         const cardWord = el.closest('.card')?.dataset?.word;
         if (typeof ctx.delW === 'function') ctx.delW(el.dataset.id || (Number.isInteger(num) ? num : cardWord), el.dataset.lang || appState?.lang);
+      } else if (act === 'report-ety') {
+        e.preventDefault(); e.stopPropagation();
+        const cardWord = el.dataset.word || el.closest('.card')?.dataset?.rawWord || '';
+        const cardEty = el.dataset.ety || '';
+        const cardLang = el.dataset.lang || appState?.lang || 'en';
+        if (global.VocabFeedback && typeof global.VocabFeedback.openFeedbackModal === 'function') {
+          global.VocabFeedback.openFeedbackModal({
+            title: `語源の誤り・修正報告: ${cardWord}`,
+            initialMessage: `単語「${cardWord}」(${cardLang.toUpperCase()}) の語源解説に関する報告:\n【現在の語源】\n${cardEty}\n\n【正しい情報・修正提案】\n`
+          });
+        } else {
+          prompt('語源の誤りや修正提案を入力してください（開発チームに送信されます）:', `【${cardWord}】`);
+          showToast('語源に関するフィードバックを受け付けました。ご協力ありがとうございます！', 'ok', 3500);
+        }
       } else if (act === 'toggle-clamp') {
         el.classList.toggle('clamp');
       } else if (act === 'switch-detail-tab') {
@@ -493,7 +636,7 @@
           const accordion = el.closest('.card-details-accordion');
           const sumLbl = accordion?.querySelector('.sum-lbl');
           if (sumLbl) {
-            const labelText = tabName === 'all' ? '詳細（語源・例文・歴史）' : (el.textContent?.trim() || '詳細');
+            const labelText = tabName === 'all' ? '詳細（すべて）' : (el.textContent?.trim() || '詳細');
             sumLbl.textContent = `${labelText} を表示中`;
           }
         }
@@ -502,6 +645,15 @@
           appState.page += Number(el.dataset.dir);
           if (typeof ctx.render === 'function') ctx.render();
           $('mainScroll')?.scrollTo?.(0, 0);
+        }
+      } else if (act === 'reset-filter') {
+        e.preventDefault();
+        if (typeof ctx.resetAllFilters === 'function') {
+          ctx.resetAllFilters();
+        } else if (typeof global.VocabCore?.resetAllFilters === 'function') {
+          global.VocabCore.resetAllFilters();
+        } else if (typeof global.VocabListView?.resetFilters === 'function') {
+          global.VocabListView.resetFilters(appState, () => ctx.render?.());
         }
       } else if (act === 'rate') {
         const rateVal = Number(el.dataset.rate);
@@ -634,10 +786,8 @@
     // 音声アンロック (iOS Safari / モバイルWebKit対応)
     const unlockAudio = () => {
       try {
-        if (window.speechSynthesis) {
-          const u = new SpeechSynthesisUtterance('');
-          u.volume = 0;
-          speechSynthesis.speak(u);
+        if (typeof window !== 'undefined' && window.speechSynthesis && window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
         }
       } catch {}
       window.removeEventListener('touchstart', unlockAudio);
@@ -647,11 +797,36 @@
     window.addEventListener('click', unlockAudio, { passive: true });
 
     // リサイズハンドラ
+    let resizeTimer = null;
     window.addEventListener('resize', () => {
       if (window.innerWidth > 768 && document.body?.classList.contains('side-open-lock')) {
         document.body.classList.remove('side-open-lock');
       }
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const cIdx = appState?.focusedCardIndex;
+        if (Number.isInteger(cIdx) && cIdx >= 0 && typeof document !== 'undefined') {
+          const cards = [...document.querySelectorAll('#list .card')];
+          const el = cards[cIdx];
+          if (el && global.VocabCardView?.scrollToCard) {
+            global.VocabCardView.scrollToCard(el, document.getElementById('mainScroll'), { immediate: true, skipRetry: true });
+          }
+        }
+      }, 150);
     }, { passive: true });
+
+    // ブラウザ履歴ナビゲーション (戻る・進む) に伴うURL単語ジャンプ連動
+    window.addEventListener('popstate', () => {
+      if (typeof window !== 'undefined' && window.location?.search) {
+        try {
+          const p = new URLSearchParams(window.location.search);
+          const w = p.get('w') || p.get('word');
+          if (w && typeof ctx.jumpToWord === 'function') {
+            ctx.jumpToWord(w, p.get('lang') || appState?.lang);
+          }
+        } catch {}
+      }
+    });
 
     // 印刷モード
     window.addEventListener('beforeprint', () => {
@@ -666,16 +841,30 @@
     // ストレージ間同期
     window.addEventListener('storage', e => {
       if (e.key && global.VocabStorage && typeof ctx.syncFromIdbForLang === 'function') {
-        const l = global.VocabStorage.keyToLang(e.key);
-        ctx.syncFromIdbForLang(l);
+        const isPairScopedKey = e.key.startsWith('distinction_entries') || e.key.startsWith('vv_tombstones_') || e.key.startsWith('vv_cleared_at_');
+        if (!isPairScopedKey) return;
+        const target = typeof global.VocabStorage.resolveConfig === 'function'
+          ? (global.VocabStorage.resolveConfig(e.key)?.key || e.key)
+          : (e.key.startsWith('distinction_entries') ? e.key : global.VocabStorage.keyToLang(e.key));
+        ctx.syncFromIdbForLang(target);
       }
     });
 
-    // オンライン / オフライン自動復帰
-    window.addEventListener('online', () => {
-      if (global.VocabSRS?.flushOfflineReviews) global.VocabSRS.flushOfflineReviews();
-      if (global.VocabSync?.isCloudReady?.()) syncCloudNow(false, ctx);
-      showToast('オンラインに復帰しました。クラウド同期を再開します。', 'info', 2500);
+    // オンライン / オフライン自動復帰 (項目25: 直列化パイプライン & 排他ミューテックス)
+    window.addEventListener('online', async () => {
+      try {
+        if (global.VocabSRS?.flushOfflineReviews) {
+          await global.VocabSRS.flushOfflineReviews();
+        }
+        if (global.VocabSync?.isCloudReady?.()) {
+          await syncCloudNow(false, ctx);
+        }
+        showToast('オンラインに復帰しました。クラウド同期を完了しました。', 'info', 2500);
+      } catch (err) {
+        if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+          console.warn('[Sync] Online recovery error:', err);
+        }
+      }
     });
     window.addEventListener('offline', () => {
       showToast('オフラインモードです。復習や編集は端末内に安全に保持されます。', 'info', 3000);
@@ -747,8 +936,11 @@
           openExtractModal: () => global.VocabModal?.openExtractModal?.(),
           toggleMask: () => ctx.toggleMask?.(),
           ankiSpeak: () => {
-            if (appState?.aList?.[0] && global.VocabSpeech) {
-              global.VocabSpeech.speakText(appState.aList[0].word, appState.aList[0].lang || appState?.lang);
+            const curApp = ctx.appState || global.VocabCore?.App || global.App || appState;
+            const curWord = curApp?.aList?.[0]?.word || $('aWord')?.textContent?.replace(/\s*#\d+$/, '').trim();
+            const curLang = curApp?.aList?.[0]?.lang || curApp?.lang || 'en';
+            if (curWord && global.VocabSpeech) {
+              global.VocabSpeech.speakText(curWord, curLang);
             }
           },
           ankiUndo: () => {
@@ -759,7 +951,7 @@
           },
           ankiAdvance: () => {
             if ($('btnAns')?.style.display !== 'none') {
-              if (global.VocabAnkiView) global.VocabAnkiView.showAns();
+              if (global.VocabAnkiView) global.VocabAnkiView.showAns(ctx.ankiCtx?.() || {});
               else ctx.showAns?.();
             } else if ($('aRat')?.style.display === 'flex') {
               if (global.VocabAnkiView) global.VocabAnkiView.procRev(2, ctx.ankiCtx?.() || {});
@@ -790,15 +982,25 @@
             if (item && typeof ctx.delW === 'function') ctx.delW(item.id || item.num, item.lang || appState?.lang);
           },
           startAnki: () => {
-            if (global.VocabAnkiView) global.VocabAnkiView.startAnki(ctx.ankiCtx?.() || {});
+            if (global.VocabAnkiView) global.VocabAnkiView.startAnki(null, ctx.ankiCtx?.() || {});
             else ctx.startAnki?.();
           },
           openGraph: () => {
             if (global.VocabGraph) global.VocabGraph.openGraphModal();
             else ctx.openGraphModal?.();
           },
+          openAnalyticsModal: () => {
+            if (global.VocabAnkiView) global.VocabAnkiView.openAnalyticsModal();
+            else if (typeof global.openAnalyticsModal === 'function') global.openAnalyticsModal();
+          },
           openShortcutsModal: () => {
             if (global.VocabModal) global.VocabModal.toggleModal('shortcutsModal', true);
+          },
+          ankiToggleMode: () => {
+            if (global.VocabAnkiView) global.VocabAnkiView.toggleAnkiMode(ctx.ankiCtx?.() || {});
+          },
+          togglePlaylist: () => {
+            if (global.VocabSpeech) global.VocabSpeech.toggleAudioPlaylist();
           }
         });
         if (handled) return;

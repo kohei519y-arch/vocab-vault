@@ -16,9 +16,10 @@
 
   const CATS = ["政治・国際関係","歴史・考古学","言語・コミュニケーション","経済・金融","社会・移民","数学・統計","科学・テクノロジー","医療・健康","環境・自然・生物","芸術・文学・文化","法律・司法","教育・学校","心理学・精神","哲学・宗教","ビジネス・経営","IT・コンピューター","メディア・報道","スポーツ・エンタメ","交通・インフラ","地理・地学・宇宙","建築・都市計画","農業・食料・料理","日常生活・服飾","感情・性格","人間関係・家族","動作・行為","状態・性質","時間・空間・頻度","抽象概念・論理","その他"];
   const ETY_CONF_ENUM = ["certain", "probable", "disputed", "unknown"];
-  const WIKT_URL_RE = /^https:\/\/[a-z0-9-]+\.wiktionary\.org\/wiki\/[^\s"<>`'\\]+$/i;
+  const WIKT_URL_RE = /^https:\/\/[a-z0-9-]+\.wiktionary\.org\/wiki\/[^\s"<>`\\]+$/i;
   const sanitizeWiktUrl = url => (typeof url === 'string' && WIKT_URL_RE.test(url.trim())) ? url.trim() : undefined;
   const cleanPho = p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim();
+  const fmtPho = p => { const c = cleanPho(p); return c ? `[ ${c} ]` : ''; };
   const genId = () => 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 9);
 
   function sanitizeItem(raw, idx, defLang = 'en') {
@@ -87,6 +88,11 @@
       interval: Number.isFinite(Number(raw.interval)) ? Number(raw.interval) : 0,
       repetition: Number.isFinite(Number(raw.repetition)) ? Number(raw.repetition) : 0,
       efactor: Number.isFinite(Number(raw.efactor)) ? Number(raw.efactor) : 2.5,
+      stability: (Number.isFinite(Number(raw.stability)) && Number(raw.stability) > 0) ? Number(raw.stability) : undefined,
+      difficulty: (Number.isFinite(Number(raw.difficulty)) && Number(raw.difficulty) >= 1 && Number(raw.difficulty) <= 10) ? Number(raw.difficulty) : undefined,
+      retrievability: (Number.isFinite(Number(raw.retrievability)) && Number(raw.retrievability) >= 0 && Number(raw.retrievability) <= 1) ? Number(raw.retrievability) : undefined,
+      pair: typeof raw.pair === 'string' && raw.pair ? raw.pair : undefined,
+      tgtLang: typeof raw.tgtLang === 'string' && raw.tgtLang ? raw.tgtLang : undefined,
       nextReview: Number.isFinite(Number(raw.nextReview)) ? Number(raw.nextReview) : Date.now(),
       reviewUpdatedAt: Number.isFinite(Number(raw.reviewUpdatedAt || raw.review_updated_at))
         ? Math.min(Number(raw.reviewUpdatedAt || raw.review_updated_at), Date.now() + 86400000)
@@ -94,21 +100,26 @@
       isDeleted: Boolean(raw.isDeleted || raw.is_deleted),
       flags: Array.isArray(raw.flags) ? raw.flags.map(String) : [],
       gen: raw.gen && typeof raw.gen === 'object' ? { model: String(raw.gen.model || ''), pv: String(raw.gen.pv || ''), at: Number(raw.gen.at) || 0 } : undefined,
+      // 項目23: 端末時計ズレ（Clock Skew）防衛のための論理クロック（Lamport Version）
+      version: (Number.isInteger(Number(raw.version)) && Number(raw.version) > 0) ? Number(raw.version) : 1,
       // 時計狂い（Clock Skew / Future Timestamp Poisoning）防衛: 未来24時間を超える不正タイムスタンプは現在時刻へクリップ
       updatedAt: Number.isFinite(parsedUpd) && parsedUpd > 0 ? Math.min(parsedUpd, Date.now() + 86400000) : 1
     };
   }
 
-  function mergeWords(arrA, arrB, l = 'en', ignoreTombstones = false, customTombMap = null, customClearedAt = null) {
-    const tombMap = ignoreTombstones ? new Map() : (customTombMap || getTombstones(l));
-    const clearedAt = ignoreTombstones ? 0 : (customClearedAt !== null ? customClearedAt : getClearedAt(l));
+  function mergeWords(arrA, arrB, lOrKey = 'en', ignoreTombstones = false, customTombMap = null, customClearedAt = null) {
+    const cfg = resolveConfig(lOrKey);
+    const srcLang = cfg.srcLang || keyToLang(lOrKey) || 'en';
+    const tombTarget = cfg.key || lOrKey;
+    const tombMap = ignoreTombstones ? new Map() : (customTombMap || getTombstones(tombTarget));
+    const clearedAt = ignoreTombstones ? 0 : (customClearedAt !== null ? customClearedAt : getClearedAt(tombTarget));
     const byId = new Map(), wkToId = new Map();
     const makeWordKey = global.VocabMorphology?.makeWordKey || ((word, lang, pos, hIdx) => `${lang}:${word}`);
 
     [arrA, arrB].forEach(list => (Array.isArray(list) ? list : []).forEach((raw, idx) => {
-      const it = sanitizeItem(raw, idx, l);
-      if (!it || (!ignoreTombstones && isTombstoned(it, tombMap, l, clearedAt))) return;
-      const wk = it.wordKey || makeWordKey(it.word, l, it.meanings?.[0]?.pos, it.homographIndex);
+      const it = sanitizeItem(raw, idx, srcLang);
+      if (!it || (!ignoreTombstones && isTombstoned(it, tombMap, tombTarget, clearedAt))) return;
+      const wk = it.wordKey || makeWordKey(it.word, srcLang, it.meanings?.[0]?.pos, it.homographIndex);
       it.wordKey = wk;
       const existingId = byId.has(it.id) ? it.id : wkToId.get(wk);
       if (!existingId) {
@@ -116,8 +127,15 @@
         wkToId.set(wk, it.id);
       } else {
         const ex = byId.get(existingId);
-        // カード情報・メタデータは updatedAt が新しい方を採用
-        const itWins = (it.updatedAt || 0) >= (ex.updatedAt || 0);
+        // 項目23: 論理クロック（Lamport Version）優先、同値時は updatedAt によるハイブリッド調停 (HLC)
+        const itVer = Number(it.version) || 1;
+        const exVer = Number(ex.version) || 1;
+        let itWins;
+        if (itVer !== exVer) {
+          itWins = itVer > exVer;
+        } else {
+          itWins = (it.updatedAt || 0) >= (ex.updatedAt || 0);
+        }
         const win = itWins ? it : ex, lose = itWins ? ex : it;
 
         // SRS復習進捗（暗記データ）は reviewUpdatedAt が新しい方を独立して採用
@@ -126,18 +144,50 @@
         const revWins = itRevTime >= exRevTime;
         const revWin = revWins ? it : ex, revLose = revWins ? ex : it;
 
+        // フィールド単位の無損失マージ (Field-level CRDT Lossless Merge)
+        const mergedNotes = (win.notes && String(win.notes).trim())
+          ? win.notes
+          : (lose.notes || '');
+        const mergedMnemonic = (win.mnemonic && String(win.mnemonic).trim())
+          ? win.mnemonic
+          : (lose.mnemonic || '');
+        const mergedContextSentence = (win.contextSentence && String(win.contextSentence).trim())
+          ? win.contextSentence
+          : (lose.contextSentence || '');
+        const mergedEtymologyDetails = (win.etymologyDetails && String(win.etymologyDetails).trim())
+          ? win.etymologyDetails
+          : (lose.etymologyDetails || '');
+
+        // 語根タグ（Set によるユニオン統合）
+        const mergedTagsSet = new Set();
+        (Array.isArray(win.etymologyTags) ? win.etymologyTags : []).forEach(t => { if (t) mergedTagsSet.add(String(t).trim()); });
+        (Array.isArray(lose.etymologyTags) ? lose.etymologyTags : []).forEach(t => { if (t) mergedTagsSet.add(String(t).trim()); });
+        const mergedTags = mergedTagsSet.size ? Array.from(mergedTagsSet) : (win.etymologyTags || lose.etymologyTags || []);
+
         const merged = {
           ...lose, ...win,
           id: ex.id || it.id,
-          folder: win.folder || lose.folder,
+          version: Math.max(itVer, exVer),
+          folder: (win.updatedAt || 0) > (lose.updatedAt || 0) || itVer > exVer
+            ? (win.folder || undefined)
+            : (win.folder || lose.folder || undefined),
+          notes: mergedNotes,
+          mnemonic: mergedMnemonic,
+          contextSentence: mergedContextSentence,
+          etymologyDetails: mergedEtymologyDetails,
           wiktGrounded: win.wiktGrounded || lose.wiktGrounded,
           wiktUrl: win.wiktUrl || lose.wiktUrl,
-          etymologyTags: win.etymologyTags?.length ? win.etymologyTags : lose.etymologyTags,
+          etymologyTags: mergedTags,
           updatedAt: Math.max(win.updatedAt || 1, lose.updatedAt || 1),
-          // SRS フィールドの独立マージ
+          pair: win.pair || lose.pair,
+          tgtLang: win.tgtLang || lose.tgtLang,
+          // SRS フィールドの独立マージ (FSRS-4.5 パラメータ含む)
           interval: revWin.interval !== undefined ? revWin.interval : revLose.interval,
           repetition: revWin.repetition !== undefined ? revWin.repetition : revLose.repetition,
           efactor: revWin.efactor !== undefined ? revWin.efactor : revLose.efactor,
+          stability: revWin.stability !== undefined ? revWin.stability : revLose.stability,
+          difficulty: revWin.difficulty !== undefined ? revWin.difficulty : revLose.difficulty,
+          retrievability: revWin.retrievability !== undefined ? revWin.retrievability : revLose.retrievability,
           nextReview: revWin.nextReview !== undefined ? revWin.nextReview : revLose.nextReview,
           reviewUpdatedAt: Math.max(itRevTime, exRevTime),
           isDeleted: Boolean(win.isDeleted !== undefined ? win.isDeleted : lose.isDeleted)
@@ -297,15 +347,15 @@
         // どちらかにある有効な単語を合算・保護
         let merged = [];
         if (lsWords.length && idbWords.length) {
-          merged = mergeWords(idbWords, lsWords, l, false, tMap, cAt);
+          merged = mergeWords(idbWords, lsWords, k, false, tMap, cAt);
         } else if (idbWords.length) {
           merged = idbWords;
         } else if (lsWords.length) {
           merged = lsWords;
         }
 
-        if (merged.length > 0) {
-          _log(`[Storage Recovery] Restored ${merged.length} words for ${k}`);
+        if (merged.length > 0 || rawLs || (Array.isArray(idbData) && idbData.length > 0)) {
+          if (merged.length > 0) _log(`[Storage Recovery] Restored ${merged.length} words for ${k}`);
           Storage.mem[k] = merged;
           await idbPut(k, merged);
           try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
@@ -433,7 +483,7 @@
     const cfg = resolveConfig(l);
     try {
       const tx = Storage.dbInst.transaction('vaults', 'readwrite'), st = tx.objectStore('vaults');
-      const r = st.add(arr, `${cfg.snap}:${new Date().toISOString().slice(0, 10)}`);
+      const r = st.put(arr, `${cfg.snap}:${new Date().toISOString().slice(0, 10)}`);
       r.onerror = e => { e.preventDefault(); e.stopPropagation(); };
       const kr = st.getAllKeys(IDBKeyRange.bound(`${cfg.snap}:`, `${cfg.snap}:\uffff`));
       kr.onsuccess = () => {
@@ -480,6 +530,21 @@
     if (pruned > 0) {
       saveTombstones(l, map);
     }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const cutoffYmd = getTodayString(new Date(Date.now() - TOMBSTONE_TTL_MS));
+        const keysToDelete = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+          const m = k.match(/^vv_(?:ai_gen_daily|ocr_daily|reviewed|rev_count)_(\d{4}-\d{2}-\d{2})$/);
+          if (m && m[1] < cutoffYmd) {
+            keysToDelete.push(k);
+          }
+        }
+        keysToDelete.forEach(k => localStorage.removeItem(k));
+      }
+    } catch {}
     return map;
   }
 
@@ -506,7 +571,8 @@
     const map = getTombstones(l);
     if (item.id) map.set(`id:${item.id}`, deletedAt);
     const sLang = (typeof l === 'string' && l.length === 2) ? l : (resolveConfig(l).srcLang || 'en');
-    const wk = item.wordKey || (global.VocabCore?.makeWordKey ? global.VocabCore.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
+    const mkWk = global.VocabMorphology?.makeWordKey || global.VocabCore?.makeWordKey || ((w, lg) => `${lg}:${String(w || '').trim().toLowerCase()}`);
+    const wk = item.wordKey || (item.word ? mkWk(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
     if (wk) map.set(`wk:${wk}`, deletedAt);
     saveTombstones(l, map);
   }
@@ -520,7 +586,8 @@
     if (cAt > 0 && (upd <= cAt || upd === 0)) return true;
     const delById = item.id ? (tMap.get(`id:${item.id}`) || 0) : 0;
     const sLang = (typeof l === 'string' && l.length === 2) ? l : (resolveConfig(l).srcLang || 'en');
-    const wk = item.wordKey || (global.VocabCore?.makeWordKey ? global.VocabCore.makeWordKey(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
+    const mkWk = global.VocabMorphology?.makeWordKey || global.VocabCore?.makeWordKey || ((w, lg) => `${lg}:${String(w || '').trim().toLowerCase()}`);
+    const wk = item.wordKey || (item.word ? mkWk(item.word, sLang, item.meanings?.[0]?.pos, item.homographIndex) : '');
     const delByWk = wk ? (tMap.get(`wk:${wk}`) || 0) : 0;
     const maxDel = Math.max(delById, delByWk);
     return maxDel > 0 && (upd === 0 || maxDel >= upd);
@@ -528,30 +595,93 @@
 
   function parseIdbResult(raw, l) {
     const sLang = typeof l === 'string' && l.length === 2 ? l : (resolveConfig(l).srcLang || 'en');
+    if (Array.isArray(raw)) {
+      return raw.map((it, i) => sanitizeItem(it, i, sLang)).filter(Boolean);
+    }
     return safeParseWords(raw, sLang)[sLang] || [];
   }
 
-  function idbCommitLangData(l, next, forceOverwrite = false) {
-    if (!Storage.dbInst) return Promise.resolve({ ok: false, data: next });
+  /**
+   * 3-way merge: base (this tab's last-known state) / local (next) / remote (current IDB).
+   * - Remote items present in local          -> HLC merge (local wins ties).
+   * - Remote items absent in local AND base  -> added by another tab/worker -> keep.
+   * - Remote items absent in local, in base  -> intentionally removed by this tab -> drop.
+   * Output preserves local ordering; remote-only additions are appended.
+   */
+  function threeWayMergeWords(remote, next, base, lOrKey) {
+    const idsOf = list => {
+      if (list && !Array.isArray(list) && list.ids instanceof Set && list.wks instanceof Set) return list;
+      const ids = new Set(), wks = new Set();
+      (list || []).forEach(it => {
+        if (!it) return;
+        if (it.id) ids.add(it.id);
+        if (it.wordKey) wks.add(it.wordKey);
+      });
+      return { ids, wks };
+    };
+    const has = (set, it) => (it.id && set.ids.has(it.id)) || (it.wordKey && set.wks.has(it.wordKey));
+    const localSet = idsOf(next), baseSet = idsOf(base);
+    const relevantRemote = remote.filter(r => has(localSet, r) || !has(baseSet, r));
+    const merged = relevantRemote.length ? mergeWords(relevantRemote, next, lOrKey, false) : mergeWords([], next, lOrKey, false);
+    const order = new Map(), wkOrder = new Map();
+    next.forEach((it, i) => {
+      if (it?.id && !order.has(it.id)) order.set(it.id, i);
+      if (it?.wordKey && !wkOrder.has(it.wordKey)) wkOrder.set(it.wordKey, i);
+    });
+    const nextById = new Map(next.filter(Boolean).map(it => [it.id, it]));
+    const rank = it => (order.has(it.id) ? order.get(it.id)
+      : (it.wordKey && wkOrder.has(it.wordKey) ? wkOrder.get(it.wordKey) : Number.MAX_SAFE_INTEGER));
+    const sorted = merged
+      .map((it, i) => ({ it, i }))
+      .sort((a, b) => (rank(a.it) - rank(b.it)) || (a.i - b.i))
+      .map(({ it }, i) => ({ ...it, num: i + 1 }));
+    const changed = sorted.length !== next.length || sorted.some(it => {
+      const loc = nextById.get(it.id);
+      return !loc || (Number(loc.version) || 1) !== (Number(it.version) || 1)
+        || (loc.updatedAt || 0) !== (it.updatedAt || 0)
+        || (Number(loc.reviewUpdatedAt || loc.updatedAt) || 0) !== (Number(it.reviewUpdatedAt || it.updatedAt) || 0);
+    });
+    return { data: sorted, changed };
+  }
+
+  /**
+   * @param {string} l storage/pair key
+   * @param {Array} next local state to persist
+   * @param {boolean} forceOverwrite blind put (no merge). Use only for intentional full replacement.
+   * @param {Array|null} baseList this tab's last-known state; enables 3-way merge that prevents
+   *   cross-tab lost updates (TOCTOU) without resurrecting items this tab removed.
+   */
+  function idbCommitLangData(l, next, forceOverwrite = false, baseList = null) {
+    if (!Storage.dbInst) return Promise.resolve({ ok: false, data: next, changed: false });
     const cfg = resolveConfig(l);
     return new Promise(res => {
       try {
         const tx = Storage.dbInst.transaction('vaults', 'readwrite'), st = tx.objectStore('vaults');
-        let finalData = next;
+        let finalData = next, changed = false;
         if (forceOverwrite) {
           st.put(next, cfg.key);
         } else {
+          // get + put share one readwrite transaction, which IDB serializes across tabs -> atomic RMW.
           const gMain = st.get(cfg.key);
           gMain.onsuccess = () => {
             const idbWords = parseIdbResult(gMain.result, l);
-            finalData = idbWords.length ? mergeWords(idbWords, next, cfg.srcLang || l, false) : next;
+            if (!idbWords.length) {
+              finalData = next;
+            } else if (baseList && typeof baseList === 'object') {
+              const r = threeWayMergeWords(idbWords, next, baseList, cfg.key);
+              finalData = r.data;
+              changed = r.changed;
+            } else {
+              finalData = mergeWords(idbWords, next, cfg.key, false);
+              changed = true;
+            }
             st.put(finalData, cfg.key);
           };
           gMain.onerror = () => st.put(next, cfg.key);
         }
-        tx.oncomplete = () => res({ ok: true, data: finalData });
-        tx.onerror = tx.onabort = () => res({ ok: false, data: next });
-      } catch { res({ ok: false, data: next }); }
+        tx.oncomplete = () => res({ ok: true, data: finalData, changed });
+        tx.onerror = tx.onabort = () => res({ ok: false, data: next, changed: false });
+      } catch { res({ ok: false, data: next, changed: false }); }
     });
   }
 
@@ -576,7 +706,7 @@
     });
   }
 
-  function deleteWord(idOrNum, lang, getListFn, setListFn, searchAllPairsFn) {
+  function deleteWord(idOrNum, langOrKey, getListFn, setListFn, searchAllPairsFn) {
     const list = getListFn ? [...getListFn()] : [];
     const targetIdx = list.findIndex(i => {
       if (typeof idOrNum === 'string' && idOrNum) {
@@ -595,7 +725,11 @@
     const now = Date.now();
     target.isDeleted = true;
     target.updatedAt = now;
-    recordTombstone(target, target.lang || lang, now);
+    // [NEW-P0-3 修正] target.lang ('en'等の2文字) ではなく、呼び出し元のペアキー (langOrKey) または target.pair を最優先で渡す
+    const tombTargetKey = (langOrKey && String(langOrKey).length > 2)
+      ? langOrKey
+      : (target.pair || langOrKey || target.lang || 'en');
+    recordTombstone(target, tombTargetKey, now);
 
     const nextList = list.filter((_, idx) => idx !== targetIdx).map((it, idx) => ({ ...it, num: idx + 1 }));
     if (setListFn) setListFn(nextList);
@@ -684,34 +818,28 @@
     }
 
     if (manualSalvage) {
-      Storage.mem.en = Storage.mem.fr = Storage.mem.de = null;
+      Storage.mem = {};
       LANG_KEYS.forEach(l => { saveClearedAt(l, 0); saveTombstones(l, new Map()); });
-      try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (k) {
-            const ext = safeParseWords(lsGet(k), keyToLang(k));
-            LANG_KEYS.forEach(l => { if (ext[l].length) ctx.setJson(LANGS[l].key, mergeWords(ctx.getJson(LANGS[l].key), ext[l], l, true), true, true); });
-          }
-        }
-      } catch {}
-      // LocalStorage 全キーから過去の単語（スナップショットや旧キー含む）を事前救出
+      // LocalStorage 内の全ペアキーの墓石・ウォーターマークもリセットし、それぞれのペアキーへ救出（異言語ペア混入を防止）
       try {
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
           if (!k || !(k.includes('distinction_entries') || k.includes('vocab_snapshot') || k.startsWith('vv_'))) continue;
+          if (k.startsWith('distinction_entries')) {
+            saveClearedAt(k, 0);
+            saveTombstones(k, new Map());
+          }
           const val = localStorage.getItem(k);
           if (!val || val === '[]' || val.length <= 5) continue;
-          const l = keyToLang(k);
+          const targetCfg = resolveConfig(k);
+          const l = targetCfg.srcLang || keyToLang(k);
           const parsed = safeParseWords(val, l)[l];
           if (!parsed || !parsed.length) continue;
-          const targetK = resolveConfig(k).key;
+          const targetK = targetCfg.key;
           const cur = ctx.getJson(targetK);
-          const rec = mergeWords(cur, parsed, l, true);
+          const rec = mergeWords(cur, parsed, targetK, true);
           if (rec.length > cur.length) {
-            _log(`[Manual Salvage] Rescued ${rec.length - cur.length} words for ${l} from key "${k}"`);
             Storage.mem[targetK] = rec;
-            Storage.mem[l] = rec;
             try { localStorage.setItem(targetK, JSON.stringify(rec)); } catch {}
           }
         }
@@ -761,14 +889,14 @@
           if (manualSalvage && b.snaps && b.snaps.length) {
             b.snaps.forEach(arr => {
               const sWords = safeParseWords(arr, srcL)[srcL];
-              if (sWords && sWords.length) idbWords = mergeWords(idbWords, sWords, srcL, true);
+              if (sWords && sWords.length) idbWords = mergeWords(idbWords, sWords, k, true);
             });
           }
           // 通常起動時は墓石を尊重 (ignoreTombstones = manualSalvage)
-          const merged = mergeWords(ctx.getJson(k), idbWords, srcL, manualSalvage);
+          const merged = mergeWords(ctx.getJson(k), idbWords, k, manualSalvage);
           if (merged.length > 0 || manualSalvage) {
             Storage.mem[k] = merged;
-            if (srcL === 'en' && k === LANGS.en.key) Storage.mem.en = merged;
+            if (k === LANGS.en.key) Storage.mem.en = merged;
             try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
             await idbPut(k, merged);
           }
@@ -793,16 +921,142 @@
     const cfg = resolveConfig(l);
     const k = cfg.key;
     const pairId = cfg.pairId || cfg.key;
-    const srcLang = cfg.srcLang || keyToLang(k);
     const b = await idbFetchLangBundle(k, false);
     if (!b) return;
     if (b.clearAt > getClearedAt(k)) Storage.clearedAt[pairId] = b.clearAt;
     absorbTombArray(getTombstones(k), b.tombs);
-    const merged = mergeWords(ctx.getJson(k), b.words, srcLang, false);
-    Storage.mem[srcLang] = merged;
+    // srcLang ではなく k を渡し、Storage.mem[srcLang] への誤上書きを排除
+    const merged = mergeWords(ctx.getJson(k), b.words, k, false);
+    if (k === LANGS.en.key) Storage.mem.en = merged;
     Storage.mem[k] = merged;
     try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
     ctx.applyMerged(k, merged);
+  }
+
+  // --- 【項目6・9解決】日次AIクォータ管理 & トークン削減メトリクス ---
+  function pad2(n) {
+    return n < 10 ? '0' + n : String(n);
+  }
+
+  function getTodayString(date) {
+    const d = date instanceof Date && !isNaN(date.getTime()) ? date : new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  function calendarDayDiff(fromYmd, toYmd) {
+    const parse = (s) => {
+      const m = String(s || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return NaN;
+      return Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    };
+    const a = parse(fromYmd);
+    const b = parse(toYmd);
+    if (!Number.isFinite(a) || !Number.isFinite(b)) return NaN;
+    return Math.round((b - a) / 86400000);
+  }
+
+  function getDailyAiUsageInfo(options = {}) {
+    const today = getTodayString();
+    const lsGetFn = options.lsGet || lsGet;
+    const app = options.appState || global.App || {};
+    const used = parseInt(lsGetFn(`vv_ai_gen_daily_${today}`, '0'), 10) || 0;
+    const isPro = Boolean(app.isPro || options.isPro || (global.VocabSync?.isPro?.()));
+    const isDev = Boolean(app.isDev || options.isDev);
+    const getKeyFn = global.getKey || (() => '');
+    const isByok = Boolean(getKeyFn());
+
+    const isUnlimited = isPro || isDev || isByok;
+    const limit = 5;
+    let remaining = isUnlimited ? 9999 : Math.max(0, limit - used);
+
+    if (!isUnlimited && app.quotaRemaining !== undefined && app.quotaRemaining !== null) {
+      remaining = Math.min(remaining, app.quotaRemaining);
+    }
+
+    return {
+      limit,
+      used,
+      count: used,
+      remaining,
+      isUnlimited,
+      isPro,
+      isDev,
+      today
+    };
+  }
+
+  function recordAiGenerationUsage(count = 1, options = {}) {
+    const today = getTodayString();
+    const lsGetFn = options.lsGet || lsGet;
+    const lsSetFn = options.lsSet || lsSet;
+    const cur = parseInt(lsGetFn(`vv_ai_gen_daily_${today}`, '0'), 10) || 0;
+    const next = cur + Math.max(0, parseInt(count, 10) || 1);
+    lsSetFn(`vv_ai_gen_daily_${today}`, String(next));
+
+    const app = options.appState || global.App || {};
+    if (app.quotaRemaining !== undefined && app.quotaRemaining !== null && !app.isPro && !app.isDev) {
+      app.quotaRemaining = Math.max(0, app.quotaRemaining - count);
+    }
+
+    return getDailyAiUsageInfo(options);
+  }
+
+  function recordMetricsEvent(type, count = 1, options = {}) {
+    const lsGetFn = options.lsGet || lsGet;
+    const lsSetFn = options.lsSet || lsSet;
+    const c = Math.max(0, parseInt(count, 10) || 1);
+
+    const totalWords = (parseInt(lsGetFn('vv_metric_total_words', '0'), 10) || 0) + c;
+    lsSetFn('vv_metric_total_words', String(totalWords));
+
+    if (type === 'cache_hit') {
+      const cacheHits = (parseInt(lsGetFn('vv_metric_cache_hits', '0'), 10) || 0) + c;
+      lsSetFn('vv_metric_cache_hits', String(cacheHits));
+      const tokensSaved = (parseInt(lsGetFn('vv_metric_tokens_saved', '0'), 10) || 0) + (c * 800);
+      lsSetFn('vv_metric_tokens_saved', String(tokensSaved));
+    } else if (type === 'on_device') {
+      const onDev = (parseInt(lsGetFn('vv_metric_on_device', '0'), 10) || 0) + c;
+      lsSetFn('vv_metric_on_device', String(onDev));
+      const tokensSaved = (parseInt(lsGetFn('vv_metric_tokens_saved', '0'), 10) || 0) + (c * 800);
+      lsSetFn('vv_metric_tokens_saved', String(tokensSaved));
+    } else if (type === 'ai_gen') {
+      const cloudGen = (parseInt(lsGetFn('vv_metric_cloud_gen', '0'), 10) || 0) + c;
+      lsSetFn('vv_metric_cloud_gen', String(cloudGen));
+    }
+  }
+
+  function getMetricsSummary(options = {}) {
+    const lsGetFn = options.lsGet || lsGet;
+    const totalWords = parseInt(lsGetFn('vv_metric_total_words', '0'), 10) || 0;
+    const cacheHits = parseInt(lsGetFn('vv_metric_cache_hits', '0'), 10) || 0;
+    const onDevice = parseInt(lsGetFn('vv_metric_on_device', '0'), 10) || 0;
+    const cloudGen = parseInt(lsGetFn('vv_metric_cloud_gen', '0'), 10) || 0;
+    const tokensSaved = parseInt(lsGetFn('vv_metric_tokens_saved', '0'), 10) || 0;
+    const cacheRate = totalWords > 0 ? Math.round(((cacheHits + onDevice) / totalWords) * 100) : 0;
+
+    return {
+      totalWords,
+      cacheHits,
+      onDevice,
+      cloudGen,
+      tokensSaved,
+      cacheRate
+    };
+  }
+
+  function idbClearAll() {
+    Storage.mem = {};
+    Storage.tombstones = {};
+    Storage.clearedAt = {};
+    if (!Storage.dbInst) return Promise.resolve(false);
+    return new Promise(res => {
+      try {
+        const tx = Storage.dbInst.transaction('vaults', 'readwrite');
+        tx.objectStore('vaults').clear();
+        tx.oncomplete = () => res(true);
+        tx.onerror = tx.onabort = () => res(false);
+      } catch { res(false); }
+    });
   }
 
   global.VocabStorage = {
@@ -811,6 +1065,7 @@
     CATS,
     state: Storage,
     initDatabase,
+    idbClearAll,
     lsGet,
     lsSet,
     keyToLang,
@@ -840,7 +1095,18 @@
     idbGet,
     idbAddSnap,
     idbCommitLangData,
-    idbFetchLangBundle
+    threeWayMergeWords,
+    idbFetchLangBundle,
+    getTodayString,
+    calendarDayDiff,
+    getDailyAiUsageInfo,
+    recordAiGenerationUsage,
+    recordMetricsEvent,
+    getMetricsSummary,
+    cleanPho,
+    fmtPho,
+    WIKT_URL_RE,
+    sanitizeWiktUrl
   };
 
   // 即時初期化開始

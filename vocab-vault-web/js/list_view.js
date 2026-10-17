@@ -74,6 +74,7 @@
 
     const createCardFn = options.createCardElement || (global.VocabCardView ? global.VocabCardView.createCardElement : null);
     const finalNodes = [...loadingCards];
+    const usedNodes = new Set(loadingCards);
     const activeKeys = new Set();
 
     // 3. 現在ページの各アイテムを差分走査
@@ -89,6 +90,9 @@
       const rev = `${item.updatedAt || 0}:${item.interval || 0}:${item.nextReview || 0}:${vMode}:${qStr}:${item.folder || ''}:${options.crossLang ? '1' : '0'}`;
 
       let cardEl = (item.id && existingCardMap.get(item.id)) || existingCardMap.get(itemKey) || existingCardMap.get(item.word);
+      // [P2-2 解決] 同形異義語や横断検索時の同一DOMノード重複割り当て競合を完全防止
+      if (cardEl && usedNodes.has(cardEl)) cardEl = null;
+
       if (cardEl && cardEl.dataset?.rev === rev) {
         // [完全一致で再利用] 期日バッジ等の動的属性のみ軽量パッチ
         const dueEl = typeof cardEl.querySelector === 'function' ? cardEl.querySelector('.due') : null;
@@ -97,23 +101,34 @@
           dueEl.className = `due ${isDue ? 'is-due' : 'is-fut'}`;
           dueEl.textContent = global.VocabCardView.relTime(item.nextReview);
         }
+        usedNodes.add(cardEl);
         finalNodes.push(cardEl);
       } else {
         // [新規作成 または 内容変更時の再生成]
-        if (typeof createCardFn === 'function') {
-          const newCard = createCardFn(item, options);
-          if (newCard) {
-            if (newCard.dataset) {
-              newCard.dataset.id = item.id || '';
-              newCard.dataset.rev = rev;
+        try {
+          if (typeof createCardFn === 'function') {
+            const newCard = createCardFn(item, options);
+            if (newCard) {
+              if (newCard.dataset) {
+                newCard.dataset.id = item.id || '';
+                newCard.dataset.rev = rev;
+              }
+              if (cardEl && typeof cardEl.replaceWith === 'function') {
+                cardEl.replaceWith(newCard);
+              }
+              usedNodes.add(newCard);
+              finalNodes.push(newCard);
             }
-            if (cardEl && typeof cardEl.replaceWith === 'function') {
-              cardEl.replaceWith(newCard);
-            }
-            finalNodes.push(newCard);
+          } else if (cardEl) {
+            usedNodes.add(cardEl);
+            finalNodes.push(cardEl);
           }
-        } else if (cardEl) {
-          finalNodes.push(cardEl);
+        } catch (cardErr) {
+          console.warn('[reconcileList Error Barrier] Failed to create or replace card node:', cardErr, item);
+          if (cardEl) {
+            usedNodes.add(cardEl);
+            finalNodes.push(cardEl);
+          }
         }
       }
     });
@@ -166,6 +181,38 @@
     // 6. アクセシビリティ属性の補強
     if (typeof options.enhanceA11y === 'function') {
       options.enhanceA11y(listContainer);
+    }
+
+    // 7. 項目17: IntersectionObserver による仮想Windowing視覚監視
+    if (typeof setupCardVisibilityObserver === 'function') {
+      setupCardVisibilityObserver(listContainer);
+    }
+  }
+
+  let _cardObserver = null;
+  /**
+   * 項目17: 画面外カードのレンダリング負荷を最小化する仮想Windowingオブザーバー
+   */
+  function setupCardVisibilityObserver(container) {
+    if (typeof IntersectionObserver === 'undefined' || !container) return null;
+    try {
+      if (_cardObserver) _cardObserver.disconnect();
+      _cardObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.target?.classList) {
+            entry.target.classList.toggle('in-view', entry.isIntersecting);
+          }
+        });
+      }, {
+        root: null,
+        rootMargin: '300px 0px 300px 0px',
+        threshold: 0.01
+      });
+      const cards = typeof container.querySelectorAll === 'function' ? container.querySelectorAll('.card') : [];
+      cards.forEach(c => _cardObserver.observe(c));
+      return _cardObserver;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -238,7 +285,8 @@
 
     // 空状態のハンドリング
     if (!f.length && !hasLoadingCards) {
-      list.innerHTML = `<div class="empty"><span>単語がありません</span><p>${appState.q || parts.length ? '条件に一致する単語が見つかりませんでした。<br><button type="button" class="btn-o" style="margin-top:10px;font-size:12px" data-act="reset-filter">フィルタを解除する</button>' : '上のバーから単語・熟語・例文を入力して登録してください。<br><button type="button" class="btn-ac" style="margin-top:12px;font-size:13px;padding:8px 18px" onclick="loadStarterPack()">厳選スターターパック（20選）を読み込む</button>'}</p></div>`;
+      const hasFilter = Boolean((appState.q && appState.q.trim()) || (appState.qStr && appState.qStr.trim()) || parts.length);
+      list.innerHTML = `<div class="empty"><span>単語がありません</span><p>${hasFilter ? '条件に一致する単語が見つかりませんでした。<br><button type="button" class="btn-o" style="margin-top:10px;font-size:12px" data-act="reset-filter">フィルタを解除する</button>' : '上のバーから単語を入力して登録するか、厳選された学術スターターパックから即座に学習を開始できます：<br><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;"><button type="button" class="btn-ac" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="academic">学術・教養コア（20選）</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="classical_roots">古典語根マスター（20選）</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="philosophy">西洋哲学・人文学（20選）</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="open-starter-modal">すべてのパックを見る...</button></div>'}</p></div>`;
       pag.innerHTML = '';
       return;
     }
@@ -412,22 +460,45 @@
     );
     const perPage = (ctx.perPage && Number.isFinite(ctx.perPage)) ? ctx.perPage : ((appState.per && Number.isFinite(appState.per)) ? appState.per : 30);
     const targetPage = itemIndex >= 0 ? Math.floor(itemIndex / perPage) + 1 : 1;
+    if (switchLang) {
+      const srcSel = $('srcLangSel');
+      const tgtSel = $('tgtLangSel');
+      if (srcSel && appState.srcLang) srcSel.value = appState.srcLang;
+      if (tgtSel && appState.tgtLang) tgtSel.value = appState.tgtLang;
+    }
 
     appState.page = targetPage;
     if (typeof ctx.onRender === 'function') ctx.onRender();
 
+    // ブラウザURLの同期（?w=単語&lang=言語）: Web版でURLを共有・再読込・ブックマークしても同一単語へ即座に復元
+    if (typeof window !== 'undefined' && window.history && typeof window.history.replaceState === 'function' && window.location && window.location.protocol !== 'file:') {
+      try {
+        const u = new URL(window.location.href);
+        u.searchParams.set('w', targetWord);
+        if (sLang && sLang !== 'en') u.searchParams.set('lang', sLang);
+        else u.searchParams.delete('lang');
+        window.history.replaceState(null, '', u.toString());
+      } catch {}
+    }
+
     const scrollHelper = global.VocabCardView?.scrollToCard;
     const findHelper = global.VocabCardView?.findCardElement;
+    const targetId = targetItem?.id || null;
+
+    function attemptScroll(retries) {
+      const cards = (typeof document !== 'undefined') ? [...document.querySelectorAll('#list .card')] : [];
+      const el = findHelper ? findHelper(cards, targetWord, targetLk, baseTargetLk, targetId) : null;
+      if (el && scrollHelper) {
+        scrollHelper(el, $('mainScroll'));
+      } else if (retries > 0) {
+        setTimeout(() => attemptScroll(retries - 1), 60);
+      }
+    }
+
     if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => {
-        const cards = [...document.querySelectorAll('#list .card')];
-        const el = findHelper ? findHelper(cards, targetWord, targetLk, baseTargetLk) : null;
-        if (el && scrollHelper) {
-          scrollHelper(el, $('mainScroll'));
-        } else {
-          $('mainScroll')?.scrollTo?.({ top: 0, behavior: 'smooth' });
-        }
-      });
+      requestAnimationFrame(() => attemptScroll(3));
+    } else {
+      setTimeout(() => attemptScroll(3), 20);
     }
   }
 
@@ -438,6 +509,7 @@
     load,
     hasActiveFilters,
     resetFilters,
-    jumpToWord
+    jumpToWord,
+    setupCardVisibilityObserver
   };
 })(typeof window !== 'undefined' ? window : globalThis);

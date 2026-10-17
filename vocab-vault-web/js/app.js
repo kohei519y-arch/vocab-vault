@@ -6,28 +6,35 @@
 
   // --- 0. グローバル・エラー防壁 (Global Error Boundary & Crash Barrier) ---
   if (typeof window !== 'undefined' && window.addEventListener) {
+    const isHarmlessError = msg => {
+      const s = String(msg || '');
+      return s.includes('ResizeObserver') ||
+             s.includes('Script error') ||
+             s.includes('chrome-extension://') ||
+             s.includes('moz-extension://') ||
+             s.includes('safari-extension://');
+    };
+
     window.addEventListener('error', function(event) {
+      const msg = event?.error?.message || event?.message || '';
       console.warn('[Global Error Boundary]', event.error || event.message);
-      if (typeof showToast === 'function' && event.error?.message) {
-        showToast(`軽微な例外を安全に処理しました: ${event.error.message.slice(0, 45)}`, 'info', 3000);
-      }
+      if (isHarmlessError(msg)) return;
     });
     window.addEventListener('unhandledrejection', function(event) {
+      const msg = event?.reason?.message || String(event?.reason || '');
       console.warn('[Global Unhandled Rejection]', event.reason);
-      if (typeof showToast === 'function' && event.reason?.message) {
-        showToast(`通信状態の警告: ${event.reason.message.slice(0, 45)}`, 'info', 3000);
-      }
+      if (isHarmlessError(msg)) return;
     });
   }
 
   const EMBEDDED_KEY = "";
   const PROMPT_VERSION = '2026-10-f';
-  const WIKT_URL_RE = /^https:\/\/[a-z0-9-]+\.wiktionary\.org\/wiki\/[^\s"<>`'\\]+$/i;
+  const WIKT_URL_RE = global.VocabStorage?.WIKT_URL_RE || /^https:\/\/[a-z0-9-]+\.wiktionary\.org\/wiki\/[^\s"<>`\\]+$/i;
   const $ = id => document.getElementById(id);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-  const cleanPho = p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim();
-  const fmtPho = p => { const c = cleanPho(p); return c ? `[ ${c} ]` : ''; };
+  const cleanPho = global.VocabStorage?.cleanPho || (p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim());
+  const fmtPho = global.VocabStorage?.fmtPho || (p => { const c = cleanPho(p); return c ? `[ ${c} ]` : ''; });
   const foldAscii = s => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/œ/g, 'oe').replace(/æ/g, 'ae').replace(/ß/g, 'ss');
 
   const FOLD_CHAR_MAP = global.VocabSearch?.FOLD_CHAR_MAP || {};
@@ -247,7 +254,7 @@
       if (global.VocabStorage) global.VocabStorage.state.loadFailed[storageKey] = true;
       updateStorageStatusUI('error', `${storageKey}のLSデータが破損しています。IDBからの自動復旧を待機中です`);
     }
-    const merged = mergeWords(parsed, [], l, false);
+    const merged = mergeWords(parsed, [], storageKey, false);
     if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = merged;
     return merged;
   }
@@ -256,6 +263,26 @@
     if (!App.aList.length) return;
     const byId = new Map(latestList.map(x => [x.id, x]));
     App.aList = App.aList.map(item => ((item.lang || App.lang) === l && byId.has(item.id)) ? byId.get(item.id) : item);
+  }
+
+  // 書き込み競合防止のための世代管理マップ
+  const _storageWriteSeq = new Map();
+  // 3-way マージ用 base インデックス (key -> { ref, ids, wks })。
+  // 配列参照が変わった時点 (= 初見時) の id/wordKey を記録するため、呼び出し側が mem 配列を
+  // in-place で splice してから setJson しても「自タブで削除した項目」を正しく識別できる。
+  const _baseIdx = new Map();
+  function noteBase(key, arr, reset = false) {
+    const cur = _baseIdx.get(key);
+    if (!reset && cur && cur.ref === arr) return cur;
+    const ids = new Set(), wks = new Set();
+    (Array.isArray(arr) ? arr : []).forEach(it => {
+      if (!it) return;
+      if (it.id) ids.add(it.id);
+      if (it.wordKey) wks.add(it.wordKey);
+    });
+    const idx = { ref: arr, ids, wks };
+    _baseIdx.set(key, idx);
+    return idx;
   }
 
   function setJson(k, v, allowEmpty = false, force = false, skipCloudTrigger = false) {
@@ -270,9 +297,24 @@
     const next = (Array.isArray(v) ? v : []).map((it, i) => sanitizeItem(it, i, l)).filter(Boolean);
     if (!allowEmpty && !next.length && prev.length) return;
     if (prev.length && prev.length > next.length && global.VocabStorage) global.VocabStorage.idbAddSnap(storageKey, prev);
+
+    // base = 記録済みインデックス ∪ 現在の prev (in-place 変更前の項目も保持)
+    const baseRec = noteBase(storageKey, prev);
+    const base = { ids: new Set(baseRec.ids), wks: new Set(baseRec.wks) };
+    prev.forEach(it => {
+      if (!it) return;
+      if (it.id) base.ids.add(it.id);
+      if (it.wordKey) base.wks.add(it.wordKey);
+    });
+
+    // 書き込み世代番号をインクリメント
+    const seq = (_storageWriteSeq.get(storageKey) || 0) + 1;
+    _storageWriteSeq.set(storageKey, seq);
+
     if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = next;
+    noteBase(storageKey, next, true);
     const curPairKey = getActivePairConfig().key;
-    if (storageKey === curPairKey || l === App.lang) App.entries = next;
+    if (storageKey === curPairKey) App.entries = next;
     syncAnkiReferences(l, next);
     if (global.VocabStorage) global.VocabStorage.state.loadFailed[storageKey] = false;
 
@@ -287,11 +329,23 @@
     }
 
     if (global.VocabStorage) {
-      global.VocabStorage.idbCommitLangData(storageKey, next, force).then(({ ok: idbOk, data: mergedData }) => {
+      // [P1 TOCTOU 修正] 強制上書きを廃止。このタブの書込前メモリ(prev)を base とした 3-way マージを
+      // 単一 readwrite トランザクション内で実行し、他タブの更新を消さず、かつ自タブの削除も復活させない。
+      global.VocabStorage.idbCommitLangData(storageKey, next, false, base).then(({ ok: idbOk, data: mergedData, changed }) => {
+        // この非同期処理の待機中に別の新しい setJson が走っていた場合は、古いデータでの上書きをスキップ
+        if (_storageWriteSeq.get(storageKey) !== seq) return;
+
         if (idbOk) {
           global.VocabStorage.state.mem[storageKey] = mergedData;
-          if (storageKey === curPairKey || l === App.lang) App.entries = mergedData;
+          if (storageKey === getActivePairConfig().key) App.entries = mergedData;
           syncAnkiReferences(l, mergedData);
+          noteBase(storageKey, mergedData, true);
+          if (changed && lsOk) {
+            try { localStorage.setItem(storageKey, JSON.stringify(mergedData)); } catch {}
+          }
+          if (changed && storageKey === getActivePairConfig().key && $('anki')?.style.display !== 'block') {
+            try { load(App.page || 1); } catch {}
+          }
           if (!lsOk) {
             global.VocabStorage.state.idbOnlyMode = true;
             try { localStorage.removeItem(storageKey); } catch {}
@@ -370,6 +424,9 @@
   const getAllKnownPairConfigs = () => global.VocabSearch ? global.VocabSearch.getAllKnownPairConfigs(App) : [];
 
   function setLanguagePair(src, tgt) {
+    if (global.VocabSpeech?.stopAudioPlaylist) {
+      global.VocabSpeech.stopAudioPlaylist();
+    }
     const s = String(src || 'en').toLowerCase();
     const t = String(tgt || 'ja').toLowerCase();
     const isLangChanged = (s !== App.srcLang || t !== App.tgtLang);
@@ -393,7 +450,19 @@
 
     if ($('anki')?.style.display === 'block') exitAnki();
     if (window.innerWidth <= 768) closeSidebar();
-    load(1);
+
+    const curPairCfg = getActivePairConfig();
+    const curItems = getJson(curPairCfg.key);
+    const pairId = curPairCfg.pairId || `${s}_${t}`;
+    const cleared = global.VocabStorage ? global.VocabStorage.getClearedAt(curPairCfg.key) : 0;
+    const starterLoaded = lsGet(`vv_starter_loaded_${pairId}`) === '1';
+
+    if ((!curItems || curItems.length === 0) && !cleared && !starterLoaded) {
+      lsSet(`vv_starter_loaded_${pairId}`, '1');
+      loadStarterPack();
+    } else {
+      load(1);
+    }
   }
 
   function swapLanguagePair() {
@@ -475,18 +544,102 @@
     render();
   }
 
-  function loadStarterPack() {
+  function loadStarterPack(packType = 'academic') {
     if (!global.VocabStarterPack?.populateStarterPack) return;
+    let actualPackType = packType;
+    if (packType === 'academic') {
+      if (App.lang === 'fr') actualPackType = 'fr_pre1';
+      else if (App.lang === 'de') actualPackType = 'de_pre1';
+    }
     const pairCfg = getActivePairConfig();
     const cur = getJson(pairCfg.key);
-    const { added, merged } = global.VocabStarterPack.populateStarterPack(cur, App.lang);
+    const { added, merged } = global.VocabStarterPack.populateStarterPack(cur, App.lang, actualPackType, pairCfg.key);
     if (!added.length) {
-      showToast('スターターパックの単語はすべて登録済みです。', 'info', 3000);
+      showToast('選択したパックの単語はすべて登録済みです。', 'info', 3000);
       return;
     }
     setJson(pairCfg.key, merged);
+    const pairId = pairCfg.pairId || `${App.srcLang}_${App.tgtLang}`;
+    lsSet(`vv_starter_loaded_${pairId}`, '1');
     load(1);
-    showToast(`厳選スターターパック（${added.length}語）を読み込みました！`, 'ok', 3500);
+    const meta = global.VocabStarterPack?.PACK_METADATA?.[actualPackType];
+    const pName = meta ? meta.name : (actualPackType === 'classical_roots' ? 'ラテン・ギリシャ古典語根マスター' : (actualPackType === 'philosophy' ? '西洋哲学・人文学キーコンセプト' : '厳選スターターパック'));
+    showToast(`「${pName}」（${added.length}語）を読み込みました！`, 'ok', 3500);
+
+    // オンボーディングツアー判定をトリガー
+    setTimeout(() => {
+      checkOnboardingReviewTrigger();
+    }, 800);
+  }
+
+  // --- 【項目3解決】新規登録 → 初回復習 オンボーディング自動誘導 ---
+  function checkOnboardingReviewTrigger() {
+    if (lsGet('vv_onboarding_anki_done') === '1') return;
+    const entries = App.entries || [];
+    if (entries.length < 3) return;
+    const hasReviewedAny = entries.some(e => (Number(e.repetition) || 0) > 0);
+    if (hasReviewedAny) {
+      lsSet('vv_onboarding_anki_done', '1');
+      return;
+    }
+    showOnboardingReviewTour();
+  }
+
+  function showOnboardingReviewTour() {
+    const existing = $('onboardingTourModal');
+    if (existing) {
+      existing.classList.add('open');
+      return;
+    }
+    if (typeof document === 'undefined') return;
+    const modalEl = document.createElement('div');
+    modalEl.id = 'onboardingTourModal';
+    modalEl.className = 'modal-ov open';
+    modalEl.setAttribute('role', 'dialog');
+    modalEl.setAttribute('aria-modal', 'true');
+    modalEl.setAttribute('aria-labelledby', 'onboardingTourTitle');
+    modalEl.innerHTML = `
+      <div class="modal-box" style="max-width:440px;text-align:center;padding:26px 22px;">
+        <div style="margin-bottom:14px;display:flex;justify-content:center">
+          <div style="width:48px;height:48px;border-radius:12px;background:rgba(99,102,241,0.12);color:var(--ac);display:flex;align-items:center;justify-content:center">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+            </svg>
+          </div>
+        </div>
+        <h3 id="onboardingTourTitle" style="margin:0 0 10px 0;font-size:18px;font-weight:700;">30秒クイック復習ツアーへようこそ</h3>
+        <p style="font-size:13px;color:var(--s);line-height:1.6;margin-bottom:22px;">
+          単語が登録されました！<br>
+          エビングハウス忘却曲線によると、学習直後〜数分以内の<strong>「ファースト・リコール（30秒復習）」</strong>で定着率は劇的に跳ね上がります。<br>
+          新しくなった高速復習モードを体験してみませんか？
+        </p>
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button type="button" class="btn-ac" id="btnStartTourReview" style="padding:10px 20px;font-weight:600;font-size:13px;">今すぐ30秒復習を体験</button>
+          <button type="button" class="btn-o" id="btnSkipTourReview" style="padding:10px 16px;font-size:13px;">あとで行う</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modalEl);
+
+    const dismissTour = (startReview) => {
+      modalEl.classList.remove('open');
+      lsSet('vv_onboarding_anki_done', '1');
+      document.removeEventListener('keydown', onTourKeydown);
+      if (startReview) startAnki();
+    };
+    function onTourKeydown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        dismissTour(false);
+      }
+    }
+    $('btnStartTourReview')?.addEventListener('click', () => dismissTour(true));
+    $('btnSkipTourReview')?.addEventListener('click', () => dismissTour(false));
+    modalEl.addEventListener('click', (e) => {
+      if (e.target === modalEl) dismissTour(false);
+    });
+    document.addEventListener('keydown', onTourKeydown);
+    $('btnStartTourReview')?.focus();
   }
 
   /**
@@ -500,8 +653,8 @@
   /**
    * DOM上のカード一覧から指定単語の要素を特定（キー・生単語・見出し語の多重照合）
    */
-  function findCardElement(cards, targetWord, targetLk, baseTargetLk) {
-    return global.VocabCardView ? global.VocabCardView.findCardElement(cards, targetWord, targetLk, baseTargetLk) : null;
+  function findCardElement(cards, targetWord, targetLk, baseTargetLk, targetId = null) {
+    return global.VocabCardView ? global.VocabCardView.findCardElement(cards, targetWord, targetLk, baseTargetLk, targetId) : null;
   }
 
   function jumpToWord(w, tLang = App.lang) {
@@ -742,7 +895,19 @@
   }
 
   function updStats() {
-    if ($('dataStatText')) $('dataStatText').textContent = `登録数: ${LANG_KEYS.map(l => `${LANGS[l].short}${getJson(LANGS[l].key).length}語`).join(' / ')}`;
+    if ($('dataStatText')) {
+      const allPairs = typeof getAllKnownPairConfigs === 'function' ? getAllKnownPairConfigs() : [];
+      const stats = allPairs
+        .map(cfg => {
+          const count = getJson(cfg.key).length;
+          return count > 0 ? `${cfg.short || cfg.label || cfg.key}:${count}語` : null;
+        })
+        .filter(Boolean);
+      const totalCount = allPairs.reduce((acc, cfg) => acc + (getJson(cfg.key)?.length || 0), 0);
+      $('dataStatText').textContent = stats.length > 0
+        ? `総登録数: ${totalCount}語 (${stats.join(' / ')})`
+        : `登録数: ${LANG_KEYS.map(l => `${LANGS[l].short}${getJson(LANGS[l].key).length}語`).join(' / ')}`;
+    }
     const lastBk = lsGet('vv_last_backup_at', '');
     if ($('lastBackupText')) $('lastBackupText').textContent = lastBk ? `最終JSONバックアップ: ${lastBk}` : '最終JSONバックアップ: 未実行（定期的なJSON保存を推奨）';
   }
@@ -881,12 +1046,28 @@
     getList: key => (key === getActivePairConfig().key ? App.entries : getJson(key)),
     saveList: (key, list) => {
       setJson(key, list, true, false);
-      if (global.VocabStorage) global.VocabStorage.state.mem[key] = list;
     },
     findAcrossAllPairs: cur => {
-      for (const p of getAllKnownPairConfigs()) {
+      if (!cur) return null;
+      const matchEntry = (x, pairSrc) => {
+        if (!x) return false;
+        if (cur.id && x.id) return x.id === cur.id;
+        if (cur.wordKey && x.wordKey) return x.wordKey === cur.wordKey;
+        const xLang = x.lang || pairSrc;
+        if (cur.word && x.word) {
+          const sameLang = !cur.lang || !xLang || xLang === cur.lang;
+          const sameHomo = (Number(x.homographIndex) || 1) === (Number(cur.homographIndex) || 1);
+          return x.word === cur.word && sameLang && sameHomo;
+        }
+        return (!cur.id && !cur.word && x.num === cur.num && (!cur.lang || !xLang || xLang === cur.lang));
+      };
+      const allPairs = getAllKnownPairConfigs();
+      const ordered = cur.lang
+        ? [...allPairs.filter(p => p.src === cur.lang), ...allPairs.filter(p => p.src !== cur.lang)]
+        : allPairs;
+      for (const p of ordered) {
         const otherList = [...getJson(p.key)];
-        const found = otherList.find(x => (cur.id && x.id === cur.id) || (cur.word && x.word === cur.word) || x.num === cur.num);
+        const found = otherList.find(x => matchEntry(x, p.src));
         if (found) return { entry: found, pairKey: p.key, list: otherList };
       }
       return null;
@@ -940,10 +1121,13 @@
   function getFocusedCardItem() {
     if (global.VocabNavigation?.getFocusedCardItem) {
       const cards = $$('#list .card');
+      const activePairKey = getActivePairConfig().key;
       return global.VocabNavigation.getFocusedCardItem(
         App.focusedCardIndex,
         cards,
-        tL => getJson(LANGS[tL]?.key || LANGS.en.key),
+        tL => (!App.crossLang || !tL || tL === App.srcLang)
+          ? getJson(activePairKey)
+          : getJson(LANGS[tL]?.key || activePairKey),
         App.lang,
         makeLookupKey
       );
@@ -954,10 +1138,15 @@
   function delW(idOrNum, tL = App.lang, skipConfirm = false) {
     if (!skipConfirm && !confirm('この単語を削除しますか？')) return;
 
-    const targetKey = (tL && LANGS[tL]?.key && !App.crossLang) ? LANGS[tL].key : getActivePairConfig().key;
+    const activePairCfg = getActivePairConfig();
+    // [NEW-P0-3 修正] 横断検索中でない限り、常に現在開いている言語ペアのストレージキー (activePairCfg.key) を対象とする
+    const targetKey = (!App.crossLang || !tL || tL === App.srcLang)
+      ? activePairCfg.key
+      : (LANGS[tL]?.key || activePairCfg.key);
+
     const getList = () => {
       const l = getJson(targetKey);
-      return (!l.length && App.entries.length) ? App.entries : l;
+      return (!l.length && App.entries.length && targetKey === activePairCfg.key) ? App.entries : l;
     };
     const rescueOtherPairs = id => {
       for (const p of getAllKnownPairConfigs()) {
@@ -966,7 +1155,8 @@
         const idx = other.findIndex(i => (typeof id === 'string' && id && (i.id === id || i.word === id)) || (Number.isFinite(n) && n > 0 && Number(i.num) === n));
         if (idx !== -1) {
           const tgt = { ...other[idx], isDeleted: true, updatedAt: Date.now() };
-          global.VocabStorage?.recordTombstone(tgt, p.src, tgt.updatedAt);
+          // [NEW-P0-3 修正] p.src ではなく p.key (ペア専用ストレージキー) に墓石を記録
+          global.VocabStorage?.recordTombstone(tgt, p.key, tgt.updatedAt);
           setJson(p.key, other.filter((_, i) => i !== idx).map((it, i) => ({ ...it, num: i + 1 })), true, true);
           break;
         }
@@ -974,10 +1164,10 @@
       load(App.page);
       return null;
     };
-    const target = global.VocabStorage?.deleteWord(idOrNum, tL, getList, nextList => {
+    // [NEW-P0-3 修正] 第2引数に tL ではなく targetKey を渡す
+    const target = global.VocabStorage?.deleteWord(idOrNum, targetKey, getList, nextList => {
       setJson(targetKey, nextList, true, true);
-      App.entries = nextList;
-      if (global.VocabStorage) global.VocabStorage.state.mem[targetKey] = nextList;
+      if (targetKey === activePairCfg.key) App.entries = global.VocabStorage?.state?.mem?.[targetKey] || nextList;
     }, rescueOtherPairs);
     if (!target) return;
     if (App.aList.length) App.aList = App.aList.filter(item => item.id !== target.id && item.word !== target.word);
@@ -1112,7 +1302,14 @@
     bindWindowEvents();
     await initStorageAndSync(false);
     if (!App.entries || !App.entries.length) {
-      loadStarterPack();
+      const curPairCfg = getActivePairConfig();
+      const pairId = curPairCfg.pairId || `${App.srcLang}_${App.tgtLang}`;
+      const cleared = global.VocabStorage ? global.VocabStorage.getClearedAt(curPairCfg.key) : 0;
+      const starterLoaded = lsGet(`vv_starter_loaded_${pairId}`) === '1';
+      if (!cleared && !starterLoaded) {
+        lsSet(`vv_starter_loaded_${pairId}`, '1');
+        loadStarterPack();
+      }
     }
     updKeyUI();
     updCloudUI();
@@ -1120,7 +1317,7 @@
     if (getKey()) fetchModels(getKey()).then(() => processQueue()).catch(() => {});
     else if (global.VocabSync?.isCloudReady?.()) processQueue();
 
-    // PWA起動モードの確認
+    // PWA起動モードおよびURLディープリンク (?w=単語, ?word=単語, ?q=検索クエリ, #単語) の確認
     const urlParams = (typeof URLSearchParams !== 'undefined' && window.location?.search)
       ? new URLSearchParams(window.location.search)
       : { get: () => null };
@@ -1130,8 +1327,47 @@
       setTimeout(() => openExtractModal(), 250);
     }
 
+    const initialJumpWord = urlParams.get('w') || urlParams.get('word') || (typeof window !== 'undefined' && window.location?.hash ? decodeURIComponent(window.location.hash.replace(/^#/, '')).trim() : null);
+    const initialJumpLang = urlParams.get('lang') || App.lang;
+    const initialSearchQ = urlParams.get('q');
+    if (initialJumpWord) {
+      setTimeout(() => {
+        jumpToWord(initialJumpWord, initialJumpLang);
+      }, 300);
+    } else if (initialSearchQ) {
+      setTimeout(() => {
+        setSearch(initialSearchQ);
+      }, 300);
+    }
+
     if (global.VocabOCR?.initOcrEvents) {
       global.VocabOCR.initOcrEvents();
+    }
+
+    setTimeout(() => {
+      checkOnboardingReviewTrigger();
+    }, 1200);
+
+    // 観点1: 忘却臨界点スマートPush通知スケジューラの起動（全言語ペア対象・起動3秒後および定期1時間）
+    if (global.VocabSRS?.checkSmartNotificationSchedule) {
+      const collectAllPairsEntries = () => {
+        const all = [];
+        try {
+          const pairs = getAllKnownPairConfigs();
+          pairs.forEach(cfg => {
+            const arr = getJson(cfg.key);
+            if (Array.isArray(arr) && arr.length) all.push(...arr);
+          });
+        } catch {}
+        return all.length ? all : (App.entries || []);
+      };
+
+      setTimeout(() => {
+        try { global.VocabSRS.checkSmartNotificationSchedule(collectAllPairsEntries()); } catch {}
+      }, 3000);
+      setInterval(() => {
+        try { global.VocabSRS.checkSmartNotificationSchedule(collectAllPairsEntries()); } catch {}
+      }, 3600000);
     }
   }
 
@@ -1179,6 +1415,7 @@
     importJSON,
     getJson,
     setJson,
+    getAppState: () => App,
     exportAnkiTSV,
     exportObsidianMarkdown,
     startAnki,
@@ -1241,12 +1478,18 @@
     openStripePortal: () => global.VocabSync?.openStripePortal?.(),
     setViewMode,
     loadStarterPack,
+    checkOnboardingReviewTrigger,
+    showOnboardingReviewTour,
     toggleDevMasterMode,
     checkDevMasterMode,
     clearOcrPreview,
     runOcrCurrentFile,
     saveOcrKeyAndExecute,
     getFiltered,
+    openAnalyticsModal: () => global.VocabAnkiView?.openAnalyticsModal?.(),
+    closeAnalyticsModal: () => global.VocabAnkiView?.closeAnalyticsModal?.(),
+    requestSmartNotifyPermission: () => global.VocabModal?.requestSmartNotifyPermission?.(),
+    updateSmartNotifyUI: () => global.VocabModal?.updateSmartNotifyUI?.(),
     initApp
   };
 

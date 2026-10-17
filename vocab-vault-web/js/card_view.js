@@ -6,9 +6,22 @@
   'use strict';
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-  const cleanPho = p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim();
-  const fmtPho = p => { const c = cleanPho(p); return c ? `[ ${c} ]` : ''; };
-  const sanitizeWiktUrl = url => (typeof url === 'string' && /^https?:\/\/[a-z0-9\-.]*wiktionary\.org\//i.test(url.trim())) ? url.trim() : undefined;
+  const cleanPho = global.VocabStorage?.cleanPho || (p => String(p ?? '').replace(/^[\[/\s]+/, '').replace(/[\]/\s]+$/, '').trim());
+  const fmtPho = global.VocabStorage?.fmtPho || (p => { const c = cleanPho(p); return c ? `[ ${c} ]` : ''; });
+  const WIKT_ANCHORS = {
+    en: '#Etymology',
+    fr: '#%C3%89tymologie',
+    de: '#Herkunft',
+    ja: '#%E8%AA%9E%E6%BA%90'
+  };
+
+  const sanitizeWiktUrl = (url, lang = 'en') => {
+    if (typeof url !== 'string' || !/^https?:\/\/[a-z0-9\-.]*wiktionary\.org\//i.test(url.trim())) return undefined;
+    const clean = url.trim();
+    if (clean.includes('#')) return clean;
+    const anchor = WIKT_ANCHORS[lang] || WIKT_ANCHORS.en;
+    return `${clean}${anchor}`;
+  };
 
   const ETY_CONF_LABELS = { certain: '確実', probable: '有力', disputed: '諸説', unknown: '語源不明' };
 
@@ -52,9 +65,6 @@
    * 意味・語源・歴史文脈のコンパクト整形
    */
   function formatMeaningAndEty(d) {
-    if (global.VocabExport && typeof global.VocabExport.formatMeaningAndEty === 'function') {
-      return global.VocabExport.formatMeaningAndEty(d);
-    }
     const raw = String(d.etymology || '').trim(), meanings = d.meanings || [];
     const hn = String(d.history_note || '').trim();
     const histDigest = hn ? (hn.startsWith('（') ? hn : `（${hn}）`) : '';
@@ -97,6 +107,7 @@
     const iL = d.lang || options.lang || global.App?.lang || 'en';
     const { meanings, histDigest, compactEty, isLongEty } = formatMeaningAndEty(d);
     const mHtml = meanings.map((x, idx) => `<div class="pos-block"><span class="pos">${esc(x.pos)}</span><span class="m-red" data-act="reveal-mask">${hlText(x.text, false, qReg)}${idx === meanings.length - 1 && histDigest ? `<span class="m-hist-note">${hlText(histDigest, false, qReg)}</span>` : ''}</span></div>`).join('');
+    const coreHtml = d.core ? `<div class="core-box" data-act="reveal-mask"><span class="core-badge">コア</span><span class="core-text">${hlText(d.core, false, qReg)}</span></div>` : '';
 
     const hn = String(d.history_note || '').trim();
     const histHtml = hn ? `<div class="hist-box" data-act="reveal-mask"><span class="hist-badge">歴史・文脈</span><span>${hlText(hn, false, qReg)}</span></div>` : '';
@@ -113,11 +124,12 @@
       return `<div><div class="sub-h">${spkFn(x.word, iL, true)}<strong>${hlText(x.word, false, qReg)}</strong> <span style="font-family:var(--mono);font-size:11px;color:var(--s)">${esc(fmtPho(x.phonetic))}</span><span class="pos-lbl">${esc(x.pos)}</span><span class="sub-m">${hlText(x.meaning, false, qReg)}</span></div>${sub}</div>`;
     }).join('');
 
-    const coreHtml = d.core ? `<div class="core-box" data-act="reveal-mask">コア: ${hlText(d.core, false, qReg)}</div>` : '';
-    const safeUrl = sanitizeWiktUrl(d.wiktUrl);
+    const safeUrl = sanitizeWiktUrl(d.wiktUrl, iL);
     const wiktPill = (d.wiktGrounded && safeUrl) ? `<a class="wikt-pill" href="${esc(safeUrl)}" target="_blank" rel="noopener noreferrer" title="Wiktionaryの言語セクションおよび語源・発音資料と照合済み (CC BY-SA)">Wiktionary裏付</a>` : '';
-    const confPill = d.etymologyConfidence && ETY_CONF_LABELS[d.etymologyConfidence] ? `<span class="conf-pill ${esc(d.etymologyConfidence)}">${esc(ETY_CONF_LABELS[d.etymologyConfidence])}</span>` : '';
-    const etyHtml = compactEty ? `<div class="ety ${isLongEty ? 'clamp' : ''}" ${isLongEty ? 'data-act="toggle-clamp"' : ''}>${wiktPill}${confPill}${hlText(compactEty, false, qReg)}</div>` : '';
+    const confKey = (d.etymologyConfidence && ETY_CONF_LABELS[d.etymologyConfidence]) ? d.etymologyConfidence : (compactEty ? 'probable' : 'unknown');
+    const confPill = `<span class="conf-pill ${esc(confKey)}" title="語源の学術的確度: ${esc(ETY_CONF_LABELS[confKey])}">${esc(ETY_CONF_LABELS[confKey])}</span>`;
+    const reportBtn = compactEty ? `<button type="button" class="report-ety-btn" data-act="report-ety" data-word="${esc(d.word)}" data-lang="${esc(iL)}" data-ety="${esc(compactEty)}" title="語源の誤り・修正を報告" aria-label="語源報告"><svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg><span>誤り報告</span></button>` : '';
+    const etyHtml = (compactEty || wiktPill) ? `<div class="ety ${isLongEty ? 'clamp' : ''}" ${isLongEty ? 'data-act="toggle-clamp"' : ''}>${wiktPill}${confPill}${hlText(compactEty, false, qReg)}${reportBtn}</div>` : '';
 
     const { chipItems, sameList, crossList } = collectEtyPeers(d, rootIndexMap);
     const chipsHtml = chipItems.map(c => `<span class="root-chip-wrap"><span class="root-chip ${c.count ? 'has-rel' : ''} ${c.hasCog ? 'has-cog' : ''}" data-act="search-root" data-query="${esc(c.key)}" data-xlang="${c.hasCog ? '1' : '0'}" title="リストで絞り込み">${hlText(c.tag, false, qReg)}${c.count ? `<span class="cnt ${c.hasCog ? 'cog-cnt' : ''}">${c.hasCog ? '3言語:' : ''}${c.count + 1}</span>` : ''}</span><button type="button" class="root-graph-btn" data-act="open-graph" data-root="${esc(c.key)}" title="「${esc(c.tag)}」の語根ネットワークを開く" aria-label="語根グラフ表示">${graphSvg}</button></span>`).join('');
@@ -127,12 +139,15 @@
     const netHtml = (chipsHtml || sLnk || cLnk) ? `<div class="ety-net">${chipsHtml}${sLnk}${cLnk}</div>` : '';
     const flagHtml = d.flags?.length ? `<div class="ety-net"><span class="conf-pill unknown" title="${esc(d.flags.join(' / '))}">要確認 ${d.flags.length}</span><span class="ety-lbl">${esc(d.flags.join(' / '))}</span></div>` : '';
 
+    const matrix = global.VocabMorphology?.buildCognateMatrix ? global.VocabMorphology.buildCognateMatrix(d, rootIndexMap) : null;
+    const matrixHtml = matrix ? (global.VocabMorphology?.renderCognateMatrixHtml ? global.VocabMorphology.renderCognateMatrixHtml(matrix) : '') : '';
+
     const panelHist = histHtml;
     const panelEx = `${exHtml}${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}`;
     const panelDrv = drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : '';
-    const panelEty = `${coreHtml}${etyHtml}${netHtml}${flagHtml}`;
+    const panelEty = `${coreHtml}${etyHtml}${matrixHtml}${netHtml}${flagHtml}`;
 
-    const fullDetailsContent = `${histHtml}${exHtml}${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}${drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : ''}${coreHtml}${etyHtml}${netHtml}${flagHtml}`;
+    const fullDetailsContent = `${histHtml}${exHtml}${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}${drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : ''}${coreHtml}${etyHtml}${matrixHtml}${netHtml}${flagHtml}`;
 
     const panels = [];
     if (panelEty) panels.push({ id: 'ety', label: '語源・語根', html: panelEty });
@@ -160,59 +175,133 @@
     const accordion = fullDetailsContent ? `<details class="card-details-accordion ${isSimple ? 'is-simple-mode' : ''}"${openAttr}><summary class="card-details-sum"><span class="sum-lbl">${initialLabel}</span><span class="sum-arrow">▾</span></summary><div class="card-details-body">${accordionBodyContent}</div></details>` : '';
 
     const quickChips = chipsHtml ? `<div class="card-quick-chips">${chipsHtml}</div>` : '';
-
-    if (isSimple) {
-      return `<div class="right"><div class="m-line">${mHtml}</div>${quickChips}${accordion}</div>`;
-    }
-
-    return `<div class="right"><div class="m-line">${mHtml}</div>${quickChips}<div class="desktop-only-details">${fullDetailsContent}</div>${accordion}</div>`;
+    return `<div class="right"><div class="m-line">${mHtml}</div>${quickChips}${accordion}</div>`;
   }
 
   /**
-   * DOMカード要素の完全生成
+   * DOMカード要素の完全生成 (Error Boundary 保護付き)
    */
   function createCardElement(i, options = {}) {
-    const iL = i.lang || options.lang || global.App?.lang || 'en';
-    const c = document.createElement('div');
-    const due = i.nextReview <= Date.now();
-    const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
+    try {
+      if (!i || typeof i !== 'object') throw new Error('無効な単語データオブジェクトです。');
+      const iL = i.lang || options.lang || global.App?.lang || 'en';
+      const c = document.createElement('div');
+      const due = Number(i.nextReview || 0) <= Date.now();
+      const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
 
-    c.className = 'card';
-    if (typeof c.setAttribute === 'function') {
-      c.setAttribute('role', 'article');
-      c.setAttribute('aria-label', `${i.word} の単語カード`);
+      c.className = 'card';
+      if (typeof c.setAttribute === 'function') {
+        c.setAttribute('role', 'article');
+        c.setAttribute('aria-label', `${i.word || '単語'} の単語カード`);
+      }
+      c.dataset.word = makeLkFn(i.word || '', iL, i.homographIndex);
+      c.dataset.rawWord = i.word || '';
+      c.dataset.lang = iL;
+      if (i.id) c.dataset.id = i.id;
+
+      const homoHtml = i.homographIndex > 1 ? `<span class="homo-badge" title="同形異義語 #${i.homographIndex}">#${i.homographIndex}</span>` : '';
+      const gramHtml = i.grammar_forms ? `<div class="gram-line">${hlText(i.grammar_forms, false, options.queryReg)}</div>` : '';
+      const spkFn = (txt, l) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l) : '';
+      const crossPill = options.crossLang ? `<span class="lang-pill">${esc(iL.toUpperCase())}</span>` : '';
+
+      const catHtml = i.category ? `<span class="tag" data-act="filter" data-type="cat" data-val="${esc(i.category)}">${esc(i.category)}</span>` : '';
+      const folHtml = i.folder ? `<span class="tag" style="border-style:dashed" data-act="filter" data-type="fol" data-val="${esc(i.folder)}">${esc(i.folder)}</span>` : '';
+
+      c.innerHTML = `<div class="card-acts"><button type="button" class="act-icon-btn" data-act="edit" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="カードを編集" aria-label="編集">${editSvg}</button><button type="button" class="act-icon-btn del-btn" data-act="del" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="削除" aria-label="削除">${delSvg}</button></div><div class="col-left"><div class="hw-wrap"><span class="id">#${i.num || 0}</span>${crossPill}${homoHtml}<span class="hw" data-act="speak" data-text="${esc(i.word || '')}" data-lang="${esc(iL)}" title="クリックでネイティブ発音">${hlText(i.word || '', false, options.queryReg)}</span>${spkFn(i.word || '', iL)}</div>${gramHtml}<div class="tag-wrap">${catHtml}${folHtml}</div><div class="pho">${esc(fmtPho(i.phonetic))}<span class="due ${due ? 'is-due' : 'is-fut'}">${relTime(i.nextReview)}</span></div></div>${buildRight(i, options)}`;
+      return c;
+    } catch (err) {
+      if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+        console.warn('[CardView Error Boundary] Failed to render card element:', err, i);
+      }
+      const errCard = document.createElement('div');
+      errCard.className = 'card card-error-fallback';
+      const safeId = esc(i?.id || '');
+      const safeWord = esc(i?.word || '名称不明');
+      const safeNum = i?.num || '?';
+      const safeLang = esc(i?.lang || options.lang || 'en');
+      errCard.dataset.word = safeWord;
+      if (safeId) errCard.dataset.id = safeId;
+      errCard.innerHTML = `
+        <div class="card-acts">
+          <button type="button" class="act-icon-btn del-btn" data-act="del" data-id="${safeId}" data-num="${safeNum}" data-lang="${safeLang}" title="破損カードを削除" aria-label="削除">${delSvg}</button>
+        </div>
+        <div style="grid-column:1/-1;padding:12px 14px;background:rgba(239,68,68,0.08);border:1px dashed var(--r);border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div>
+            <div style="font-weight:700;color:var(--r);font-size:12.5px;display:flex;align-items:center;gap:6px">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span>カード表示エラー (#${safeNum}: ${safeWord})</span>
+            </div>
+            <div style="font-size:11px;color:var(--s);margin-top:2px">データの構文解釈中にエラーが発生しました（${esc(err.message)}）。他のカードは安全に保持されています。</div>
+          </div>
+          <button type="button" class="btn-xs btn-o" data-act="edit" data-id="${safeId}" data-num="${safeNum}" data-lang="${safeLang}" style="white-space:nowrap">編集・修復</button>
+        </div>
+      `;
+      return errCard;
     }
-    c.dataset.word = makeLkFn(i.word, iL, i.homographIndex);
-    c.dataset.rawWord = i.word;
-    c.dataset.lang = iL;
-    if (i.id) c.dataset.id = i.id;
-
-    const homoHtml = i.homographIndex > 1 ? `<span class="homo-badge" title="同形異義語 #${i.homographIndex}">#${i.homographIndex}</span>` : '';
-    const gramHtml = i.grammar_forms ? `<div class="gram-line">${hlText(i.grammar_forms, false, options.queryReg)}</div>` : '';
-    const spkFn = (txt, l) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l) : '';
-    const crossPill = options.crossLang ? `<span class="lang-pill">${esc(iL.toUpperCase())}</span>` : '';
-
-    const catHtml = i.category ? `<span class="tag" data-act="filter" data-type="cat" data-val="${esc(i.category)}">${esc(i.category)}</span>` : '';
-    const folHtml = i.folder ? `<span class="tag" style="border-style:dashed" data-act="filter" data-type="fol" data-val="${esc(i.folder)}">${esc(i.folder)}</span>` : '';
-
-    c.innerHTML = `<div class="card-acts"><button type="button" class="act-icon-btn" data-act="edit" data-id="${esc(i.id)}" data-num="${i.num}" data-lang="${esc(iL)}" title="カードを編集" aria-label="編集">${editSvg}</button><button type="button" class="act-icon-btn del-btn" data-act="del" data-id="${esc(i.id)}" data-num="${i.num}" data-lang="${esc(iL)}" title="削除" aria-label="削除">${delSvg}</button></div><div class="col-left"><div class="hw-wrap"><span class="id">#${i.num}</span>${crossPill}${homoHtml}<span class="hw" data-act="speak" data-text="${esc(i.word)}" data-lang="${esc(iL)}" title="クリックでネイティブ発音">${hlText(i.word, false, options.queryReg)}</span>${spkFn(i.word, iL)}</div>${gramHtml}<div class="tag-wrap">${catHtml}${folHtml}</div><div class="pho">${esc(fmtPho(i.phonetic))}<span class="due ${due ? 'is-due' : 'is-fut'}">${relTime(i.nextReview)}</span></div></div>${buildRight(i, options)}`;
-    return c;
   }
 
   /**
-   * 対象カード要素を画面中央にスムーズスクロールし、発光ハイライトを付与
+   * 対象カード要素を画面サイズ・レスポンシブ配置に応じて適切にスクロールし、発光ハイライトを付与
+   * 画面サイズが異なる場合（モバイル、タブレット、小型/大型PC）や、仮想キーボード・サイドバー開閉等の
+   * 動的レイアウト変化後でも確実にターゲット単語を可視領域内に収める堅牢設計
    */
-  function scrollToCard(el, container = null) {
+  function scrollToCard(el, container = null, options = {}) {
     if (!el) return;
     const scrollContainer = container || (typeof document !== 'undefined' ? document.getElementById('mainScroll') : null);
-    if (scrollContainer && typeof scrollContainer.getBoundingClientRect === 'function') {
-      const cRect = scrollContainer.getBoundingClientRect();
-      const eRect = el.getBoundingClientRect();
-      const targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - (scrollContainer.clientHeight / 2) + (el.clientHeight / 2);
-      scrollContainer.scrollTo?.({ top: Math.max(0, targetScrollTop), behavior: 'smooth' });
-    } else {
-      el.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    const behavior = options.immediate ? 'auto' : 'smooth';
+
+    function performScroll(smooth = true) {
+      if (!el || typeof el.getBoundingClientRect !== 'function') return;
+      if (scrollContainer && typeof scrollContainer.getBoundingClientRect === 'function') {
+        const cRect = scrollContainer.getBoundingClientRect();
+        const eRect = el.getBoundingClientRect();
+        const cHeight = scrollContainer.clientHeight || cRect.height || (typeof window !== 'undefined' ? window.innerHeight : 600);
+        const eHeight = el.clientHeight || eRect.height || 100;
+
+        let targetScrollTop;
+        // カードの高さが表示領域の75%を超える場合（モバイル画面や長文語源カード等）は、
+        // 中央揃えだと見出し語が画面上部に隠れてしまうため、上部に適度な余白(14px)を設けて上揃え配置
+        if (eHeight >= cHeight * 0.75) {
+          targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - 14;
+        } else {
+          // それ以外の場合は視認性の高い中央揃え
+          targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - (cHeight / 2) + (eHeight / 2);
+        }
+
+        const safeTop = Math.max(0, targetScrollTop);
+        try {
+          scrollContainer.scrollTo?.({ top: safeTop, behavior: smooth ? 'smooth' : 'auto' });
+        } catch {
+          scrollContainer.scrollTop = safeTop;
+        }
+
+        // ビューポート自体（window/body）のスクロールズレも解消
+        if (typeof el.scrollIntoView === 'function' && typeof window !== 'undefined') {
+          const updatedERect = el.getBoundingClientRect();
+          if (updatedERect.top < 0 || updatedERect.bottom > window.innerHeight) {
+            try {
+              el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: (eHeight >= cHeight * 0.75) ? 'start' : 'center' });
+            } catch {}
+          }
+        }
+      } else if (typeof el.scrollIntoView === 'function') {
+        try {
+          el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'center' });
+        } catch {
+          el.scrollIntoView();
+        }
+      }
     }
+
+    // 第1フェーズ: 即時実行
+    performScroll(behavior === 'smooth');
+
+    // 第2フェーズ: サイドバー開閉アニメーション(280ms)や仮想キーボード閉鎖(300ms)後の位置ずれを自動補正
+    if (!options.skipRetry) {
+      setTimeout(() => performScroll(true), 120);
+      setTimeout(() => performScroll(false), 320);
+    }
+
     el.classList?.add?.('highlight-jump');
     if (typeof document !== 'undefined') {
       const cards = [...document.querySelectorAll('#list .card')];
@@ -223,9 +312,14 @@
   }
 
   /**
-   * DOM上のカード一覧から指定単語の要素を特定（キー・生単語・見出し語の多重照合）
+   * DOM上のカード一覧から指定単語の要素を特定（キー・生単語・見出し語・IDの多重照合）
    */
-  function findCardElement(cards, targetWord, targetLk, baseTargetLk) {
+  function findCardElement(cards, targetWord, targetLk, baseTargetLk, targetId = null) {
+    if (!Array.isArray(cards) || !cards.length) return null;
+    if (targetId) {
+      const byId = cards.find(c => c && c.dataset && c.dataset.id === targetId);
+      if (byId) return byId;
+    }
     const cleanW = (targetWord || '').toLowerCase().trim();
     return cards.find(c => c.dataset.word === targetLk)
       || cards.find(c => c.dataset.word === baseTargetLk)

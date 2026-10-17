@@ -23,6 +23,12 @@ serve(async (req) => {
       return new Response("Missing signature header", { status: 400 });
     }
 
+    // [DoS/OOM 防衛] メモリ枯渇攻撃を防ぐためWebhookペイロード上限（2MB）を解析前に強制
+    const contentLength = req.headers.get("content-length");
+    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
+      return new Response("Payload too large", { status: 413 });
+    }
+
     const body = await req.text();
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: "2023-10-16",
@@ -52,6 +58,16 @@ serve(async (req) => {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // [P1-3 解決] 即時決済（paid）でない場合はProに昇格させない（未入金ただ乗り防止）
+        if (session.payment_status !== "paid") {
+          console.warn(`[Stripe] Checkout session not paid: ${session.id}, status=${session.payment_status}`);
+          return new Response(JSON.stringify({ received: true, ignored: true, reason: "payment_status_not_paid" }), {
+            headers: { "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+
         userId = session.client_reference_id || session.metadata?.supabase_user_id || null;
         customerId = (session.customer as string) || null;
         subscriptionId = (session.subscription as string) || null;
@@ -146,12 +162,16 @@ serve(async (req) => {
       }
 
       case "customer.subscription.trial_will_end": {
-        // トライアル終了前の通知受領（状態はactiveを維持）
+        // トライアル終了前の通知受領（状態はactiveを維持し、解約予約フラグや期間終了を正確に反映）
         const subscription = event.data.object as Stripe.Subscription;
         customerId = (subscription.customer as string) || null;
         subscriptionId = subscription.id;
-        subStatus = "trialing";
+        subStatus = subscription.status || "trialing";
         plan = "pro";
+        cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end);
+        if (subscription.current_period_end) {
+          periodEndIso = new Date(subscription.current_period_end * 1000).toISOString();
+        }
         break;
       }
 

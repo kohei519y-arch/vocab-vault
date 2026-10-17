@@ -58,6 +58,11 @@
       '*sekw-': { label: '*sekw-', meaning: '従う、続く', words: ['sequence', 'second', 'consequence', 'pursue', 'suit', 'ensue', 'subsequent', 'execute', 'persecute', 'suite', 'suitor'] },
       '*bhew-': { label: '*bhew-', meaning: '存在する、成長する、生じる', words: ['be', 'been', 'build', 'future', 'physic', 'physical', 'biology', 'bond', 'bound', 'husband'] },
       '*deik-': { label: '*deik-', meaning: '指し示す、告げる、宣言する', words: ['dictate', 'indicate', 'index', 'teach', 'token', 'digit', 'diction', 'verdict', 'predict', 'dedicate', 'contradict', 'addict'] },
+      '*ked-': { label: '*ked-', meaning: '行く、退く、歩み出る', words: ['precedent', 'precede', 'accede', 'concede', 'exceed', 'proceed', 'succeed', 'recede', 'access', 'process'] },
+      '*tag-': { label: '*tag-', meaning: '触れる、接する、手にとる、達する', words: ['touch', 'contact', 'tangible', 'tact', 'tactile', 'intact', 'contingency', 'contingent', 'contiguous', 'contagious', 'integrate', 'integrity', 'attain'] },
+      '*lau-': { label: '*lau-', meaning: '獲得する、利益を得る', words: ['lucrative', 'lucre'] },
+      '*per-': { label: '*per-', meaning: '通す、運ぶ、超える、前へ', words: ['export', 'transport', 'support', 'portable', 'import', 'report', 'port', 'portal'] },
+      '*mey-': { label: '*mey-', meaning: '送る、放つ、動かす、交換する', words: ['admit', 'transmit', 'emit', 'submit', 'permit', 'remuneration', 'mission', 'missile', 'commit', 'dismiss'] },
       '*kwel-': { label: '*kwel-', meaning: '回転する、巡る、耕す', words: ['cycle', 'wheel', 'culture', 'cultivate', 'colony', 'polar', 'pole', 'collar', 'pulley', 'cyclical'] },
       '*gwem-': { label: '*gwem-', meaning: '来る、歩む、近づく', words: ['come', 'become', 'advent', 'prevent', 'convene', 'venue', 'event', 'invent', 'revenue', 'intervene', 'souvenir'] },
       '*med-': { label: '*med-', meaning: '測る、適切な処置をとる', words: ['measure', 'medicine', 'moderate', 'modify', 'meditate', 'commodity', 'remedy', 'modest', 'accommodate'] },
@@ -76,7 +81,6 @@
       '*clud-': { label: '*clud-', meaning: '閉じる、塞ぐ、鍵をかける', words: ['close', 'conclude', 'include', 'exclude', 'clause', 'closet', 'seclude', 'preclude', 'enclose'] },
       '*skreybh-': { label: '*skreybh-', meaning: '引っ掻く、記す、書く', words: ['write', 'script', 'describe', 'prescribe', 'subscribe', 'inscribe', 'manuscript', 'transcribe', 'ascribe'] },
       '*blew-': { label: '*blew-', meaning: '流れる、湧き出る、溢れる', words: ['flow', 'fluent', 'fluid', 'influence', 'fluctuate', 'flood', 'affluent', 'superfluous', 'influx'] },
-      '*tag-': { label: '*tag-', meaning: '触れる、手にとる、達する', words: ['touch', 'contact', 'tangible', 'attain', 'tactile', 'intact', 'contingent', 'contagious'] },
       '*port-': { label: '*port-', meaning: '運ぶ、通す、出入口', words: ['port', 'export', 'import', 'transport', 'report', 'support', 'portal', 'deport', 'opportunity', 'porter', 'transporter', 'pforte', 'transportieren'] },
       '*tragh-': { label: '*tragh-', meaning: '引く、引っ張る、進む', words: ['drag', 'draw', 'tractor', 'attract', 'contract', 'extract', 'distract', 'retract', 'treat', 'trait', 'trace', 'traiter', 'attirer', 'trecken', 'vertrag'] },
       '*sent-': { label: '*sent-', meaning: '感じる、知覚する、向かう', words: ['sense', 'scent', 'sentiment', 'consent', 'resent', 'assent', 'dissent', 'sentence', 'sensitive', 'sentir', 'sentiment', 'sinn', 'sinne', 'senden'] },
@@ -158,7 +162,7 @@
         }
       },
       'laïcité': {
-        etymology: 'ギリシャ語 laikos (民衆・世俗) ➔ ラテン語 laicus ➔ フランス語 laïque 由来。',
+        etymology: 'ギリシャ語 laikos (民衆・世俗) → ラテン語 laicus → フランス語 laïque 由来。',
         etymologyTags: [],
         core: '宗教的権威から分離された公的市民社会の原理。',
         history_note: '1905年フランス政教分離法（Loi de séparation）によって確立された共和国の根本原理。',
@@ -408,6 +412,29 @@
     const items = payloadItems.map((it, idx) => {
       const rawW = String(it.reqWord || it.word || '').trim();
       const normW = rawW.toLowerCase().normalize('NFC');
+
+      // 英検準1級カタログの完全オフライン・ゼロレイテンシ即時展開
+      const eikenCard = global.VocabEikenCatalog ? global.VocabEikenCatalog.getWord(normW) : null;
+      if (eikenCard) {
+        return {
+          reqIndex: idx,
+          reqWord: rawW,
+          word: rawW,
+          category: typeof it.category === 'number' ? it.category : 29,
+          phonetic: eikenCard.phonetic || '',
+          grammar_forms: eikenCard.grammar_forms || '',
+          etymologyConfidence: 'certain',
+          etymology: eikenCard.etymology || '',
+          etymologyTags: eikenCard.etymologyTags || [],
+          history_note: eikenCard.history_note || '',
+          core: eikenCard.core || '',
+          meanings: eikenCard.meanings || [{ pos: 'Noun', text: rawW }],
+          example: eikenCard.example || { foreign: '', ja: '', used_form: rawW },
+          phrases: eikenCard.phrases || [],
+          derivatives: eikenCard.derivatives || []
+        };
+      }
+
       const wRef = wiktMap?.get ? wiktMap.get(idx) : null;
       const histData = BUILTIN_ETYMOLOGY_KNOWLEDGE.historical[normW];
 
@@ -470,7 +497,7 @@
         reqWord: rawW,
         word: rawW,
         homographIndex: it.homographIndex || 1,
-        category: 0,
+        category: typeof it.category === 'number' ? it.category : 29,
         phonetic: wRef?.ipa || '',
         grammar_forms: '',
         etymologyConfidence,
@@ -495,24 +522,27 @@
   let _cachedModels = null;
   let _cachedModelsTs = 0;
   const MODELS_CACHE_TTL = 3600000; // 1時間
+  let _cachedModelsKey = '';
 
-  async function fetchModels(key) {
+  async function fetchModels(key, strictCheck = false) {
     if (!key) return [];
     const now = Date.now();
-    if (_cachedModels && (now - _cachedModelsTs < MODELS_CACHE_TTL)) {
+    if (!strictCheck && _cachedModels && _cachedModelsKey === key && (now - _cachedModelsTs < MODELS_CACHE_TTL)) {
       return _cachedModels;
     }
-    try {
-      const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem('vv_cached_gemini_models') : null;
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && Array.isArray(parsed.models) && (now - parsed.ts < MODELS_CACHE_TTL)) {
-          _cachedModels = parsed.models;
-          _cachedModelsTs = parsed.ts;
-          return _cachedModels;
+    if (!strictCheck && _cachedModelsKey === key) {
+      try {
+        const saved = (typeof localStorage !== 'undefined') ? localStorage.getItem('vv_cached_gemini_models') : null;
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed.models) && (now - parsed.ts < MODELS_CACHE_TTL)) {
+            _cachedModels = parsed.models;
+            _cachedModelsTs = parsed.ts;
+            return _cachedModels;
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     try {
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', { headers: { 'x-goog-api-key': key } });
@@ -532,6 +562,7 @@
         if (valid.length) {
           _cachedModels = valid;
           _cachedModelsTs = now;
+          _cachedModelsKey = key;
           try {
             if (typeof localStorage !== 'undefined') {
               localStorage.setItem('vv_cached_gemini_models', JSON.stringify({ ts: now, models: valid }));
@@ -539,8 +570,15 @@
           } catch {}
           return valid;
         }
+      } else {
+        if (strictCheck || res.status === 400 || res.status === 401 || res.status === 403) {
+          throw new Error(`APIキーが無効です (HTTP ${res.status})。正しいGemini APIキーを入力してください。`);
+        }
       }
     } catch (e) {
+      if (strictCheck || e?.message?.includes('APIキーが無効')) {
+        throw e;
+      }
       console.warn('[fetchModels fallback]', e?.message || e);
     }
     return ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
