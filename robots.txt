@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kohei519y-arch.github.io/vocab-vault/sitemap.xml

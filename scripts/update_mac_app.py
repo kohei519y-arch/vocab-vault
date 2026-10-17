@@ -92,6 +92,19 @@ if os.path.exists("VocabVault-Mac.zip"):
 shutil.copyfile(staged_zip, "VocabVault-Mac.zip")
 shutil.copyfile(staged_zip, "vocab-vault-web/VocabVault-Mac.zip")
 
+# Generate clean vocab-vault-web.zip
+import zipfile
+web_zip_path = "vocab-vault-web.zip"
+with zipfile.ZipFile(web_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+    for root_w, _, files_w in os.walk("vocab-vault-web"):
+        for file_w in files_w:
+            if file_w.endswith('.zip') or file_w.startswith('.'):
+                continue
+            full_w = os.path.join(root_w, file_w)
+            rel_w = os.path.relpath(full_w, "vocab-vault-web")
+            zf.write(full_w, os.path.join("vocab-vault-web", rel_w))
+shutil.copyfile(web_zip_path, os.path.join("vocab-vault-web", web_zip_path))
+
 # Sync freshly signed Mach-O binary and _CodeSignature back to workspace Vocab Vault.app
 for root_d, _, files_d in os.walk("Vocab Vault.app"):
     for fn_d in files_d:

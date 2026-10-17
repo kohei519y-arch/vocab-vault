@@ -20,6 +20,10 @@ __pycache__/
 
 # Local backup / zip
 *.zip
+!VocabVault-Mac.zip
+!vocab-vault-web.zip
+!vocab-vault-web/VocabVault-Mac.zip
+!vocab-vault-web/vocab-vault-web.zip
 dist/
 VocabVault_Recovered_Full_Backup.json
 
