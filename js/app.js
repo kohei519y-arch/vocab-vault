@@ -555,6 +555,14 @@
     render();
   }
 
+  function setPage(p) {
+    const val = parseInt(p, 10);
+    if (!Number.isFinite(val) || val < 1) return;
+    App.page = val;
+    render();
+    $('mainScroll')?.scrollTo?.(0, 0);
+  }
+
   // --- 初回オンボーディング（ウェルカムガイドツアー）制御 ---
   let currentTourStep = 1;
   let selectedTourMode = 'simple';
@@ -1592,6 +1600,7 @@
     startStripeCheckout: p => global.VocabSync?.startStripeCheckout?.(p),
     openStripePortal: () => global.VocabSync?.openStripePortal?.(),
     setViewMode,
+    setPage,
     getTourStep,
     setTourStep,
     selectTourMode,
@@ -1622,6 +1631,8 @@
         global[k] = global.VocabCore[k];
       } catch (_) {}
     }
+    global.VocabCore.setPage = setPage;
+    global.setPage = setPage;
     global.promptAppInstall = promptAppInstall;
     global.printVocabList = printVocabList;
     global.openAnalyticsModal = () => global.VocabAnkiView?.openAnalyticsModal?.();

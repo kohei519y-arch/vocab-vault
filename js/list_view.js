@@ -310,7 +310,80 @@
       enhanceA11y: ctx.enhanceA11y
     });
 
-    pag.innerHTML = tot <= 1 ? '' : `<button type="button" class="btn-o" data-act="page" data-dir="-1" ${appState.page === 1 ? 'disabled' : ''}>前へ</button><span>${appState.page} / ${tot}</span><button type="button" class="btn-o" data-act="page" data-dir="1" ${appState.page === tot ? 'disabled' : ''}>次へ</button>`;
+    pag.innerHTML = renderPaginationHtml(appState.page, tot);
+  }
+
+  /**
+   * ページ番号ウィンドウ（現在ページ前後のピルと省略記号）を生成
+   */
+  function buildPageWindow(current, total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages = new Set([1, total]);
+    for (let i = Math.max(1, current - 1); i <= Math.min(total, current + 1); i++) {
+      pages.add(i);
+    }
+    if (current <= 3) {
+      pages.add(2);
+      pages.add(3);
+      pages.add(4);
+    }
+    if (current >= total - 2) {
+      pages.add(total - 3);
+      pages.add(total - 2);
+      pages.add(total - 1);
+    }
+    const sorted = Array.from(pages).sort((a, b) => a - b);
+    const result = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+        result.push('...');
+      }
+      result.push(sorted[i]);
+    }
+    return result;
+  }
+
+  /**
+   * 最初へ・前へ・番号ピル・クイックジャンプ・次へ・最後へを備えた高機能ページネーションHTMLを生成
+   */
+  function renderPaginationHtml(page, tot) {
+    if (tot <= 1) return '';
+
+    const isFirst = page === 1;
+    const isLast = page === tot;
+
+    // 1. 最初へボタン (« 最初)
+    const firstBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="1" ${isFirst ? 'disabled' : ''} title="最初のページへ (1ページ)" aria-label="最初のページへ"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg><span class="pag-btn-lbl">最初</span></button>`;
+
+    // 2. 前へボタン (‹ 前へ)
+    const prevBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="-1" ${isFirst ? 'disabled' : ''} title="前のページへ" aria-label="前のページへ"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="15 18 9 12 15 6"/></svg><span class="pag-btn-lbl">前へ</span></button>`;
+
+    // 3. ページ番号ピル（デスクトップ・タブレット用）
+    const pageWindow = buildPageWindow(page, tot);
+    const pillsHtml = pageWindow.map(p => {
+      if (p === '...') {
+        return `<span class="pag-ellipsis">…</span>`;
+      }
+      const activeCls = p === page ? ' active' : '';
+      return `<button type="button" class="btn-o btn-pag btn-pag-num${activeCls}" data-act="page-jump" data-page="${p}" aria-label="${p}ページへ" ${p === page ? 'aria-current="page"' : ''}>${p}</button>`;
+    }).join('');
+
+    // 4. クイックジャンプセレクター（全端末共通：タップで全ページから瞬時に選択）
+    let selectOpts = '';
+    for (let p = 1; p <= tot; p++) {
+      selectOpts += `<option value="${p}" ${p === page ? 'selected' : ''}>${p} / ${tot} ページ</option>`;
+    }
+    const selectHtml = `<div class="pag-select-wrap" title="クリックしてページを直接選択"><select class="pag-select" data-act="page-select" onchange="window.VocabCore?.setPage?.(this.value)" aria-label="ページ番号を選択">${selectOpts}</select><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" class="pag-select-arr"><polyline points="6 9 12 15 18 9"/></svg></div>`;
+
+    // 5. 次へボタン (次へ ›)
+    const nextBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="1" ${isLast ? 'disabled' : ''} title="次のページへ" aria-label="次のページへ"><span class="pag-btn-lbl">次へ</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="9 18 15 12 9 6"/></svg></button>`;
+
+    // 6. 最後へボタン (最後 »)
+    const lastBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="${tot}" ${isLast ? 'disabled' : ''} title="最後のページへ (${tot}ページ)" aria-label="最後のページへ"><span class="pag-btn-lbl">最後</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></button>`;
+
+    return `<div class="pag-bar" role="navigation" aria-label="ページネーション">${firstBtn}${prevBtn}<div class="pag-center">${selectHtml}<div class="pag-pills">${pillsHtml}</div></div>${nextBtn}${lastBtn}</div>`;
   }
 
   /**
@@ -509,6 +582,8 @@
     reconcileList,
     render,
     load,
+    buildPageWindow,
+    renderPaginationHtml,
     hasActiveFilters,
     resetFilters,
     jumpToWord,

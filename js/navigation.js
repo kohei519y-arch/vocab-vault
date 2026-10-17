@@ -412,7 +412,34 @@
         }
       }
 
-      if (e.key === 'j' || e.key === 'ArrowDown') {
+      if (e.key === 'Home') {
+        e.preventDefault();
+        if (typeof global.VocabCore?.setPage === 'function') global.VocabCore.setPage(1);
+        return true;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        const appState = ctx.appState || global.VocabCore?.App;
+        if (appState && typeof global.VocabCore?.setPage === 'function') {
+          const per = appState.per || 30;
+          const tot = Math.max(1, Math.ceil((appState.entries?.length || 1) / per));
+          global.VocabCore.setPage(tot);
+        }
+        return true;
+      } else if (e.key === 'PageUp' || e.key === '[') {
+        e.preventDefault();
+        const appState = ctx.appState || global.VocabCore?.App;
+        if (appState && typeof global.VocabCore?.setPage === 'function') {
+          global.VocabCore.setPage((appState.page || 1) - 1);
+        }
+        return true;
+      } else if (e.key === 'PageDown' || e.key === ']') {
+        e.preventDefault();
+        const appState = ctx.appState || global.VocabCore?.App;
+        if (appState && typeof global.VocabCore?.setPage === 'function') {
+          global.VocabCore.setPage((appState.page || 1) + 1);
+        }
+        return true;
+      } else if (e.key === 'j' || e.key === 'ArrowDown') {
         e.preventDefault();
         if (typeof ctx.moveCardFocus === 'function') ctx.moveCardFocus(1);
         return true;

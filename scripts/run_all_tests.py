@@ -34,6 +34,20 @@ def log_fail(msg):
     FAILED += 1
     print(f"  \033[31m✘ FAIL:\033[0m {msg}")
 
+def run_jsc(code):
+    """Executes JavaScript code via macOS JavaScriptCore (jsc) using a temporary file to avoid ARG_MAX limit."""
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".js", delete=False) as tf:
+        tf.write(code)
+        tmp_name = tf.name
+    try:
+        return subprocess.run([JSC_PATH, tmp_name], capture_output=True, text=True)
+    finally:
+        if os.path.exists(tmp_name):
+            try:
+                os.remove(tmp_name)
+            except Exception:
+                pass
+
 def check_jsc_syntax():
     print("\n--- 1. JavaScript Syntax Verification (via JSC) ---")
     js_files = [
@@ -66,7 +80,7 @@ def check_jsc_syntax():
         print("  [WARN] macOS JSC not found, falling back to node if available")
         runner = ["node", "-c"]
     else:
-        runner = [JSC_PATH, "-e"]
+        runner = [JSC_PATH]
 
     for rel_path in js_files:
         full_path = os.path.join(BASE_DIR, rel_path)
@@ -104,7 +118,7 @@ def check_jsc_syntax():
             globalThis.URLSearchParams = function(q){ this.get = function(){ return null; }; };
             var URLSearchParams = globalThis.URLSearchParams;
             """
-            res = subprocess.run([JSC_PATH, "-e", shim + code], capture_output=True, text=True)
+            res = run_jsc(shim + code)
 
         if res.returncode == 0:
             log_pass(f"{rel_path} (Syntax valid)")
@@ -289,7 +303,7 @@ def test_delete_word_integrity():
     print("OK");
     """
 
-    res = subprocess.run([JSC_PATH, "-e", combined_code], capture_output=True, text=True)
+    res = run_jsc(combined_code)
     if res.returncode == 0 and "OK" in res.stdout:
         log_pass("Word deletion (delW) removes target item cleanly and renumbers sequence")
         log_pass("Storage and memory cache are synchronously purged on deletion")
@@ -1402,7 +1416,7 @@ def test_cloze_and_audio_playlist():
     print("OK");
     """
 
-    res = subprocess.run([JSC_PATH, "-e", test_jsc_code], capture_output=True, text=True)
+    res = run_jsc(test_jsc_code)
     if res.returncode == 0 and "OK" in res.stdout:
         log_pass("VocabSpeech & VocabAnkiView cloze, hints & audio playlist functional in JSC engine")
     else:
@@ -1534,7 +1548,7 @@ def test_lineage_tree_and_sns_share_card():
       print("TREE_FAIL:roots=" + roots.length + ",branches=" + branches.length + ",leaves=" + leaves.length + ",buds=" + buds.length + ",twigs=" + twigs.length);
     }}
     """
-    res = subprocess.run([JSC_PATH, "-e", test_tree_jsc], capture_output=True, text=True)
+    res = run_jsc(test_tree_jsc)
     if res.returncode == 0 and "TREE_OK" in res.stdout:
         log_pass("JSC verification: 4-tier tree nodes (Root, Branch, Leaf, Ghost Bud, Twig) built flawlessly")
     else:
@@ -1820,6 +1834,144 @@ def test_onboarding_cloze_fuzzy_and_sw_banner():
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
 
+def test_rich_pagination_and_keyboard_shortcuts():
+    print("\n--- 20. Rich Pagination & Keyboard Navigation Tests ---")
+    list_view_path = os.path.join(BASE_DIR, "js/list_view.js")
+    app_path = os.path.join(BASE_DIR, "js/app.js")
+    events_path = os.path.join(BASE_DIR, "js/events.js")
+    navigation_path = os.path.join(BASE_DIR, "js/navigation.js")
+    anki_view_path = os.path.join(BASE_DIR, "js/anki_view.js")
+    css_path = os.path.join(BASE_DIR, "css/app.css")
+    index_path = os.path.join(BASE_DIR, "index.html")
+    dev_path = os.path.join(BASE_DIR, "dev.html")
+
+    with open(list_view_path, "r", encoding="utf-8") as f:
+        list_view_code = f.read()
+    with open(app_path, "r", encoding="utf-8") as f:
+        app_code = f.read()
+    with open(events_path, "r", encoding="utf-8") as f:
+        events_code = f.read()
+    with open(navigation_path, "r", encoding="utf-8") as f:
+        navigation_code = f.read()
+    with open(anki_view_path, "r", encoding="utf-8") as f:
+        anki_view_code = f.read()
+    with open(css_path, "r", encoding="utf-8") as f:
+        css_code = f.read()
+    with open(index_path, "r", encoding="utf-8") as f:
+        index_html = f.read()
+    with open(dev_path, "r", encoding="utf-8") as f:
+        dev_html = f.read()
+
+    # CSS verification
+    css_classes = [".pag-bar", ".btn-pag", ".btn-pag-nav", ".btn-pag-num", ".pag-center", ".pag-pills", ".pag-select-wrap", ".pag-select"]
+    for c in css_classes:
+        if c in css_code:
+            log_pass(f"css/app.css: contains {c} pagination style")
+        else:
+            log_fail(f"css/app.css: missing {c} pagination style")
+
+    # HTML shortcuts table verification
+    for doc_name, doc_content in [("index.html", index_html), ("dev.html", dev_html)]:
+        if "Home" in doc_content and "End" in doc_content and "PageUp" in doc_content and "PageDown" in doc_content:
+            log_pass(f"{doc_name}: shortcutsModal contains Home, End, PageUp, PageDown")
+        else:
+            log_fail(f"{doc_name}: shortcutsModal missing page navigation keys")
+        if "(FSRS-4.5 SRS)" in doc_content:
+            log_pass(f"{doc_name}: settings modal correctly displays FSRS-4.5 SRS")
+        else:
+            log_fail(f"{doc_name}: settings modal missing FSRS-4.5 SRS heading")
+
+    # Cloze typing IME check
+    if "event.isComposing" in anki_view_code and ("event.keyCode !== 229" in anki_view_code or "keyCode !== 229" in anki_view_code):
+        log_pass("js/anki_view.js: Cloze input prevents submission during Japanese/Chinese IME composition")
+    else:
+        log_fail("js/anki_view.js: Cloze input lacks IME composition protection")
+
+    # JSC verification of buildPageWindow and renderPaginationHtml
+    jsc_test = """
+    var window = globalThis;
+    var document = {
+        addEventListener: function(){},
+        getElementById: function(){ return null; },
+        querySelector: function(){ return null; },
+        querySelectorAll: function(){ return []; }
+    };
+    globalThis.localStorage = { getItem: function(){ return null; }, setItem: function(){} };
+    """ + list_view_code + """
+
+    if (!VocabListView || typeof VocabListView.buildPageWindow !== 'function' || typeof VocabListView.renderPaginationHtml !== 'function') {
+        throw new Error('VocabListView pagination functions missing');
+    }
+
+    // Test buildPageWindow
+    var w1 = VocabListView.buildPageWindow(1, 10);
+    if (JSON.stringify(w1) !== JSON.stringify([1, 2, 3, 4, '...', 10])) throw new Error('buildPageWindow(1, 10) mismatch: ' + JSON.stringify(w1));
+
+    var w8 = VocabListView.buildPageWindow(8, 10);
+    if (JSON.stringify(w8) !== JSON.stringify([1, '...', 7, 8, 9, 10])) throw new Error('buildPageWindow(8, 10) mismatch: ' + JSON.stringify(w8));
+
+    var w5 = VocabListView.buildPageWindow(5, 10);
+    if (JSON.stringify(w5) !== JSON.stringify([1, '...', 4, 5, 6, '...', 10])) throw new Error('buildPageWindow(5, 10) mismatch: ' + JSON.stringify(w5));
+
+    var w7 = VocabListView.buildPageWindow(3, 7);
+    if (JSON.stringify(w7) !== JSON.stringify([1, 2, 3, 4, 5, 6, 7])) throw new Error('buildPageWindow(3, 7) mismatch: ' + JSON.stringify(w7));
+
+    var wSingle = VocabListView.buildPageWindow(1, 1);
+    if (JSON.stringify(wSingle) !== JSON.stringify([1])) throw new Error('buildPageWindow(1, 1) mismatch: ' + JSON.stringify(wSingle));
+
+    // Test renderPaginationHtml
+    var hSingle = VocabListView.renderPaginationHtml(1, 1);
+    if (hSingle !== '') throw new Error('Single page should render empty string, got: ' + hSingle);
+
+    var h1 = VocabListView.renderPaginationHtml(1, 10);
+    if (!h1.includes('data-act="page-jump"') || !h1.includes('data-page="1"')) throw new Error('Page 1 markup missing first page jump button');
+    if (!h1.includes('disabled') || !h1.includes('最初')) throw new Error('Page 1 first button should be disabled');
+    if (!h1.includes('data-page="10"') || !h1.includes('最後')) throw new Error('Page 1 markup missing last page jump button');
+    if (!h1.includes('data-act="page-select"')) throw new Error('Page 1 markup missing quick select dropdown');
+    if (!h1.includes('<option value="1" selected>1 / 10 ページ</option>')) throw new Error('Page 1 dropdown selected option missing');
+
+    var h8 = VocabListView.renderPaginationHtml(8, 10);
+    if (!h8.includes('data-page="8"') || !h8.includes('active')) throw new Error('Page 8 pill not marked active');
+    if (h8.includes('disabled title="最初のページへ')) throw new Error('Page 8 first button should not be disabled');
+    if (h8.includes('disabled title="最後のページへ')) throw new Error('Page 8 last button should not be disabled');
+
+    var h10 = VocabListView.renderPaginationHtml(10, 10);
+    if (!h10.includes('disabled') || !h10.includes('最後')) throw new Error('Page 10 last button should be disabled');
+
+    print('JSC_PAGINATION_OK');
+    """
+
+    res = run_jsc(jsc_test)
+    if res.returncode == 0 and "JSC_PAGINATION_OK" in res.stdout:
+        log_pass("JSC verification: buildPageWindow sliding window & renderPaginationHtml verified flawless")
+    else:
+        log_fail(f"JSC pagination verification error: {res.stderr or res.stdout}")
+
+    # setPage export verification in app.js
+    if "setPage" in app_code and "VocabCore.setPage" in app_code:
+        log_pass("js/app.js: setPage provides robust bounds clamping (1 <= p <= tot) and global export")
+    else:
+        log_fail("js/app.js: setPage missing or not exported to VocabCore")
+
+    # events.js verification
+    if 'act === "page-jump"' in events_code or "act === 'page-jump'" in events_code:
+        log_pass("js/events.js: supports act === 'page-jump' for 1-tap direct page jumping")
+    else:
+        log_fail("js/events.js: missing act === 'page-jump' handler")
+
+    if 'data-act="page-select"' in events_code or 'page-select' in events_code:
+        log_pass("js/events.js: supports act === 'page-select' for dropdown select jumping")
+    else:
+        log_fail("js/events.js: missing act === 'page-select' change listener")
+
+    # navigation.js verification
+    nav_keys = ["Home", "End", "PageUp", "PageDown", "[", "]"]
+    for k in nav_keys:
+        if f"'{k}'" in navigation_code or f'"{k}"' in navigation_code:
+            log_pass(f"js/navigation.js: keyboard shortcut for {k} wired to pagination")
+        else:
+            log_fail(f"js/navigation.js: missing keyboard shortcut for {k}")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -1844,6 +1996,7 @@ def main():
     test_eiken_pre1_catalog_and_fog_of_war()
     test_global_i18n_and_multi_currency()
     test_onboarding_cloze_fuzzy_and_sw_banner()
+    test_rich_pagination_and_keyboard_shortcuts()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")

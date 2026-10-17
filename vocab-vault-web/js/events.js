@@ -652,9 +652,14 @@
             sumLbl.textContent = `${labelText} を表示中`;
           }
         }
-      } else if (act === 'page') {
+      } else if (act === 'page' || act === 'page-jump') {
         if (appState) {
-          appState.page += Number(el.dataset.dir);
+          if (el.dataset.page !== undefined) {
+            const p = parseInt(el.dataset.page, 10);
+            if (Number.isFinite(p) && p >= 1) appState.page = p;
+          } else if (el.dataset.dir !== undefined) {
+            appState.page += Number(el.dataset.dir);
+          }
           if (typeof ctx.render === 'function') ctx.render();
           $('mainScroll')?.scrollTo?.(0, 0);
         }
@@ -731,6 +736,18 @@
       e.target.closest('.ext-item')?.classList.toggle('checked', e.target.checked);
       if (global.VocabModal && typeof global.VocabModal.updateExtCounts === 'function') {
         global.VocabModal.updateExtCounts();
+      }
+    });
+
+    document.addEventListener('change', e => {
+      const el = e.target.closest?.('[data-act="page-select"]');
+      if (el && appState) {
+        const val = parseInt(el.value, 10);
+        if (Number.isFinite(val) && val >= 1) {
+          appState.page = val;
+          if (typeof ctx.render === 'function') ctx.render();
+          $('mainScroll')?.scrollTo?.(0, 0);
+        }
       }
     });
 

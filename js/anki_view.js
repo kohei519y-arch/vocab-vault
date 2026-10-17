@@ -439,7 +439,7 @@
     const firstChar = item.word ? item.word.charAt(0) : '';
     const lenHint = item.word ? `${item.word.length}文字 / 先頭 '${esc(firstChar)}...'` : 'スペルを入力';
     const typeBox = `<div class="cloze-type-wrap" style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center">
-      <input type="text" id="clozeTypeInput" class="cloze-type-input" placeholder="タイピング産出 (${lenHint})" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;width:230px;text-align:center" onkeydown="if(event.key==='Enter'){event.preventDefault();window.VocabAnkiView?.checkClozeTyping?.();}">
+      <input type="text" id="clozeTypeInput" class="cloze-type-input" placeholder="タイピング産出 (${lenHint})" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;width:230px;text-align:center" onkeydown="if(event.key==='Enter' && !event.isComposing && event.keyCode !== 229){event.preventDefault();window.VocabAnkiView?.checkClozeTyping?.();}">
       <button type="button" class="btn-xs btn-ac-o" onclick="window.VocabAnkiView?.checkClozeTyping?.()">判定</button>
     </div>`;
     return badges.join('') + typeBox;
