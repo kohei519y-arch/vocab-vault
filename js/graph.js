@@ -2007,6 +2007,7 @@
 
   function fitGraphToView() {
     if (!graphState.nodes || !graphState.nodes.length) return;
+    syncCanvasDimensions();
 
     // 異常値・極端な外れ値ノードに引っ張られて極小化するのを防ぐため、外れ値を除外した堅牢なバウンディングボックスを算出
     const xs = graphState.nodes.map(n => n.x).sort((a, b) => a - b);
@@ -2016,11 +2017,25 @@
     const minX = xs[pLow], maxX = xs[pHigh];
     const minY = ys[pLow], maxY = ys[pHigh];
 
+    const drawer = document.getElementById('graphDetailDrawer');
+    const isDrawerOpen = drawer && drawer.style.display !== 'none';
+    let availableW = graphState.width || 800;
+    let availableH = graphState.height || 600;
+    if (isDrawerOpen) {
+      if (availableW <= 768) {
+        const drawerH = drawer.offsetHeight || (availableH * 0.45);
+        availableH = Math.max(120, availableH - drawerH);
+      } else {
+        const drawerW = drawer.offsetWidth || 360;
+        availableW = Math.max(200, availableW - drawerW);
+      }
+    }
+
     const pad = 38;
     const w = Math.max(120, maxX - minX);
     const h = Math.max(120, maxY - minY);
-    const scaleX = (graphState.width - pad * 2) / w;
-    const scaleY = (graphState.height - pad * 2) / h;
+    const scaleX = (availableW - pad * 2) / w;
+    const scaleY = (availableH - pad * 2) / h;
     const isTree = (graphState.layoutMode === 'tree');
     const minZ = 0.50;
     const maxZ = isTree ? 1.65 : 1.35;
@@ -2028,9 +2043,10 @@
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
+    const { cx, cy } = getEffectiveViewportCenter();
     graphState.zoom = targetZoom;
-    graphState.panX = graphState.width / 2 - centerX * targetZoom;
-    graphState.panY = graphState.height / 2 - centerY * targetZoom;
+    graphState.panX = cx - centerX * targetZoom;
+    graphState.panY = cy - centerY * targetZoom;
     updateZoomDisplay();
     drawGraph();
   }
@@ -2253,6 +2269,16 @@
     } else {
       wakeGraphSimulation();
     }
+
+    // モーダルCSSトランジション完了後のレイアウト寸法確定に合わせた自動補正
+    setTimeout(() => {
+      syncCanvasDimensions();
+      if (graphState.selectedNode) {
+        centerOnNode(graphState.selectedNode, graphState.zoom);
+      } else {
+        fitGraphToView();
+      }
+    }, 120);
   }
 
   function resetGraphZoom() {
@@ -2422,6 +2448,20 @@
     renderDetailDrawer(node);
     if (center && node) {
       centerOnNode(node, graphState.zoom);
+      // Drawer展開直後はDOMのoffsetHeight / offsetWidthが未確定の場合があるため、
+      // requestAnimationFrame 及び タイマーで真の可視領域中心へ再センタリング
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => {
+          if (graphState.selectedNode === node) {
+            centerOnNode(node, graphState.zoom);
+          }
+        });
+      }
+      setTimeout(() => {
+        if (graphState.selectedNode === node) {
+          centerOnNode(node, graphState.zoom);
+        }
+      }, 120);
     } else {
       drawGraph();
     }
@@ -2751,7 +2791,7 @@
     if (typeof toggleModalFn === 'function') toggleModalFn('graphModal', false);
     const jumpFn = global.jumpToWord || global.VocabCore?.jumpToWord;
     if (typeof jumpFn === 'function') {
-      setTimeout(() => jumpFn(word, lang), 20);
+      setTimeout(() => jumpFn(word, lang), 40);
     }
   }
 

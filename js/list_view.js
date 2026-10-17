@@ -560,20 +560,25 @@
     const findHelper = global.VocabCardView?.findCardElement;
     const targetId = targetItem?.id || null;
 
-    function attemptScroll(retries) {
+    // モバイルでのサイドバー閉鎖（280msトランジション）やページ切替時のDOM再構築完了を完全にカバーするスケジュール
+    const scheduleDelays = [0, 60, 140, 280, 420];
+
+    function runAttempt(idx) {
       const cards = (typeof document !== 'undefined') ? [...document.querySelectorAll('#list .card')] : [];
       const el = findHelper ? findHelper(cards, targetWord, targetLk, baseTargetLk, targetId) : null;
       if (el && scrollHelper) {
-        scrollHelper(el, $('mainScroll'));
-      } else if (retries > 0) {
-        setTimeout(() => attemptScroll(retries - 1), 60);
+        scrollHelper(el, $('mainScroll'), { immediate: idx === 0 });
+      }
+      if (idx + 1 < scheduleDelays.length) {
+        const nextDelay = scheduleDelays[idx + 1] - scheduleDelays[idx];
+        setTimeout(() => runAttempt(idx + 1), nextDelay);
       }
     }
 
     if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => attemptScroll(3));
+      requestAnimationFrame(() => runAttempt(0));
     } else {
-      setTimeout(() => attemptScroll(3), 20);
+      setTimeout(() => runAttempt(0), 10);
     }
   }
 

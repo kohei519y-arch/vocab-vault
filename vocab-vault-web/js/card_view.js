@@ -241,6 +241,34 @@
   }
 
   /**
+   * スクロールコンテナ内における要素の累積Y絶対座標（scrollTop非依存）を算出
+   */
+  function getElementTopInContainer(el, container) {
+    if (!el || !container) return 0;
+    let offset = 0;
+    let curr = el;
+    let found = false;
+    while (curr && curr !== container) {
+      offset += (curr.offsetTop || 0);
+      curr = curr.offsetParent;
+      if (curr === container) {
+        found = true;
+        break;
+      }
+    }
+    if (found) {
+      return offset;
+    }
+    // offsetParentチェーンに container が含まれなかった場合（position設定差等）の安全フォールバック
+    if (typeof el.getBoundingClientRect === 'function' && typeof container.getBoundingClientRect === 'function') {
+      const eRect = el.getBoundingClientRect();
+      const cRect = container.getBoundingClientRect();
+      return (eRect.top - cRect.top) + (container.scrollTop || 0);
+    }
+    return el.offsetTop || 0;
+  }
+
+  /**
    * 対象カード要素を画面サイズ・レスポンシブ配置に応じて適切にスクロールし、発光ハイライトを付与
    * 画面サイズが異なる場合（モバイル、タブレット、小型/大型PC）や、仮想キーボード・サイドバー開閉等の
    * 動的レイアウト変化後でも確実にターゲット単語を可視領域内に収める堅牢設計
@@ -251,24 +279,23 @@
     const behavior = options.immediate ? 'auto' : 'smooth';
 
     function performScroll(smooth = true) {
-      if (!el || typeof el.getBoundingClientRect !== 'function') return;
-      if (scrollContainer && typeof scrollContainer.getBoundingClientRect === 'function') {
-        const cRect = scrollContainer.getBoundingClientRect();
-        const eRect = el.getBoundingClientRect();
-        const cHeight = scrollContainer.clientHeight || cRect.height || (typeof window !== 'undefined' ? window.innerHeight : 600);
-        const eHeight = el.clientHeight || eRect.height || 100;
+      if (!el) return;
+      if (scrollContainer) {
+        const cHeight = scrollContainer.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
+        const eHeight = el.offsetHeight || el.clientHeight || 100;
+        const elementTop = getElementTopInContainer(el, scrollContainer);
 
         const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
-        const topSafeOffset = isMobile ? 22 : 16;
+        const topSafeOffset = isMobile ? 24 : 16;
 
         let targetScrollTop;
-        // カードの高さが表示領域の65%を超える場合（モバイル画面や長文語源カード等）は、
-        // 中央揃えだと見出し語が画面上部に隠れてしまうため、上部に適度な余白を設けて上揃え配置
-        if (eHeight >= cHeight * 0.65) {
-          targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - topSafeOffset;
+        // カードの高さが表示領域の60%を超える場合、またはモバイル画面の場合は、
+        // 中央揃えだと見出し語が上部に隠れたり切れたりするため、上部安全余白を空けて上揃え配置
+        if (eHeight >= cHeight * 0.6 || isMobile) {
+          targetScrollTop = elementTop - topSafeOffset;
         } else {
-          // それ以外の場合は視認性の高い中央揃え
-          targetScrollTop = scrollContainer.scrollTop + (eRect.top - cRect.top) - (cHeight / 2) + (eHeight / 2);
+          // デスクトップで通常カードの場合は視認性の高い中央揃え
+          targetScrollTop = elementTop - (cHeight / 2) + (eHeight / 2);
         }
 
         const safeTop = Math.max(0, targetScrollTop);
@@ -286,12 +313,15 @@
       }
     }
 
-    // 第1フェーズ: 即時実行
+    // 第1フェーズ: 即時/指定アニメーション実行
     performScroll(behavior === 'smooth');
 
-    // 第2フェーズ: サイドバー開閉アニメーション(280ms)や仮想キーボード閉鎖(300ms)後の位置ずれを自動補正
+    // 第2フェーズ: DOM reflow および サイドバー開閉(280ms)・仮想キーボード(300ms)後の位置ずれを自動補正
     if (!options.skipRetry) {
-      setTimeout(() => performScroll(true), 120);
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => performScroll(behavior === 'smooth'));
+      }
+      setTimeout(() => performScroll(true), 80);
       setTimeout(() => performScroll(false), 320);
     }
 
