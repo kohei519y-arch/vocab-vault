@@ -535,6 +535,75 @@
     return data;
   }
 
+  async function callOcrProxy({ imageBase64, mimeType = 'image/jpeg', lang = 'en' } = {}) {
+    const cfg = getConfig();
+    if (!cfg.configured) throw new Error('Supabase設定が未構成です。');
+    const token = await ensureValidToken().catch(() => null);
+
+    const headers = {
+      apikey: cfg.anonKey,
+      'Content-Type': 'application/json'
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const r = await fetch(`${cfg.url}/functions/v1/vocab-generate`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'ocr',
+        imageBase64,
+        mimeType,
+        lang
+      })
+    });
+
+    const data = await r.json();
+    if (!r.ok) {
+      const err = new Error(data.error || `OCR解析エラー (HTTP ${r.status})`);
+      err.status = r.status;
+      if (r.status === 429 || (data.error && (data.error.includes('クォータ') || data.error.includes('上限') || data.error.includes('Pro')))) {
+        err.isQuotaExceeded = true;
+      }
+      throw err;
+    }
+    return data;
+  }
+
+  async function callPassageExtractProxy({ passage, lang = 'en', maxCnt = 12, levelPrompt = '' } = {}) {
+    const cfg = getConfig();
+    if (!cfg.configured) throw new Error('Supabase設定が未構成です。');
+    const token = await ensureValidToken().catch(() => null);
+
+    const headers = {
+      apikey: cfg.anonKey,
+      'Content-Type': 'application/json'
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const r = await fetch(`${cfg.url}/functions/v1/vocab-generate`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        action: 'extract_passage',
+        passage,
+        lang,
+        maxCnt,
+        levelPrompt
+      })
+    });
+
+    const data = await r.json();
+    if (!r.ok) {
+      const err = new Error(data.error || `長文抽出エラー (HTTP ${r.status})`);
+      err.status = r.status;
+      if (r.status === 429 || (data.error && (data.error.includes('クォータ') || data.error.includes('上限') || data.error.includes('Pro')))) {
+        err.isQuotaExceeded = true;
+      }
+      throw err;
+    }
+    return data;
+  }
+
   function isAndroidPlayStoreApp() {
     if (typeof document === 'undefined') return false;
     if (document.referrer && document.referrer.startsWith('android-app://')) return true;
@@ -755,6 +824,8 @@
     syncLangWithSupabase,
     acquireSyncLock,
     callVocabGenerateProxy,
+    callOcrProxy,
+    callPassageExtractProxy,
     startStripeCheckout,
     openStripePortal,
     fetchUserProfile
