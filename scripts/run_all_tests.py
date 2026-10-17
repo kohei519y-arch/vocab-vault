@@ -16,6 +16,7 @@ import re
 import sys
 import json
 import subprocess
+import tempfile
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JSC_PATH = "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/Helpers/jsc"
@@ -555,7 +556,17 @@ def test_mobile_tabs_and_pair_sync():
     print("OK");
     """
 
-    res = subprocess.run([JSC_PATH, "-e", combined_code], capture_output=True, text=True)
+    tmp_test_file = os.path.join(tempfile.gettempdir(), "vocab_vault_test_3c.js")
+    with open(tmp_test_file, "w", encoding="utf-8") as tf:
+        tf.write(combined_code)
+    try:
+        res = subprocess.run([JSC_PATH, tmp_test_file], capture_output=True, text=True)
+    finally:
+        if os.path.exists(tmp_test_file):
+            try:
+                os.remove(tmp_test_file)
+            except Exception:
+                pass
     if res.returncode == 0 and "OK" in res.stdout:
         log_pass("Mobile detail tabs generated with clean segment controls (.detail-tabs-bar) & ARIA tags")
         log_pass("Mobile sidebar scroll lock (side-open-lock) safely handles drawer lifecycle")

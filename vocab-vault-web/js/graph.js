@@ -242,13 +242,19 @@
     const word = String(item?.word || '').toLowerCase();
     const lang = String(item?.lang || 'en').toLowerCase();
 
-    // 1. ラテン語・ロマンス諸語の主要接頭辞
-    const prefixes = [
+    // 1. 古典ラテン語系の主要接頭辞
+    const latinPrefixes = [
       { p: 'con', label: 'con- (共に)' },
       { p: 'com', label: 'com- (共に)' },
       { p: 'sub', label: 'sub- (下に)' },
+      { p: 'suc', label: 'sub- (下に)' },
+      { p: 'suf', label: 'sub- (下に)' },
+      { p: 'sup', label: 'sub- (下に)' },
+      { p: 'sus', label: 'sub- (下に)' },
       { p: 'in', label: 'in- (中に/否定)' },
       { p: 'im', label: 'im- (中に/否定)' },
+      { p: 'il', label: 'in- (中に/否定)' },
+      { p: 'ir', label: 'in- (中に/否定)' },
       { p: 'ex', label: 'ex- (外に)' },
       { p: 'per', label: 'per- (完全に)' },
       { p: 'trans', label: 'trans- (越えて)' },
@@ -257,53 +263,170 @@
       { p: 'pre', label: 'pre- (前に)' },
       { p: 'de', label: 'de- (離れて)' },
       { p: 'ad', label: 'ad- (向かって)' },
+      { p: 'ac', label: 'ad- (向かって)' },
+      { p: 'ap', label: 'ad- (向かって)' },
+      { p: 'at', label: 'ad- (向かって)' },
       { p: 'ob', label: 'ob- (対して)' },
+      { p: 'op', label: 'ob- (対して)' },
       { p: 'dis', label: 'dis- (分離)' },
-      { p: 'inter', label: 'inter- (相互)' }
+      { p: 'di', label: 'dis- (分離)' },
+      { p: 'inter', label: 'inter- (相互)' },
+      { p: 'contra', label: 'contra- (対抗)' },
+      { p: 'counter', label: 'counter- (対抗)' }
     ];
 
-    // フランス語 / ロマンス諸語
-    if (lang === 'fr' || ety.includes('french') || ety.includes('français') || ety.includes('fr.')) {
-      const matched = prefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
-      if (matched) return `Romance: ${matched.label}`;
-      return 'Romance: フランス・ロマンス語群';
+    // 2. フランス・ロマンス諸語固有の変形・接頭辞階層
+    const romancePrefixes = [
+      { p: 'sur', label: 'sur- (上に/超越)' },
+      { p: 'en', label: 'en- (内部化/促成)' },
+      { p: 'em', label: 'em- (内部化/促成)' },
+      { p: 'dé', label: 'dé- (分離/解除)' },
+      { p: 'des', label: 'des- (分離/解除)' },
+      { p: 'par', label: 'par- (徹底/完了)' },
+      { p: 'entre', label: 'entre- (相互/中間)' },
+      { p: 'més', label: 'més- (過誤/悪)' },
+      { p: 'pour', label: 'pour- (推進/目的)' }
+    ];
+
+    // 3. 西ゲルマン語群・英語本来語（古英語）の固有接頭辞階層
+    const germanicPrefixes = [
+      { p: 'under', label: 'under- (下層/基底)' },
+      { p: 'over', label: 'over- (超過/支配)' },
+      { p: 'fore', label: 'fore- (予め/前方)' },
+      { p: 'with', label: 'with- (対抗/後退)' },
+      { p: 'out', label: 'out- (外部/凌駕)' },
+      { p: 'mis', label: 'mis- (誤り/悪)' },
+      { p: 'after', label: 'after- (追従/後)' }
+    ];
+
+    // 4. ドイツ語群（現代・古高ドイツ語）固有の前綴り階層
+    const germanPrefixes = [
+      { p: 'ver', label: 'ver- (変化/完了)' },
+      { p: 'ent', label: 'ent- (分離/開始)' },
+      { p: 'zer', label: 'zer- (解体/破壊)' },
+      { p: 'er', label: 'er- (獲得/生起)' },
+      { p: 'ge', label: 'ge- (集合/完了)' },
+      { p: 'auf', label: 'auf- (上方/開始)' },
+      { p: 'aus', label: 'aus- (脱出/徹底)' },
+      { p: 'ab', label: 'ab- (離脱/減少)' },
+      { p: 'vor', label: 'vor- (前方/事前)' },
+      { p: 'nach', label: 'nach- (追従/後)' },
+      { p: 'be', label: 'be- (他動化/強調)' }
+    ];
+
+    // 5. ギリシャ古典語系の接頭辞
+    const greekPrefixes = [
+      { p: 'tele', label: 'tele- (遠方)' },
+      { p: 'photo', label: 'photo- (光)' },
+      { p: 'dia', label: 'dia- (貫通/横断)' },
+      { p: 'syn', label: 'syn- (共に)' },
+      { p: 'sym', label: 'sym- (共に)' },
+      { p: 'anti', label: 'anti- (反対/対抗)' },
+      { p: 'auto', label: 'auto- (自身)' },
+      { p: 'micro', label: 'micro- (微小)' },
+      { p: 'macro', label: 'macro- (巨大)' },
+      { p: 'poly', label: 'poly- (多数)' },
+      { p: 'mono', label: 'mono- (単一)' },
+      { p: 'hyper', label: 'hyper- (超過)' },
+      { p: 'hypo', label: 'hypo- (下位)' }
+    ];
+
+    // --- 分岐判定 ---
+
+    // A. フランス語 / ロマンス諸語
+    const isRomance = lang === 'fr' || ety.includes('french') || ety.includes('français') || ety.includes('fr.') || ety.includes('old french') || ety.includes('anglo-norman');
+    if (isRomance) {
+      // 1) フランス語固有変形接頭辞
+      const matchedRomance = romancePrefixes.find(pr => {
+        if (word.startsWith(pr.p) || ety.includes(`${pr.p}-`)) {
+          if (pr.p === 'en' && ['end', 'enemy', 'entire', 'entry'].includes(word)) return false;
+          if (pr.p === 'em' && ['empire', 'empty'].includes(word)) return false;
+          return true;
+        }
+        return false;
+      });
+      if (matchedRomance) return `Romance: ${matchedRomance.label}`;
+
+      // 2) ラテン共通接頭辞
+      const matchedLatin = latinPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedLatin) return `Romance: ${matchedLatin.label}`;
+
+      return 'Romance: フランス・ロマンス語根幹';
     }
 
-    // ドイツ語
-    if (lang === 'de' || ety.includes('german') || ety.includes('deutsch')) {
-      return 'Germanic: ドイツ語群幹';
+    // B. ドイツ語群
+    const isGerman = lang === 'de' || ety.includes('german') || ety.includes('deutsch') || ety.includes('old high german');
+    if (isGerman) {
+      const matchedGerman = germanPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedGerman) return `Germanic: ${matchedGerman.label}`;
+      return 'Germanic: ドイツ語本来語幹';
     }
 
-    // ゲルマン系語根・古英語（*sta- 含む）
-    if (ety.includes('old english') || ety.includes('proto-germanic') || ety.includes('germanic') || ety.includes('anglo-saxon') || ety.includes('norse')) {
-      if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh'))) {
-        return 'Germanic: *standaną (立つ)';
-      }
-      return 'Germanic: ゲルマン祖語幹';
-    }
-
-    // ギリシャ語系
-    if (ety.includes('greek') || ety.includes('hellenic') || word.startsWith('tele') || word.startsWith('photo') || word.startsWith('dia') || word.startsWith('syn') || word.startsWith('sym') || word.startsWith('anti') || word.startsWith('auto') || word.startsWith('micro') || word.startsWith('macro')) {
+    // C. ギリシャ古典語系
+    const isGreek = ety.includes('greek') || ety.includes('hellenic') || greekPrefixes.some(pr => word.startsWith(pr.p));
+    if (isGreek) {
+      const matchedGreek = greekPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedGreek) return `Greek: ${matchedGreek.label}`;
       return 'Greek: ギリシャ古典語幹';
     }
 
-    // ラテン系英語（接頭辞あり、またはetymologyにlatin記載）
-    const matchedPrefix = prefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
-    if (matchedPrefix) {
-      return `Latin: ${matchedPrefix.label}`;
+    // D. ゲルマン祖語・古英語（本来語根）
+    const isExplicitGermanic = ety.includes('old english') || ety.includes('proto-germanic') || ety.includes('germanic') || ety.includes('anglo-saxon') || ety.includes('norse');
+    if (isExplicitGermanic) {
+      // 1) ゲルマン固有主要接頭辞
+      const matchedGmc = germanicPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedGmc) return `Germanic: ${matchedGmc.label}`;
+
+      // 2) 特殊語根 (*sta- 等)
+      if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh'))) {
+        return 'Germanic: *standaną (立つ)';
+      }
+
+      // 3) un- / be- / for- 特殊接頭辞
+      if (word.startsWith('un') && word.length > 3 && !['unit', 'unite', 'uncle', 'under', 'unique', 'union', 'until'].some(w => word.startsWith(w))) {
+        return 'Germanic: un- (否定/反転)';
+      }
+      if ((word.startsWith('be') && ['become', 'behold', 'befall', 'believe', 'behave', 'beset', 'beware', 'beside', 'between', 'beyond'].some(w => word.startsWith(w))) || ety.includes('be-')) {
+        return 'Germanic: be- (強調/他動化)';
+      }
+      if ((word.startsWith('for') && ['forbid', 'forgive', 'forget', 'forgo', 'forlorn', 'forsake', 'forbear'].some(w => word.startsWith(w))) || ety.includes('for-')) {
+        return 'Germanic: for- (徹底/禁止)';
+      }
+      if (word.startsWith('up') && ['upright', 'uphold', 'upset', 'upward', 'upbringing', 'upgrade', 'uproar', 'upheaval', 'upside'].some(w => word.startsWith(w))) {
+        return 'Germanic: up- (上方/向上)';
+      }
+
+      return 'Germanic: 古英語本来語幹 (Old English Core)';
+    }
+
+    // E. ラテン系英語（接頭辞あり、またはetymologyにlatin記載）
+    const matchedLatinPrefix = latinPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+    if (matchedLatinPrefix) {
+      return `Latin: ${matchedLatinPrefix.label}`;
     }
     if (ety.includes('latin') || ety.includes('lat.')) {
       if (rootKey === '*sta-') return 'Latin: stāre (立つ)';
       return 'Latin: 古典ラテン語幹';
     }
 
-    // 日本語借用語
+    // F. 日本語借用語
     if (lang === 'ja') {
       return 'Borrowed: 外来・学術受容';
     }
 
-    // 英語の標準語根派生（接頭辞なしの基本語は西ゲルマン語群へ自然に分類）
-    return 'Germanic: 西ゲルマン語群 (Old English)';
+    // G. 英語の標準語根派生（本来語・接頭辞付き本来語フォールバック）
+    const matchedDefaultGmc = germanicPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+    if (matchedDefaultGmc) {
+      return `Germanic: ${matchedDefaultGmc.label}`;
+    }
+    if (word.startsWith('un') && word.length > 3 && !['unit', 'unite', 'uncle', 'under', 'unique', 'union', 'until'].some(w => word.startsWith(w))) {
+      return 'Germanic: un- (否定/反転)';
+    }
+    if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh'))) {
+      return 'Germanic: *standaną (立つ)';
+    }
+
+    return 'Germanic: 西ゲルマン語群根幹 (Old English)';
   }
 
   /**
