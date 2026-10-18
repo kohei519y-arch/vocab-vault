@@ -263,41 +263,70 @@
   }
 
   /**
+   * 系統樹モードにおける古典分岐（Branch）の正規化・集約
+   * - 重複する同義接頭辞（con- / com-, in- / im- 等）を統合し、過密と文字衝突を根絶
+   * - ラテン語とロマンス語で同源の接頭辞を同一ブランチに統合
+   */
+  function normalizeBranch(bLabel) {
+    if (!bLabel) return 'Germanic: 西ゲルマン語群根幹 (Old English)';
+    let clean = String(bLabel).trim();
+    clean = clean.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic):\s*/i, '');
+
+    if (clean.startsWith('con-') || clean.startsWith('com-')) return 'Italic: con- / com- (共に)';
+    if (clean.startsWith('in-') || clean.startsWith('im-') || clean.startsWith('il-') || clean.startsWith('ir-')) return 'Italic: in- / im- (中に/否定)';
+    if (clean.startsWith('ad-') || clean.startsWith('ac-') || clean.startsWith('ap-') || clean.startsWith('at-')) return 'Italic: ad- (向かって)';
+    if (clean.startsWith('sub-') || clean.startsWith('suc-') || clean.startsWith('suf-') || clean.startsWith('sup-') || clean.startsWith('sus-')) return 'Italic: sub- (下に)';
+    if (clean.startsWith('per-') || clean.startsWith('par-')) return 'Italic: per- (完全に)';
+    if (clean.startsWith('ob-') || clean.startsWith('op-')) return 'Italic: ob- (対して)';
+    if (clean.startsWith('ex-') || clean.startsWith('ef-')) return 'Italic: ex- (外に)';
+    if (clean.startsWith('re-')) return 'Italic: re- (再び/後)';
+    if (clean.startsWith('de-') || clean.startsWith('dis-') || clean.startsWith('dé-') || clean.startsWith('des-')) return 'Italic: de- / dis- (分離/解除)';
+    if (clean.startsWith('pro-') || clean.startsWith('pre-') || clean.startsWith('pour-')) return 'Italic: pre- / pro- (前に)';
+    if (clean.startsWith('trans-') || clean.startsWith('tra-')) return 'Italic: trans- (越えて)';
+    if (clean.startsWith('フランス') || clean.startsWith('ロマンス') || clean.includes('romance') || clean.includes('french')) return 'Romance: フランス・ロマンス語根幹';
+    if (clean.startsWith('西ゲルマン') || clean.startsWith('古英語') || clean.includes('old english')) return 'Germanic: 西ゲルマン語群根幹 (Old English)';
+    if (clean.startsWith('ドイツ') || ['ver-', 'be-', 'auf-', 'ent-', 'er-', 'ge-', 'ab-', 'vor-', 'nach-', 'aus-', 'zer-'].some(x => clean.startsWith(x))) return 'Germanic: ドイツ語群本来語幹';
+    if (clean.startsWith('ギリシャ') || ['dia-', 'anti-', 'tele-', 'photo-', 'syn-', 'sym-', 'auto-', 'micro-', 'macro-', 'poly-', 'mono-', 'hyper-', 'hypo-'].some(x => clean.startsWith(x))) return 'Greek: ギリシャ古典語幹';
+
+    return bLabel;
+  }
+
+  /**
    * 語源テキスト・接頭辞から古典分岐（第2階層: Branch）を抽出
    */
-  function extractBranchInfo(item, rootKey) {
+  function extractBranchInfo(item, rootKey, itemLang = '') {
     const ety = String(item?.etymology || '').toLowerCase();
     const word = String(item?.word || '').toLowerCase();
-    const lang = String(item?.lang || 'en').toLowerCase();
+    const lang = String(itemLang || item?.lang || 'en').toLowerCase();
 
-    // 1. 古典ラテン語系の主要接頭辞
+    // 1. 古典ラテン語系の主要接頭辞（同義異形を統合し、過密と衝突を根絶）
     const latinPrefixes = [
-      { p: 'con', label: 'con- (共に)' },
-      { p: 'com', label: 'com- (共に)' },
+      { p: 'con', label: 'con- / com- (共に)' },
+      { p: 'com', label: 'con- / com- (共に)' },
       { p: 'sub', label: 'sub- (下に)' },
       { p: 'suc', label: 'sub- (下に)' },
       { p: 'suf', label: 'sub- (下に)' },
       { p: 'sup', label: 'sub- (下に)' },
       { p: 'sus', label: 'sub- (下に)' },
-      { p: 'in', label: 'in- (中に/否定)' },
-      { p: 'im', label: 'im- (中に/否定)' },
-      { p: 'il', label: 'in- (中に/否定)' },
-      { p: 'ir', label: 'in- (中に/否定)' },
+      { p: 'in', label: 'in- / im- (中に/否定)' },
+      { p: 'im', label: 'in- / im- (中に/否定)' },
+      { p: 'il', label: 'in- / im- (中に/否定)' },
+      { p: 'ir', label: 'in- / im- (中に/否定)' },
       { p: 'ex', label: 'ex- (外に)' },
       { p: 'per', label: 'per- (完全に)' },
       { p: 'trans', label: 'trans- (越えて)' },
       { p: 're', label: 're- (再び/後)' },
-      { p: 'pro', label: 'pro- (前に)' },
-      { p: 'pre', label: 'pre- (前に)' },
-      { p: 'de', label: 'de- (離れて)' },
+      { p: 'pro', label: 'pre- / pro- (前に)' },
+      { p: 'pre', label: 'pre- / pro- (前に)' },
+      { p: 'de', label: 'de- / dis- (分離/解除)' },
+      { p: 'dis', label: 'de- / dis- (分離/解除)' },
+      { p: 'di', label: 'de- / dis- (分離/解除)' },
       { p: 'ad', label: 'ad- (向かって)' },
       { p: 'ac', label: 'ad- (向かって)' },
       { p: 'ap', label: 'ad- (向かって)' },
       { p: 'at', label: 'ad- (向かって)' },
       { p: 'ob', label: 'ob- (対して)' },
       { p: 'op', label: 'ob- (対して)' },
-      { p: 'dis', label: 'dis- (分離)' },
-      { p: 'di', label: 'dis- (分離)' },
       { p: 'inter', label: 'inter- (相互)' },
       { p: 'contra', label: 'contra- (対抗)' },
       { p: 'counter', label: 'counter- (対抗)' }
@@ -306,14 +335,14 @@
     // 2. フランス・ロマンス諸語固有の変形・接頭辞階層
     const romancePrefixes = [
       { p: 'sur', label: 'sur- (上に/超越)' },
-      { p: 'en', label: 'en- (内部化/促成)' },
-      { p: 'em', label: 'em- (内部化/促成)' },
-      { p: 'dé', label: 'dé- (分離/解除)' },
-      { p: 'des', label: 'des- (分離/解除)' },
-      { p: 'par', label: 'par- (徹底/完了)' },
+      { p: 'en', label: 'en- / em- (内部化/促成)' },
+      { p: 'em', label: 'en- / em- (内部化/促成)' },
+      { p: 'dé', label: 'de- / dis- (分離/解除)' },
+      { p: 'des', label: 'de- / dis- (分離/解除)' },
+      { p: 'par', label: 'per- (完全に)' },
       { p: 'entre', label: 'entre- (相互/中間)' },
       { p: 'més', label: 'més- (過誤/悪)' },
-      { p: 'pour', label: 'pour- (推進/目的)' }
+      { p: 'pour', label: 'pre- / pro- (前に)' }
     ];
 
     // 3. 西ゲルマン語群・英語本来語（古英語）の固有接頭辞階層
@@ -373,11 +402,11 @@
         }
         return false;
       });
-      if (matchedRomance) return `Romance: ${matchedRomance.label}`;
+      if (matchedRomance) return `Italic: ${matchedRomance.label}`;
 
       // 2) ラテン共通接頭辞
       const matchedLatin = latinPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
-      if (matchedLatin) return `Romance: ${matchedLatin.label}`;
+      if (matchedLatin) return `Italic: ${matchedLatin.label}`;
 
       return 'Romance: フランス・ロマンス語根幹';
     }
@@ -430,7 +459,7 @@
     // E. ラテン系英語（接頭辞あり、またはetymologyにlatin記載）
     const matchedLatinPrefix = latinPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
     if (matchedLatinPrefix) {
-      return `Latin: ${matchedLatinPrefix.label}`;
+      return `Italic: ${matchedLatinPrefix.label}`;
     }
     if (ety.includes('latin') || ety.includes('lat.')) {
       if (rootKey === '*sta-') return 'Latin: stāre (立つ)';
@@ -749,7 +778,10 @@
         rNode.connectedWords.forEach(wNode => {
           validWordIds.add(wNode.id);
           const primRoot = wNode.connectedRoots?.[0]?.label || rNode.label;
-          const bLabel = extractBranchInfo(wNode.item, primRoot);
+          let bLabel = extractBranchInfo(wNode.item, primRoot, wNode.lang);
+          if (isTree || isUnifiedPIE) {
+            bLabel = normalizeBranch(bLabel);
+          }
 
           // 形態素語幹 (Level 4: Morphological Stem) の付与
           const stemInfo = global.VocabMorphology?.extractMorphologicalStem
@@ -838,7 +870,10 @@
           const budWord = budItem.word;
           const budWordData = budItem.meanings ? budItem : (global.VocabEikenCatalog ? global.VocabEikenCatalog.getWord(budWord) : null);
           const primRoot = budItem.rootLabel || rNode.label;
-          const bLabel = extractBranchInfo(budWordData, primRoot);
+          let bLabel = extractBranchInfo(budWordData, primRoot, 'en');
+          if (isTree || isUnifiedPIE) {
+            bLabel = normalizeBranch(bLabel);
+          }
 
           const bId = isUnifiedPIE ? `branch:pie:${bLabel}` : `branch:${rNode.label}:${bLabel}`;
           let bNode = branchMap.get(bId);
@@ -949,10 +984,10 @@
       // セクター（Angle / θ）による言語系統の空間分類:
       function classifyBranchSector(bLabel) {
         const bl = String(bLabel || '').toLowerCase();
-        if (bl.includes('germanic') || bl.includes('old english') || bl.includes('proto-germanic') || bl.includes('de')) {
+        if (bl.startsWith('germanic') || bl.includes('german') || bl.includes('old english') || bl.includes('deutsch')) {
           return 'germanic';
         }
-        if (bl.includes('latin') || bl.includes('romance') || bl.includes('fr')) {
+        if (bl.startsWith('italic') || bl.startsWith('latin') || bl.startsWith('romance') || bl.includes('french') || bl.includes('français')) {
           return 'latin';
         }
         return 'greek_other';
@@ -1034,43 +1069,42 @@
           if (!sDef || !bList || bList.length === 0) return;
           const numB = bList.length;
 
-          const pad = 0.05; // 境界線とのパディング
+          const pad = 0.06; // 境界線とのパディング
           const totalSpan = (sDef.end - sDef.start) - pad * 2;
 
           // セクター内の各ブランチの単語数（重み）を計算
-          const totalWordsInSector = bList.reduce((sum, b) => sum + Math.max(2.5, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
+          const totalWordsInSector = bList.reduce((sum, b) => sum + Math.max(3, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
 
           let currentTheta = sDef.start + pad;
 
           bList.forEach((bNode, bIdx) => {
             const bWords = (bNode.connectedWords?.length || 0) + (bNode.connectedBuds?.length || 0) * 0.5;
-            const weight = (numB === 1) ? 1.0 : Math.max(2.5, bWords) / Math.max(1, totalWordsInSector);
-            const branchSpan = (numB === 1) ? totalSpan : totalSpan * weight;
+            const rawWeight = Math.max(3, bWords) / Math.max(1, totalWordsInSector);
+            // 最低限の角度スパン（0.18 rad ≈ 10.3度）を確保してテキスト衝突を防止
+            const branchSpan = (numB === 1) ? totalSpan : Math.max(0.18, totalSpan * rawWeight);
             const thetaB = (numB === 1) ? sDef.center : (currentTheta + branchSpan / 2);
             currentTheta += branchSpan;
 
-            // 第1軌道: 古典分岐ノード (r = 220〜495 6段階スタガー配置でブランチ同士の接触・重合を解消し、広々と配分)
-            const bRadius = (numB <= 2) ? 250 : (220 + (bIdx % 6) * 55);
+            // 第1軌道: 古典分岐ノード (r = 240, 315, 390 3段階スタガー配置でブランチ同士の接触・重合を解消)
+            const bRadius = (numB <= 2) ? 260 : (240 + (bIdx % 3) * 75);
             bNode.targetX = rNode.targetX + bRadius * Math.cos(thetaB);
             bNode.targetY = rNode.targetY + bRadius * Math.sin(thetaB);
             bNode.angle = thetaB;
 
-            // 第2軌道〜外周軌道: 現代語の学習済ノード (Multi-Orbit Staggering: 560px〜)
-            // 単語同士の物理距離を十分に空けるため、ベース半径を560pxに拡張し、軌道間隔を広げ、オービット数を増やす
+            // 第2軌道〜外周軌道: 現代語の学習済ノード (Multi-Orbit Staggering: 500px〜)
+            // 単語同士の物理距離を十分に空けつつ、親ブランチの放射コーン内に収めて扇状に整然と配置
             const leaves = bNode.connectedWords || [];
             const leafCount = leaves.length;
 
-            const baseLeafR = 560; // 440 -> 560 (周長が27%拡大し、外周にゆったりと展開)
-            const leafOrbitGap = leafCount > 80 ? 84 : (leafCount > 30 ? 96 : 110); // 軌道間隔を大幅拡大
+            const baseLeafR = 500;
+            const leafOrbitGap = 72;
 
-            // 1軌道あたりのノード密度を抑えるため、オービット数をより積極的に展開
-            const numLeafOrbits = Math.min(22, Math.max(2, Math.ceil(Math.sqrt(leafCount * 2.6))));
+            // 軌道数の動的計算（1〜5軌道）
+            const numLeafOrbits = leafCount > 24 ? 5 : (leafCount > 12 ? 4 : (leafCount > 6 ? 3 : (leafCount > 2 ? 2 : 1)));
 
-            // 各軌道で最低64pxの周方向物理距離を保証するための必要スパン計算
-            const maxNodesPerBucket = Math.ceil(leafCount / Math.max(1, numLeafOrbits));
-            const neededArcSpan = (maxNodesPerBucket > 1) ? ((maxNodesPerBucket - 1) * (64 / baseLeafR)) : 0.10;
-            const minSpanForLeaves = Math.min(Math.PI * 0.85, Math.max(neededArcSpan, leafCount * 0.088));
-            const lSpan = Math.max(branchSpan * 0.95, minSpanForLeaves);
+            // 親ブランチの角度スパン内に収め、他ブランチの単語領域と交差・重複しないように厳密にバインド
+            const maxAllowedSpan = Math.min(branchSpan * 0.88, 0.45);
+            const lSpan = Math.min(maxAllowedSpan, Math.max(0.06, (leafCount - 1) * 0.035));
             const lStart = thetaB - lSpan / 2;
 
             const orbitBuckets = Array.from({ length: numLeafOrbits }, () => []);
@@ -1095,13 +1129,13 @@
                 lNode.targetY = rNode.targetY + leafR * Math.sin(thetaL);
                 lNode.angle = thetaL;
 
-                // 派生語・成句 (Twigs: 親単語から放射状に56px外側へ分岐)
+                // 派生語・成句 (Twigs: 親単語から放射状に48px外側へ分岐)
                 const myTwigs = twigs.filter(t => t.parentWord === lNode.label);
                 myTwigs.forEach((tNode, tIdx) => {
-                  const twigOffset = (myTwigs.length === 1) ? 0 : (tIdx === 0 ? -0.050 : 0.050);
+                  const twigOffset = (myTwigs.length === 1) ? 0 : (tIdx === 0 ? -0.040 : 0.040);
                   const thetaT = thetaL + twigOffset;
-                  tNode.targetX = lNode.targetX + 56 * Math.cos(thetaT);
-                  tNode.targetY = lNode.targetY + 56 * Math.sin(thetaT);
+                  tNode.targetX = lNode.targetX + 48 * Math.cos(thetaT);
+                  tNode.targetY = lNode.targetY + 48 * Math.sin(thetaT);
                   tNode.angle = thetaT;
                 });
               });
@@ -1111,15 +1145,13 @@
             const buds = bNode.connectedBuds || [];
             const budCount = buds.length;
 
-            const maxLeafOrbitR = baseLeafR + (numLeafOrbits - 1) * leafOrbitGap;
-            const budBaseR = Math.max(maxLeafOrbitR + 125, 820);
-            const numBudOrbits = budCount > 15 ? 4 : (budCount > 6 ? 3 : (budCount > 3 ? 2 : 1));
-            const budOrbitGap = 88;
+            const maxLeafOrbitR = baseLeafR + Math.max(0, numLeafOrbits - 1) * leafOrbitGap;
+            const budBaseR = maxLeafOrbitR + 80;
+            const numBudOrbits = budCount > 12 ? 3 : (budCount > 4 ? 2 : 1);
+            const budOrbitGap = 75;
 
-            const maxBudsPerBucket = Math.ceil(budCount / Math.max(1, numBudOrbits));
-            const neededBudSpan = (maxBudsPerBucket > 1) ? ((maxBudsPerBucket - 1) * (64 / budBaseR)) : 0.12;
-            const bSpan = Math.max(branchSpan * 0.92, neededBudSpan, 0.20);
-            const budStart = thetaB - bSpan / 2;
+            const budSpan = Math.min(branchSpan * 0.85, 0.42);
+            const budStart = thetaB - budSpan / 2;
 
             const budBuckets = Array.from({ length: numBudOrbits }, () => []);
             buds.forEach((budNode, budIdx) => {
@@ -1131,7 +1163,7 @@
               const countInBBucket = bBucket.length;
               if (countInBBucket === 0) return;
 
-              const bStep = (countInBBucket > 1) ? (bSpan / (countInBBucket - 1)) : 0;
+              const bStep = (countInBBucket > 1) ? (budSpan / (countInBBucket - 1)) : 0;
               const bStaggerShift = (countInBBucket > 1 && boIdx % 2 === 1) ? (bStep * 0.5) : 0;
 
               bBucket.forEach((budNode, bbIdx) => {
@@ -1155,16 +1187,16 @@
           if (parentNode && parentNode.targetX !== undefined) {
             const pAngle = parentNode.angle || 0;
             const thetaT = pAngle + (tIdx % 2 === 0 ? -0.040 : 0.040);
-            tNode.targetX = parentNode.targetX + 50 * Math.cos(thetaT);
-            tNode.targetY = parentNode.targetY + 50 * Math.sin(thetaT);
+            tNode.targetX = parentNode.targetX + 48 * Math.cos(thetaT);
+            tNode.targetY = parentNode.targetY + 48 * Math.sin(thetaT);
           }
         }
       });
 
-      // ノード間の空間的重複をゼロにし、十分な間隔（72px以上）を担保する高速空間ハッシュ緩和パス (O(N) Relaxation Pass)
+      // 緩和パス (O(N) Relaxation Pass): 重なり防止の微小補正
       const placedNodes = nodes.filter(n => n.targetX !== undefined && n.type !== 'root');
-      const rCell = 96;
-      const passes = placedNodes.length > 800 ? 6 : (placedNodes.length > 200 ? 10 : 16);
+      const rCell = 80;
+      const passes = 3;
 
       for (let pass = 0; pass < passes; pass++) {
         const sGrid = new Map();
@@ -1195,11 +1227,11 @@
                 const dy = nb.targetY - na.targetY;
                 const distSq = dx * dx + dy * dy;
                 const minDist = (na.type === 'branch' && nb.type === 'branch')
-                  ? 88
-                  : ((na.type === 'word' && nb.type === 'word') ? 72 : 62);
+                  ? 80
+                  : ((na.type === 'word' && nb.type === 'word') ? 60 : 50);
                 if (distSq < minDist * minDist && distSq > 0.001) {
                   const dist = Math.sqrt(distSq);
-                  const push = (minDist - dist) * 0.38;
+                  const push = Math.min(3.5, (minDist - dist) * 0.25);
                   const px = (dx / dist) * push;
                   const py = (dy / dist) * push;
                   na.targetX -= px;
@@ -1213,9 +1245,9 @@
         }
       }
 
-      // 初期位置のセット
+      // 初期位置のセット（系統樹モード時はターゲット確定座標で初期化）
       nodes.forEach(n => {
-        if (n.x === 0 && n.y === 0 && n.targetX !== undefined) {
+        if (n.targetX !== undefined) {
           n.x = n.targetX;
           n.y = n.targetY;
         }
@@ -2037,11 +2069,11 @@
     const scaleX = (availableW - pad * 2) / w;
     const scaleY = (availableH - pad * 2) / h;
     const isTree = (graphState.layoutMode === 'tree');
-    const minZ = 0.50;
+    const minZ = isTree ? 0.32 : 0.50;
     const maxZ = isTree ? 1.65 : 1.35;
     const targetZoom = Math.min(Math.max(Math.min(scaleX, scaleY), minZ), maxZ);
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
+    const centerX = isTree ? 0 : (minX + maxX) / 2;
+    const centerY = isTree ? 0 : (minY + maxY) / 2;
 
     const { cx, cy } = getEffectiveViewportCenter();
     graphState.zoom = targetZoom;
@@ -3056,6 +3088,14 @@
     const backdrop = document.getElementById('graphEikenBackdrop');
     const btn = document.getElementById('graphEikenExplorerBtn');
 
+    // 閉じる指示（forceState === false）の場合は、ドロワーを閉じるのみでレイアウトモードの移行は行わない
+    if (forceState === false) {
+      if (drawer) drawer.style.display = 'none';
+      if (backdrop) backdrop.style.display = 'none';
+      if (btn) btn.classList.remove('active');
+      return;
+    }
+
     // 系統樹ビューでない場合は、即座に系統樹 & スキルツリーモードへ移行してツリーに内包展開
     if (graphState.layoutMode !== 'tree' || graphState.activeViewTab !== 'tree') {
       graphState.layoutMode = 'tree';
@@ -3568,8 +3608,8 @@
       }
 
       // 大規模語彙（3,000単語規模）最適化:
-      // 超俯瞰時 (zoom < 0.60) は末端の細い現代語エッジを省略し、主要ブランチの主幹導管のみを描画（60FPS維持 & 毛玉化防止）
-      if (isTree && zoom < 0.60 && !focusNode && !isFiltered && (e.kind === 'branch_to_leaf' || e.kind === 'leaf_to_twig' || e.kind === 'bud_edge')) {
+      // 超俯瞰時 (zoom < 0.22) のみ末端の小枝・つぼみエッジを省略
+      if (isTree && zoom < 0.22 && !focusNode && !isFiltered && (e.kind === 'leaf_to_twig' || e.kind === 'bud_edge')) {
         continue;
       }
 
@@ -3607,9 +3647,9 @@
           ctx.lineWidth = 2.0;
           if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
         } else if (isTree && e.kind === 'branch_to_leaf') {
-          // 古典枝から現代見出し語への導管
+          // 古典枝から現代見出し語への導管（常に明瞭に描画）
           ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.45)' : 'rgba(37, 99, 235, 0.40)';
-          ctx.lineWidth = 1.2;
+          ctx.lineWidth = zoom < 0.45 ? 0.9 : 1.3;
           if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
         } else {
           // FSRS Stability S 連動の枝の太さと光彩
@@ -3924,7 +3964,7 @@
           ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)';
           ctx.lineWidth = 3.0;
           ctx.textAlign = 'center';
-          const cleanBranchLabel = n.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed):\s*/i, '');
+          const cleanBranchLabel = n.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic):\s*/i, '');
           const wCount = n.connectedWords?.length || 0;
           const displayBranchText = wCount > 0 ? `${cleanBranchLabel} (${wCount})` : cleanBranchLabel;
           ctx.strokeText(displayBranchText, n.x, n.y + drawRadius + bFontSize + 2);
@@ -4346,7 +4386,7 @@
             tt.innerHTML = `<strong>語根: ${escFn(hit.label)}</strong><div>派生単語: ${hit.childCount}語 (${escFn(wordsPreview)}${more})</div><div style="font-size:10px;color:var(--m);margin-top:3px">クリックで詳細・Anki特訓パネルを表示</div>`;
           } else if (hit.type === 'branch') {
             const wCount = hit.connectedWords?.length || 0;
-            const cleanLabel = hit.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed):\s*/i, '');
+            const cleanLabel = hit.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic):\s*/i, '');
             tt.innerHTML = `<strong>古典分岐: ${escFn(cleanLabel)}</strong><div>収録単語: ${wCount}語</div><div style="font-size:10px;color:var(--m);margin-top:3px">クリックでブランチ特訓</div>`;
           } else if (hit.type === 'ghost_bud') {
             tt.innerHTML = `<strong>${escFn(hit.label)} <span style="font-size:10px;color:#ea580c;font-weight:400">[未開拓スキル]</span></strong><div>印欧祖語「${escFn(hit.rootLabel)}」の重要語彙</div><div style="font-size:10px;color:var(--m);margin-top:3px">クリックで単語帳に追加</div>`;
