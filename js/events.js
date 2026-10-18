@@ -683,6 +683,13 @@
         } else if (typeof global.VocabListView?.resetFilters === 'function') {
           global.VocabListView.resetFilters(appState, () => ctx.render?.());
         }
+      } else if (act === 'open-upsell') {
+        const reason = el.dataset.reason || '';
+        if (global.VocabModal && typeof global.VocabModal.openUpsellModal === 'function') {
+          global.VocabModal.openUpsellModal(reason);
+        } else if (typeof ctx.openUpsellModal === 'function') {
+          ctx.openUpsellModal(reason);
+        }
       } else if (act === 'rate') {
         const rateVal = Number(el.dataset.rate);
         if (global.VocabAnkiView) global.VocabAnkiView.procRev(rateVal, ctx.ankiCtx?.() || {});

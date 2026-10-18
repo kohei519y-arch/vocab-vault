@@ -211,12 +211,12 @@ serve(async (req) => {
     }
 
     // [P2-2 解決] インメモリ Map (ipBurstTracker / guestRateMemory) の長期メモリリーク防止 (nowMs を再利用)
-    if (ipBurstTracker.size > 5000) {
+    if (ipBurstTracker.size > 200) {
       for (const [k, v] of ipBurstTracker.entries()) {
         if (nowMs > v.resetAt) ipBurstTracker.delete(k);
       }
     }
-    if (guestRateMemory.size > 5000) {
+    if (guestRateMemory.size > 500) {
       const todayPrefix = `_${new Date().toISOString().slice(0, 10)}`;
       for (const k of guestRateMemory.keys()) {
         if (!k.endsWith(todayPrefix)) guestRateMemory.delete(k);

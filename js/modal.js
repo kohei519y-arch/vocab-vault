@@ -319,6 +319,11 @@
 
     const curQuota = global.App?.quotaRemaining ?? 30;
     if ($('quotaNum')) $('quotaNum').textContent = curQuota;
+
+    const isSessionOnly = (global.lsGet ? global.lsGet('vv_key_session_only', '0') : '0') === '1' || Boolean(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('vv_gemini_api_key'));
+    if ($('chkApiKeySessionOnly')) $('chkApiKeySessionOnly').checked = isSessionOnly;
+    if ($('apiKeyInput')) $('apiKeyInput').value = global.getKey ? global.getKey() : '';
+
     toggleModal('settingsModal', true);
   }
 
@@ -406,10 +411,20 @@
 
   async function saveKeyFromModal() {
     const k = $('apiKeyInput')?.value?.trim() || $('customApiKey')?.value?.trim() || '';
-    if (global.setKey) global.setKey(k);
-    else if (global.lsSet) global.lsSet('vv_gemini_api_key', k);
-    else if (typeof localStorage !== 'undefined') {
+    const isSessionOnly = $('chkApiKeySessionOnly')?.checked === true;
+    if (global.setKey) {
+      global.setKey(k, isSessionOnly);
+    } else if (isSessionOnly) {
+      try { sessionStorage.setItem('vv_gemini_api_key', k); } catch {}
+      try { localStorage.removeItem('vv_gemini_api_key'); } catch {}
+      if (global.lsSet) global.lsSet('vv_key_session_only', '1');
+    } else if (global.lsSet) {
+      global.lsSet('vv_gemini_api_key', k);
+      try { sessionStorage.removeItem('vv_gemini_api_key'); } catch {}
+      global.lsSet('vv_key_session_only', '0');
+    } else if (typeof localStorage !== 'undefined') {
       try { localStorage.setItem('vv_gemini_api_key', k); } catch {}
+      try { sessionStorage.removeItem('vv_gemini_api_key'); } catch {}
     }
     if (global.App) global.App.cachedModels = null;
     if (global.updKeyUI) global.updKeyUI();
@@ -604,8 +619,13 @@
 
   function updateExtCounts() {
     const App = global.App || {};
-    const n = (App.extCandidates || []).filter(c => c.checked).length;
-    if ($('extResCount')) $('extResCount').textContent = `抽出候補: ${(App.extCandidates || []).length} 語 （選択: ${n} 語）`;
+    const list = App.extCandidates || [];
+    const n = list.filter(c => c.checked).length;
+    const alr = list.filter(c => c.already).length;
+    const unadded = list.length - alr;
+    if ($('extResCount')) {
+      $('extResCount').innerHTML = `<span>抽出候補: ${list.length} 語</span> <small style="font-size:11px;color:var(--s);margin-left:6px">（未登録: <strong style="color:var(--ok)">${unadded}</strong> 語 / 登録済: <strong style="color:var(--m)">${alr}</strong> 語）</small>`;
+    }
     if ($('btnCommitExt')) {
       $('btnCommitExt').disabled = !n;
       $('btnCommitExt').textContent = `選択した ${n} 語を一括登録`;
@@ -621,9 +641,13 @@
     }
   }
 
-  function toggleAllExtChecks(f) {
+  function toggleAllExtChecks(mode) {
     const App = global.App || {};
-    (App.extCandidates || []).forEach(c => { c.checked = f ? !c.already : false; });
+    (App.extCandidates || []).forEach(c => {
+      if (mode === 'all') c.checked = true;
+      else if (mode === true) c.checked = !c.already;
+      else c.checked = false;
+    });
     renderExtCandidates();
   }
 

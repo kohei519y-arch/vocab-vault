@@ -503,7 +503,7 @@ etymology:${eInst}`;
               card.dataset.srcLang = sLang;
               card.dataset.tgtLang = tLang;
               card.dataset.pairKey = saveKey;
-              card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成枠上限（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">本日の無料枠(5語/日)に達しました。Proプランで無制限に生成できます。</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" onclick="openUpsellModal('無料枠到達')">アップグレード</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
+              card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成枠上限（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">本日の無料枠(5語/日)に達しました。Proプランで無制限に生成できます。</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="open-upsell" data-reason="無料枠到達">アップグレード</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
             }
             syncPersistedQueue();
             return false;
@@ -637,6 +637,12 @@ etymology:${eInst}`;
 
       if (global.VocabStorage) global.VocabStorage.saveTombstones(saveKey, tombMap);
       if (setJsonFn) setJsonFn(saveKey, cur.map((it, i) => ({ ...it, num: i + 1 })), false, true);
+      if (saveKey === pairCfg.key && typeof loadFn === 'function') {
+        try { loadFn(App.page || 1); } catch {}
+      }
+      if (global.showToast && matchedIndices.size > 0) {
+        global.showToast(`単語カード生成完了: ${items.map(x=>x.word).join(', ')}（${matchedIndices.size}語）を追加しました`, 'ok', 3500);
+      }
 
       if (global.VocabStorage && matchedIndices.size > 0) {
         if (usedModel === 'shared-cache') {

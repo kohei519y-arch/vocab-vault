@@ -137,8 +137,9 @@
   }
 
   function getConfig() {
-    const url = (safeLsGet(SUPABASE_URL_KEY, '') || DEFAULT_SUPABASE_URL).trim().replace(/\/+$/, '');
-    const anonKey = (safeLsGet(SUPABASE_ANON_KEY, '') || DEFAULT_SUPABASE_ANON_KEY).trim();
+    const override = (typeof window !== 'undefined' && window.SUPABASE_CONFIG_OVERRIDE) ? window.SUPABASE_CONFIG_OVERRIDE : {};
+    const url = (override.url || safeLsGet(SUPABASE_URL_KEY, '') || DEFAULT_SUPABASE_URL).trim().replace(/\/+$/, '');
+    const anonKey = (override.anonKey || safeLsGet(SUPABASE_ANON_KEY, '') || DEFAULT_SUPABASE_ANON_KEY).trim();
     return { url, anonKey, configured: Boolean(url && anonKey && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) };
   }
 

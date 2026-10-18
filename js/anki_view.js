@@ -295,6 +295,7 @@
       appState.aList = reviewCandidates.slice(0, cap);
       appState.ankiTotalCount = appState.aList.length;
       appState.ankiHistory = [];
+      appState._sessionReviewedItems = [];
     }
 
     const listView = $('listView'), ctrlForm = $('ctrlForm'), anki = $('anki');
@@ -794,6 +795,16 @@
       e.updatedAt = now;
     }
 
+    if (!appState._sessionReviewedItems) appState._sessionReviewedItems = [];
+    appState._sessionReviewedItems.push({
+      word: e.word || cur.word,
+      lang: tL,
+      rating: r,
+      roots: Array.isArray(e.etymologyTags) ? e.etymologyTags : (Array.isArray(cur.etymologyTags) ? cur.etymologyTags : []),
+      stabilityBefore: Number(cur.stability) || 1,
+      stabilityAfter: Number(e.stability) || 1
+    });
+
     if (typeof ctx.saveList === 'function') ctx.saveList(targetKey, list);
     if (targetKey === curPairKey) {
       appState.entries = list;
@@ -809,7 +820,82 @@
       const finalStreak = getStreakInfo(ctx);
       const streakTxt = finalStreak.streak > 0 ? ` / 連続: ${finalStreak.streak}日` : '';
       ctx.showToast?.(`本日の復習完了。本日: ${finalGoal.count}語${streakTxt}`, 'ok', 4000);
-      exitAnki(ctx);
+      showSessionSummary(ctx, appState._sessionReviewedItems || []);
+    }
+  }
+
+  /**
+   * 復習完了時の「今日伸びた語根ネットワーク領域」ビジュアルフィードバック
+   */
+  function showSessionSummary(ctx = {}, reviewedItems = []) {
+    const aCard = $('aCard');
+    const aDiv = $('aDiv'), aBack = $('aBack'), aRat = $('aRat'), btnAns = $('btnAns');
+    if (aDiv) aDiv.style.display = 'none';
+    if (aBack) aBack.style.display = 'none';
+    if (aRat) aRat.style.display = 'none';
+    if (btnAns) btnAns.style.display = 'none';
+
+    const finalGoal = getDailyGoalInfo(ctx);
+    const finalStreak = getStreakInfo(ctx);
+    const streakTxt = finalStreak.streak > 0 ? `${finalStreak.streak}日連続達成` : '';
+
+    // 語根ごとの成長集計
+    const rootGrowthMap = new Map();
+    let correctCount = 0;
+    (reviewedItems || []).forEach(it => {
+      if (it.rating >= 2) correctCount++;
+      const sGrowth = Math.max(0, it.stabilityAfter - it.stabilityBefore);
+      (it.roots || []).forEach(r => {
+        if (!r || typeof r !== 'string' || !r.startsWith('*')) return;
+        const cur = rootGrowthMap.get(r) || { count: 0, growth: 0 };
+        cur.count++;
+        cur.growth += sGrowth;
+        rootGrowthMap.set(r, cur);
+      });
+    });
+
+    const totalRev = reviewedItems.length;
+    const accuracy = totalRev > 0 ? Math.round((correctCount / totalRev) * 100) : 100;
+    const topRoots = [...rootGrowthMap.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5);
+
+    const rootListHtml = topRoots.length > 0 ? topRoots.map(([r, d]) => {
+      const growthPct = Math.min(100, Math.round((d.growth / Math.max(1, d.count)) * 20));
+      return `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-hov);border:1px solid var(--b);border-radius:6px;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-family:var(--mono);font-weight:700;color:var(--ac);font-size:13px">${esc(r)}</span>
+            <span style="font-size:11px;color:var(--s)">${d.count}語 定着強化</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--ok)">+${Math.max(12, growthPct)}% 安定度UP</span>
+            <button type="button" class="btn-xs btn-o" data-act="open-graph" data-root="${esc(r)}">系統樹</button>
+          </div>
+        </div>
+      `;
+    }).join('') : `<div style="font-size:12px;color:var(--s);text-align:center;padding:12px">語源ネットワークの記憶定着度が向上しました。</div>`;
+
+    if (aCard) {
+      aCard.innerHTML = `
+        <div style="padding:24px 20px;text-align:center">
+          <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:rgba(16,185,129,0.15);color:var(--ok);margin-bottom:12px">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <h2 style="font-size:18px;font-weight:750;color:var(--t);margin:0 0 6px">本日の復習セッション完了</h2>
+          <p style="font-size:12.5px;color:var(--s);margin:0 0 16px">本日: <strong>${finalGoal.count}</strong> 語復習完了 ${streakTxt ? `（${streakTxt}）` : ''} / 正答率: <strong>${accuracy}%</strong></p>
+
+          <div style="text-align:left;margin-bottom:18px">
+            <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:8px">本日成長した語根ネットワーク領域</div>
+            ${rootListHtml}
+          </div>
+
+          <div style="display:flex;justify-content:center;gap:10px">
+            <button type="button" class="btn-ac" id="btnFinishAnkiSession" style="padding:9px 24px;font-size:13px;font-weight:600">一覧に戻る</button>
+          </div>
+        </div>
+      `;
+      $('btnFinishAnkiSession')?.addEventListener('click', () => exitAnki(ctx));
     }
   }
 
@@ -1249,6 +1335,7 @@
     procRev,
     undoAnkiRev,
     exitAnki,
+    showSessionSummary,
     getCommitHeatmapData,
     getFutureWorkloadData,
     getOverallRetrievabilityStats,

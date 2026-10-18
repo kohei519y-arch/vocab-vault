@@ -1356,6 +1356,13 @@
     },
 
     /**
+     * 登録済みカタログ単語リストの全キーを配列で取得
+     */
+    getAllWords: function() {
+      return Array.from(WORD_INDEX.keys());
+    },
+
+    /**
      * 現在の単語帳（currentEntries）と照合して、語根ごとの達成率・未学習語を計算
      */
     calcProgress: function(currentEntries) {

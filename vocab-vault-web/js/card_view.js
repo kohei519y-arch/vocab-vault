@@ -25,6 +25,49 @@
 
   const ETY_CONF_LABELS = { certain: '確実', probable: '有力', disputed: '諸説', unknown: '語源不明' };
 
+  /**
+   * 文法上の性別判定 (フランス語・ドイツ語の名詞)
+   */
+  function detectGrammaticalGender(item, lang = 'en') {
+    if (!item || !['fr', 'de'].includes(lang)) return null;
+    const gField = String(item.gender || '').trim().toLowerCase();
+    const gForm = String(item.grammar_forms || '').trim();
+    const w = String(item.word || '').trim();
+    const pos = (item.meanings?.[0]?.pos || '').trim();
+
+    // 1. 直接指定フィールド
+    if (['m', 'masc', 'masculin', 'masculine'].includes(gField)) {
+      return { cls: 'masc', label: lang === 'de' ? 'der (m)' : 'le (m)', full: '男性名詞' };
+    }
+    if (['f', 'fem', 'feminin', 'feminine'].includes(gField)) {
+      return { cls: 'fem', label: lang === 'de' ? 'die (f)' : 'la (f)', full: '女性名詞' };
+    }
+    if (lang === 'de' && ['n', 'neut', 'neutral', 'neuter'].includes(gField)) {
+      return { cls: 'neut', label: 'das (n)', full: '中性名詞' };
+    }
+
+    // 2. 品詞タグからの判定 (N[m], N[f], N[n])
+    if (/N\[m\]/i.test(pos)) return { cls: 'masc', label: lang === 'de' ? 'der (m)' : 'le (m)', full: '男性名詞' };
+    if (/N\[f\]/i.test(pos)) return { cls: 'fem', label: lang === 'de' ? 'die (f)' : 'la (f)', full: '女性名詞' };
+    if (lang === 'de' && /N\[n\]/i.test(pos)) return { cls: 'neut', label: 'das (n)', full: '中性名詞' };
+
+    // 3. grammar_forms からの定冠詞・性別記号判定
+    if (lang === 'fr') {
+      if (/\b(?:le|un|l')\b/i.test(gForm) || /\[m\]|\bm\./i.test(gForm)) return { cls: 'masc', label: 'le (m)', full: '男性名詞' };
+      if (/\b(?:la|une)\b/i.test(gForm) || /\[f\]|\bf\./i.test(gForm)) return { cls: 'fem', label: 'la (f)', full: '女性名詞' };
+      if (/^le\s+/i.test(w)) return { cls: 'masc', label: 'le (m)', full: '男性名詞' };
+      if (/^la\s+/i.test(w)) return { cls: 'fem', label: 'la (f)', full: '女性名詞' };
+    } else if (lang === 'de') {
+      if (/\bder\b/i.test(gForm) || /\[m\]|\bm\./i.test(gForm)) return { cls: 'masc', label: 'der (m)', full: '男性名詞' };
+      if (/\bdie\b/i.test(gForm) || /\[f\]|\bf\./i.test(gForm)) return { cls: 'fem', label: 'die (f)', full: '女性名詞' };
+      if (/\bdas\b/i.test(gForm) || /\[n\]|\bn\./i.test(gForm)) return { cls: 'neut', label: 'das (n)', full: '中性名詞' };
+      if (/^der\s+/i.test(w)) return { cls: 'masc', label: 'der (m)', full: '男性名詞' };
+      if (/^die\s+/i.test(w)) return { cls: 'fem', label: 'die (f)', full: '女性名詞' };
+      if (/^das\s+/i.test(w)) return { cls: 'neut', label: 'das (n)', full: '中性名詞' };
+    }
+    return null;
+  }
+
   const editSvg = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
   const delSvg = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
   const graphSvg = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>';
@@ -200,6 +243,8 @@
       if (i.id) c.dataset.id = i.id;
 
       const homoHtml = i.homographIndex > 1 ? `<span class="homo-badge" title="同形異義語 #${i.homographIndex}">#${i.homographIndex}</span>` : '';
+      const gender = detectGrammaticalGender(i, iL);
+      const genderHtml = gender ? `<span class="gender-badge ${gender.cls}" title="${esc(gender.full)}">${esc(gender.label)}</span>` : '';
       const gramHtml = i.grammar_forms ? `<div class="gram-line">${hlText(i.grammar_forms, false, options.queryReg)}</div>` : '';
       const spkFn = (txt, l) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l) : '';
       const crossPill = options.crossLang ? `<span class="lang-pill">${esc(iL.toUpperCase())}</span>` : '';
@@ -207,7 +252,7 @@
       const catHtml = i.category ? `<span class="tag" data-act="filter" data-type="cat" data-val="${esc(i.category)}">${esc(i.category)}</span>` : '';
       const folHtml = i.folder ? `<span class="tag" style="border-style:dashed" data-act="filter" data-type="fol" data-val="${esc(i.folder)}">${esc(i.folder)}</span>` : '';
 
-      c.innerHTML = `<div class="card-acts"><button type="button" class="act-icon-btn" data-act="edit" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="カードを編集" aria-label="編集">${editSvg}</button><button type="button" class="act-icon-btn del-btn" data-act="del" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="削除" aria-label="削除">${delSvg}</button></div><div class="col-left"><div class="hw-wrap"><span class="id">#${i.num || 0}</span>${crossPill}${homoHtml}<span class="hw" data-act="speak" data-text="${esc(i.word || '')}" data-lang="${esc(iL)}" title="クリックでネイティブ発音">${hlText(i.word || '', false, options.queryReg)}</span>${spkFn(i.word || '', iL)}</div>${gramHtml}<div class="tag-wrap">${catHtml}${folHtml}</div><div class="pho">${esc(fmtPho(i.phonetic))}<span class="due ${due ? 'is-due' : 'is-fut'}">${relTime(i.nextReview)}</span></div></div>${buildRight(i, options)}`;
+      c.innerHTML = `<div class="card-acts"><button type="button" class="act-icon-btn" data-act="edit" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="カードを編集" aria-label="編集">${editSvg}</button><button type="button" class="act-icon-btn del-btn" data-act="del" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="削除" aria-label="削除">${delSvg}</button></div><div class="col-left"><div class="hw-wrap"><span class="id">#${i.num || 0}</span>${crossPill}${homoHtml}${genderHtml}<span class="hw" data-act="speak" data-text="${esc(i.word || '')}" data-lang="${esc(iL)}" title="クリックでネイティブ発音">${hlText(i.word || '', false, options.queryReg)}</span>${spkFn(i.word || '', iL)}</div>${gramHtml}<div class="tag-wrap">${catHtml}${folHtml}</div><div class="pho">${esc(fmtPho(i.phonetic))}<span class="due ${due ? 'is-due' : 'is-fut'}">${relTime(i.nextReview)}</span></div></div>${buildRight(i, options)}`;
       return c;
     } catch (err) {
       if (typeof console !== 'undefined' && typeof console.warn === 'function') {
@@ -353,6 +398,7 @@
 
   // --- グローバルエクスポート ---
   global.VocabCardView = {
+    detectGrammaticalGender,
     highlightPlain,
     hlText,
     relTime,

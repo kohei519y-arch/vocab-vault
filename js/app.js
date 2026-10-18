@@ -809,7 +809,26 @@
   const generateWithInternalAI = (payloadItems, sLang, tLang, fName, useHist, wiktMap) => global.VocabDictionary ? global.VocabDictionary.generateWithInternalAI(payloadItems, sLang, tLang, fName, useHist, wiktMap) : { items: [], usedModel: 'fallback' };
 
   // --- 5. Wiktionary API & Gemini API (js/dictionary.js へ分離・委譲) ---
-  const getKey = () => String(EMBEDDED_KEY || lsGet('vv_gemini_api_key')).trim();
+  const getKey = () => {
+    let sessKey = '';
+    try { sessKey = (typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('vv_gemini_api_key') : '') || ''; } catch {}
+    return String(sessKey || EMBEDDED_KEY || lsGet('vv_gemini_api_key')).trim();
+  };
+
+  const setKey = (k, isSessionOnly = false) => {
+    const cleanK = String(k || '').trim();
+    if (isSessionOnly) {
+      try { sessionStorage.setItem('vv_gemini_api_key', cleanK); } catch {}
+      try { localStorage.removeItem('vv_gemini_api_key'); } catch {}
+      lsSet('vv_key_session_only', '1');
+    } else {
+      lsSet('vv_gemini_api_key', cleanK);
+      try { sessionStorage.removeItem('vv_gemini_api_key'); } catch {}
+      lsSet('vv_key_session_only', '0');
+    }
+  };
+  global.setKey = setKey;
+  global.getKey = getKey;
   const extractCleanIpa = section => global.VocabDictionary ? global.VocabDictionary.extractCleanIpa(section) : '';
   const extractWiktLangSection = (fullText, targetLang, host) => global.VocabDictionary ? global.VocabDictionary.extractWiktLangSection(fullText, targetLang, host) : null;
   const fetchWiktOne = (word, targetLang) => global.VocabDictionary ? global.VocabDictionary.fetchWiktOne(word, targetLang) : null;

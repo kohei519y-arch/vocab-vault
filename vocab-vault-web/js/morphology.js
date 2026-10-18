@@ -601,9 +601,86 @@
     };
   }
 
+  /**
+   * レーベンシュタイン距離の計算 (O(min(N, M)) メモリ最適化)
+   */
+  function calcLevenshtein(a, b) {
+    if (a === b) return 0;
+    if (!a.length) return b.length;
+    if (!b.length) return a.length;
+    const row = [];
+    for (let i = 0; i <= b.length; i++) row[i] = i;
+    for (let i = 1; i <= a.length; i++) {
+      let prev = i;
+      for (let j = 1; j <= b.length; j++) {
+        const val = a[i - 1] === b[j - 1] ? row[j - 1] : Math.min(row[j - 1] + 1, prev + 1, row[j] + 1);
+        row[j - 1] = prev;
+        prev = val;
+      }
+      row[b.length] = prev;
+    }
+    return row[b.length];
+  }
+
+  const COMMON_TRICKY_WORDS = [
+    'accommodate', 'definitely', 'occurrence', 'embarrass', 'millennium', 'privilege',
+    'separate', 'necessary', 'maintenance', 'recommend', 'rhythm', 'conscience',
+    'discipline', 'gauge', 'hierarchy', 'liaison', 'maneuver', 'perseverance',
+    'supersede', 'surveillance', 'threshold', 'vacuum', 'withhold', 'independent',
+    'experience', 'government', 'environment', 'calendar', 'cemetery', 'pronunciation'
+  ];
+
+  /**
+   * スペルミス・タイポのサジェスト判定 (もしかして判定)
+   */
+  function findTypoSuggestion(rawWord, lang = 'en', entries = []) {
+    if (!rawWord || typeof rawWord !== 'string') return null;
+    const clean = rawWord.trim().toLowerCase();
+    if (clean.length < 4 || clean.includes(' ')) return null;
+
+    // 候補セットの収集（英検カタログ語彙、現在の単語帳、頻出難関語）
+    const candidates = new Set(COMMON_TRICKY_WORDS);
+    if (global.VocabEikenCatalog?.getAllWords) {
+      global.VocabEikenCatalog.getAllWords().forEach(w => candidates.add(w.toLowerCase()));
+    }
+    if (Array.isArray(entries)) {
+      entries.forEach(e => {
+        if (e && e.word && !e.isDeleted) candidates.add(e.word.toLowerCase());
+      });
+    }
+
+    if (candidates.has(clean)) return null;
+
+    let bestMatch = null;
+    let minDistance = 3;
+
+    for (const cand of candidates) {
+      if (Math.abs(cand.length - clean.length) > 2) continue;
+      if (cand[0] !== clean[0] && Math.abs(cand.length - clean.length) > 1) continue;
+
+      const dist = calcLevenshtein(clean, cand);
+      if (dist < minDistance) {
+        minDistance = dist;
+        bestMatch = cand;
+        if (dist === 1) break;
+      }
+    }
+
+    if (bestMatch && minDistance <= 2) {
+      return {
+        original: rawWord,
+        suggestion: bestMatch,
+        distance: minDistance
+      };
+    }
+    return null;
+  }
+
   // --- グローバルエクスポート ---
   global.VocabMorphology = {
     foldAscii,
+    calcLevenshtein,
+    findTypoSuggestion,
     ROOT_PREFIXES,
     normRootKey,
     matchRootInText,

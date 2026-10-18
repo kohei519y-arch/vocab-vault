@@ -84,6 +84,22 @@
       }
     }
 
+    // スペルミス・タイポのサジェスト判定 (もしかして判定)
+    if (!suggestions.some(s => s.isExact) && global.VocabMorphology?.findTypoSuggestion) {
+      const typo = global.VocabMorphology.findTypoSuggestion(raw, 'en', list);
+      if (typo) {
+        suggestions.unshift({
+          type: 'typo',
+          word: typo.suggestion,
+          meaning: `「${raw}」の修正候補（もしかして）`,
+          pos: 'スペル修正',
+          isRegistered: false,
+          isExact: false,
+          isTypo: true
+        });
+      }
+    }
+
     return suggestions;
   }
 
@@ -97,6 +113,19 @@
     if (!Array.isArray(suggestions) || !suggestions.length) return '';
 
     return suggestions.map((s, idx) => {
+      if (s.isTypo) {
+        return `
+          <div class="suggest-item typo-suggest" data-idx="${idx}" data-type="typo" data-word="${escFn(s.word)}" style="background:rgba(245,158,11,0.08);border-left:3px solid var(--warn)">
+            <div class="suggest-item-left">
+              <span class="suggest-item-word" style="color:var(--warn)">もしかして: <strong style="color:var(--t)">${escFn(s.word)}</strong></span>
+              <span class="suggest-item-meaning">${escFn(s.meaning)}</span>
+            </div>
+            <span class="suggest-item-badge" style="background:rgba(245,158,11,0.15);color:var(--warn);border:1px solid rgba(245,158,11,0.3)">
+              スペル補正
+            </span>
+          </div>
+        `;
+      }
       const jumpW = (s.item && s.item.homographIndex > 1) ? `${s.word}#${s.item.homographIndex}` : s.word;
       return `
         <div class="suggest-item ${s.isExact ? 'exact-match' : ''}" data-idx="${idx}" data-type="${s.type}" data-word="${escFn(jumpW)}">
@@ -217,6 +246,11 @@
       const type = el.dataset?.type;
       const word = el.dataset?.word;
       box.style.display = 'none';
+      if (type === 'typo') {
+        input.value = word;
+        input.focus();
+        return;
+      }
       input.value = '';
       try { input.blur(); } catch {}
       if (type === 'word') {

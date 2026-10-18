@@ -491,7 +491,11 @@
       <div id="extResSec" class="cfg-sec" style="display:none;border-top:1px solid var(--b);padding-top:10px">
         <div class="cfg-title flx-sb">
           <span id="extResCount">抽出された単語</span>
-          <div class="f-row"><button type="button" class="btn-o btn-xs" onclick="toggleAllExtChecks(true)">未登録を全選択</button><button type="button" class="btn-o btn-xs" onclick="toggleAllExtChecks(false)">全解除</button></div>
+          <div class="f-row">
+            <button type="button" class="btn-o btn-xs" onclick="toggleAllExtChecks(true)">未登録のみ選択</button>
+            <button type="button" class="btn-o btn-xs" onclick="toggleAllExtChecks('all')">すべて選択</button>
+            <button type="button" class="btn-o btn-xs" onclick="toggleAllExtChecks(false)">全解除</button>
+          </div>
         </div>
         <div id="extCandidateGrid" class="ext-grid"></div>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px">
@@ -699,6 +703,10 @@
               <button type="button" class="btn-o btn-xs" onclick="const i=$('apiKeyInput'),p=i.type==='password';i.type=p?'text':'password';this.textContent=p?'隠す':'表示'">表示</button>
               <button type="button" onclick="saveKeyFromModal()">保存・確認</button>
             </div>
+            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;color:var(--s);cursor:pointer">
+              <input type="checkbox" id="chkApiKeySessionOnly">
+              <span>ブラウザを閉じたら消去する（このセッションのみ有効 / sessionStorage）</span>
+            </label>
             <p class="cfg-desc" style="margin-top:6px;font-size:11px">※ご自身のGoogle AI Studio発行キーで直接通信したい場合のみ設定してください。キーはローカルブラウザ内にのみ保持され、Google Gemini APIとのHTTPS通信にのみ使用されます。</p>
             <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
               <span style="font-size:11.5px;color:var(--s);font-weight:600">使用AIモデル:</span>

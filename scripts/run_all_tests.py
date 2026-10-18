@@ -1024,7 +1024,7 @@ def test_backend_security_and_p0_remediation():
             log_fail("vocab-generate: missing generic folder cache preservation")
 
         # P2-2: Memory leak prevention for in-memory maps
-        if "ipBurstTracker.size > 5000" in vg_code and "guestRateMemory.size > 5000" in vg_code:
+        if ("ipBurstTracker.size > 5000" in vg_code or "ipBurstTracker.size > 200" in vg_code) and ("guestRateMemory.size > 5000" in vg_code or "guestRateMemory.size > 500" in vg_code):
             log_pass("vocab-generate: in-memory rate tracker maps protected by size-capped GC")
         else:
             log_fail("vocab-generate: missing in-memory map leak prevention")
