@@ -555,15 +555,490 @@
     }
   }
 
+  // ==========================================
+  // Item 46: VocabZip & Anki (.apkg) Engine
+  // ==========================================
+
+  function encodeUtf8(str) {
+    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(str);
+    const unescaped = unescape(encodeURIComponent(str));
+    const arr = new Uint8Array(unescaped.length);
+    for (let i = 0; i < unescaped.length; i++) arr[i] = unescaped.charCodeAt(i);
+    return arr;
+  }
+
+  function decodeUtf8(u8) {
+    if (typeof TextDecoder !== 'undefined') return new TextDecoder('utf-8', { fatal: false }).decode(u8);
+    let s = '';
+    for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]);
+    try { return decodeURIComponent(escape(s)); } catch(e) { return s; }
+  }
+
+  function safeBtoa(bin) {
+    if (typeof btoa !== 'undefined') return btoa(bin);
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let str = String(bin);
+    let output = '';
+    for (let block = 0, charCode, idx = 0, map = chars;
+      str.charAt(idx | 0) || (map = '=', idx % 1);
+      output += map.charAt(63 & block >> 8 - idx % 1 * 8)) {
+      charCode = str.charCodeAt(idx += 3/4);
+      if (charCode > 0xFF) throw new Error("'btoa' failed: outside Latin1 range");
+      block = block << 8 | charCode;
+    }
+    return output;
+  }
+
+  function safeAtob(input) {
+    if (typeof atob !== 'undefined') return atob(input);
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let str = String(input).replace(/[=]+$/, '');
+    if (str.length % 4 === 1) throw new Error("'atob' failed: invalid base64 length");
+    let output = '';
+    for (let bc = 0, bs = 0, buffer, idx = 0;
+      buffer = str.charAt(idx++);
+      ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer,
+        bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0
+    ) {
+      buffer = chars.indexOf(buffer);
+    }
+    return output;
+  }
+
+  const CRC32_TABLE = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let k = 0; k < 8; k++) {
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    CRC32_TABLE[i] = c >>> 0;
+  }
+
+  function calcCRC32(buf) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < buf.length; i++) {
+      c = CRC32_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+    }
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  const VocabZip = {
+    createZip(files) {
+      const localHeaders = [];
+      const centralHeaders = [];
+      let offset = 0;
+
+      (files || []).forEach(f => {
+        const nameBytes = encodeUtf8(f.name);
+        let dataBytes = f.data;
+        if (typeof dataBytes === 'string') dataBytes = encodeUtf8(dataBytes);
+        else if (dataBytes instanceof ArrayBuffer) dataBytes = new Uint8Array(dataBytes);
+        else if (!(dataBytes instanceof Uint8Array)) dataBytes = new Uint8Array(0);
+
+        const crc = calcCRC32(dataBytes);
+        const size = dataBytes.length;
+
+        // Local header (30 bytes + name + data)
+        const lh = new Uint8Array(30 + nameBytes.length);
+        const ldv = new DataView(lh.buffer);
+        ldv.setUint32(0, 0x04034b50, true);
+        ldv.setUint16(4, 20, true);
+        ldv.setUint16(6, 0x0800, true); // UTF-8
+        ldv.setUint16(8, 0, true); // Stored (no compression)
+        ldv.setUint16(10, 0, true);
+        ldv.setUint16(12, 0, true);
+        ldv.setUint32(14, crc, true);
+        ldv.setUint32(18, size, true);
+        ldv.setUint32(22, size, true);
+        ldv.setUint16(26, nameBytes.length, true);
+        ldv.setUint16(28, 0, true);
+        lh.set(nameBytes, 30);
+
+        localHeaders.push({ lh, data: dataBytes, offset });
+
+        // Central directory header (46 bytes + name)
+        const cd = new Uint8Array(46 + nameBytes.length);
+        const cdv = new DataView(cd.buffer);
+        cdv.setUint32(0, 0x02014b50, true);
+        cdv.setUint16(4, 20, true);
+        cdv.setUint16(6, 20, true);
+        cdv.setUint16(8, 0x0800, true);
+        cdv.setUint16(10, 0, true);
+        cdv.setUint16(12, 0, true);
+        cdv.setUint16(14, 0, true);
+        cdv.setUint32(16, crc, true);
+        cdv.setUint32(20, size, true);
+        cdv.setUint32(24, size, true);
+        cdv.setUint16(28, nameBytes.length, true);
+        cdv.setUint16(30, 0, true);
+        cdv.setUint16(32, 0, true);
+        cdv.setUint16(34, 0, true);
+        cdv.setUint16(36, 0, true);
+        cdv.setUint32(38, 0, true);
+        cdv.setUint32(42, offset, true);
+        cd.set(nameBytes, 46);
+
+        centralHeaders.push(cd);
+        offset += lh.length + dataBytes.length;
+      });
+
+      const cdOffset = offset;
+      const cdSize = centralHeaders.reduce((sum, h) => sum + h.length, 0);
+
+      // End of central directory record (22 bytes)
+      const eocd = new Uint8Array(22);
+      const edv = new DataView(eocd.buffer);
+      edv.setUint32(0, 0x06054b50, true);
+      edv.setUint16(4, 0, true);
+      edv.setUint16(6, 0, true);
+      edv.setUint16(8, files.length, true);
+      edv.setUint16(10, files.length, true);
+      edv.setUint32(12, cdSize, true);
+      edv.setUint32(16, cdOffset, true);
+      edv.setUint16(20, 0, true);
+
+      const totalSize = offset + cdSize + 22;
+      const zipOut = new Uint8Array(totalSize);
+      let pos = 0;
+      localHeaders.forEach(item => {
+        zipOut.set(item.lh, pos);
+        pos += item.lh.length;
+        zipOut.set(item.data, pos);
+        pos += item.data.length;
+      });
+      centralHeaders.forEach(cd => {
+        zipOut.set(cd, pos);
+        pos += cd.length;
+      });
+      zipOut.set(eocd, pos);
+      return zipOut;
+    },
+
+    extractZip(buffer) {
+      const u8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+      const files = [];
+      let i = 0;
+      while (i < u8.length - 30) {
+        if (u8[i] === 0x50 && u8[i+1] === 0x4b && u8[i+2] === 0x03 && u8[i+3] === 0x04) {
+          const dv = new DataView(u8.buffer, u8.byteOffset + i, 30);
+          const compMethod = dv.getUint16(8, true);
+          const compSize = dv.getUint32(18, true);
+          const uncompSize = dv.getUint32(22, true);
+          const nameLen = dv.getUint16(26, true);
+          const extraLen = dv.getUint16(28, true);
+          const nameBytes = u8.subarray(i + 30, i + 30 + nameLen);
+          const filename = decodeUtf8(nameBytes);
+          const dataStart = i + 30 + nameLen + extraLen;
+          const dataEnd = dataStart + compSize;
+          if (dataEnd <= u8.length) {
+            const rawData = u8.subarray(dataStart, dataEnd);
+            files.push({ name: filename, method: compMethod, compSize, uncompSize, data: rawData });
+          }
+          i = dataEnd;
+        } else {
+          i++;
+        }
+      }
+      return files;
+    }
+  };
+
+  /**
+   * Anki (.apkg) パッケージエクスポート
+   */
+  function exportAnkiAPKG(items, lang = 'en', options = {}) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) {
+      if (typeof alert === 'function') alert('単語がありません。');
+      return null;
+    }
+    const cl = s => esc(String(s || '').replace(/[\t\r\n]+/g, ' ').trim());
+    const clAllowBold = s => String(s || '').replace(/[\t\r\n]+/g, ' ').trim().split(/(<b>[\s\S]*?<\/b>)/gi).map(p => /^<b>[\s\S]*<\/b>$/i.test(p) ? `<b>${esc(p.slice(3, -4))}</b>` : esc(p)).join('');
+    const sanitizeTag = s => esc(String(s || '').trim().replace(/\s+/g, '_'));
+
+    const tsvLines = ['#separator:tab', '#html:true', '#tags column:3', '#columns:Front\tBack\tTags', ...list.map(i => {
+      const { meanings, histDigest, compactEty } = formatMeaningAndEty(i);
+      const m = meanings.map((x, idx) => `<b>${cl(x.pos)}</b> <span style="color:#d13438;font-weight:bold">${cl(x.text)}${idx === meanings.length - 1 && histDigest ? cl(histDigest) : ''}</span>`).join(' / ');
+      const ex = i.example ? `<br><br>${cl(i.example.foreign)}<br><small>${clAllowBold(i.example.ja)}</small>` : '';
+      const gram = i.grammar_forms ? ` <small>[${cl(i.grammar_forms)}]</small>` : '';
+      const tags = [i.lang || lang, i.category, i.folder].filter(Boolean).map(sanitizeTag).join(' ');
+      return `<b>${cl(i.word)}</b> ${esc(fmtPho(i.phonetic))}${gram}\t${m}${ex}${compactEty ? `<br><small>${cl(compactEty)}</small>` : ''}\t${tags}`;
+    })];
+
+    const tsvContent = tsvLines.join('\n');
+    const files = [
+      { name: 'cards.tsv', data: tsvContent },
+      { name: 'media', data: '{}' },
+      { name: 'meta.json', data: JSON.stringify({ version: 2, createdBy: 'Vocab Vault', lang, count: list.length }) }
+    ];
+
+    const zipBytes = VocabZip.createZip(files);
+    const fileName = `anki_deck_${lang}.apkg`;
+    dlBlob([zipBytes], 'application/zip', fileName);
+    return fileName;
+  }
+
+  /**
+   * Anki (.apkg / TSV / CSV) ファイル自動認識インポート
+   */
+  async function importAnkiFile(file, ctx = {}) {
+    if (!file) return;
+
+    // 1. ファイルをArrayBufferとして読み込み
+    const buffer = await file.arrayBuffer();
+    const u8 = new Uint8Array(buffer);
+
+    // 2. ZIPシグネチャ (PK\x03\x04) 判定
+    const isZip = u8.length > 4 && u8[0] === 0x50 && u8[1] === 0x4B && u8[2] === 0x03 && u8[3] === 0x04;
+
+    if (isZip) {
+      const extracted = VocabZip.extractZip(u8);
+      // a) cards.tsv または .tsv / .txt ファイルの探索
+      const textFile = extracted.find(f => f.name.endsWith('.tsv') || f.name.endsWith('.txt') || f.name === 'cards.tsv');
+      if (textFile) {
+        const text = decodeUtf8(textFile.data);
+        return importAnkiText(text, ctx);
+      }
+
+      // b) collection.anki2 (SQLite) からのノート文字列抽出
+      const ankiDb = extracted.find(f => f.name === 'collection.anki2' || f.name === 'collection.anki21');
+      if (ankiDb) {
+        const dbText = decodeUtf8(ankiDb.data);
+        // SQLite 内の flds (0x1f 区切りのフィールド) を走査
+        const rawChunks = dbText.split(/\x1f/);
+        const pairs = [];
+        for (let i = 0; i < rawChunks.length - 1; i += 2) {
+          const front = rawChunks[i].replace(/[\x00-\x1e]/g, '').trim();
+          const back = rawChunks[i + 1].replace(/[\x00-\x1e]/g, '').trim();
+          // 単語らしき文字列（300文字以内、英数字または日本語）を抽出
+          if (front && front.length <= 150 && back && back.length <= 2000) {
+            pairs.push(`${front}\t${back}`);
+          }
+        }
+        if (pairs.length > 0) {
+          const generatedTsv = `#separator:tab\n#html:true\n` + pairs.join('\n');
+          return importAnkiText(generatedTsv, ctx);
+        }
+      }
+
+      throw new Error('APKGファイル内に読み取り可能なカードデータが見つかりませんでした。');
+    } else {
+      // プレーンテキスト（TSV / CSV）として処理
+      const text = textDecoder.decode(u8);
+      return importAnkiText(text, ctx);
+    }
+  }
+
+  // ==========================================
+  // Item 47: Obsidian Vault Direct Sync (File System Access API)
+  // ==========================================
+
+  function generateObsidianDoc(item, lang = 'en', nowIso = '') {
+    const safeYamlStr = s => String(s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' ');
+    const { meanings, histDigest, compactEty } = formatMeaningAndEty(item);
+    const tags = ['vocab', item.lang || lang, item.category, item.folder].filter(Boolean).map(t => safeYamlStr(String(t).replace(/[\s\/\\]+/g, '_')));
+    const roots = (item.etymologyTags || []).map(r => `"[[*${safeYamlStr(normRootKey(r).replace(/^\*/, ''))}]]"`);
+
+    const frontmatter = [
+      '---',
+      `word: "${safeYamlStr(item.word)}"`,
+      `lang: "${safeYamlStr(item.lang || lang)}"`,
+      item.phonetic ? `phonetic: "${safeYamlStr(cleanPho(item.phonetic))}"` : null,
+      item.grammar_forms ? `grammar: "${safeYamlStr(item.grammar_forms)}"` : null,
+      `level: "${safeYamlStr(item.level || 'B2')}"`,
+      tags.length ? `tags: [${tags.join(', ')}]` : null,
+      roots.length ? `roots: [${roots.join(', ')}]` : null,
+      `created: "${item.createdAt ? new Date(item.createdAt).toISOString().slice(0, 10) : (nowIso ? nowIso.slice(0, 10) : '')}"`,
+      '---'
+    ].filter(Boolean).join('\n');
+
+    const mLines = meanings.map(m => `- **[${m.pos}]** ${m.text}`).join('\n');
+    const histLine = item.history_note ? `\n> [!NOTE] 歴史的・制度的文脈\n> ${item.history_note}\n` : '';
+    const exLine = item.example && (item.example.foreign || item.example.ja)
+      ? `\n### 例文\n> ${item.example.foreign || ''}\n> *${item.example.ja || ''}*\n`
+      : '';
+    const coreLine = item.core ? `\n> **コア概念**: ${item.core}\n` : '';
+    const etyLine = compactEty ? `\n### 語源・概念史\n${compactEty}\n` : '';
+
+    return `${frontmatter}\n\n# ${item.word}\n\n${coreLine}\n### 意味\n${mLines}\n${histLine}${exLine}${etyLine}\n---\n`;
+  }
+
+  async function syncObsidianVault(items, lang = 'en', options = {}) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) {
+      if (typeof alert === 'function') alert('同期する単語がありません。');
+      return null;
+    }
+
+    if (!window.showDirectoryPicker) {
+      // File System Access API 非対応環境のフォールバック
+      return exportObsidianMarkdown(items, lang);
+    }
+
+    try {
+      const dirHandle = await window.showDirectoryPicker({
+        mode: 'readwrite',
+        startIn: 'documents'
+      });
+
+      const subfolder = options.subfolder || 'VocabVault';
+      let targetDir = dirHandle;
+      if (subfolder) {
+        targetDir = await dirHandle.getDirectoryHandle(subfolder, { create: true });
+      }
+
+      let saved = 0;
+      const nowIso = new Date().toISOString();
+      for (const item of list) {
+        const safeWord = String(item.word || 'word').replace(/[\\/:*?"<>|]/g, '_').trim();
+        const filename = `${safeWord}.md`;
+        const doc = generateObsidianDoc(item, lang, nowIso);
+        const fileHandle = await targetDir.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(doc);
+        await writable.close();
+        saved++;
+      }
+
+      const msg = `Obsidian Vault同期完了: ${saved} 語のノートを保存しました（フォルダ: ${subfolder}）。`;
+      if (options.showToast) options.showToast(msg, 'ok');
+      else if (typeof alert === 'function') alert(msg);
+      return { saved, folder: subfolder };
+    } catch (err) {
+      if (err.name === 'AbortError') return null; // ユーザーキャンセル
+      console.error('Obsidian Vault sync error:', err);
+      if (typeof alert === 'function') alert(`Obsidian Vault同期エラー: ${err.message}`);
+      throw err;
+    }
+  }
+
+  // ==========================================
+  // Item 49: Shareable Deck URL Generator & Parser
+  // ==========================================
+
+  function generateShareDeckUrl(items, deckTitle = 'Vocab Vault 共有デッキ', lang = 'en') {
+    const list = (Array.isArray(items) ? items : []).slice(0, 150);
+    if (!list.length) {
+      if (typeof alert === 'function') alert('共有する単語がありません。');
+      return null;
+    }
+
+    const payload = {
+      t: String(deckTitle || '共有デッキ').slice(0, 60),
+      l: lang || 'en',
+      v: 1,
+      w: list.map(i => ({
+        w: i.word,
+        m: i.meanings,
+        c: i.core,
+        e: i.etymology,
+        r: i.etymologyTags,
+        p: i.phonetic,
+        g: i.grammar_forms,
+        ex: i.example
+      }))
+    };
+
+    const json = JSON.stringify(payload);
+    const bytes = encodeUtf8(json);
+    let bin = '';
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    const b64 = safeBtoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    const origin = (typeof location !== 'undefined') ? location.origin : 'https://vocabvault.app';
+    const path = (typeof location !== 'undefined') ? location.pathname : '/';
+    const shareUrl = `${origin}${path}?share=${b64}`;
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl).catch(() => {});
+    }
+
+    return { shareUrl, count: list.length, title: payload.t };
+  }
+
+  function parseShareDeckUrl(urlOrQuery) {
+    if (!urlOrQuery) return null;
+    let query = String(urlOrQuery);
+    if (query.includes('?')) query = query.split('?')[1];
+    if (query.includes('#')) query = query.split('#')[0];
+
+    let b64 = '';
+    if (typeof URLSearchParams !== 'undefined') {
+      try {
+        const params = new URLSearchParams(query);
+        if (params.has('share')) b64 = params.get('share');
+      } catch(e) {}
+    }
+    if (!b64) {
+      const match = query.match(/(?:^|[&?])share=([^&]+)/);
+      if (match) b64 = decodeURIComponent(match[1]);
+      else if (!query.includes('=')) b64 = query;
+    }
+
+    if (!b64) return null;
+
+    try {
+      let normB64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+      while (normB64.length % 4) normB64 += '=';
+      const bin = safeAtob(normB64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const json = decodeUtf8(bytes);
+      const parsed = JSON.parse(json);
+
+      if (!parsed || !Array.isArray(parsed.w)) return null;
+
+      const lang = parsed.l || 'en';
+      const items = parsed.w.map((w, idx) => ({
+        id: `share_${Date.now().toString(36)}_${idx + 1}`,
+        num: idx + 1,
+        word: String(w.w || '').trim(),
+        lang: lang,
+        meanings: Array.isArray(w.m) ? w.m : [{ pos: 'All', text: w.w }],
+        core: String(w.c || ''),
+        etymology: String(w.e || ''),
+        etymologyTags: Array.isArray(w.r) ? w.r : [],
+        phonetic: String(w.p || ''),
+        grammar_forms: String(w.g || ''),
+        example: w.ex || null,
+        category: parsed.t || '共有デッキ',
+        folder: parsed.t || '共有デッキ',
+        interval: 0,
+        repetition: 0,
+        efactor: 2.5,
+        nextReview: Date.now(),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        isDeleted: false
+      })).filter(it => it.word.length > 0);
+
+      return {
+        title: parsed.t || '共有デッキ',
+        lang: lang,
+        items: items,
+        count: items.length
+      };
+    } catch (err) {
+      console.warn('Failed to parse share deck URL:', err);
+      return null;
+    }
+  }
+
   // --- グローバルエクスポート ---
   global.VocabExport = {
     dlBlob,
     formatMeaningAndEty,
     exportAnkiTSV,
+    exportAnkiAPKG,
     exportObsidianMarkdown,
     exportFullJSON,
     importJSON,
     parseAnkiExport,
-    importAnkiText
+    importAnkiText,
+    importAnkiFile,
+    syncObsidianVault,
+    generateShareDeckUrl,
+    parseShareDeckUrl,
+    VocabZip
   };
 })(typeof window !== 'undefined' ? window : globalThis);

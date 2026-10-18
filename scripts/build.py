@@ -64,7 +64,7 @@ def sync_web_package():
     os.makedirs(web_dir, exist_ok=True)
 
     # 同期対象ディレクトリ
-    dirs_to_sync = ["js", "css", "icons"]
+    dirs_to_sync = ["js", "css", "icons", "legal", "extension"]
     for d in dirs_to_sync:
         src = os.path.join(BASE_DIR, d)
         dst = os.path.join(web_dir, d)

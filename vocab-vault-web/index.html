@@ -723,9 +723,12 @@
           <button type="button" class="cfg-card" onclick="exportJSON()"><span>JSON保存</span><small>全言語データを保存</small></button>
           <button type="button" class="cfg-card" onclick="$('fileIn').click()"><span>JSON復元</span><small>バックアップを統合</small></button>
           <button type="button" class="cfg-card" onclick="exportAnkiTSV()"><span>Anki / TSV出力</span><small>表示中リストを出力</small></button>
+          <button type="button" class="cfg-card" onclick="exportAnkiAPKG()"><span>Anki (.apkg) 出力</span><small>公式Ankiパッケージ保存</small></button>
           <button type="button" class="cfg-card" onclick="exportObsidianMarkdown()"><span>Obsidian出力</span><small>Wikiリンク・語根付き.md</small></button>
+          <button type="button" class="cfg-card" onclick="syncObsidianVaultDirect()"><span>Obsidian直接同期</span><small>Vaultフォルダへ直書き出し</small></button>
+          <button type="button" class="cfg-card" onclick="generateCurrentShareDeckUrl()"><span>共有デッキURL発行</span><small>URLで友人に単語配布</small></button>
           <button type="button" class="cfg-card" onclick="VocabModal.openStarterPackModal()"><span>スターターパック</span><small>厳選学術パックを導入</small></button>
-          <button type="button" class="cfg-card" onclick="VocabModal.openAnkiImportModal()"><span>Ankiインポート</span><small>TSV/CSVから取り込み</small></button>
+          <button type="button" class="cfg-card" onclick="VocabModal.openAnkiImportModal()"><span>Ankiインポート</span><small>APKG/TSVから取り込み</small></button>
           <button type="button" class="cfg-card" onclick="salvageAll(true)" style="border-color:var(--ac-b)"><span>全ストレージ救出</span><small>退避スナップショットを含め復元</small></button>
         </div>
         <input type="file" id="fileIn" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
@@ -856,10 +859,15 @@
       <span class="modal-title" id="legalModalTitle">法務・ポリシー情報</span>
       <button type="button" class="modal-close" onclick="toggleModal('legalModal',false)" aria-label="閉じる">&times;</button>
     </div>
-    <div style="display:flex;gap:8px;border-bottom:1px solid var(--b);padding:6px 0;margin-bottom:8px">
+    <div style="display:flex;gap:8px;align-items:center;border-bottom:1px solid var(--b);padding:6px 0;margin-bottom:8px;flex-wrap:wrap">
       <button type="button" id="tabLegalTerms" class="btn-xs" onclick="switchLegalTab('terms')">利用規約</button>
       <button type="button" id="tabLegalPrivacy" class="btn-xs btn-o" onclick="switchLegalTab('privacy')">プライバシーポリシー</button>
       <button type="button" id="tabLegalTokusho" class="btn-xs btn-o" onclick="switchLegalTab('tokusho')">特定商取引法表記</button>
+      <div style="margin-left:auto;display:flex;gap:6px">
+        <a href="legal/tokushoho.html" target="_blank" rel="noopener" class="btn-xs btn-o" style="text-decoration:none">特商法(独立URL)</a>
+        <a href="legal/terms.html" target="_blank" rel="noopener" class="btn-xs btn-o" style="text-decoration:none">規約(独立URL)</a>
+        <a href="legal/privacy.html" target="_blank" rel="noopener" class="btn-xs btn-o" style="text-decoration:none">プライバシー(独立URL)</a>
+      </div>
     </div>
     <div id="legalModalContent" style="flex:1;overflow-y:auto;font-size:12px;line-height:1.7;color:var(--s);padding-right:4px">
       <!-- JavaScriptで動的流し込み -->
@@ -1232,22 +1240,22 @@
   </div>
 </div>
 
-<!-- Anki互換インポートモーダル (TSV / CSV / JSON) -->
+<!-- Anki互換インポートモーダル (APKG / TSV / CSV / JSON) -->
 <div id="ankiImportModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="ankiImportModalTitle" onclick="if(event.target===this) toggleModal('ankiImportModal',false)">
   <div class="modal-box" style="max-width:620px">
     <div class="modal-hd flx-sb">
       <h2 id="ankiImportModalTitle" style="font-size:15px;display:flex;align-items:center;gap:6px">
-        <span>Ankiデッキ・TSV/CSVインポート (FSRSマッピング)</span>
+        <span>Ankiデッキ (.apkg / TSV / CSV) インポート (FSRSマッピング)</span>
       </h2>
       <button type="button" class="btn-o btn-xs" onclick="toggleModal('ankiImportModal',false)" aria-label="閉じる">×</button>
     </div>
     <div class="modal-bd">
       <p class="cfg-desc" style="line-height:1.5">
-        Ankiからエクスポートしたテキスト（TSV / CSV / タブ区切り）を直接読み込みます。見出し語、発音、訳語、語源タグを自動認識し、復習間隔（Interval）が存在する場合はFSRS安定度パラメータへ自動マッピングします。
+        本家Ankiデッキパッケージ（.apkg）またはエクスポートテキスト（TSV / CSV / タブ区切り）を直接読み込みます。見出し語、発音、訳語、語源タグを自動認識し、復習間隔が存在する場合はFSRS安定度パラメータへ自動マッピングします。
       </p>
       <div style="margin:12px 0">
-        <label style="display:block;font-size:11px;font-weight:700;color:var(--s);margin-bottom:4px">TSV / CSV ファイルを選択:</label>
-        <input type="file" id="ankiFileInput" accept=".tsv,.csv,.txt" onchange="VocabModal.handleAnkiFileSelect(event)">
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--s);margin-bottom:4px">APKG / TSV / CSV ファイルを選択:</label>
+        <input type="file" id="ankiFileInput" accept=".apkg,.tsv,.csv,.txt" onchange="VocabModal.handleAnkiFileSelect(event)">
       </div>
       <div style="margin:12px 0">
         <label style="display:block;font-size:11px;font-weight:700;color:var(--s);margin-bottom:4px">またはテキストを貼り付け:</label>
@@ -1255,11 +1263,34 @@
       </div>
       <div style="margin:10px 0;padding:10px;background:var(--bg-sub, rgba(0,0,0,0.02));border-radius:6px;border:1px solid var(--b)">
         <div style="font-size:11px;font-weight:700;color:var(--s);margin-bottom:4px">インポートプレビュー:</div>
-        <div id="ankiImportPreview" style="font-size:12px;color:var(--m)">TSV/CSVテキストを入力するかファイルを選択してください</div>
+        <div id="ankiImportPreview" style="font-size:12px;color:var(--m)">APKGファイルまたはTSV/CSVテキストを選択してください</div>
       </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
         <button type="button" class="btn-o" onclick="toggleModal('ankiImportModal',false)">キャンセル</button>
         <button type="button" class="btn-ac" onclick="VocabModal.executeAnkiImport()">インポート実行</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 共有デッキインポートモーダル -->
+<div id="shareDeckModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="shareDeckModalTitle" onclick="if(event.target===this) toggleModal('shareDeckModal',false)">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-hd flx-sb">
+      <div>
+        <h3 style="margin:0;font-size:15px;color:var(--t)" id="shareDeckModalTitle">共有デッキのインポート</h3>
+        <small style="color:var(--m)" id="shareDeckModalCount">0 語</small>
+      </div>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('shareDeckModal',false)" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-bd">
+      <div style="font-size:12px;color:var(--s);margin-bottom:10px;line-height:1.5">
+        URLから共有された単語デッキです。取り込むと現在のライブラリへ新規追加されます（重複単語は既存設定を維持）。
+      </div>
+      <div id="shareDeckModalList" style="max-height:260px;overflow-y:auto;border:1px solid var(--b);border-radius:6px;padding:8px;background:var(--bg);margin-bottom:12px"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="button" class="btn-o" onclick="toggleModal('shareDeckModal',false)">キャンセル</button>
+        <button type="button" class="btn-ac" onclick="VocabModal.executeShareDeckImport()">マイライブラリに追加</button>
       </div>
     </div>
   </div>

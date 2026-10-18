@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      <div class="logo"></div>
+      <span class="title">Vocab Vault</span>
+    </div>
+    <button id="openAppBtn" class="btn-xs" title="アプリを開く">アプリを開く</button>
+  </div>
+
+  <div class="add-box">
+    <input type="text" id="manualInput" placeholder="単語を直接入力 (例: serendipity)" autocomplete="off">
+    <select id="langSelect">
+      <option value="en">EN</option>
+      <option value="fr">FR</option>
+      <option value="de">DE</option>
+    </select>
+    <button id="addBtn" class="btn-add">追加</button>
+  </div>
+
+  <div class="section-title">
+    <span>収集した単語 (<span id="queueCount">0</span>)</span>
+    <div class="sec-actions">
+      <button id="copyAllBtn" class="btn-link">一括コピー</button>
+      <button id="clearBtn" class="btn-link">クリア</button>
+    </div>
+  </div>
+
+  <div id="queueList" class="queue-list">
+    <!-- 動的生成 -->
+  </div>
+
+  <div class="footer">
+    <span>Web閲覧中に単語を選択して1タップ登録</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

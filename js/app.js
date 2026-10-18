@@ -1476,6 +1476,16 @@
       }, 300);
     }
 
+    const shareParam = urlParams.get('share') || (typeof window !== 'undefined' && window.location?.hash?.includes('share=') ? window.location.hash.split('share=')[1] : null);
+    if (shareParam && global.VocabExport?.parseShareDeckUrl) {
+      setTimeout(() => {
+        const deckData = global.VocabExport.parseShareDeckUrl(shareParam);
+        if (deckData && global.VocabModal?.openShareDeckModal) {
+          global.VocabModal.openShareDeckModal(deckData);
+        }
+      }, 400);
+    }
+
     if (global.VocabOCR?.initOcrEvents) {
       global.VocabOCR.initOcrEvents();
     }

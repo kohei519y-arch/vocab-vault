@@ -35,6 +35,7 @@
     WKUserContentController *userContent = [[WKUserContentController alloc] init];
     [userContent addScriptMessageHandler:self name:@"nativeSave"];
     [userContent addScriptMessageHandler:self name:@"nativePrint"];
+    [userContent addScriptMessageHandler:self name:@"nativeCheckForUpdates"];
 
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
     config.userContentController = userContent;
@@ -58,6 +59,7 @@
     [menubar addItem:appMenuItem];
     NSMenu *appMenu = [[NSMenu alloc] init];
     [appMenu addItemWithTitle:@"About Vocab Vault" action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];
+    [appMenu addItemWithTitle:@"Check for Updates..." action:@selector(checkForUpdates:) keyEquivalent:@""];
     [appMenu addItem:[NSMenuItem separatorItem]];
     [appMenu addItemWithTitle:@"Hide Vocab Vault" action:@selector(hide:) keyEquivalent:@"h"];
     NSMenuItem *hideOthers = [appMenu addItemWithTitle:@"Hide Others" action:@selector(hideOtherApplications:) keyEquivalent:@"h"];
@@ -274,11 +276,66 @@
         [op runOperationModalForWindow:self.window delegate:nil didRunSelector:NULL contextInfo:NULL];
         return;
     }
+    if ([message.name isEqualToString:@"nativeCheckForUpdates"]) {
+        [self checkForUpdates:nil];
+        return;
+    }
 }
 
 - (void)applicationWillTerminate:(NSNotification *)notification {
     [self.webView.configuration.userContentController removeScriptMessageHandlerForName:@"nativeSave"];
     [self.webView.configuration.userContentController removeScriptMessageHandlerForName:@"nativePrint"];
+    [self.webView.configuration.userContentController removeScriptMessageHandlerForName:@"nativeCheckForUpdates"];
+}
+
+// 6.5 バージョン確認・自動アップデート通知 (GitHub Releases API)
+- (void)checkForUpdates:(id)sender {
+    NSString *currentVer = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] ?: @"2.4.0";
+    NSURL *url = [NSURL URLWithString:@"https://api.github.com/repos/kohei519y-arch/vocab-vault/releases/latest"];
+    NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:url];
+    [req setValue:@"VocabVault-MacApp" forHTTPHeaderField:@"User-Agent"];
+    [req setTimeoutInterval:10.0];
+
+    NSURLSessionDataTask *task = [[NSURLSession sharedSession] dataTaskWithRequest:req completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (error || !data) {
+                if (sender != nil) {
+                    NSAlert *alert = [[NSAlert alloc] init];
+                    [alert setMessageText:@"アップデート確認エラー"];
+                    [alert setInformativeText:@"サーバーとの通信に失敗しました。ネットワーク接続を確認してください。"];
+                    [alert addButtonWithTitle:@"OK"];
+                    [alert beginSheetModalForWindow:self.window completionHandler:nil];
+                }
+                return;
+            }
+
+            NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+            NSString *tag = json[@"tag_name"] ?: @"";
+            NSString *cleanTag = [tag stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"vV "]];
+            NSString *htmlUrl = json[@"html_url"] ?: @"https://github.com/kohei519y-arch/vocab-vault/releases";
+
+            if (cleanTag.length > 0 && [cleanTag compare:currentVer options:NSNumericSearch] == NSOrderedDescending) {
+                NSAlert *alert = [[NSAlert alloc] init];
+                [alert setMessageText:@"新しいバージョンが利用可能です"];
+                [alert setInformativeText:[NSString stringWithFormat:@"Vocab Vault v%@ が公開されています（現在: v%@）。\n最新バージョンへアップデートしますか？", cleanTag, currentVer]];
+                [alert addButtonWithTitle:@"アップデートをダウンロード"];
+                [alert addButtonWithTitle:@"後で"];
+                [alert setAlertStyle:NSAlertStyleInformational];
+                [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
+                    if (returnCode == NSAlertFirstButtonReturn) {
+                        [[NSWorkspace sharedWorkspace] openURL:[NSURL URLWithString:htmlUrl]];
+                    }
+                }];
+            } else if (sender != nil) {
+                NSAlert *alert = [[NSAlert alloc] init];
+                [alert setMessageText:@"最新バージョンです"];
+                [alert setInformativeText:[NSString stringWithFormat:@"Vocab Vault v%@ は最新の状態です。", currentVer]];
+                [alert addButtonWithTitle:@"OK"];
+                [alert beginSheetModalForWindow:self.window completionHandler:nil];
+            }
+        });
+    }];
+    [task resume];
 }
 
 // 7. ナビゲーションポリシー (blob: URL誤動作の根絶 & 外部リンク安全化)

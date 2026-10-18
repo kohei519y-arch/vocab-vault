@@ -746,9 +746,24 @@
     toggleModal('ankiImportModal', true);
   }
 
-  function handleAnkiFileSelect(ev) {
+  async function handleAnkiFileSelect(ev) {
     const f = ev.target?.files?.[0];
     if (!f) return;
+    if (f.name.endsWith('.apkg')) {
+      const previewEl = $('ankiImportPreview');
+      if (previewEl) previewEl.innerHTML = '<span style="color:var(--m)">Anki (.apkg) パッケージを解析中...</span>';
+      try {
+        if (global.VocabExport?.importAnkiFile) {
+          await global.VocabExport.importAnkiFile(f, {
+            showToast: showToast
+          });
+          toggleModal('ankiImportModal', false);
+        }
+      } catch (err) {
+        if (previewEl) previewEl.innerHTML = `<span style="color:var(--err)">APKG解析失敗: ${esc(err.message)}</span>`;
+      }
+      return;
+    }
     const r = new FileReader();
     r.onload = e => {
       const text = e.target.result;
@@ -805,6 +820,73 @@
     }
   }
 
+  // --- 共有デッキインポートモーダル ---
+  let pendingShareDeck = null;
+  function openShareDeckModal(deckData) {
+    if (!deckData || !Array.isArray(deckData.items)) return;
+    pendingShareDeck = deckData;
+    const titleEl = $('shareDeckModalTitle');
+    if (titleEl) titleEl.textContent = deckData.title || '共有デッキのインポート';
+    const countEl = $('shareDeckModalCount');
+    if (countEl) countEl.textContent = `${deckData.count || deckData.items.length} 語 (${(deckData.lang || 'en').toUpperCase()})`;
+    const listEl = $('shareDeckModalList');
+    if (listEl) {
+      listEl.innerHTML = deckData.items.slice(0, 30).map(i => `
+        <div style="padding:6px 10px;background:var(--bg-card);border:1px solid var(--b);border-radius:6px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <strong>${esc(i.word)}</strong> ${i.phonetic ? `<small style="color:var(--m)">[${esc(i.phonetic)}]</small>` : ''}
+            <div style="font-size:12px;color:var(--t-m);margin-top:2px">${esc(i.meanings?.[0]?.text || '')}</div>
+          </div>
+          ${(i.etymologyTags && i.etymologyTags.length) ? `<span class="badge" style="background:rgba(217,119,6,0.12);color:var(--w-root);border:1px solid rgba(217,119,6,0.3)">*${esc(i.etymologyTags[0].replace(/^\*/, ''))}</span>` : ''}
+        </div>
+      `).join('') + (deckData.items.length > 30 ? `<div style="text-align:center;font-size:11px;color:var(--m);padding:6px">他 ${deckData.items.length - 30} 語...</div>` : '');
+    }
+    toggleModal('shareDeckModal', true);
+  }
+
+  function executeShareDeckImport() {
+    if (!pendingShareDeck || !pendingShareDeck.items) return;
+    const items = pendingShareDeck.items;
+    const lang = pendingShareDeck.lang || 'en';
+    const pairKey = `distinction_entries_${lang}_ja`;
+    const cur = (global.VocabStorage ? global.VocabStorage.getJson(pairKey) : null) || (lang === (global.App?.lang || 'en') ? (global.App?.entries || []) : []);
+    const existingWords = new Set(cur.map(i => String(i.word || '').toLowerCase()));
+    let added = 0;
+    let skipped = 0;
+    const toAdd = [];
+    let maxNum = cur.reduce((m, i) => Math.max(m, i.num || 0), 0);
+
+    items.forEach(it => {
+      const wLower = String(it.word || '').toLowerCase();
+      if (existingWords.has(wLower)) {
+        skipped++;
+      } else {
+        existingWords.add(wLower);
+        maxNum++;
+        it.num = maxNum;
+        toAdd.push(it);
+        added++;
+      }
+    });
+
+    const merged = [...cur, ...toAdd];
+    if (global.setJson) {
+      global.setJson(pairKey, merged, true, true);
+    } else if (global.VocabStorage) {
+      global.VocabStorage.state.mem[pairKey] = merged;
+    }
+    if (lang === (global.App?.lang || 'en')) {
+      if (global.App) global.App.entries = merged;
+      if (global.load) global.load(1);
+    }
+
+    toggleModal('shareDeckModal', false);
+    if (global.VocabModal?.showToast) {
+      global.VocabModal.showToast(`共有デッキを取り込みました: ${added} 語を追加（${skipped} 語は既存登録済）`, 'ok');
+    }
+    pendingShareDeck = null;
+  }
+
   // グローバルクリックハンドラ（starter pack install 等のデリゲーション）
   if (typeof document !== 'undefined') {
     document.addEventListener('click', e => {
@@ -819,6 +901,38 @@
       }
     });
   }
+
+  // グローバル関数バインド
+  global.exportAnkiAPKG = function () {
+    if (global.VocabExport?.exportAnkiAPKG) {
+      const items = global.App?.entries || [];
+      const lang = global.App?.lang || 'en';
+      global.VocabExport.exportAnkiAPKG(items, lang);
+    }
+  };
+
+  global.syncObsidianVaultDirect = async function () {
+    if (global.VocabExport?.syncObsidianVault) {
+      const items = global.App?.entries || [];
+      const lang = global.App?.lang || 'en';
+      await global.VocabExport.syncObsidianVault(items, lang, { showToast });
+    }
+  };
+
+  global.generateCurrentShareDeckUrl = function () {
+    if (global.VocabExport?.generateShareDeckUrl) {
+      const items = global.App?.entries || [];
+      const lang = global.App?.lang || 'en';
+      const folder = global.App?.curFolder || (lang.toUpperCase() + ' 重要語彙');
+      const res = global.VocabExport.generateShareDeckUrl(items, folder, lang);
+      if (res && res.shareUrl) {
+        showToast(`共有URLを発行しました (${res.count}語)。クリップボードにコピー済みです。`, 'ok');
+      }
+    }
+  };
+
+  global.openShareDeckModal = openShareDeckModal;
+  global.executeShareDeckImport = executeShareDeckImport;
 
   // --- グローバルエクスポート ---
   global.VocabModal = {
@@ -849,6 +963,8 @@
     openAnkiImportModal,
     handleAnkiFileSelect,
     previewAnkiImport,
-    executeAnkiImport
+    executeAnkiImport,
+    openShareDeckModal,
+    executeShareDeckImport
   };
 })(typeof window !== 'undefined' ? window : globalThis);

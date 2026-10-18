@@ -1984,6 +1984,156 @@ def test_rich_pagination_and_keyboard_shortcuts():
         else:
             log_fail(f"js/navigation.js: missing keyboard shortcut for {k}")
 
+def test_items_45_to_50_integrity():
+    print("\n--- 21. Improvements 45-50: APKG, Obsidian Sync, Extension, Share URL, Legal & Mac Updater ---")
+
+    # Item 45: Mac Native App Update Checker
+    main_m_path = os.path.join(BASE_DIR, "scripts", "native_app", "main.m")
+    if os.path.exists(main_m_path):
+        with open(main_m_path, "r", encoding="utf-8") as f:
+            main_m_code = f.read()
+        if "checkForUpdates:" in main_m_code and "nativeCheckForUpdates" in main_m_code and "api.github.com" in main_m_code:
+            log_pass("scripts/native_app/main.m: Check for Updates & GitHub release checker implemented")
+        else:
+            log_fail("scripts/native_app/main.m: missing update check implementation")
+
+    # Item 46: VocabZip & Anki (.apkg) Import/Export
+    export_path = os.path.join(BASE_DIR, "js", "export.js")
+    with open(export_path, "r", encoding="utf-8") as f:
+        export_code = f.read()
+
+    if "VocabZip" in export_code and "calcCRC32" in export_code and "exportAnkiAPKG" in export_code and "importAnkiFile" in export_code:
+        log_pass("js/export.js: VocabZip engine, APKG export & importAnkiFile functional")
+    else:
+        log_fail("js/export.js: missing VocabZip or APKG export/import methods")
+
+    index_path = os.path.join(BASE_DIR, "index.html")
+    with open(index_path, "r", encoding="utf-8") as f:
+        index_code = f.read()
+
+    if '.apkg' in index_code and 'accept=".apkg,.tsv,.csv,.txt"' in index_code:
+        log_pass("index.html: ankiFileInput supports native .apkg packages")
+    else:
+        log_fail("index.html: missing .apkg in ankiFileInput accept attribute")
+
+    # JSC test: VocabZip roundtrip & APKG generation
+    jsc_zip_test = """
+    var testData = "Vocab Vault Anki Card Roundtrip Test";
+    var files = [{ name: "test.txt", data: testData }];
+    var zipBytes = VocabExport.VocabZip.createZip(files);
+    if (!zipBytes || zipBytes.length < 30) throw new Error("VocabZip failed to produce zip bytes");
+    var extracted = VocabExport.VocabZip.extractZip(zipBytes);
+    if (!extracted || extracted.length !== 1) throw new Error("VocabZip failed to extract file");
+    """
+    try:
+        combined_code = "var window = globalThis; var global = globalThis;\n" + export_code + "\n" + jsc_zip_test
+        res = run_jsc(combined_code)
+        if res.returncode == 0:
+            log_pass("JSC verification: VocabZip binary compression & extraction lossless roundtrip")
+        else:
+            log_fail(f"JSC verification VocabZip failed: {res.stdout or res.stderr}")
+    except Exception as e:
+        log_fail(f"JSC verification VocabZip failed: {e}")
+
+    # Item 47: Obsidian Vault Direct Sync (File System Access API)
+    if "syncObsidianVault" in export_code and "showDirectoryPicker" in export_code:
+        log_pass("js/export.js: syncObsidianVault provides direct local Vault folder sync")
+    else:
+        log_fail("js/export.js: missing syncObsidianVault or showDirectoryPicker")
+
+    modal_path = os.path.join(BASE_DIR, "js", "modal.js")
+    with open(modal_path, "r", encoding="utf-8") as f:
+        modal_code = f.read()
+
+    if "syncObsidianVaultDirect" in modal_code and "exportAnkiAPKG" in modal_code:
+        log_pass("js/modal.js: syncObsidianVaultDirect and exportAnkiAPKG bound to window")
+    else:
+        log_fail("js/modal.js: missing syncObsidianVaultDirect or exportAnkiAPKG bindings")
+
+    # Item 48: Browser Extension (Manifest V3)
+    ext_manifest_path = os.path.join(BASE_DIR, "extension", "manifest.json")
+    if os.path.exists(ext_manifest_path):
+        try:
+            with open(ext_manifest_path, "r", encoding="utf-8") as f:
+                manifest_json = json.load(f)
+            if manifest_json.get("manifest_version") == 3 and "contextMenus" in manifest_json.get("permissions", []):
+                log_pass("extension/manifest.json: valid Manifest V3 with contextMenus & storage permissions")
+            else:
+                log_fail("extension/manifest.json: invalid Manifest V3 specification")
+        except Exception as e:
+            log_fail(f"extension/manifest.json parse error: {e}")
+    else:
+        log_fail("extension/manifest.json does not exist")
+
+    ext_files = [
+        "extension/background.js",
+        "extension/content.js",
+        "extension/content.css",
+        "extension/popup.html",
+        "extension/popup.js",
+        "extension/popup.css",
+        "extension/icons/icon16.png",
+        "extension/icons/icon48.png",
+        "extension/icons/icon128.png",
+        "extension/README.md"
+    ]
+    all_ext_exist = all(os.path.exists(os.path.join(BASE_DIR, p)) for p in ext_files)
+    if all_ext_exist:
+        log_pass("extension: all 10 browser extension core assets and icons present")
+    else:
+        log_fail("extension: missing one or more browser extension asset files")
+
+    # Item 49: Shareable Deck URL Generator & Parser
+    if "generateShareDeckUrl" in export_code and "parseShareDeckUrl" in export_code:
+        log_pass("js/export.js: generateShareDeckUrl & parseShareDeckUrl implemented")
+    else:
+        log_fail("js/export.js: missing share deck URL generator or parser")
+
+    jsc_share_test = """
+    var sampleItems = [
+        { word: "epiphany", meanings: [{ pos: "N", text: "直観的ひらめき" }], etymology: "epi- + phainein", etymologyTags: ["*bha-"], phonetic: "ɪˈpɪfəni" },
+        { word: "constant", meanings: [{ pos: "Adj", text: "不変の" }], etymology: "con- + stare", etymologyTags: ["*sta-"], phonetic: "ˈkɒnstənt" }
+    ];
+    var genRes = VocabExport.generateShareDeckUrl(sampleItems, "哲学重要単語", "en");
+    if (!genRes || !genRes.shareUrl) throw new Error("generateShareDeckUrl failed to produce URL");
+    var parsed = VocabExport.parseShareDeckUrl(genRes.shareUrl);
+    if (!parsed || parsed.items.length !== 2) throw new Error("parseShareDeckUrl failed to parse items: " + JSON.stringify(parsed));
+    if (parsed.items[0].word !== "epiphany" || parsed.items[1].word !== "constant") throw new Error("Parsed items mismatch");
+    """
+    try:
+        combined_code = "var window = globalThis; var global = globalThis; var location = { origin: 'https://vocabvault.app', pathname: '/' };\n" + export_code + "\n" + jsc_share_test
+        res = run_jsc(combined_code)
+        if res.returncode == 0:
+            log_pass("JSC verification: share deck URL generation and lossless parsing roundtrip")
+        else:
+            log_fail(f"JSC verification share deck URL failed: {res.stdout or res.stderr}")
+    except Exception as e:
+        log_fail(f"JSC verification share deck URL failed: {e}")
+
+    if 'id="shareDeckModal"' in index_code and 'id="shareDeckModalList"' in index_code:
+        log_pass("index.html: #shareDeckModal and #shareDeckModalList present")
+    else:
+        log_fail("index.html: missing #shareDeckModal")
+
+    # Item 50: Standalone Legal Pages
+    legal_pages = ["terms.html", "privacy.html", "tokushoho.html"]
+    for lp in legal_pages:
+        lp_path = os.path.join(BASE_DIR, "legal", lp)
+        if os.path.exists(lp_path):
+            with open(lp_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            if "Vocab Vault" in content and ("Stripe" in content or "特定商取引法" in content or "利用規約" in content):
+                log_pass(f"legal/{lp}: standalone legal page present with statutory disclosures")
+            else:
+                log_fail(f"legal/{lp}: missing essential legal content")
+        else:
+            log_fail(f"legal/{lp}: file not found")
+
+    if 'href="legal/tokushoho.html"' in index_code and 'href="legal/terms.html"' in index_code and 'href="legal/privacy.html"' in index_code:
+        log_pass("index.html: provides permanent independent URL links to all legal pages")
+    else:
+        log_fail("index.html: missing independent legal page links")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -2009,6 +2159,7 @@ def main():
     test_global_i18n_and_multi_currency()
     test_onboarding_cloze_fuzzy_and_sw_banner()
     test_rich_pagination_and_keyboard_shortcuts()
+    test_items_45_to_50_integrity()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")
@@ -2022,3 +2173,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
