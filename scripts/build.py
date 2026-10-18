@@ -15,10 +15,10 @@ def log(msg):
     print(f"\033[36m[BUILD]\033[0m {msg}")
 
 def log_success(msg):
-    print(f"\033[32m✔ [BUILD SUCCESS]\033[0m {msg}")
+    print(f"\033[32m[BUILD SUCCESS]\033[0m {msg}")
 
 def log_fail(msg):
-    print(f"\033[31m✘ [BUILD ERROR]\033[0m {msg}")
+    print(f"\033[31m[BUILD ERROR]\033[0m {msg}")
 
 def generate_dev_html():
     """index.html を SSOT (Single Source of Truth) として dev.html を自動生成"""

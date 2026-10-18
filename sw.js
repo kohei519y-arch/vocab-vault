@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v46-modular-graph';
+const CACHE_NAME = 'vocab-vault-v47-webgl-multilang';
 
 // [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
 function fetchWithTimeout(request, timeoutMs = 3000) {
@@ -25,6 +25,7 @@ const PRECACHE_ASSETS = [
   './js/morphology.js',
   './js/eiken_catalog.js',
   './js/graph_layout.js',
+  './js/graph_webgl.js',
   './js/graph_renderer.js',
   './js/graph_views.js',
   './js/graph.js',

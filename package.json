@@ -1,0 +1,14 @@
+{
+  "name": "vocab-vault",
+  "version": "2.0.0",
+  "description": "Deep PIE Etymology & Conceptual History Vocabulary Vault",
+  "private": true,
+  "scripts": {
+    "test": "python3 scripts/run_all_tests.py",
+    "test:e2e": "playwright test",
+    "build": "python3 scripts/build.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

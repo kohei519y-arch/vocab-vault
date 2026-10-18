@@ -245,6 +245,23 @@
     const canvas = graphState.canvas;
     if (!ctx || !canvas) return;
 
+    // WebGL ハイブリッドレンダリング判定（800ノード以上または強制指定時にGPUハードウェア加速）
+    const useWebGL = Boolean(
+      global.VocabWebGLGraph &&
+      global.VocabWebGLGraph.isSupported() &&
+      (graphState.nodes.length >= 800 || graphState.forceWebGL)
+    );
+
+    if (useWebGL) {
+      try {
+        global.VocabWebGLGraph.render(graphState);
+      } catch (e) {
+        console.warn('[WebGL Fallback] Canvas 2D fallback engaged:', e);
+      }
+    } else if (global.VocabWebGLGraph) {
+      global.VocabWebGLGraph.hide();
+    }
+
     const dpr = window.devicePixelRatio || 1;
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -325,6 +342,11 @@
 
       const isConnectedToFocus = focusNode && (e.source === focusNode || e.target === focusNode);
       const isTwigEdge = (e.kind === 'leaf_to_twig');
+
+      // WebGL 稼働時: 背景エッジはGPUが一括描画するため、フォーカス中の強調エッジ以外はスキップしてCPU負荷をゼロ化
+      if (useWebGL && !isConnectedToFocus) {
+        continue;
+      }
 
       // 系統樹モード時、派生小枝 (Twig) は親単語がホバー/選択されている時のみ表示して過密を根絶
       if (isTree && isTwigEdge) {

@@ -7,7 +7,7 @@
   'use strict';
 
   const STORAGE_KEY = 'vv_ui_locale';
-  const SUPPORTED_LOCALES = ['en', 'ja'];
+  const SUPPORTED_LOCALES = ['en', 'ja', 'fr', 'de', 'es'];
 
   // 多言語対照辞書 (Translation Lexicon)
   const TRANSLATIONS = {
@@ -635,6 +635,876 @@
       'toast.sync_success': 'Cloud differential sync completed',
       'toast.unlocked': 'Skill learned and added to vocabulary',
       'toast.eiken_all_unlocked': 'All branch skills for this root learned'
+    },
+
+    fr: {
+      // Commun & Navigation
+      'app.title': 'Vocab Vault',
+      'app.tagline': 'Étymologie indo-européenne et histoire des concepts pour les esprits intellectuels',
+      'nav.explore': 'Explorer',
+      'nav.list': 'Liste',
+      'nav.extract': 'Extraire',
+      'nav.review': 'Réviser',
+      'nav.analytics': 'Analyses',
+      'nav.mask': 'Masque',
+      'side.explorer': 'Explorateur & Recherche',
+      'nav.all_words': 'Tous les mots',
+      'nav.anki': 'Révision Anki',
+      'nav.graph': 'Réseau de racines',
+      'nav.settings': 'Paramètres',
+      'nav.add_word': 'Ajouter un mot',
+      'nav.search_ph': 'Rechercher: mot, sens, *racine, #catégorie, @domaine...',
+      'nav.sync_cloud': 'Sync Cloud',
+      'nav.syncing': 'Synchronisation...',
+      'nav.synced': 'Synchronisé',
+      'nav.offline': 'Hors ligne',
+      'nav.ear_learning': 'Boucle audio',
+      'nav.ear_learning_title': 'Lecture audio continue des mots et exemples (L)',
+      'nav.mode_academic': 'Académique',
+      'nav.mode_simple': 'Simple',
+      'nav.sort_new': 'Tri: Plus récent',
+      'nav.sort_old': 'Tri: Plus ancien (#1~)',
+      'nav.sort_due': 'Tri: À réviser en priorité',
+      'nav.sort_alpha': 'Tri: Alphabétique',
+
+      // Révision Anki
+      'anki.recog': 'Reconnaissance',
+      'anki.cloze': 'Production (Texte à trous)',
+      'anki.recog_title': 'Rappeler le sens depuis le mot (M)',
+      'anki.cloze_title': 'Compléter le mot dans le contexte (M)',
+      'anki.undo': 'Annuler (Z)',
+      'anki.show_ans': 'Afficher la réponse (Espace)',
+      'anki.again': 'À revoir (1)',
+      'anki.hard': 'Difficile (2)',
+      'anki.good': 'Correct (3)',
+      'anki.easy': 'Facile (4)',
+      'anki.offline_badge': 'Révisions non synchronisées',
+      'anki.context_title': 'Contexte rencontré (Mémoire épisodique)',
+      'anki.swipe_left': '← Glisser vers la gauche: À revoir',
+      'anki.swipe_right': 'Glisser vers la droite: Correct →',
+      'anki.empty_title': 'Toutes les révisions du jour sont terminées !',
+      'anki.empty_desc': 'Ajoutez de nouveaux mots ou installez un pack de démarrage pour enrichir votre réseau de racines.',
+
+      // Vue Réseau
+      'graph.title': 'Réseau de racines étymologiques',
+      'graph.tab_network': 'Réseau',
+      'graph.tab_tree': 'Arbre généalogique',
+      'graph.tab_mindmap': 'Carte mentale',
+      'graph.tab_matrix': 'Préfixe x Racine',
+      'graph.eiken_btn': 'Catalogue des racines',
+      'graph.watering_btn': 'Révision ciblée',
+      'graph.mask_btn_off': 'Masque: DÉSACTIVÉ',
+      'graph.mask_btn_on': 'Masque: ACTIVÉ',
+      'graph.cluster_btn': 'Groupes seuls',
+      'graph.color_btn': 'Couleur par langue',
+      'graph.physics_stop': 'Pause',
+      'graph.physics_run': 'Actif',
+      'graph.fit_btn': 'Ajuster la vue',
+      'graph.save_img': 'Exporter PNG',
+      'graph.filter_ph': 'Filtrer par racine ou mot...',
+      'graph.all_lang': 'Toutes les langues',
+      'graph.en_only': 'Anglais uniquement',
+      'graph.fr_only': 'Français uniquement',
+      'graph.de_only': 'Allemand uniquement',
+      'graph.ja_only': 'Japonais uniquement',
+      'graph.root_jump_default': 'Aller à la racine...',
+      'graph.all_roots': 'Répertoire de toutes les racines',
+      'graph.unlock_eiken': 'Apprendre toutes les branches',
+
+      // Paramètres & Forfaits
+      'settings.title': 'Paramètres & Compte',
+      'settings.modal_title': 'Paramètres, Synchronisation Cloud & Données',
+      'settings.tab_general': 'Général & Affichage',
+      'settings.tab_account': 'Compte & Synchronisation',
+      'settings.tab_plans': 'Forfaits & Facturation',
+      'settings.tab_ai': 'IA & Mémorisation',
+      'settings.tab_storage': 'Gestion des données',
+      'settings.lang_heading': 'Langue de l\'interface',
+      'settings.lang_desc': 'Choisissez la langue d\'affichage des menus et commandes.',
+      'settings.theme_heading': 'Paramètres d\'affichage & audio',
+      'settings.theme_dark': 'Mode sombre',
+      'settings.theme_light': 'Mode clair',
+      'settings.auto_speak': 'Prononciation automatique en révision',
+      'settings.auto_speak_title': 'Prononcer automatiquement le mot en mode Anki',
+      'settings.tts_rate_title': 'Vitesse de diction',
+      'settings.tts_rate_slow': 'Vitesse: 0.85x (Lente)',
+      'settings.tts_rate_natural': 'Vitesse: 0.95x (Naturelle)',
+      'settings.tts_rate_fast': 'Vitesse: 1.05x (Rapide)',
+      'settings.onboarding_title': 'Guide de démarrage & Visite guidée',
+      'settings.onboarding_badge': 'Disponible à tout moment',
+      'settings.onboarding_desc': 'Redécouvrez les principes de mémorisation par racines étymologiques, l\'algorithme FSRS-4.5 et les modes de vue.',
+      'settings.onboarding_btn': 'Ouvrir la visite guidée',
+      'settings.pwa_title': 'Ouvrir en application autonome (sans cadre navigateur)',
+      'settings.pwa_badge': 'Compatible autonome',
+      'settings.pwa_desc': 'Utilisez l\'application dans une fenêtre dédiée sans barre d\'URL sur Mac, Windows et mobile.',
+      'settings.pwa_install_btn': 'Installer l\'application (Autonome)',
+      'settings.pwa_guide_btn': 'Guide d\'installation par OS',
+      'settings.pwa_mac_note': '*Sur Mac, lancez directement l\'application sans navigateur en double-cliquant sur "Vocab Vault.app" dans ce dossier.',
+      'settings.account_title': 'Gestion du compte & Synchronisation Cloud',
+      'settings.not_logged_in': 'Non connecté',
+      'settings.logged_in': 'Connecté',
+      'settings.email_ph': 'Adresse e-mail',
+      'settings.pass_ph': 'Mot de passe (6+ caractères)',
+      'settings.login_btn': 'Connexion',
+      'settings.signup_btn': 'Inscription',
+      'settings.agree_terms': 'Conditions d\'utilisation',
+      'settings.agree_and': ' et ',
+      'settings.agree_privacy': 'Politique de confidentialité',
+      'settings.agree_suffix': '',
+      'settings.supabase_selfhost_title': 'Avancé: Point de terminaison Supabase personnalisé',
+      'settings.supabase_url_ph': 'Supabase URL (https://xxx.supabase.co)',
+      'settings.supabase_anon_ph': 'Clé publique anon Supabase',
+      'settings.supabase_selfhost_desc': '*Non requis en temps normal. Connexion chiffrée SSL automatique au serveur officiel.',
+      'settings.sync_now_btn': 'Synchroniser maintenant',
+      'settings.logout_btn': 'Déconnexion',
+      'settings.quota_desc': '*Les comptes gratuits peuvent générer 5 mots IA par jour (cache partagé illimité). La synchronisation multi-appareils est incluse dans le forfait Pro (3,99 $/mois).',
+      'settings.plan_heading': 'Abonnements & Forfaits (Stripe)',
+      'settings.free_plan': 'Forfait Gratuit',
+      'settings.pro_plan': 'Forfait Pro',
+      'settings.current_plan': 'Forfait actuel',
+      'settings.recommended': 'Recommandé',
+      'settings.plan_monthly': 'Mensuel',
+      'settings.plan_annual': 'Annuel (-17% / 2 mois offerts)',
+      'settings.price_free': '0 $/mois',
+      'settings.price_pro_monthly': '3,99 $/mois',
+      'settings.price_pro_annual': '39,00 $/an (3,25 $/mois)',
+      'settings.free_feat1': 'Jusqu\'à 5 nouvelles générations de mots IA par jour',
+      'settings.free_feat2': 'Accès illimité au dictionnaire partagé en cache',
+      'settings.free_feat3': 'Stockage local sur un appareil avec sauvegarde JSON',
+      'settings.free_feat4': 'Révision espacée SM-2/FSRS et interface tactile',
+      'settings.pro_feat1': 'Génération IA illimitée et histoire conceptuelle approfondie',
+      'settings.pro_feat2': 'Extraction illimitée de textes longs et OCR image',
+      'settings.pro_feat3': 'Synchronisation différentielle cloud multi-appareils',
+      'settings.pro_feat4': 'Support prioritaire',
+      'settings.legal_notice_title': '[Informations légales sur le renouvellement et l\'annulation]',
+      'settings.legal_notice_1': '• Renouvellement automatique à 3,99 $/mois ou 39,00 $/an',
+      'settings.legal_notice_2': '• Résiliable à tout moment avant renouvellement via Paramètres ou Portail Stripe',
+      'settings.legal_notice_3': '• Les fonctionnalités Pro restent actives jusqu\'à la fin de la période en cours',
+      'settings.upgrade_btn': 'Passer au Forfait Pro',
+      'settings.portal_btn': 'Facturation & Factures (Portail Stripe)',
+      'settings.stripe_secure_note': '*Paiements sécurisés via le protocole SSL chiffré de Stripe.',
+      'settings.link_terms': 'Conditions',
+      'settings.link_privacy': 'Confidentialité',
+      'settings.link_tokusho': 'Mentions légales',
+      'settings.metrics_title': 'Métriques de génération IA et d\'économie de jetons',
+      'settings.metrics_badge_cache': 'Cache haute efficacité actif',
+      'settings.metric_total_words': 'Requêtes de génération',
+      'settings.metric_cache_rate': 'Taux de succès du cache',
+      'settings.metric_tokens_saved': 'Jetons économisés estimés',
+      'settings.metric_daily_quota': 'Quota quotidien d\'IA',
+      'settings.metrics_desc': '*Les mots extraits du cache partagé ne consomment aucun jeton et s\'enregistrent instantanément sans latence (0 ms).',
+      'settings.ai_engine_title': 'Moteur IA et protection de la confidentialité',
+      'settings.ai_engine_badge': 'IA intégrée active (Confidentialité totale)',
+      'settings.ai_engine_desc': 'Cette application intègre un moteur IA chiffré TLS/SSL. Vos données personnelles et clés restent entièrement protégées.',
+      'settings.byok_title': 'Avancé: Clé API Gemini personnalisée (BYOK: HTTPS direct)',
+      'settings.byok_ph': 'AIzaSy... (Non requis en temps normal)',
+      'settings.byok_show': 'Afficher',
+      'settings.byok_save': 'Enregistrer & Vérifier',
+      'settings.byok_session_only': 'Effacer à la fermeture du navigateur (sessionStorage uniquement)',
+      'settings.byok_desc': '*À configurer uniquement si vous utilisez votre propre clé Google AI Studio. La clé reste strictement stockée dans votre navigateur local.',
+      'settings.byok_model_lbl': 'Modèle IA:',
+      'settings.byok_model_auto': 'Automatique (Modèle optimal par mode)',
+      'settings.byok_reload': 'Actualiser',
+      'settings.storage_title': 'Stockage principal IndexedDB haute capacité',
+      'settings.storage_badge': 'Stockage normal',
+      'settings.export_json': 'Exporter JSON',
+      'settings.export_json_desc': 'Sauvegarder toutes les langues',
+      'settings.import_json': 'Importer JSON',
+      'settings.import_json_desc': 'Fusionner une sauvegarde',
+      'settings.export_tsv': 'Export Anki / TSV',
+      'settings.export_tsv_desc': 'Exporter la liste affichée',
+      'settings.export_apkg': 'Export Anki (.apkg)',
+      'settings.export_apkg_desc': 'Paquet officiel Anki',
+      'settings.export_obsidian': 'Export Obsidian',
+      'settings.export_obsidian_desc': 'Fichiers .md avec liens wiki',
+      'settings.sync_obsidian': 'Sync directe Obsidian',
+      'settings.sync_obsidian_desc': 'Écriture directe dans le Vault',
+      'settings.share_deck_url': 'Créer une URL partagée',
+      'settings.share_deck_url_desc': 'Partager un paquet par lien',
+      'settings.starter_pack': 'Packs de démarrage',
+      'settings.starter_pack_desc': 'Importer des listes académiques',
+      'settings.anki_import': 'Import Anki',
+      'settings.anki_import_desc': 'Importer depuis APKG/TSV',
+      'settings.salvage_all': 'Récupération intégrale',
+      'settings.salvage_all_desc': 'Restaurer depuis les instantanés',
+      'settings.fsrs_title': 'Optimiseur FSRS personnalisé (Personalized FSRS)',
+      'settings.fsrs_badge': 'FSRS-4.5 optimisé',
+      'settings.fsrs_desc': 'Ajuste dynamiquement les coefficients d\'oubli individuels en minimisant l\'erreur quadratique moyenne (MSE).',
+      'settings.fsrs_manual_opt': 'Optimisation manuelle des poids FSRS',
+      'settings.fsrs_manual_opt_desc': 'Recalcule la vitesse d\'oubli sur les 500 derniers journaux de révision.',
+      'settings.fsrs_opt_now': 'Optimiser maintenant',
+      'settings.fsrs_reset_weights': 'Réinitialiser aux valeurs par défaut',
+      'settings.notify_title': 'Rappels push intelligents au seuil d\'oubli',
+      'settings.notify_badge': 'Veille intelligente',
+      'settings.notify_heading': 'Alerte automatique juste avant le seuil de 90%',
+      'settings.notify_desc': 'Vous alerte automatiquement lorsque la rétention prédictive passe sous 90%.',
+      'settings.notify_enable': 'Activé',
+      'settings.notify_perm_heading': 'Autorisation des notifications navigateur',
+      'settings.notify_perm_desc': 'Notifications bureau et mobile via l\'API Web Notification',
+      'settings.notify_perm_btn': 'Autoriser les notifications',
+      'settings.cap_title': 'Limite de révision & redistribution du retard (FSRS-4.5)',
+      'settings.cap_badge': 'Optimisé',
+      'settings.cap_heading': 'Plafond quotidien de révision',
+      'settings.cap_desc': 'Limite le volume journalier pour prévenir la surcharge cognitive.',
+      'settings.cap_opt_20': '20 mots (Détendu)',
+      'settings.cap_opt_30': '30 mots (Recommandé)',
+      'settings.cap_opt_50': '50 mots (Intensif)',
+      'settings.cap_opt_unlimited': 'Illimité (Tout)',
+      'settings.snooze_heading': 'Redistribution fluide des cartes en retard (Snooze)',
+      'settings.snooze_desc': 'Répartit uniformément les révisions en retard sur les 7 prochains jours.',
+      'settings.snooze_btn': 'Redistribuer le retard',
+      'settings.diagnostics_heading': 'Diagnostic d\'intégrité & Auto-réparation de la base',
+      'settings.diagnostics_desc': 'Détecte et répare les doublons, dates corrompues et tombstones obsolètes.',
+      'settings.diagnostics_btn': 'Lancer le diagnostic & réparer',
+      'settings.sovereignty_title': 'Souveraineté des données & Garantie de gratuité à vie',
+      'settings.sovereignty_desc': 'Même en résiliant le forfait Pro, l\'intégralité de vos mots enregistrés, le système Anki SRS et les fonctions d\'export restent gratuits à vie. Votre patrimoine intellectuel ne sera jamais verrouillé.',
+      'settings.dev_title': 'Mode Maître Développeur',
+      'settings.dev_desc': 'Débloque tous les quotas et restrictions pour les développeurs et administrateurs.',
+      'settings.dev_btn': 'Basculer les autorisations',
+      'settings.clear_lang_title': 'Supprimer toutes les données de la langue actuelle',
+      'settings.clear_lang_desc_pre': 'Supprime définitivement les mots pour la langue (',
+      'settings.clear_lang_desc_post': ') (action irréversible).',
+      'settings.clear_lang_btn': 'Tout supprimer',
+      'settings.delete_acct_title': 'Supprimer définitivement le compte',
+      'settings.delete_acct_desc': 'Efface de manière irréversible toutes les données cloud, l\'historique et le profil.',
+      'settings.delete_acct_btn': 'Supprimer compte & données',
+      'settings.close_btn': 'Fermer les paramètres',
+      'toolbar.wordbook': 'Vocabulaire',
+      'toolbar.swap_lang': 'Intervertir les langues (⇄)',
+      'toolbar.storage_status': 'État du stockage',
+      'toolbar.ai_quota_prefix': 'IA restante: ',
+      'toolbar.cloud_ai_active': 'IA intégrée: Active (Privée)',
+      'addbar.fol_ph': 'Catégorie / Domaine (facultatif)',
+      'addbar.word_ph': 'Saisissez un mot ou une expression (virgule ou retour à la ligne pour l\'ajout par lot)',
+      'addbar.hist_lbl': 'Histoire',
+      'addbar.hist_title': 'Contexte historique, institutionnel et conceptuel approfondi',
+      'addbar.wikt_lbl': 'Wikt',
+      'addbar.wikt_title': 'Recoupement avec l\'étymologie et l\'API de Wiktionary',
+      'addbar.submit': 'Ajouter',
+      'addbar.opts_title': 'Développer les options & catégories',
+      'feedback.banner_notice': 'Annonce',
+      'feedback.banner_text': 'Donnez votre avis sur l\'apprentissage étymologique (bénéficiez d\'un an de Pro offert).',
+      'feedback.participate': 'Participer',
+      'feedback.close': 'Fermer',
+      'list.all_words': 'Tous les mots',
+      'list.audio_loop': 'Boucle audio',
+      'list.audio_loop_title': 'Lecture audio en continu des mots affichés (L)',
+      'list.academic': 'Académique',
+      'list.academic_title': 'Étymologie complète, histoire conceptuelle et représentations clés',
+      'list.simple': 'Simple',
+      'list.simple_title': 'Vue épurée avec définitions et exemples',
+      'side.lang_pairs': 'Paires de langues',
+      'side.status_filter': 'Statut & Révision',
+      'side.field_filter': 'Catégorie & Domaine',
+      'side.pos_filter': 'Partie du discours (POS)',
+      'side.cat_filter': 'Catégories',
+      'side.feedback': 'Commentaires',
+      'side.settings': 'Paramètres',
+      'side.xlang_btn': 'Trans-linguistique',
+      'side.xlang_title': 'Rechercher parmi toutes les paires linguistiques',
+      'side.reset_btn': 'Réinitialiser',
+      'cat.philosophy': 'Philosophie & Pensée',
+      'cat.psychology': 'Psychologie & Esprit',
+      'cat.science': 'Sciences & Technologies',
+      'cat.politics': 'Politique & Droit',
+      'cat.business': 'Économie & Affaires',
+      'cat.arts': 'Littérature & Arts',
+      'cat.daily': 'Quotidien & Général',
+      'cat.general': 'Général',
+      'upsell.title': 'Dépassez la mémorisation mécanique avec Vocab Vault Pro',
+      'upsell.subtitle': 'Accédez à l\'étymologie générative illimitée, la synchronisation temps réel et l\'optimisation FSRS.',
+      'upsell.feat_ai': 'Génération IA illimitée et histoire conceptuelle approfondie',
+      'upsell.feat_cache': 'Accès illimité au cache partagé et aux 2 000 mots académiques',
+      'upsell.feat_sync': 'Synchronisation différentielle cloud multi-appareils',
+      'upsell.feat_ocr': 'Extraction illimitée de textes et OCR appareil photo',
+      'upsell.feat_analytics': 'Optimiseur de rétention personnalisé FSRS-4.5',
+      'upsell.save_badge': 'Économisez 17% avec la facturation annuelle !',
+      'upsell.upgrade_now': 'Commencer le Forfait Pro',
+      'upsell.skip': 'Peut-être plus tard',
+      'toast.saved': 'Enregistré avec succès',
+      'toast.sync_success': 'Synchronisation cloud terminée',
+      'toast.unlocked': 'Compétence acquise et ajoutée au vocabulaire',
+      'toast.eiken_all_unlocked': 'Toutes les compétences de cette racine acquises'
+    },
+
+    de: {
+      // Allgemein & Navigation
+      'app.title': 'Vocab Vault',
+      'app.tagline': 'Indogermanische Etymologie und Begriffsgeschichte für intellektuelle Lerner',
+      'nav.explore': 'Erkunden',
+      'nav.list': 'Liste',
+      'nav.extract': 'Extrahieren',
+      'nav.review': 'Wiederholen',
+      'nav.analytics': 'Analysen',
+      'nav.mask': 'Maske',
+      'side.explorer': 'Explorer & Suche',
+      'nav.all_words': 'Alle Wörter',
+      'nav.anki': 'Anki-Wiederholung',
+      'nav.graph': 'Wurzelnetzwerk',
+      'nav.settings': 'Einstellungen',
+      'nav.add_word': 'Wort hinzufügen',
+      'nav.search_ph': 'Suche: Wort, Bedeutung, *Wurzel, #Wortart, @Kategorie...',
+      'nav.sync_cloud': 'Cloud-Sync',
+      'nav.syncing': 'Synchronisierung...',
+      'nav.synced': 'Synchronisiert',
+      'nav.offline': 'Offline',
+      'nav.ear_learning': 'Audio-Schleife',
+      'nav.ear_learning_title': 'Wörter und Beispielsätze automatisch im Hintergrund abspielen (L)',
+      'nav.mode_academic': 'Akademisch',
+      'nav.mode_simple': 'Einfach',
+      'nav.sort_new': 'Sortierung: Neueste',
+      'nav.sort_old': 'Sortierung: Älteste (#1~)',
+      'nav.sort_due': 'Sortierung: Fällig zur Wiederholung',
+      'nav.sort_alpha': 'Sortierung: Alphabetisch',
+
+      // Anki-Wiederholung
+      'anki.recog': 'Erkennung',
+      'anki.cloze': 'Produktion (Lückentext)',
+      'anki.recog_title': 'Bedeutung anhand des Wortes abrufen (M)',
+      'anki.cloze_title': 'Wort aus dem Kontext ergänzen (M)',
+      'anki.undo': 'Rückgängig (Z)',
+      'anki.show_ans': 'Antwort anzeigen (Leertaste)',
+      'anki.again': 'Nochmal (1)',
+      'anki.hard': 'Schwer (2)',
+      'anki.good': 'Gut (3)',
+      'anki.easy': 'Einfach (4)',
+      'anki.offline_badge': 'Nicht synchronisierte Wiederholungen',
+      'anki.context_title': 'Begegnungskontext (Episodisches Gedächtnis)',
+      'anki.swipe_left': '← Nach links wischen: Nochmal',
+      'anki.swipe_right': 'Nach rechts wischen: Gut →',
+      'anki.empty_title': 'Alle heutigen Wiederholungen sind abgeschlossen!',
+      'anki.empty_desc': 'Fügen Sie neue Wörter hinzu oder installieren Sie ein Starterpaket, um Ihr Wurzelnetzwerk zu erweitern.',
+
+      // Graph-Ansicht
+      'graph.title': 'Etymologisches Wurzelnetzwerk',
+      'graph.tab_network': 'Netzwerk',
+      'graph.tab_tree': 'Stammbaum',
+      'graph.tab_mindmap': 'Mindmap',
+      'graph.tab_matrix': 'Präfix x Wurzel',
+      'graph.eiken_btn': 'Wurzelkatalog',
+      'graph.watering_btn': 'Gezielte Wiederholung',
+      'graph.mask_btn_off': 'Maske: AUS',
+      'graph.mask_btn_on': 'Maske: AN',
+      'graph.cluster_btn': 'Nur Cluster',
+      'graph.color_btn': 'Farbe nach Sprache',
+      'graph.physics_stop': 'Pause',
+      'graph.physics_run': 'Aktiv',
+      'graph.fit_btn': 'Ansicht anpassen',
+      'graph.save_img': 'PNG exportieren',
+      'graph.filter_ph': 'Nach Wurzel oder Wort filtern...',
+      'graph.all_lang': 'Alle Sprachen',
+      'graph.en_only': 'Nur Englisch',
+      'graph.fr_only': 'Nur Französisch',
+      'graph.de_only': 'Nur Deutsch',
+      'graph.ja_only': 'Nur Japanisch',
+      'graph.root_jump_default': 'Zur Wurzel springen...',
+      'graph.all_roots': 'Verzeichnis aller Wurzeln',
+      'graph.unlock_eiken': 'Alle Zweige erlernen',
+
+      // Einstellungen & Pläne
+      'settings.title': 'Einstellungen & Konto',
+      'settings.modal_title': 'Einstellungen, Cloud-Synchronisierung & Daten',
+      'settings.tab_general': 'Allgemein & Anzeige',
+      'settings.tab_account': 'Konto & Synchronisierung',
+      'settings.tab_plans': 'Pläne & Abrechnung',
+      'settings.tab_ai': 'KI & Gedächtnis',
+      'settings.tab_storage': 'Datenverwaltung',
+      'settings.lang_heading': 'Oberflächensprache',
+      'settings.lang_desc': 'Wählen Sie die Anzeigesprache für Menüs und Bedienelemente.',
+      'settings.theme_heading': 'Anzeige- & Audioeinstellungen',
+      'settings.theme_dark': 'Dunkelmodus',
+      'settings.theme_light': 'Hellmodus',
+      'settings.auto_speak': 'Automatische Aussprache bei Wiederholung',
+      'settings.auto_speak_title': 'Wort im Anki-Modus automatisch aussprechen',
+      'settings.tts_rate_title': 'Sprechgeschwindigkeit',
+      'settings.tts_rate_slow': 'Tempo: 0.85x (Langsam)',
+      'settings.tts_rate_natural': 'Tempo: 0.95x (Natürlich)',
+      'settings.tts_rate_fast': 'Tempo: 1.05x (Schnell)',
+      'settings.onboarding_title': 'Einführung & Bedienungsanleitung',
+      'settings.onboarding_badge': 'Jederzeit verfügbar',
+      'settings.onboarding_desc': 'Entdecken Sie die Grundlagen des etymologischen Lernens, den FSRS-4.5-Algorithmus und die Ansichtsmodi.',
+      'settings.onboarding_btn': 'Einführungstour öffnen',
+      'settings.pwa_title': 'Als eigenständige App öffnen (ohne Browserrahmen)',
+      'settings.pwa_badge': 'App-fähig',
+      'settings.pwa_desc': 'Nutzen Sie die App in einem separaten Fenster ohne URL-Leiste auf Mac, Windows und Mobilgeräten.',
+      'settings.pwa_install_btn': 'App installieren (Eigenständig)',
+      'settings.pwa_guide_btn': 'Installationsanleitung je Betriebssystem',
+      'settings.pwa_mac_note': '*Auf dem Mac können Sie die App direkt per Doppelklick auf "Vocab Vault.app" in diesem Ordner starten.',
+      'settings.account_title': 'Kontoverwaltung & Cloud-Synchronisierung',
+      'settings.not_logged_in': 'Nicht angemeldet',
+      'settings.logged_in': 'Angemeldet',
+      'settings.email_ph': 'E-Mail-Adresse',
+      'settings.pass_ph': 'Passwort (mindestens 6 Zeichen)',
+      'settings.login_btn': 'Anmelden',
+      'settings.signup_btn': 'Registrieren',
+      'settings.agree_terms': 'Nutzungsbedingungen',
+      'settings.agree_and': ' und ',
+      'settings.agree_privacy': 'Datenschutzerklärung',
+      'settings.agree_suffix': '',
+      'settings.supabase_selfhost_title': 'Erweitert: Eigener Supabase-Server (Self-Hosted)',
+      'settings.supabase_url_ph': 'Supabase URL (https://xxx.supabase.co)',
+      'settings.supabase_anon_ph': 'Supabase Anon Public Key',
+      'settings.supabase_selfhost_desc': '*Normalerweise nicht erforderlich. Automatische SSL-Verbindung zum offiziellen Server.',
+      'settings.sync_now_btn': 'Jetzt synchronisieren',
+      'settings.logout_btn': 'Abmelden',
+      'settings.quota_desc': '*Kostenlose Konten können 5 KI-Wörter pro Tag generieren (unbegrenzter Shared Cache). Multi-Device-Sync ist im Pro-Plan (3,99 $/Monat) enthalten.',
+      'settings.plan_heading': 'Abonnements & Pläne (Stripe)',
+      'settings.free_plan': 'Kostenloser Plan',
+      'settings.pro_plan': 'Pro-Plan',
+      'settings.current_plan': 'Aktueller Plan',
+      'settings.recommended': 'Empfohlen',
+      'settings.plan_monthly': 'Monatlich',
+      'settings.plan_annual': 'Jährlich (17% sparen / 2 Monate gratis)',
+      'settings.price_free': '0 $/Monat',
+      'settings.price_pro_monthly': '3,99 $/Monat',
+      'settings.price_pro_annual': '39,00 $/Jahr (3,25 $/Monat)',
+      'settings.free_feat1': 'Bis zu 5 neue KI-Wortgenerierungen pro Tag',
+      'settings.free_feat2': 'Unbegrenzter Zugriff auf geteilten Wörterbuch-Cache',
+      'settings.free_feat3': 'Lokale Speicherung auf 1 Gerät mit JSON-Backup',
+      'settings.free_feat4': 'SM-2/FSRS Spaced Repetition und Wischgesten',
+      'settings.pro_feat1': 'Unbegrenzte KI-Generierung & vertiefte Begriffsgeschichte',
+      'settings.pro_feat2': 'Unbegrenzte Textextraktion & Kamera-OCR',
+      'settings.pro_feat3': 'Echtzeit-Cloud-Diff-Sync für mehrere Geräte',
+      'settings.pro_feat4': 'Prioritäts-Support',
+      'settings.legal_notice_title': '[Gesetzliche Hinweise zu Verlängerung und Kündigung]',
+      'settings.legal_notice_1': '• Automatische Verlängerung zu 3,99 $/Monat oder 39,00 $/Jahr',
+      'settings.legal_notice_2': '• Jederzeit vor Verlängerung in den Einstellungen oder im Stripe-Portal kündbar',
+      'settings.legal_notice_3': '• Pro-Funktionen bleiben nach Kündigung bis zum Periodenende aktiv',
+      'settings.upgrade_btn': 'Auf Pro upgraden',
+      'settings.portal_btn': 'Rechnungen & Abo verwalten (Stripe-Portal)',
+      'settings.stripe_secure_note': '*Sichere Zahlungen über die SSL-Verschlüsselung von Stripe.',
+      'settings.link_terms': 'Bedingungen',
+      'settings.link_privacy': 'Datenschutz',
+      'settings.link_tokusho': 'Impressum',
+      'settings.metrics_title': 'KI-Generierungs- & Token-Ersparnismetriken',
+      'settings.metrics_badge_cache': 'Hocheffizienter Cache aktiv',
+      'settings.metric_total_words': 'Gesamte Generierungsanfragen',
+      'settings.metric_cache_rate': 'Cache-Trefferquote',
+      'settings.metric_tokens_saved': 'Geschätzte Token-Ersparnis',
+      'settings.metric_daily_quota': 'Tägliches KI-Restkontingent',
+      'settings.metrics_desc': '*Aus dem Shared Cache geladene Wörter verbrauchen keine API-Tokens und laden sofort ohne Wartezeit (0 ms).',
+      'settings.ai_engine_title': 'KI-Engine & Datenschutz',
+      'settings.ai_engine_badge': 'Eingebettete KI aktiv (Voller Datenschutz)',
+      'settings.ai_engine_desc': 'Diese App verfügt über eine TLS/SSL-verschlüsselte integrierte KI. Ihre Privatsphäre bleibt geschützt.',
+      'settings.byok_title': 'Erweitert: Eigener Gemini-API-Schlüssel (BYOK: Direktes HTTPS)',
+      'settings.byok_ph': 'AIzaSy... (Normalerweise nicht erforderlich)',
+      'settings.byok_show': 'Anzeigen',
+      'settings.byok_save': 'Speichern & Prüfen',
+      'settings.byok_session_only': 'Beim Schließen des Browsers löschen (nur sessionStorage)',
+      'settings.byok_desc': '*Nur erforderlich, wenn Sie Ihren eigenen Google AI Studio Schlüssel verwenden möchten. Der Schlüssel verbleibt lokal in Ihrem Browser.',
+      'settings.byok_model_lbl': 'KI-Modell:',
+      'settings.byok_model_auto': 'Automatisch (Optimal je Modus)',
+      'settings.byok_reload': 'Neu laden',
+      'settings.storage_title': 'IndexedDB-Hauptspeicher hoher Kapazität',
+      'settings.storage_badge': 'Speicher normal',
+      'settings.export_json': 'JSON exportieren',
+      'settings.export_json_desc': 'Alle Sprachdaten sichern',
+      'settings.import_json': 'JSON importieren',
+      'settings.import_json_desc': 'Backup zusammenführen',
+      'settings.export_tsv': 'Anki / TSV Export',
+      'settings.export_tsv_desc': 'Aktuelle Liste exportieren',
+      'settings.export_apkg': 'Anki (.apkg) Export',
+      'settings.export_apkg_desc': 'Offizielles Anki-Paket',
+      'settings.export_obsidian': 'Obsidian Export',
+      'settings.export_obsidian_desc': '.md-Dateien mit Wiki-Links',
+      'settings.sync_obsidian': 'Direkter Obsidian-Sync',
+      'settings.sync_obsidian_desc': 'Direkt ins Vault-Verzeichnis schreiben',
+      'settings.share_deck_url': 'Geteilte Deck-URL erstellen',
+      'settings.share_deck_url_desc': 'Deck per Link mit Freunden teilen',
+      'settings.starter_pack': 'Starterpakete',
+      'settings.starter_pack_desc': 'Akademische Wortlisten laden',
+      'settings.anki_import': 'Anki-Import',
+      'settings.anki_import_desc': 'Aus APKG/TSV importieren',
+      'settings.salvage_all': 'Vollständige Rettung',
+      'settings.salvage_all_desc': 'Aus Snapshots wiederherstellen',
+      'settings.fsrs_title': 'Personalisierter FSRS-Gewichtsoptimierer (Personalized FSRS)',
+      'settings.fsrs_badge': 'FSRS-4.5 optimiert',
+      'settings.fsrs_desc': 'Passt individuelle Vergessenskurven dynamisch an, um den mittleren quadratischen Vorhersagefehler (MSE) zu minimieren.',
+      'settings.fsrs_manual_opt': 'FSRS-Gewichte manuell optimieren',
+      'settings.fsrs_manual_opt_desc': 'Berechnet die Vergessensrate anhand der letzten 500 Wiederholungsprotokolle neu.',
+      'settings.fsrs_opt_now': 'Jetzt optimieren',
+      'settings.fsrs_reset_weights': 'Auf Standardwerte zurücksetzen',
+      'settings.notify_title': 'Intelligente Push-Erinnerungen an der Vergessensgrenze',
+      'settings.notify_badge': 'Intelligenter Bereitschaftsmodus',
+      'settings.notify_heading': 'Automatische Erinnerung kurz vor 90% Behaltenswahrscheinlichkeit',
+      'settings.notify_desc': 'Erinnert Sie rechtzeitig, bevor das Erinnerungsniveau unter 90% sinkt.',
+      'settings.notify_enable': 'Aktiviert',
+      'settings.notify_perm_heading': 'Berechtigung für Browser-Benachrichtigungen',
+      'settings.notify_perm_desc': 'Desktop- und Mobilbenachrichtigungen über die Web Notification API',
+      'settings.notify_perm_btn': 'Benachrichtigungen erlauben',
+      'settings.cap_title': 'Wiederholungslimit & Entzerrung fälliger Karten (FSRS-4.5)',
+      'settings.cap_badge': 'Optimiert',
+      'settings.cap_heading': 'Tägliches maximales Wiederholungslimit',
+      'settings.cap_desc': 'Begrenzt das tägliche Pensum, um Überlastung zu vermeiden.',
+      'settings.cap_opt_20': '20 Wörter (Entspannt)',
+      'settings.cap_opt_30': '30 Wörter (Empfohlen)',
+      'settings.cap_opt_50': '50 Wörter (Intensiv)',
+      'settings.cap_opt_unlimited': 'Unbegrenzt (Alle)',
+      'settings.snooze_heading': 'Sanfte Entzerrung überfälliger Karten (Snooze)',
+      'settings.snooze_desc': 'Verteilt überfällige Karten gleichmäßig über die nächsten 7 Tage.',
+      'settings.snooze_btn': 'Gleichmäßig verteilen',
+      'settings.diagnostics_heading': 'Datenbankintegrität & Selbstreparatur (Self-Healing)',
+      'settings.diagnostics_desc': 'Erkennt und repariert Duplikate, fehlerhafte Daten und veraltete Tombstones.',
+      'settings.diagnostics_btn': 'Diagnose & Reparatur starten',
+      'settings.sovereignty_title': 'Datensouveränität & Lebenslange Kostenlos-Garantie',
+      'settings.sovereignty_desc': 'Auch nach Kündigung des Pro-Abonnements bleiben alle Ihre Wörter, die Anki SRS-Funktion und Exportmöglichkeiten dauerhaft kostenlos. Ihre Lerninhalte werden niemals gesperrt.',
+      'settings.dev_title': 'Entwickler-Master-Modus',
+      'settings.dev_desc': 'Hebt alle Kontingente und Begrenzungen für Entwickler und Administratoren auf.',
+      'settings.dev_btn': 'Berechtigungen umschalten',
+      'settings.clear_lang_title': 'Alle Daten der aktuellen Sprache löschen',
+      'settings.clear_lang_desc_pre': 'Löscht unwiderruflich alle Wörter der Sprache (',
+      'settings.clear_lang_desc_post': ') (kann nicht rückgängig gemacht werden).',
+      'settings.clear_lang_btn': 'Alles löschen',
+      'settings.delete_acct_title': 'Konto dauerhaft löschen',
+      'settings.delete_acct_desc': 'Löscht unwiderruflich alle Cloud-Daten, den Verlauf und das Kontoprofil.',
+      'settings.delete_acct_btn': 'Konto & Daten löschen',
+      'settings.close_btn': 'Einstellungen schließen',
+      'toolbar.wordbook': 'Wortschatz',
+      'toolbar.swap_lang': 'Sprachen tauschen (⇄)',
+      'toolbar.storage_status': 'Speicherstatus',
+      'toolbar.ai_quota_prefix': 'Verbleibende KI: ',
+      'toolbar.cloud_ai_active': 'Eingebettete KI: Aktiv (Geschützt)',
+      'addbar.fol_ph': 'Kategorie / Fachgebiet (optional)',
+      'addbar.word_ph': 'Wort oder Phrase eingeben (Komma oder Zeilenumbruch für Stapel)',
+      'addbar.hist_lbl': 'Geschichte',
+      'addbar.hist_title': 'Vertiefte historische, institutionelle und begriffliche Hintergründe',
+      'addbar.wikt_lbl': 'Wikt',
+      'addbar.wikt_title': 'Gegenprüfung mit Wiktionary-Etymologie und Lautschrift',
+      'addbar.submit': 'Hinzufügen',
+      'addbar.opts_title': 'Optionen & Kategorien einblenden',
+      'feedback.banner_notice': 'Hinweis',
+      'feedback.banner_text': 'Geben Sie Feedback zum etymologischen Lernen (1 Jahr Pro kostenlos).',
+      'feedback.participate': 'Teilnehmen',
+      'feedback.close': 'Schließen',
+      'list.all_words': 'Alle Wörter',
+      'list.audio_loop': 'Audio-Schleife',
+      'list.audio_loop_title': 'Kontinuierliche Audiowiedergabe der Wörter (L)',
+      'list.academic': 'Akademisch',
+      'list.academic_title': 'Vollständige Etymologie, Begriffsgeschichte und Kernbilder',
+      'list.simple': 'Einfach',
+      'list.simple_title': 'Schlanke Ansicht mit Bedeutungen und Beispielen',
+      'side.lang_pairs': 'Sprachpaare',
+      'side.status_filter': 'Status & Wiederholung',
+      'side.field_filter': 'Kategorie & Fachgebiet',
+      'side.pos_filter': 'Wortart (POS)',
+      'side.cat_filter': 'Kategorien',
+      'side.feedback': 'Feedback',
+      'side.settings': 'Einstellungen',
+      'side.xlang_btn': 'Sprachübergreifend',
+      'side.xlang_title': 'Über alle Sprachpaare hinweg suchen',
+      'side.reset_btn': 'Zurücksetzen',
+      'cat.philosophy': 'Philosophie & Geistesleben',
+      'cat.psychology': 'Psychologie & Geist',
+      'cat.science': 'Wissenschaft & Technik',
+      'cat.politics': 'Politik & Recht',
+      'cat.business': 'Wirtschaft & Finanzen',
+      'cat.arts': 'Literatur & Kunst',
+      'cat.daily': 'Alltag & Allgemeines',
+      'cat.general': 'Allgemein',
+      'upsell.title': 'Überwinden Sie mechanisches Auswendiglernen mit Vocab Vault Pro',
+      'upsell.subtitle': 'Nutzen Sie unbegrenzte generative Etymologie, Echtzeit-Synchronisation und adaptive FSRS-Wiederholung.',
+      'upsell.feat_ai': 'Unbegrenzte KI-Begriffsgeschichte & Etymologie',
+      'upsell.feat_cache': 'Unbegrenzter Zugriff auf geteilten Cache & 2.000 akademische Wörter',
+      'upsell.feat_sync': 'Echtzeit-Cloud-Diff-Sync für mehrere Geräte',
+      'upsell.feat_ocr': 'Unbegrenzte Textextraktion & Kamera-OCR',
+      'upsell.feat_analytics': 'Personalisierter FSRS-4.5 Retentionsoptimierer',
+      'upsell.save_badge': '17% sparen mit jährlicher Abrechnung!',
+      'upsell.upgrade_now': 'Pro-Plan starten',
+      'upsell.skip': 'Vielleicht später',
+      'toast.saved': 'Erfolgreich gespeichert',
+      'toast.sync_success': 'Cloud-Synchronisierung abgeschlossen',
+      'toast.unlocked': 'Fähigkeit gemeistert und zum Wortschatz hinzugefügt',
+      'toast.eiken_all_unlocked': 'Alle Zweigfähigkeiten dieser Wurzel gemeistert'
+    },
+
+    es: {
+      // Común y Navegación
+      'app.title': 'Vocab Vault',
+      'app.tagline': 'Etimología indoeuropea e historia conceptual para mentes intelectuales',
+      'nav.explore': 'Explorar',
+      'nav.list': 'Lista',
+      'nav.extract': 'Extraer',
+      'nav.review': 'Repasar',
+      'nav.analytics': 'Analítica',
+      'nav.mask': 'Máscara',
+      'side.explorer': 'Explorador y Búsqueda',
+      'nav.all_words': 'Todas las palabras',
+      'nav.anki': 'Repaso Anki',
+      'nav.graph': 'Red de raíces',
+      'nav.settings': 'Ajustes',
+      'nav.add_word': 'Añadir palabra',
+      'nav.search_ph': 'Buscar: palabra, significado, *raíz, #categoría, @área...',
+      'nav.sync_cloud': 'Sync en la nube',
+      'nav.syncing': 'Sincronizando...',
+      'nav.synced': 'Sincronizado',
+      'nav.offline': 'Sin conexión',
+      'nav.ear_learning': 'Bucle de audio',
+      'nav.ear_learning_title': 'Reproducción continua automática en segundo plano (L)',
+      'nav.mode_academic': 'Académico',
+      'nav.mode_simple': 'Simple',
+      'nav.sort_new': 'Orden: Más recientes',
+      'nav.sort_old': 'Orden: Más antiguos (#1~)',
+      'nav.sort_due': 'Orden: Pendientes de repaso',
+      'nav.sort_alpha': 'Orden: Alfabético',
+
+      // Repaso Anki
+      'anki.recog': 'Reconocimiento',
+      'anki.cloze': 'Producción (Texto con huecos)',
+      'anki.recog_title': 'Recordar significado a partir de la palabra (M)',
+      'anki.cloze_title': 'Completar la palabra en el contexto (M)',
+      'anki.undo': 'Deshacer (Z)',
+      'anki.show_ans': 'Mostrar respuesta (Espacio)',
+      'anki.again': 'Otra vez (1)',
+      'anki.hard': 'Difícil (2)',
+      'anki.good': 'Bien (3)',
+      'anki.easy': 'Fácil (4)',
+      'anki.offline_badge': 'Repasos pendientes de sincronizar',
+      'anki.context_title': 'Contexto encontrado (Memoria episódica)',
+      'anki.swipe_left': '← Deslizar a la izquierda: Otra vez',
+      'anki.swipe_right': 'Deslizar a la derecha: Bien →',
+      'anki.empty_title': '¡Todos los repasos de hoy están completados!',
+      'anki.empty_desc': 'Añada nuevas palabras o instale un paquete inicial para ampliar su red de raíces.',
+
+      // Vista de Red
+      'graph.title': 'Red de raíces etimológicas',
+      'graph.tab_network': 'Red',
+      'graph.tab_tree': 'Árbol genealógico',
+      'graph.tab_mindmap': 'Mapa mental',
+      'graph.tab_matrix': 'Prefijo x Raíz',
+      'graph.eiken_btn': 'Catálogo de raíces',
+      'graph.watering_btn': 'Repaso específico',
+      'graph.mask_btn_off': 'Máscara: DESACTIVADA',
+      'graph.mask_btn_on': 'Máscara: ACTIVADA',
+      'graph.cluster_btn': 'Solo agrupaciones',
+      'graph.color_btn': 'Color por idioma',
+      'graph.physics_stop': 'Pausar',
+      'graph.physics_run': 'Activo',
+      'graph.fit_btn': 'Ajustar vista',
+      'graph.save_img': 'Exportar PNG',
+      'graph.filter_ph': 'Filtrar por raíz o palabra...',
+      'graph.all_lang': 'Todos los idiomas',
+      'graph.en_only': 'Solo inglés',
+      'graph.fr_only': 'Solo francés',
+      'graph.de_only': 'Solo alemán',
+      'graph.ja_only': 'Solo japonés',
+      'graph.root_jump_default': 'Ir a la raíz...',
+      'graph.all_roots': 'Directorio de todas las raíces',
+      'graph.unlock_eiken': 'Aprender todas las ramas',
+
+      // Ajustes y Planes
+      'settings.title': 'Ajustes y Cuenta',
+      'settings.modal_title': 'Ajustes, Sincronización en la Nube y Datos',
+      'settings.tab_general': 'General y Pantalla',
+      'settings.tab_account': 'Cuenta y Sincronización',
+      'settings.tab_plans': 'Planes y Facturación',
+      'settings.tab_ai': 'IA y Retención',
+      'settings.tab_storage': 'Gestión de datos',
+      'settings.lang_heading': 'Idioma de la interfaz',
+      'settings.lang_desc': 'Seleccione el idioma para los menús y controles de la interfaz.',
+      'settings.theme_heading': 'Ajustes de pantalla y audio',
+      'settings.theme_dark': 'Modo oscuro',
+      'settings.theme_light': 'Modo claro',
+      'settings.auto_speak': 'Pronunciación automática al repasar',
+      'settings.auto_speak_title': 'Pronunciar automáticamente la palabra en modo Anki',
+      'settings.tts_rate_title': 'Velocidad de voz',
+      'settings.tts_rate_slow': 'Velocidad: 0.85x (Lenta)',
+      'settings.tts_rate_natural': 'Velocidad: 0.95x (Natural)',
+      'settings.tts_rate_fast': 'Velocidad: 1.05x (Rápida)',
+      'settings.onboarding_title': 'Guía de inicio y recorrido',
+      'settings.onboarding_badge': 'Disponible en todo momento',
+      'settings.onboarding_desc': 'Revise los fundamentos del aprendizaje por raíces, el algoritmo FSRS-4.5 y los modos de visualización.',
+      'settings.onboarding_btn': 'Abrir recorrido guiado',
+      'settings.pwa_title': 'Abrir como aplicación independiente (sin marco de navegador)',
+      'settings.pwa_badge': 'Compatible como app',
+      'settings.pwa_desc': 'Utilice la aplicación en una ventana dedicada sin barra de URL en Mac, Windows y móvil.',
+      'settings.pwa_install_btn': 'Instalar aplicación (Independiente)',
+      'settings.pwa_guide_btn': 'Guía de instalación por SO',
+      'settings.pwa_mac_note': '*En Mac, puede iniciar la app directamente haciendo doble clic en "Vocab Vault.app" en esta carpeta.',
+      'settings.account_title': 'Gestión de cuenta y sincronización en la nube',
+      'settings.not_logged_in': 'No identificado',
+      'settings.logged_in': 'Identificado',
+      'settings.email_ph': 'Correo electrónico',
+      'settings.pass_ph': 'Contraseña (mínimo 6 caracteres)',
+      'settings.login_btn': 'Iniciar sesión',
+      'settings.signup_btn': 'Registrarse',
+      'settings.agree_terms': 'Términos de servicio',
+      'settings.agree_and': ' y ',
+      'settings.agree_privacy': 'Política de privacidad',
+      'settings.agree_suffix': '',
+      'settings.supabase_selfhost_title': 'Avanzado: Servidor Supabase personalizado (Auto-alojado)',
+      'settings.supabase_url_ph': 'Supabase URL (https://xxx.supabase.co)',
+      'settings.supabase_anon_ph': 'Clave pública anon de Supabase',
+      'settings.supabase_selfhost_desc': '*Normalmente no se requiere. Conexión cifrada SSL automática con el servidor oficial.',
+      'settings.sync_now_btn': 'Sincronizar ahora',
+      'settings.logout_btn': 'Cerrar sesión',
+      'settings.quota_desc': '*Las cuentas gratuitas pueden generar 5 palabras IA al día (caché compartida ilimitada). La sincronización multidispositivo está incluida en el plan Pro (3,99 $/mes).',
+      'settings.plan_heading': 'Suscripciones y Planes (Stripe)',
+      'settings.free_plan': 'Plan Gratuito',
+      'settings.pro_plan': 'Plan Pro',
+      'settings.current_plan': 'Plan actual',
+      'settings.recommended': 'Recomendado',
+      'settings.plan_monthly': 'Mensual',
+      'settings.plan_annual': 'Anual (Ahorre 17% / 2 meses gratis)',
+      'settings.price_free': '0 $/mes',
+      'settings.price_pro_monthly': '3,99 $/mes',
+      'settings.price_pro_annual': '39,00 $/año (3,25 $/mes)',
+      'settings.free_feat1': 'Hasta 5 nuevas generaciones IA por día',
+      'settings.free_feat2': 'Acceso ilimitado a la caché compartida',
+      'settings.free_feat3': 'Almacenamiento local en 1 dispositivo con respaldo JSON',
+      'settings.free_feat4': 'Repaso espaciado SM-2/FSRS e interfaz táctil',
+      'settings.pro_feat1': 'Generación IA ilimitada e historia conceptual profunda',
+      'settings.pro_feat2': 'Extracción ilimitada de textos y OCR con cámara',
+      'settings.pro_feat3': 'Sincronización diferencial en la nube en tiempo real',
+      'settings.pro_feat4': 'Soporte prioritario',
+      'settings.legal_notice_title': '[Información legal sobre renovación y cancelación]',
+      'settings.legal_notice_1': '• Renovación automática a 3,99 $/mes o 39,00 $/año',
+      'settings.legal_notice_2': '• Cancele en cualquier momento antes de la renovación desde Ajustes o Portal de Stripe',
+      'settings.legal_notice_3': '• Las funciones Pro permanecen activas hasta el fin del periodo tras cancelar',
+      'settings.upgrade_btn': 'Mejorar a Plan Pro',
+      'settings.portal_btn': 'Gestión de facturación (Portal Stripe)',
+      'settings.stripe_secure_note': '*Pagos procesados de forma segura mediante cifrado SSL de Stripe.',
+      'settings.link_terms': 'Términos',
+      'settings.link_privacy': 'Privacidad',
+      'settings.link_tokusho': 'Aviso legal',
+      'settings.metrics_title': 'Métricas de generación IA y ahorro de tokens',
+      'settings.metrics_badge_cache': 'Caché de alta eficiencia activa',
+      'settings.metric_total_words': 'Peticiones de generación',
+      'settings.metric_cache_rate': 'Tasa de acierto de caché',
+      'settings.metric_tokens_saved': 'Tokens ahorrados estimados',
+      'settings.metric_daily_quota': 'Cupo diario restante de IA',
+      'settings.metrics_desc': '*Las palabras recuperadas de la caché compartida no consumen tokens y se registran al instante (0 ms).',
+      'settings.ai_engine_title': 'Motor de IA y protección de la privacidad',
+      'settings.ai_engine_badge': 'IA integrada activa (Privacidad total)',
+      'settings.ai_engine_desc': 'Esta aplicación integra un motor de IA cifrado TLS/SSL. Sus datos personales y claves permanecen totalmente protegidos.',
+      'settings.byok_title': 'Avanzado: Clave API personalizada de Gemini (BYOK: HTTPS directo)',
+      'settings.byok_ph': 'AIzaSy... (Normalmente no se requiere)',
+      'settings.byok_show': 'Mostrar',
+      'settings.byok_save': 'Guardar y verificar',
+      'settings.byok_session_only': 'Borrar al cerrar el navegador (solo sessionStorage)',
+      'settings.byok_desc': '*Configure esto solo si desea usar su propia clave de Google AI Studio. La clave se almacena exclusivamente en su navegador local.',
+      'settings.byok_model_lbl': 'Modelo de IA:',
+      'settings.byok_model_auto': 'Automático (Óptimo según modo)',
+      'settings.byok_reload': 'Actualizar',
+      'settings.storage_title': 'Almacenamiento principal IndexedDB de alta capacidad',
+      'settings.storage_badge': 'Almacenamiento normal',
+      'settings.export_json': 'Guardar JSON',
+      'settings.export_json_desc': 'Respaldar todos los idiomas',
+      'settings.import_json': 'Restaurar JSON',
+      'settings.import_json_desc': 'Fusionar copia de seguridad',
+      'settings.export_tsv': 'Exportar Anki / TSV',
+      'settings.export_tsv_desc': 'Exportar la lista mostrada',
+      'settings.export_apkg': 'Exportar Anki (.apkg)',
+      'settings.export_apkg_desc': 'Paquete oficial de Anki',
+      'settings.export_obsidian': 'Exportar Obsidian',
+      'settings.export_obsidian_desc': 'Archivos .md con enlaces wiki',
+      'settings.sync_obsidian': 'Sync directo con Obsidian',
+      'settings.sync_obsidian_desc': 'Escritura directa en la carpeta Vault',
+      'settings.share_deck_url': 'Crear URL de mazo compartido',
+      'settings.share_deck_url_desc': 'Compartir mazo por enlace',
+      'settings.starter_pack': 'Paquetes iniciales',
+      'settings.starter_pack_desc': 'Instalar selecciones académicas',
+      'settings.anki_import': 'Importar Anki',
+      'settings.anki_import_desc': 'Importar desde APKG/TSV',
+      'settings.salvage_all': 'Rescate integral',
+      'settings.salvage_all_desc': 'Restaurar desde instantáneas',
+      'settings.fsrs_title': 'Optimizador de pesos FSRS personalizado (Personalized FSRS)',
+      'settings.fsrs_badge': 'FSRS-4.5 optimizado',
+      'settings.fsrs_desc': 'Ajusta dinámicamente los coeficientes de olvido individuales minimizando el error cuadrático medio (MSE).',
+      'settings.fsrs_manual_opt': 'Optimización manual de pesos FSRS',
+      'settings.fsrs_manual_opt_desc': 'Recalcula la velocidad de olvido con los últimos 500 registros de repaso.',
+      'settings.fsrs_opt_now': 'Optimizar ahora',
+      'settings.fsrs_reset_weights': 'Restablecer a valores iniciales',
+      'settings.notify_title': 'Notificaciones push inteligentes en el umbral de olvido',
+      'settings.notify_badge': 'Modo inteligente activo',
+      'settings.notify_heading': 'Aviso automático justo antes del 90% de retención',
+      'settings.notify_desc': 'Le notifica automáticamente antes de que la probabilidad de recuerdo baje del 90%.',
+      'settings.notify_enable': 'Activado',
+      'settings.notify_perm_heading': 'Permiso de notificaciones del navegador',
+      'settings.notify_perm_desc': 'Notificaciones en escritorio y móvil mediante la Web Notification API',
+      'settings.notify_perm_btn': 'Permitir notificaciones',
+      'settings.cap_title': 'Límite de repaso y redistribución de tarjetas acumuladas (FSRS-4.5)',
+      'settings.cap_badge': 'Optimizado',
+      'settings.cap_heading': 'Límite máximo diario de repaso',
+      'settings.cap_desc': 'Limita el volumen diario para prevenir la saturación cognitiva.',
+      'settings.cap_opt_20': '20 palabras (Relajado)',
+      'settings.cap_opt_30': '30 palabras (Recomendado)',
+      'settings.cap_opt_50': '50 palabras (Intensivo)',
+      'settings.cap_opt_unlimited': 'Ilimitado (Todo)',
+      'settings.snooze_heading': 'Redistribución suave de repasos atrasados (Snooze)',
+      'settings.snooze_desc': 'Distribuye uniformemente las tarjetas vencidas en los próximos 7 días.',
+      'settings.snooze_btn': 'Redistribuir de forma uniforme',
+      'settings.diagnostics_heading': 'Diagnóstico de integridad y autorreparación (Self-Healing)',
+      'settings.diagnostics_desc': 'Detecta y repara duplicados, fechas erróneas y lápidas obsoletas.',
+      'settings.diagnostics_btn': 'Ejecutar diagnóstico y reparación',
+      'settings.sovereignty_title': 'Soberanía de datos y garantía gratuita de por vida',
+      'settings.sovereignty_desc': 'Incluso tras cancelar la suscripción Pro, todas sus palabras, el sistema Anki SRS y las funciones de exportación siguen siendo gratuitas para siempre. Sus activos de aprendizaje nunca serán bloqueados.',
+      'settings.dev_title': 'Modo Maestro Desarrollador',
+      'settings.dev_desc': 'Desbloquea todos los límites de cuota y facturación para uso administrativo y desarrollo.',
+      'settings.dev_btn': 'Cambiar permisos',
+      'settings.clear_lang_title': 'Eliminar todos los datos del idioma actual',
+      'settings.clear_lang_desc_pre': 'Elimina permanentemente las palabras del idioma (',
+      'settings.clear_lang_desc_post': ') (no se puede deshacer).',
+      'settings.clear_lang_btn': 'Eliminar todo',
+      'settings.delete_acct_title': 'Eliminar cuenta permanentemente',
+      'settings.delete_acct_desc': 'Borra de forma irreversible todos los datos en la nube, el historial y el perfil.',
+      'settings.delete_acct_btn': 'Eliminar cuenta y datos',
+      'settings.close_btn': 'Cerrar ajustes',
+      'toolbar.wordbook': 'Vocabulario',
+      'toolbar.swap_lang': 'Intercambiar idiomas (⇄)',
+      'toolbar.storage_status': 'Estado de almacenamiento',
+      'toolbar.ai_quota_prefix': 'IA restante: ',
+      'toolbar.cloud_ai_active': 'IA integrada: Activa (Privada)',
+      'addbar.fol_ph': 'Categoría / Área (opcional)',
+      'addbar.word_ph': 'Escriba una palabra o frase (coma o salto de línea para añadir por lote)',
+      'addbar.hist_lbl': 'Historia',
+      'addbar.hist_title': 'Contexto histórico, institucional y conceptual profundo',
+      'addbar.wikt_lbl': 'Wikt',
+      'addbar.wikt_title': 'Cotejo con etimología y pronunciación de Wiktionary',
+      'addbar.submit': 'Añadir',
+      'addbar.opts_title': 'Desplegar opciones y categorías',
+      'feedback.banner_notice': 'Aviso',
+      'feedback.banner_text': 'Comparta su opinión sobre el aprendizaje etimológico (reciba 1 año de Pro gratis).',
+      'feedback.participate': 'Participar',
+      'feedback.close': 'Cerrar',
+      'list.all_words': 'Todas las palabras',
+      'list.audio_loop': 'Bucle de audio',
+      'list.audio_loop_title': 'Reproducción continua de audio de las palabras mostradas (L)',
+      'list.academic': 'Académico',
+      'list.academic_title': 'Etimología completa, historia conceptual e imágenes esenciales',
+      'list.simple': 'Simple',
+      'list.simple_title': 'Vista limpia con significados y ejemplos',
+      'side.lang_pairs': 'Pares de idiomas',
+      'side.status_filter': 'Filtro de estado y repaso',
+      'side.field_filter': 'Categoría y Área',
+      'side.pos_filter': 'Categoría gramatical (POS)',
+      'side.cat_filter': 'Categorías',
+      'side.feedback': 'Comentarios',
+      'side.settings': 'Ajustes',
+      'side.xlang_btn': 'Inter-idiomas',
+      'side.xlang_title': 'Buscar en todos los pares de idiomas',
+      'side.reset_btn': 'Restablecer',
+      'cat.philosophy': 'Filosofía y Pensamiento',
+      'cat.psychology': 'Psicología y Mente',
+      'cat.science': 'Ciencia y Tecnología',
+      'cat.politics': 'Política y Derecho',
+      'cat.business': 'Economía y Negocios',
+      'cat.arts': 'Literatura y Artes',
+      'cat.daily': 'Cotidiano y General',
+      'cat.general': 'General',
+      'upsell.title': 'Supere la memorización mecánica con Vocab Vault Pro',
+      'upsell.subtitle': 'Desbloquee etimología generativa ilimitada, sincronización en tiempo real y optimización FSRS.',
+      'upsell.feat_ai': 'Historia conceptual profunda y etimología IA ilimitadas',
+      'upsell.feat_cache': 'Acceso ilimitado a la caché compartida y a 2.000 palabras académicas',
+      'upsell.feat_sync': 'Sincronización diferencial en la nube para múltiples dispositivos',
+      'upsell.feat_ocr': 'Extracción ilimitada de textos y OCR con cámara',
+      'upsell.feat_analytics': 'Optimizador de retención adaptativo FSRS-4.5',
+      'upsell.save_badge': '¡Ahorre un 17% con facturación anual!',
+      'upsell.upgrade_now': 'Comenzar Plan Pro',
+      'upsell.skip': 'Quizás más tarde',
+      'toast.saved': 'Guardado con éxito',
+      'toast.sync_success': 'Sincronización con la nube completada',
+      'toast.unlocked': 'Habilidad aprendida y añadida al vocabulario',
+      'toast.eiken_all_unlocked': 'Todas las habilidades de esta raíz aprendidas'
     }
   };
 
@@ -669,6 +1539,9 @@
     if (typeof navigator !== 'undefined') {
       const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
       if (navLang.startsWith('ja')) return 'ja';
+      if (navLang.startsWith('fr')) return 'fr';
+      if (navLang.startsWith('de')) return 'de';
+      if (navLang.startsWith('es')) return 'es';
     }
     return 'en'; // デフォルトは世界展開を見据えて英語
   }
@@ -678,8 +1551,9 @@
   /**
    * 翻訳文字列の取得
    */
-  function t(key, fallback = '') {
-    const dict = TRANSLATIONS[currentLocale] || TRANSLATIONS.en;
+  function t(key, fallback = '', targetLocale = null) {
+    const loc = (targetLocale && SUPPORTED_LOCALES.includes(targetLocale)) ? targetLocale : currentLocale;
+    const dict = TRANSLATIONS[loc] || TRANSLATIONS.en;
     if (dict && dict[key]) return dict[key];
     const fallbackDict = TRANSLATIONS.en;
     if (fallbackDict && fallbackDict[key]) return fallbackDict[key];
@@ -868,9 +1742,20 @@
 
     // 1. モーダルタイトル
     const titleEl = document.getElementById('cfgModalTitle');
-    if (titleEl) titleEl.textContent = isEn ? 'Settings & Cloud Sync & Data Management' : '設定・クラウド同期・データ管理';
+    if (titleEl) titleEl.textContent = t('settings.modal_title');
 
-    // 2. 音声設定チェックボックス
+    // 2. 言語セレクタ & バッジ同期
+    const uiLanguageSel = document.getElementById('uiLanguageSel');
+    if (uiLanguageSel && uiLanguageSel.value !== currentLocale) {
+      uiLanguageSel.value = currentLocale;
+    }
+    const uiLangBadge = document.getElementById('uiLangBadge');
+    if (uiLangBadge) {
+      const badgeNames = { en: 'Global (EN)', ja: '日本語 (JA)', fr: 'Français (FR)', de: 'Deutsch (DE)', es: 'Español (ES)' };
+      uiLangBadge.textContent = badgeNames[currentLocale] || 'Global';
+    }
+
+    // 3. 音声設定チェックボックス
     const chkAutoSpeak = document.getElementById('chkAutoSpeak');
     if (chkAutoSpeak && chkAutoSpeak.parentElement && chkAutoSpeak.parentElement.childNodes) {
       try {
@@ -878,100 +1763,104 @@
         const nodes = Array.from(parent.childNodes || []);
         const textNode = nodes.find(n => n && (n.nodeType === 3 || (typeof Node !== 'undefined' && n.nodeType === Node.TEXT_NODE)));
         if (textNode) {
-          textNode.nodeValue = isEn ? 'Auto-pronounce during review' : '復習時に自動発音';
+          textNode.nodeValue = t('settings.auto_speak');
         }
       } catch (e) {}
     }
 
-    // 3. 音声速度セレクタ
+    // 4. 音声速度セレクタ
     const ttsRateSel = document.getElementById('ttsRateSel');
     if (ttsRateSel && ttsRateSel.options) {
       try {
         Array.from(ttsRateSel.options).forEach(opt => {
           if (!opt) return;
-          if (opt.value === '0.85') opt.textContent = isEn ? 'Speed: 0.85x (Slow)' : '速度: 0.85x (ゆっくり)';
-          else if (opt.value === '0.95') opt.textContent = isEn ? 'Speed: 0.95x (Natural)' : '速度: 0.95x (自然)';
-          else if (opt.value === '1.05') opt.textContent = isEn ? 'Speed: 1.05x (Fast)' : '速度: 1.05x (やや速め)';
+          if (opt.value === '0.85') opt.textContent = t('settings.tts_rate_slow');
+          else if (opt.value === '0.95') opt.textContent = t('settings.tts_rate_natural');
+          else if (opt.value === '1.05') opt.textContent = t('settings.tts_rate_fast');
         });
       } catch (e) {}
     }
 
-    // 4. アカウント認証フォームプレースホルダー & ボタン
+    // 5. アカウント認証フォームプレースホルダー & ボタン
     const sbEmailInput = document.getElementById('sbEmailInput');
-    if (sbEmailInput) sbEmailInput.placeholder = isEn ? 'Email address' : 'メールアドレス';
+    if (sbEmailInput) sbEmailInput.placeholder = t('settings.email_ph');
     const sbPassInput = document.getElementById('sbPassInput');
-    if (sbPassInput) sbPassInput.placeholder = isEn ? 'Password (6+ characters)' : 'パスワード (6文字以上)';
+    if (sbPassInput) sbPassInput.placeholder = t('settings.pass_ph');
     const sbUrlInput = document.getElementById('sbUrlInput');
-    if (sbUrlInput) sbUrlInput.placeholder = isEn ? 'Supabase URL (https://xxx.supabase.co)' : 'Supabase URL (https://xxx.supabase.co)';
+    if (sbUrlInput) sbUrlInput.placeholder = t('settings.supabase_url_ph');
     const sbAnonInput = document.getElementById('sbAnonInput');
-    if (sbAnonInput) sbAnonInput.placeholder = isEn ? 'Supabase Anon Public Key' : 'Supabase Anon Public Key';
+    if (sbAnonInput) sbAnonInput.placeholder = t('settings.supabase_anon_ph');
 
     const sbAuthFormRow = document.getElementById('sbAuthFormRow');
     if (sbAuthFormRow && sbAuthFormRow.querySelectorAll) {
       try {
         const btns = sbAuthFormRow.querySelectorAll('button');
         if (btns && btns.length >= 2) {
-          if (btns[0]) btns[0].textContent = isEn ? 'Sign In' : 'ログイン';
-          if (btns[1]) btns[1].textContent = isEn ? 'Sign Up' : '新規登録';
+          if (btns[0]) btns[0].textContent = t('settings.login_btn');
+          if (btns[1]) btns[1].textContent = t('settings.signup_btn');
         }
       } catch (e) {}
     }
 
-    // 5. バッジ類
+    // 6. バッジ類
     const sbStatusBadge = document.getElementById('sbStatusBadge');
     if (sbStatusBadge && sbStatusBadge.textContent && sbStatusBadge.textContent.includes('ログイン')) {
-      sbStatusBadge.textContent = isEn ? 'Not Signed In' : '未ログイン';
+      sbStatusBadge.textContent = t('settings.not_logged_in');
     }
     const curPlanBadge = document.getElementById('curPlanBadge');
     if (curPlanBadge) {
       const cur = curPlanBadge.textContent || '';
-      if (cur.includes('Free') || cur.includes('フリー')) {
-        curPlanBadge.textContent = isEn ? 'Free Tier' : 'Free プラン';
+      if (cur.includes('Free') || cur.includes('フリー') || cur.includes('Gratuit') || cur.includes('Kostenlos') || cur.includes('Gratuito')) {
+        curPlanBadge.textContent = t('settings.free_plan');
       } else if (cur.includes('Pro')) {
-        curPlanBadge.textContent = isEn ? 'Pro Plan' : 'Pro プラン';
+        curPlanBadge.textContent = t('settings.pro_plan');
       }
     }
     const pwaStatusBadge = document.getElementById('pwaStatusBadge');
-    if (pwaStatusBadge) pwaStatusBadge.textContent = isEn ? 'Standalone Ready' : '単体起動対応';
+    if (pwaStatusBadge) pwaStatusBadge.textContent = t('settings.pwa_badge');
     const metricsEfficiencyBadge = document.getElementById('metricsEfficiencyBadge');
-    if (metricsEfficiencyBadge) metricsEfficiencyBadge.textContent = isEn ? 'High-Efficiency Cache Active' : '高効率キャッシュ稼働中';
+    if (metricsEfficiencyBadge) metricsEfficiencyBadge.textContent = t('settings.metrics_badge_cache');
     const apiBadge = document.getElementById('apiBadge');
-    if (apiBadge) apiBadge.textContent = isEn ? 'Embedded AI Active (Full Privacy)' : '内蔵AI稼働中 (完全機密保護)';
+    if (apiBadge) apiBadge.textContent = t('settings.ai_engine_badge');
     const storageBadge = document.getElementById('storageBadge');
-    if (storageBadge) storageBadge.textContent = isEn ? 'Storage Normal' : '保存正常';
+    if (storageBadge) storageBadge.textContent = t('settings.storage_badge');
     const fsrsOptBadge = document.getElementById('fsrsOptBadge');
-    if (fsrsOptBadge) fsrsOptBadge.textContent = isEn ? 'FSRS-4.5 Optimized' : 'FSRS-4.5 最適化済';
+    if (fsrsOptBadge) fsrsOptBadge.textContent = t('settings.fsrs_badge');
     const smartNotifyBadge = document.getElementById('smartNotifyBadge');
-    if (smartNotifyBadge) smartNotifyBadge.textContent = isEn ? 'Smart Standby' : 'スマート待機中';
+    if (smartNotifyBadge) smartNotifyBadge.textContent = t('settings.notify_badge');
 
-    // 6. 復習上限セレクタ
+    // 7. 復習上限セレクタ
     const selDailyCap = document.getElementById('selDailyCap');
     if (selDailyCap && selDailyCap.options) {
       try {
         Array.from(selDailyCap.options).forEach(opt => {
           if (!opt) return;
-          if (opt.value === '20') opt.textContent = isEn ? '20 words (Relaxed)' : '20 語 (ゆったり)';
-          else if (opt.value === '30') opt.textContent = isEn ? '30 words (Recommended)' : '30 語 (推奨・標準)';
-          else if (opt.value === '50') opt.textContent = isEn ? '50 words (Intensive)' : '50 語 (集中)';
-          else if (opt.value === '99999') opt.textContent = isEn ? 'Unlimited (All)' : '無制限 (すべて)';
+          if (opt.value === '20') opt.textContent = t('settings.cap_opt_20');
+          else if (opt.value === '30') opt.textContent = t('settings.cap_opt_30');
+          else if (opt.value === '50') opt.textContent = t('settings.cap_opt_50');
+          else if (opt.value === '99999') opt.textContent = t('settings.cap_opt_unlimited');
         });
       } catch (e) {}
     }
 
-    // 7. クォータ説明文
+    // 8. クォータ説明文
     const sbQuotaText = document.getElementById('sbQuotaText');
     if (sbQuotaText) {
-      sbQuotaText.textContent = isEn
-        ? '*Free accounts can generate up to 5 AI words per day (unlimited shared cache). Real-time cross-device cloud sync is included in the Pro plan ($3.99/mo).'
-        : '※無料アカウント登録で1日5語までAI新規生成可能（共有キャッシュは無制限）。複数端末間のクラウド自動同期はProプラン（月480円）でご利用いただけます。';
+      sbQuotaText.textContent = t('settings.quota_desc');
     }
 
-    // 8. 課金切り替えタブの年払い無料バッジ
+    // 9. 課金切り替えタブの年払い無料バッジ
     const settingsBillingAnnualBtn = document.getElementById('settingsBillingAnnualBtn');
     if (settingsBillingAnnualBtn) {
-      settingsBillingAnnualBtn.innerHTML = isEn
-        ? 'Annual <span style="color:var(--ok);font-size:10px">(Save 17%)</span>'
-        : '年払い <span style="color:var(--ok);font-size:10px">(2ヶ月無料)</span>';
+      settingsBillingAnnualBtn.innerHTML = currentLocale === 'ja'
+        ? '年払い <span style="color:var(--ok);font-size:10px">(2ヶ月無料)</span>'
+        : (currentLocale === 'fr'
+          ? 'Annuel <span style="color:var(--ok);font-size:10px">(-17%)</span>'
+          : (currentLocale === 'de'
+            ? 'Jährlich <span style="color:var(--ok);font-size:10px">(17% sparen)</span>'
+            : (currentLocale === 'es'
+              ? 'Anual <span style="color:var(--ok);font-size:10px">(Ahorre 17%)</span>'
+              : 'Annual <span style="color:var(--ok);font-size:10px">(Save 17%)</span>')));
     }
   }
 
