@@ -169,6 +169,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_user_tombstones_user_pair_key
 CREATE UNIQUE INDEX IF NOT EXISTS uq_user_lang_watermarks_user_pair
   ON public.user_lang_watermarks (user_id, pair);
 
+-- 4.5. user_app_settings テーブル（FSRS重み・学習ログ・クラウド設定同期）
+CREATE TABLE IF NOT EXISTS public.user_app_settings (
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  setting_key TEXT NOT NULL,
+  setting_val JSONB NOT NULL,
+  updated_at BIGINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, setting_key)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_user_app_settings_key
+  ON public.user_app_settings (user_id, setting_key);
+
 
 -- 5. global_dictionary_cache テーブル（共有辞書キャッシュ: コスト0円化＆高速化）
 CREATE TABLE IF NOT EXISTS public.global_dictionary_cache (
@@ -267,6 +278,12 @@ CREATE POLICY "Users can manage own tombstones" ON public.user_tombstones
 -- user_lang_watermarks: 本人のみ全操作
 DROP POLICY IF EXISTS "Users can manage own watermarks" ON public.user_lang_watermarks;
 CREATE POLICY "Users can manage own watermarks" ON public.user_lang_watermarks
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- user_app_settings: 本人のみ全操作（FSRS重み・学習ログ同期）
+ALTER TABLE public.user_app_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users can manage own settings" ON public.user_app_settings;
+CREATE POLICY "Users can manage own settings" ON public.user_app_settings
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- global_dictionary_cache: 全員参照可（未ログイン・ゲスト含む）、書込はService Roleのみ

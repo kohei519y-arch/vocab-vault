@@ -600,6 +600,7 @@
   const playlistState = {
     isRunning: false,
     isPaused: false,
+    isRepeat: false,
     currentIndex: 0,
     items: [],
     sessionToken: 0,
@@ -680,6 +681,11 @@
   async function runPlaylistLoop(token) {
     while (playlistState.isRunning && token === playlistState.sessionToken) {
       if (playlistState.currentIndex >= playlistState.items.length) {
+        if (playlistState.isRepeat && playlistState.items.length > 0) {
+          playlistState.currentIndex = 0;
+          await waitMs(600);
+          continue;
+        }
         // 全単語再生完了
         stopAudioPlaylist();
         if (global.VocabModal?.showToast) {
@@ -855,10 +861,17 @@
     }
   }
 
+  function togglePlaylistRepeat(forceState) {
+    playlistState.isRepeat = typeof forceState === 'boolean' ? forceState : !playlistState.isRepeat;
+    updatePlaylistUI();
+    return playlistState.isRepeat;
+  }
+
   function getPlaylistState() {
     return {
       isRunning: playlistState.isRunning,
       isPaused: playlistState.isPaused,
+      isRepeat: playlistState.isRepeat,
       currentIndex: playlistState.currentIndex,
       totalItems: playlistState.items.length
     };
@@ -886,6 +899,7 @@
     pauseAudioPlaylist,
     resumeAudioPlaylist,
     toggleAudioPlaylist,
+    togglePlaylistRepeat,
     nextPlaylistItem,
     prevPlaylistItem,
     getPlaylistState

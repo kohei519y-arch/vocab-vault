@@ -58,6 +58,9 @@ def check_jsc_syntax():
         "js/ocr.js",
         "js/morphology.js",
         "js/eiken_catalog.js",
+        "js/graph_layout.js",
+        "js/graph_renderer.js",
+        "js/graph_views.js",
         "js/graph.js",
         "js/feedback.js",
         "js/dictionary.js",
@@ -1528,10 +1531,19 @@ def test_lineage_tree_and_sns_share_card():
     """
     with open(os.path.join(BASE_DIR, "js", "dictionary.js"), "r", encoding="utf-8") as f:
         dict_code = f.read()
+    with open(os.path.join(BASE_DIR, "js", "graph_layout.js"), "r", encoding="utf-8") as f:
+        layout_code = f.read()
+    with open(os.path.join(BASE_DIR, "js", "graph_renderer.js"), "r", encoding="utf-8") as f:
+        renderer_code = f.read()
+    with open(os.path.join(BASE_DIR, "js", "graph_views.js"), "r", encoding="utf-8") as f:
+        views_code = f.read()
 
     test_tree_jsc = f"""
     {shim}
     {dict_code}
+    {layout_code}
+    {renderer_code}
+    {views_code}
     {graph_code}
 
     VocabGraph.graphState.layoutMode = 'tree';

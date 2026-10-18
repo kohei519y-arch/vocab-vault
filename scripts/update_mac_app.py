@@ -10,10 +10,6 @@ os.makedirs(res_dir, exist_ok=True)
 for fn in ["index.html", "dev.html", "manifest.json", "sw.js"]:
     shutil.copy(fn, res_dir)
 
-backup_fn = "VocabVault_Recovered_Full_Backup.json"
-if os.path.exists(backup_fn):
-    shutil.copy(backup_fn, "Vocab Vault.app/Contents/Resources/" + backup_fn)
-
 for folder in ["css", "js", "icons"]:
     dest = os.path.join(res_dir, folder)
     if os.path.exists(dest):

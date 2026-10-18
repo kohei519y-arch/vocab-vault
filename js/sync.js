@@ -486,11 +486,105 @@
     const SYNC_OVERLAP_MS = 120000;
     const nextSyncCursor = Math.max(0, serverNow - SYNC_OVERLAP_MS);
     safeLsSet(lastSyncKey, String(nextSyncCursor));
+
+    // FSRS重み・学習ログのクラウド同期をバックグラウンド実行（非同期・ノンブロッキング）
+    syncAppSettingsWithSupabase().catch(() => {});
+
     return {
       pulled: remoteEntries.length,
       pushed: delta.entriesToPush.length,
       tombPushed: delta.tombstonesToPush.length
     };
+  }
+
+  async function syncAppSettingsWithSupabase() {
+    const cfg = getConfig();
+    if (!cfg.configured) return null;
+    const token = await ensureValidToken().catch(() => null);
+    if (!token) return null;
+    const user = getUser();
+    if (!user || !user.id) return null;
+
+    try {
+      const res = await fetch(`${cfg.url}/rest/v1/user_app_settings?user_id=eq.${user.id}`, {
+        headers: {
+          apikey: cfg.anonKey,
+          Authorization: `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        const cloudMap = {};
+        if (Array.isArray(rows)) {
+          rows.forEach(r => { cloudMap[r.setting_key] = r; });
+        }
+
+        // 1. FSRS重みの同期
+        const localWeights = global.VocabSRS?.getUserFSRSWeights?.();
+        const cloudWeightsRow = cloudMap['vv_user_fsrs_weights'];
+        if (cloudWeightsRow && cloudWeightsRow.setting_val) {
+          const cloudVal = cloudWeightsRow.setting_val;
+          const cloudTs = cloudWeightsRow.updated_at || 0;
+          const localTs = Number(localStorage?.getItem('vv_user_fsrs_weights_ts') || 0);
+          if (cloudTs > localTs) {
+            global.VocabSRS?.setUserFSRSWeights?.(cloudVal);
+            safeLsSet('vv_user_fsrs_weights_ts', String(cloudTs));
+          } else if (localWeights && localTs > cloudTs) {
+            await pushSettingRow(cfg, token, user.id, 'vv_user_fsrs_weights', localWeights, localTs);
+          }
+        } else if (localWeights) {
+          const nowTs = Date.now();
+          safeLsSet('vv_user_fsrs_weights_ts', String(nowTs));
+          await pushSettingRow(cfg, token, user.id, 'vv_user_fsrs_weights', localWeights, nowTs);
+        }
+
+        // 2. FSRS復習履歴ログの同期
+        const localLogs = global.VocabSRS?.getReviewHistoryLog?.() || [];
+        const cloudLogsRow = cloudMap['vv_review_history_log'];
+        if (cloudLogsRow && Array.isArray(cloudLogsRow.setting_val)) {
+          const mergedLogs = mergeHistoryLogs(localLogs, cloudLogsRow.setting_val);
+          global.VocabSRS?.saveReviewHistoryLog?.(mergedLogs);
+          if (mergedLogs.length > (cloudLogsRow.setting_val.length || 0)) {
+            await pushSettingRow(cfg, token, user.id, 'vv_review_history_log', mergedLogs, Date.now());
+          }
+        } else if (localLogs.length > 0) {
+          await pushSettingRow(cfg, token, user.id, 'vv_review_history_log', localLogs, Date.now());
+        }
+      }
+    } catch (e) {
+      console.warn('[Sync] App settings sync error (non-fatal):', e);
+    }
+  }
+
+  async function pushSettingRow(cfg, token, userId, key, val, ts) {
+    await fetch(`${cfg.url}/rest/v1/user_app_settings`, {
+      method: 'POST',
+      headers: {
+        apikey: cfg.anonKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        setting_key: key,
+        setting_val: val,
+        updated_at: ts
+      })
+    }).catch(() => {});
+  }
+
+  function mergeHistoryLogs(a, b) {
+    const seen = new Set();
+    const res = [];
+    [...a, ...b].sort((x, y) => (x.timestamp || 0) - (y.timestamp || 0)).forEach(item => {
+      const k = `${item.word}_${item.timestamp}_${item.rating}`;
+      if (!seen.has(k)) {
+        seen.add(k);
+        res.push(item);
+      }
+    });
+    return res.slice(-500);
   }
 
   async function callVocabGenerateProxy({ lang, srcLang, tgtLang, useHist, fName, folder, items, words }) {
@@ -822,6 +916,7 @@
     deleteUserAccount,
     exportAllUserDataJson,
     syncLangWithSupabase,
+    syncAppSettingsWithSupabase,
     acquireSyncLock,
     callVocabGenerateProxy,
     callOcrProxy,

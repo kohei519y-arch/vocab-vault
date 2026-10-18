@@ -302,19 +302,16 @@
     decisionHandler(WKNavigationActionPolicyAllow);
 }
 
-// 8. ページ読み込み完了時の自動復元 (端末内限定: 救出ファイルが存在する場合に自動マージ)
+// 8. ページ読み込み完了時の自動復元 (端末内限定: アプリと同階層に救出ファイルが明示的に存在する場合のみ自動マージ)
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
     NSString *appDir = [[NSBundle mainBundle] bundlePath];
     NSString *parentDir = [appDir stringByDeletingLastPathComponent];
     NSString *backupFile1 = [parentDir stringByAppendingPathComponent:@"VocabVault_Recovered_Full_Backup.json"];
-    NSString *backupFile2 = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"VocabVault_Recovered_Full_Backup.json"];
 
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *targetFile = nil;
     if ([fm fileExistsAtPath:backupFile1]) {
         targetFile = backupFile1;
-    } else if ([fm fileExistsAtPath:backupFile2]) {
-        targetFile = backupFile2;
     }
 
     if (targetFile) {
@@ -363,7 +360,16 @@
                 @"      }"
                 @"    } catch(e) { console.error('Native Auto Restore Err:', e); }"
                 @"  }"
-                @"  setTimeout(runNativeRestore, 350);"
+                @"  function checkAndRun(attempt) {"
+                @"    if (window.VocabStorage && window.VocabStorage.state && window.VocabStorage.state.isReady) {"
+                @"      runNativeRestore();"
+                @"    } else if (attempt < 30) {"
+                @"      setTimeout(function() { checkAndRun(attempt + 1); }, 150);"
+                @"    } else {"
+                @"      runNativeRestore();"
+                @"    }"
+                @"  }"
+                @"  checkAndRun(0);"
                 @"})();", base64];
             [webView evaluateJavaScript:injectJs completionHandler:nil];
         }

@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v44-onboarding-cloze-fuzzy';
+const CACHE_NAME = 'vocab-vault-v45-modular-graph';
 
 // [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
 function fetchWithTimeout(request, timeoutMs = 3000) {
@@ -24,6 +24,9 @@ const PRECACHE_ASSETS = [
   './js/ocr.js',
   './js/morphology.js',
   './js/eiken_catalog.js',
+  './js/graph_layout.js',
+  './js/graph_renderer.js',
+  './js/graph_views.js',
   './js/graph.js',
   './js/feedback.js',
   './js/dictionary.js',
@@ -50,6 +53,29 @@ const PRECACHE_ASSETS = [
 self.addEventListener('message', event => {
   if (event.data === 'skipWaiting') {
     self.skipWaiting();
+  } else if (event.data && typeof event.data === 'object') {
+    if (event.data.type === 'SHOW_NOTIFICATION' && self.registration?.showNotification) {
+      const { title, options } = event.data;
+      self.registration.showNotification(title || '【Vocab Vault】忘却臨界点アラート', Object.assign({
+        icon: './icons/icon-192.png',
+        badge: './icons/favicon-32.png',
+        tag: 'vocab-forgetting-alert',
+        renotify: true,
+        data: { url: './?mode=anki' }
+      }, options || {}));
+    } else if (event.data.type === 'SCHEDULE_NOTIFICATION' && event.data.delayMs > 0) {
+      setTimeout(() => {
+        if (self.registration?.showNotification) {
+          self.registration.showNotification(event.data.title || '【Vocab Vault】忘却臨界点アラート', Object.assign({
+            icon: './icons/icon-192.png',
+            badge: './icons/favicon-32.png',
+            tag: 'vocab-forgetting-alert',
+            renotify: true,
+            data: { url: './?mode=anki' }
+          }, event.data.options || {}));
+        }
+      }, Math.min(event.data.delayMs, 2147483647));
+    }
   }
 });
 
@@ -134,22 +160,24 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // 2. CSS / JS: Network-First (タイムアウト3秒でキャッシュへフォールバック)
+  // 2. CSS / JS: Stale-While-Revalidate (キャッシュがあれば即座に0ms返却し、バックグラウンドで最新版を更新)
   const isCode = url.pathname.endsWith('.js') || url.pathname.endsWith('.css');
   if (isCode) {
     event.respondWith(
-      fetchWithTimeout(event.request, 3000)
-        .then(res => {
-          if (res && res.status === 200) {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
-          }
-          return res;
-        })
-        .catch(async () => {
-          const cache = await caches.open(CACHE_NAME);
-          return (await cache.match(event.request, { ignoreSearch: true })) || new Response('', { status: 404 });
-        })
+      caches.open(CACHE_NAME).then(async cache => {
+        const cached = await cache.match(event.request, { ignoreSearch: true });
+        const netPromise = fetchWithTimeout(event.request, 3000)
+          .then(res => {
+            if (res && res.status === 200) {
+              cache.put(event.request, res.clone());
+            }
+            return res;
+          })
+          .catch(() => null);
+
+        // キャッシュがあれば即時返却（電波ゼロ・弱電波でも爆速表示）、初回のみネットワーク待機
+        return cached || (await netPromise) || new Response('Offline resource unavailable', { status: 503 });
+      })
     );
     return;
   }

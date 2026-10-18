@@ -305,8 +305,19 @@
     const diffDelta = rating === 0 ? 1.2 : rating === 1 ? 0.6 : rating === 2 ? -0.2 : -0.8;
     const nextDifficulty = Math.max(1.0, Math.min(10.0, Number((curDifficulty + diffDelta).toFixed(2))));
 
+    // 項目22: Leech（難語・忘却多発）の追跡
+    let curLapses = Number(e?.lapses || 0);
     if (rating === 0) {
-      // 忘却時: Stabilityを減衰させ、即座にリラーニングキューへ
+      curLapses++;
+    }
+    const isLeech = curLapses >= 5;
+    const flags = Array.isArray(e?.flags) ? [...e.flags] : [];
+    if (isLeech && !flags.includes('leech')) {
+      flags.push('leech');
+    }
+
+    if (rating === 0) {
+      // 項目21: 忘却時 — 即座に同セッション内短期リラーニングキュー（1分後）へ
       nextRepetition = 0;
       nextInterval = 0;
       curStability = Number(predStability(e, 0).toFixed(2));
@@ -349,6 +360,8 @@
       efactor: nextEfactor,
       stability: curStability,
       difficulty: nextDifficulty,
+      lapses: curLapses,
+      flags,
       retrievability: Number((Number.isFinite(currentR) ? currentR : 1.0).toFixed(3)),
       nextReview: nextReviewDate,
       version: (Number(e?.version) || 1) + 1,
