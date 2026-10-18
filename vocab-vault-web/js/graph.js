@@ -725,12 +725,8 @@
       const ghostBuds = [];
       const twigs = [];
 
-      const isUnifiedPIE = !graphState.focusedRootKey;
-      let activeRoots = finalRoots;
-
-      if (isUnifiedPIE) {
-        // 全語根を1つの「印欧祖語 / PIE」コアに大統合
-        const unifiedPieRoot = {
+      function createUnifiedPieRoot() {
+        const uRoot = {
           id: 'root:pie:unified',
           label: '印欧祖語 (PIE)',
           meaning: 'Proto-Indo-European',
@@ -751,16 +747,33 @@
           (r.connectedWords || []).forEach(w => {
             if (!allConnectedWordsSet.has(w.id)) {
               allConnectedWordsSet.add(w.id);
-              unifiedPieRoot.connectedWords.push(w);
+              uRoot.connectedWords.push(w);
             }
           });
         });
-        unifiedPieRoot.childCount = unifiedPieRoot.connectedWords.length;
-        activeRoots = [unifiedPieRoot];
-      } else if (graphState.focusedRootKey) {
-        const found = finalRoots.filter(r => r.label === graphState.focusedRootKey);
+        uRoot.childCount = uRoot.connectedWords.length;
+        return uRoot;
+      }
+
+      let isUnifiedPIE = !graphState.focusedRootKey;
+      let activeRoots = [];
+
+      if (isUnifiedPIE) {
+        // 全語根を1つの「印欧祖語 / PIE」コアに大統合
+        activeRoots = [createUnifiedPieRoot()];
+      } else {
+        const fKey = cleanRootKey(graphState.focusedRootKey);
+        const fKeyFlat = fKey.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+        const found = finalRoots.filter(r => {
+          const rFlat = (r.label || '').replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+          return r.label === fKey || rFlat === fKeyFlat || r.label === graphState.focusedRootKey;
+        });
         if (found.length > 0) {
           activeRoots = found;
+        } else {
+          // 指定語根が見つからない場合は単一統合PIEにフォールバック（200語根が散らばるのを防止）
+          isUnifiedPIE = true;
+          activeRoots = [createUnifiedPieRoot()];
         }
       }
 
@@ -959,6 +972,7 @@
               type: 'twig',
               level: 4,
               parentWord: wNode.label,
+              parentWordId: wNode.id,
               radius: 4.0,
               x: 0,
               y: 0,
@@ -1080,8 +1094,8 @@
           bList.forEach((bNode, bIdx) => {
             const bWords = (bNode.connectedWords?.length || 0) + (bNode.connectedBuds?.length || 0) * 0.5;
             const rawWeight = Math.max(3, bWords) / Math.max(1, totalWordsInSector);
-            // 最低限の角度スパン（0.18 rad ≈ 10.3度）を確保してテキスト衝突を防止
-            const branchSpan = (numB === 1) ? totalSpan : Math.max(0.18, totalSpan * rawWeight);
+            // 最低限の角度スパン（0.18 rad ≈ 10.3度）を確保してテキスト衝突を防止（セクター境界を超えないようクランプ）
+            const branchSpan = (numB === 1) ? totalSpan : (totalSpan < numB * 0.18 ? (totalSpan / numB) : Math.max(0.18, totalSpan * rawWeight));
             const thetaB = (numB === 1) ? sDef.center : (currentTheta + branchSpan / 2);
             currentTheta += branchSpan;
 
@@ -1130,9 +1144,9 @@
                 lNode.angle = thetaL;
 
                 // 派生語・成句 (Twigs: 親単語から放射状に48px外側へ分岐)
-                const myTwigs = twigs.filter(t => t.parentWord === lNode.label);
+                const myTwigs = twigs.filter(t => (t.parentWordId ? t.parentWordId === lNode.id : t.parentWord === lNode.label));
                 myTwigs.forEach((tNode, tIdx) => {
-                  const twigOffset = (myTwigs.length === 1) ? 0 : (tIdx === 0 ? -0.040 : 0.040);
+                  const twigOffset = (myTwigs.length === 1) ? 0 : (-0.040 + (0.080 / Math.max(1, myTwigs.length - 1)) * tIdx);
                   const thetaT = thetaL + twigOffset;
                   tNode.targetX = lNode.targetX + 48 * Math.cos(thetaT);
                   tNode.targetY = lNode.targetY + 48 * Math.sin(thetaT);
@@ -1183,12 +1197,17 @@
       // 孤立したtwigがあれば親単語に紐づけて配置
       twigs.forEach((tNode, tIdx) => {
         if (tNode.targetX === undefined) {
-          const parentNode = nodeMap.get(`word:en:${tNode.parentWord}#1`) || nodes.find(n => n.label === tNode.parentWord);
+          const parentNode = (tNode.parentWordId ? nodeMap.get(tNode.parentWordId) : null) ||
+                             nodeMap.get(`word:en:${tNode.parentWord}#1`) ||
+                             nodes.find(n => n.label === tNode.parentWord);
           if (parentNode && parentNode.targetX !== undefined) {
             const pAngle = parentNode.angle || 0;
             const thetaT = pAngle + (tIdx % 2 === 0 ? -0.040 : 0.040);
             tNode.targetX = parentNode.targetX + 48 * Math.cos(thetaT);
             tNode.targetY = parentNode.targetY + 48 * Math.sin(thetaT);
+          } else if (parentNode && parentNode.x !== undefined) {
+            tNode.targetX = parentNode.x + 48;
+            tNode.targetY = parentNode.y;
           }
         }
       });
@@ -1246,12 +1265,23 @@
       }
 
       // 初期位置のセット（系統樹モード時はターゲット確定座標で初期化）
+      // 確定座標が付与されなかった孤立ノードを安全に除外して原点(0,0)集中を防止
+      const validNodes = [];
+      const validNodeSet = new Set();
       nodes.forEach(n => {
         if (n.targetX !== undefined) {
           n.x = n.targetX;
           n.y = n.targetY;
+          validNodes.push(n);
+          validNodeSet.add(n);
         }
       });
+      nodes.length = 0;
+      nodes.push(...validNodes);
+
+      const validEdges = finalEdges.filter(e => validNodeSet.has(e.source) && validNodeSet.has(e.target));
+      finalEdges.length = 0;
+      finalEdges.push(...validEdges);
     }
 
     // クイックジャンプ用セレクター (#graphRootJumpSel) & パンくずバーの動的更新
@@ -1752,17 +1782,17 @@
           return `
             <div class="mindmap-word-row">
               <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
-                <span class="pos-lbl">${escFn(w.lang.toUpperCase())}</span>
+                <span class="pos-lbl">${escFn((w.lang || 'en').toUpperCase())}</span>
                 <strong style="font-size:13.5px;color:var(--t)">${escFn(w.label)}</strong>
                 ${phonetic}
                 <span style="font-size:12px;color:var(--t);${maskStyle}">${meaningText}</span>
                 ${core}
               </div>
               <div style="display:flex;align-items:center;gap:6px">
-                <button type="button" class="spk-btn" onclick="VocabGraph.speakNodeWord('${escFn(w.label)}','${escFn(w.lang)}')" title="発音を聞く" aria-label="発音">
+                <button type="button" class="spk-btn" onclick="VocabGraph.speakNodeWord('${escFn(w.label)}','${escFn(w.lang || 'en')}')" title="発音を聞く" aria-label="発音">
                   <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
                 </button>
-                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.jumpToNodeWord('${escFn(w.label)}','${escFn(w.lang)}')">詳細</button>
+                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.jumpToNodeWord('${escFn(w.label)}','${escFn(w.lang || 'en')}')">詳細</button>
               </div>
             </div>
           `;
@@ -2304,15 +2334,17 @@
       wakeGraphSimulation();
     }
 
-    // モーダルCSSトランジション完了後のレイアウト寸法確定に合わせた自動補正
-    setTimeout(() => {
-      syncCanvasDimensions();
-      if (graphState.selectedNode) {
-        centerOnNode(graphState.selectedNode, graphState.zoom);
-      } else {
-        fitGraphToView();
-      }
-    }, 120);
+    // モーダルCSSトランジション完了後のレイアウト寸法確定に合わせた多段自動補正
+    [50, 160, 320].forEach(delay => {
+      setTimeout(() => {
+        syncCanvasDimensions();
+        if (graphState.selectedNode) {
+          centerOnNode(graphState.selectedNode, graphState.zoom, delay > 50);
+        } else {
+          fitGraphToView();
+        }
+      }, delay);
+    });
   }
 
   function resetGraphZoom() {
@@ -2562,10 +2594,11 @@
 
       const langCountMap = {};
       (node.connectedWords || []).forEach(w => {
-        langCountMap[w.lang] = (langCountMap[w.lang] || 0) + 1;
+        const l = w.lang || 'en';
+        langCountMap[l] = (langCountMap[l] || 0) + 1;
       });
       const langPills = Object.entries(langCountMap).map(([l, cnt]) => `
-        <span style="font-size:10.5px;padding:2px 7px;border-radius:4px;background:var(--bg-hov);border:1px solid var(--b)">${l.toUpperCase()}: ${cnt}語</span>
+        <span style="font-size:10.5px;padding:2px 7px;border-radius:4px;background:var(--bg-hov);border:1px solid var(--b)">${(l || 'en').toUpperCase()}: ${cnt}語</span>
       `).join('');
 
       const wordsListHtml = (node.connectedWords || []).map(w => {
@@ -2579,7 +2612,7 @@
         return `
           <div class="graph-peer-item" onclick="VocabGraph.selectNodeById('${escFn(w.id)}')">
             <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
-              <span style="font-size:9.5px;padding:1px 4px;border-radius:3px;background:var(--bg-hov);font-family:var(--mono);font-weight:700">${escFn(w.lang.toUpperCase())}</span>
+              <span style="font-size:9.5px;padding:1px 4px;border-radius:3px;background:var(--bg-hov);font-family:var(--mono);font-weight:700">${escFn((w.lang || 'en').toUpperCase())}</span>
               <strong style="color:var(--t)">${escFn(w.label)}</strong>
               <span style="font-size:11px;color:var(--s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escFn(w.meaning)}</span>
             </div>
@@ -2636,7 +2669,7 @@
       const wordsListHtml = leafWords.map(w => `
         <div class="graph-peer-item" onclick="VocabGraph.selectNodeById('${escFn(w.id)}')">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
-            <span style="font-size:9.5px;padding:1px 4px;border-radius:3px;background:var(--bg-hov);font-family:var(--mono);font-weight:700">${escFn(w.lang.toUpperCase())}</span>
+            <span style="font-size:9.5px;padding:1px 4px;border-radius:3px;background:var(--bg-hov);font-family:var(--mono);font-weight:700">${escFn((w.lang || 'en').toUpperCase())}</span>
             <strong style="color:var(--t)">${escFn(w.label)}</strong>
             <span style="font-size:11px;color:var(--s);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escFn(w.meaning)}</span>
           </div>
@@ -2751,7 +2784,7 @@
       `;
     } else {
       // 単語ノード (Leaf)
-      badge.textContent = `${node.lang.toUpperCase()} 単語`;
+      badge.textContent = `${(node.lang || 'en').toUpperCase()} 単語`;
       badge.style.background = 'rgba(37, 99, 235, 0.15)';
       badge.style.color = '#38bdf8';
       title.textContent = node.label;
@@ -3670,14 +3703,24 @@
 
       ctx.beginPath();
       ctx.moveTo(e.source.x, e.source.y);
-      if (isTree) {
+      if (isTree && !isTwigEdge) {
         // 放射状スキルツリー用 極座標ベジェ曲線（制御点キャッシングで三角関数計算を毎フレーム0回化）
         let cpX = e._cpX;
         let cpY = e._cpY;
-        if (cpX === undefined || e._lastSrcX !== e.source.x || e._lastTgtX !== e.target.x) {
-          const rNode = e.source.rootLabel ? rootMap.get(e.source.rootLabel) : null;
-          const rx = rNode ? (rNode.targetX !== undefined ? rNode.x : 0) : 0;
-          const ry = rNode ? (rNode.targetY !== undefined ? rNode.y : 0) : 0;
+        if (cpX === undefined ||
+            e._lastSrcX !== e.source.x || e._lastSrcY !== e.source.y ||
+            e._lastTgtX !== e.target.x || e._lastTgtY !== e.target.y) {
+          let rNode = null;
+          if (e.source.type === 'root') {
+            rNode = e.source;
+          } else if (e.source.rootLabel) {
+            rNode = rootMap.get(e.source.rootLabel) || rootMap.get(cleanRootKey(e.source.rootLabel));
+          }
+          if (!rNode && rootMap.size === 1) {
+            rNode = rootMap.values().next().value;
+          }
+          const rx = rNode ? (rNode.x !== undefined ? rNode.x : (rNode.targetX || 0)) : 0;
+          const ry = rNode ? (rNode.y !== undefined ? rNode.y : (rNode.targetY || 0)) : 0;
           const r1 = Math.hypot(e.source.x - rx, e.source.y - ry);
           const r2 = Math.hypot(e.target.x - rx, e.target.y - ry);
           const midR = (r1 + r2) / 2;
@@ -3692,7 +3735,9 @@
           e._cpX = cpX;
           e._cpY = cpY;
           e._lastSrcX = e.source.x;
+          e._lastSrcY = e.source.y;
           e._lastTgtX = e.target.x;
+          e._lastTgtY = e.target.y;
         }
         ctx.bezierCurveTo(
           (e.source.x * 2 + cpX) / 3, (e.source.y * 2 + cpY) / 3,
@@ -4651,28 +4696,45 @@
       }
     });
 
-    window.addEventListener('resize', () => {
+    function handleResize() {
       const modal = document.getElementById('graphModal');
-      if (!modal || !modal.classList.contains('open')) return;
+      if (!modal || (!modal.classList.contains('open') && modal.style.display === 'none')) return;
       const canvas = document.getElementById('graphCanvas');
       if (!canvas || !wrap) return;
       const oldW = graphState.width;
       const oldH = graphState.height;
-      graphState.width = wrap.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
-      graphState.height = wrap.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width = graphState.width * dpr;
-      canvas.height = graphState.height * dpr;
-      canvas.style.width = graphState.width + 'px';
-      canvas.style.height = graphState.height + 'px';
+      const realW = wrap.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
+      const realH = wrap.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
+      if (realW <= 0 || realH <= 0) return;
+
+      graphState.width = realW;
+      graphState.height = realH;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = realW * dpr;
+      canvas.height = realH * dpr;
+      canvas.style.width = realW + 'px';
+      canvas.style.height = realH + 'px';
+      invalidateTreeBgCache();
+
       if (graphState.selectedNode) {
-        centerOnNode(graphState.selectedNode, graphState.zoom);
+        centerOnNode(graphState.selectedNode, graphState.zoom, false);
       } else {
         graphState.panX += (graphState.width - oldW) / 2;
         graphState.panY += (graphState.height - oldH) / 2;
         drawGraph();
       }
-    });
+    }
+
+    window.addEventListener('resize', handleResize);
+
+    if (typeof ResizeObserver !== 'undefined' && wrap) {
+      if (wrap._graphRo) wrap._graphRo.disconnect();
+      const ro = new ResizeObserver(() => {
+        handleResize();
+      });
+      ro.observe(wrap);
+      wrap._graphRo = ro;
+    }
   }
 
   /**

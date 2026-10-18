@@ -199,36 +199,33 @@
     let targetSpan = null;
     const numSpans = spans.length;
 
-    // A. WebKit / Safari 単語インデックス適応モード
-    // charIndex が小整数 (0 <= charIndex < numSpans) で、末尾単語の文字開始位置と大きく乖離している場合は word-idx と判定
-    const lastStart = parseInt(spans[numSpans - 1]?.getAttribute('data-start'), 10) || 0;
-    if (charIndex >= 0 && charIndex < numSpans && lastStart > numSpans * 2) {
-      targetSpan = spans[charIndex];
-    }
+    // 1. 文字オフセット (UTF-16 offset) による厳密マッチ & 単語間スペースのスナップ
+    for (let i = 0; i < numSpans; i++) {
+      const s = spans[i];
+      const start = parseInt(s.getAttribute('data-start'), 10) || 0;
+      const end = parseInt(s.getAttribute('data-end'), 10) || 0;
 
-    // B. 文字オフセット (UTF-16 offset) による厳密マッチ & 最近傍スナップ
-    if (!targetSpan) {
-      for (let i = 0; i < numSpans; i++) {
-        const s = spans[i];
-        const start = parseInt(s.getAttribute('data-start'), 10) || 0;
-        const end = parseInt(s.getAttribute('data-end'), 10) || 0;
+      if (charIndex >= start && charIndex < end) {
+        targetSpan = s;
+        break;
+      }
 
-        if (charIndex >= start && charIndex < end) {
+      // 単語間の空白・約物にある場合は直前の発話単語を維持
+      if (i < numSpans - 1) {
+        const nextStart = parseInt(spans[i + 1].getAttribute('data-start'), 10) || 0;
+        if (charIndex >= start && charIndex < nextStart) {
           targetSpan = s;
           break;
         }
-
-        // 単語間の空白・約物にある場合は直前の発話単語を維持
-        if (i < numSpans - 1) {
-          const nextStart = parseInt(spans[i + 1].getAttribute('data-start'), 10) || 0;
-          if (charIndex >= start && charIndex < nextStart) {
-            targetSpan = s;
-            break;
-          }
-        } else if (charIndex >= start) {
-          targetSpan = s;
-        }
+      } else if (charIndex >= start) {
+        targetSpan = s;
+        break;
       }
+    }
+
+    // 2. 文字オフセットで合致しなかった環境向けの単語インデックスフォールバック
+    if (!targetSpan && charIndex >= 0 && charIndex < numSpans) {
+      targetSpan = spans[charIndex];
     }
 
     if (!targetSpan) return;
@@ -431,7 +428,7 @@
             progressTimer = null;
             return;
           }
-          if (boundarySeen && (Date.now() - lastBoundaryTime < 400)) return;
+          if (boundarySeen && (Date.now() - lastBoundaryTime < 1500)) return;
           if (!speechStartTime) return;
 
           const elapsed = Date.now() - speechStartTime;
