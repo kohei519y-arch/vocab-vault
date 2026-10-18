@@ -324,7 +324,34 @@
     if ($('chkApiKeySessionOnly')) $('chkApiKeySessionOnly').checked = isSessionOnly;
     if ($('apiKeyInput')) $('apiKeyInput').value = global.getKey ? global.getKey() : '';
 
+    const savedTab = (global.lsGet ? global.lsGet('vv_active_cfg_tab', 'general') : (typeof localStorage !== 'undefined' ? localStorage.getItem('vv_active_cfg_tab') : 'general')) || 'general';
+    switchSettingsTab(savedTab);
+
     toggleModal('settingsModal', true);
+  }
+
+  function switchSettingsTab(tabName) {
+    if (typeof document === 'undefined') return;
+    const tabBtns = document.querySelectorAll('.settings-tab-btn');
+    const panels = document.querySelectorAll('.settings-panel');
+    const validTabs = ['general', 'account', 'plans', 'ai', 'storage'];
+    const activeTab = validTabs.includes(tabName) ? tabName : 'general';
+
+    tabBtns.forEach(btn => {
+      const match = btn.getAttribute('data-tab') === activeTab;
+      btn.classList.toggle('active', match);
+      btn.setAttribute('aria-selected', match ? 'true' : 'false');
+    });
+
+    panels.forEach(p => {
+      const match = p.id === `cfgPanel${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`;
+      p.classList.toggle('active', match);
+    });
+
+    try {
+      if (global.lsSet) global.lsSet('vv_active_cfg_tab', activeTab);
+      else if (typeof localStorage !== 'undefined') localStorage.setItem('vv_active_cfg_tab', activeTab);
+    } catch (e) {}
   }
 
   function updateFSRSOptimizerUI() {
@@ -946,6 +973,7 @@
 
   global.openShareDeckModal = openShareDeckModal;
   global.executeShareDeckImport = executeShareDeckImport;
+  global.switchSettingsTab = switchSettingsTab;
 
   // --- グローバルエクスポート ---
   global.VocabModal = {
@@ -959,6 +987,7 @@
     openLegalModal,
     openUpsellModal,
     openSettings,
+    switchSettingsTab,
     saveKeyFromModal,
     parsePipeLines,
     openEditModal,

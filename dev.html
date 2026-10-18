@@ -509,347 +509,416 @@
 
 <!-- 設定・データ管理・クラウド同期モーダル -->
 <div id="settingsModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="cfgModalTitle" onclick="if(event.target===this) toggleModal('settingsModal',false)">
-  <div class="modal-box wide">
-    <div class="modal-hd flx-sb"><h2 id="cfgModalTitle" data-i18n="settings.modal_title">設定・クラウド同期・データ管理</h2><button type="button" class="btn-o btn-xs" onclick="toggleModal('settingsModal',false)" aria-label="閉じる">×</button></div>
-    <div class="modal-bd">
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.lang_heading">表示言語 (Display Language)</span>
-          <span class="badge ok" id="uiLangBadge">i18n Global</span>
+  <div class="modal-box wide settings-modal-box">
+    <div class="modal-hd flx-sb">
+      <h2 id="cfgModalTitle" data-i18n="settings.modal_title">設定・クラウド同期・データ管理</h2>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('settingsModal',false)" aria-label="閉じる">×</button>
+    </div>
+
+    <!-- 5タブ カテゴリナビゲーションバー -->
+    <div class="settings-tab-bar" role="tablist" aria-label="設定カテゴリ">
+      <button type="button" class="settings-tab-btn active" data-tab="general" role="tab" aria-selected="true" onclick="switchSettingsTab('general')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span data-i18n="settings.tab_general">一般・表示</span>
+      </button>
+      <button type="button" class="settings-tab-btn" data-tab="account" role="tab" aria-selected="false" onclick="switchSettingsTab('account')">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span data-i18n="settings.tab_account">アカウント・同期</span>
+      </button>
+      <button type="button" class="settings-tab-btn" data-tab="plans" role="tab" aria-selected="false" onclick="switchSettingsTab('plans')">
+        <svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        <span data-i18n="settings.tab_plans">プラン・課金</span>
+      </button>
+      <button type="button" class="settings-tab-btn" data-tab="ai" role="tab" aria-selected="false" onclick="switchSettingsTab('ai')">
+        <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <span data-i18n="settings.tab_ai">AI・忘却曲線</span>
+      </button>
+      <button type="button" class="settings-tab-btn" data-tab="storage" role="tab" aria-selected="false" onclick="switchSettingsTab('storage')">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+        <span data-i18n="settings.tab_storage">データ管理</span>
+      </button>
+    </div>
+
+    <!-- モーダル本体（スクロール領域） -->
+    <div class="modal-bd settings-modal-bd">
+      <!-- 1. 一般・表示タブ -->
+      <div class="settings-panel active" id="cfgPanelGeneral">
+        <!-- 表示言語グループ -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.lang_heading">表示言語 (Display Language)</h3>
+            <span class="badge ok" id="uiLangBadge">i18n Global</span>
+          </div>
+          <div class="flx-sb" style="flex-wrap:wrap;gap:8px;padding-top:4px">
+            <label style="font-size:12px;color:var(--s)" data-i18n="settings.lang_desc">UIおよびメニューの表示言語を選択します:</label>
+            <select id="uiLanguageSel" onchange="VocabI18n.setLocale(this.value)" style="font-size:12px;padding:5px 10px;border-radius:5px;border:1px solid var(--b);background:var(--bg-card);color:var(--t)">
+              <option value="en">English (Default / Global)</option>
+              <option value="ja">日本語 (Japanese)</option>
+            </select>
+          </div>
         </div>
-        <div class="flx-sb" style="flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          <label style="font-size:12px;color:var(--s)" data-i18n="settings.lang_desc">UIおよびメニューの表示言語を選択します:</label>
-          <select id="uiLanguageSel" onchange="VocabI18n.setLocale(this.value)" style="font-size:12px;padding:4px 8px;border-radius:4px;border:1px solid var(--b);background:var(--bg-card);color:var(--t)">
-            <option value="en">English (Default / Global)</option>
-            <option value="ja">日本語 (Japanese)</option>
-          </select>
+
+        <!-- テーマ・音声設定グループ -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.theme_heading">表示・音声設定</h3>
+          </div>
+          <div class="flx-sb" style="flex-wrap:wrap;gap:12px;padding-top:4px">
+            <label class="chk-lbl"><input type="checkbox" id="chkDark" onchange="toggleDarkMode(this.checked)"><span data-i18n="settings.theme_dark">ダークモード</span></label>
+            <label class="chk-lbl" data-i18n-title="settings.auto_speak_title" title="暗記復習(Anki)モードでカード表示時に自動発音"><input type="checkbox" id="chkAutoSpeak" checked onchange="lsSet('vv_tts_auto_anki',this.checked?'1':'0')"><span data-i18n="settings.auto_speak">復習時に自動発音</span></label>
+            <select id="ttsRateSel" onchange="lsSet('vv_tts_rate',this.value)" data-i18n-title="settings.tts_rate_title" title="読み上げ速度" style="font-size:12px;padding:4px 8px">
+              <option value="0.85" data-i18n="settings.tts_rate_slow">速度: 0.85x (ゆっくり)</option>
+              <option value="0.95" selected data-i18n="settings.tts_rate_natural">速度: 0.95x (自然)</option>
+              <option value="1.05" data-i18n="settings.tts_rate_fast">速度: 1.05x (やや速め)</option>
+            </select>
+          </div>
         </div>
-        <div class="cfg-title" data-i18n="settings.theme_heading">表示・音声設定</div>
-        <div class="flx-sb" style="flex-wrap:wrap">
-          <label class="chk-lbl"><input type="checkbox" id="chkDark" onchange="toggleDarkMode(this.checked)"><span data-i18n="settings.theme_dark">ダークモード</span></label>
-          <label class="chk-lbl" data-i18n-title="settings.auto_speak_title" title="暗記復習(Anki)モードでカード表示時に自動発音"><input type="checkbox" id="chkAutoSpeak" checked onchange="lsSet('vv_tts_auto_anki',this.checked?'1':'0')"><span data-i18n="settings.auto_speak">復習時に自動発音</span></label>
-          <select id="ttsRateSel" onchange="lsSet('vv_tts_rate',this.value)" data-i18n-title="settings.tts_rate_title" title="読み上げ速度">
-            <option value="0.85" data-i18n="settings.tts_rate_slow">速度: 0.85x (ゆっくり)</option>
-            <option value="0.95" selected data-i18n="settings.tts_rate_natural">速度: 0.95x (自然)</option>
-            <option value="1.05" data-i18n="settings.tts_rate_fast">速度: 1.05x (やや速め)</option>
-          </select>
+
+        <!-- オンボーディングガイドグループ -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.onboarding_title">初期オンボーディング・操作ガイド</h3>
+            <span class="badge ok" data-i18n="settings.onboarding_badge">いつでも再確認可能</span>
+          </div>
+          <p class="cfg-desc" data-i18n="settings.onboarding_desc">印欧祖語（語根）による芋づる式暗記の基礎概念、FSRS-4.5科学的忘却曲線、および表示モードの選択ガイドツアーをいつでも再確認できます。</p>
+          <div style="margin-top:4px">
+            <button type="button" class="btn-o btn-sm" onclick="VocabCore.openWelcomeTour()" data-i18n="settings.onboarding_btn">オンボーディングツアーを開く</button>
+          </div>
+        </div>
+
+        <!-- PWA / 単独アプリグループ -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.pwa_title">アプリ単体で開く (Chrome等のブラウザ枠なし起動)</h3>
+            <span id="pwaStatusBadge" class="badge ok" data-i18n="settings.pwa_badge">単体起動対応</span>
+          </div>
+          <p class="cfg-desc" data-i18n="settings.pwa_desc">ChromeのURLバーやタブを介さず、Mac・Windows・スマホで独立した専用アプリウィンドウとして快適にご利用いただけます。</p>
+          <div class="f-row" style="flex-wrap:wrap;gap:8px;margin-top:4px">
+            <button type="button" id="btnPwaInstall" class="btn-ac-o" onclick="promptAppInstall()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-i18n="settings.pwa_install_btn">アプリをインストール（単独起動）</span></button>
+            <button type="button" class="btn-o" onclick="toggleModal('installGuideModal', true)" data-i18n="settings.pwa_guide_btn">OS別セットアップ手順</button>
+          </div>
+          <p class="cfg-desc" style="margin-top:6px;color:var(--ac);font-weight:600" data-i18n="settings.pwa_mac_note">※Macの方は、本フォルダ内の「Vocab Vault.app」または「Vocab Vault.command」をダブルクリックするだけで、ブラウザ枠なしの単体アプリとして直接起動できます。</p>
         </div>
       </div>
 
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.onboarding_title">初期オンボーディング・操作ガイド</span>
-          <span class="badge ok" data-i18n="settings.onboarding_badge">いつでも再確認可能</span>
+      <!-- 2. アカウント・同期タブ -->
+      <div class="settings-panel" id="cfgPanelAccount">
+        <!-- アカウント認証・同期カード -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.account_title">アカウント管理 ＆ クラウド同期</h3>
+            <span id="sbStatusBadge" class="badge ng" data-i18n="settings.not_logged_in">未ログイン</span>
+          </div>
+          <div class="f-row" id="sbAuthFormRow" style="margin-top:4px">
+            <input type="email" id="sbEmailInput" class="f1" data-i18n-ph="settings.email_ph" placeholder="メールアドレス" autocomplete="username">
+            <input type="password" id="sbPassInput" class="f1" data-i18n-ph="settings.pass_ph" placeholder="パスワード (6文字以上)" autocomplete="current-password">
+            <button type="button" onclick="cloudLogin(false)" data-i18n="settings.login_btn">ログイン</button>
+            <button type="button" class="btn-o" onclick="cloudLogin(true)" data-i18n="settings.signup_btn">新規登録</button>
+          </div>
+          <div id="sbTermsAgreeRow" style="margin-top:4px;font-size:11px;color:var(--s);display:flex;align-items:center;gap:6px">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="checkbox" id="chkTermsAgree">
+              <span><button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px" data-i18n="settings.link_terms">利用規約</button><span data-i18n="settings.agree_and"> および </span><button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px" data-i18n="settings.link_privacy">プライバシーポリシー</button><span data-i18n="settings.agree_suffix"> に同意する</span></span>
+            </label>
+          </div>
+          <div class="flx-sb" id="sbLoggedInRow" style="display:none;margin-top:8px">
+            <span id="sbUserText" style="font-size:12px;font-weight:600;color:var(--ok)"></span>
+            <div class="f-row">
+              <button type="button" class="btn-ac-o btn-xs" onclick="syncCloudNow(true)" data-i18n="settings.sync_now_btn">今すぐ差分同期</button>
+              <button type="button" class="btn-o btn-xs" onclick="cloudLogout()" data-i18n="settings.logout_btn">ログアウト</button>
+            </div>
+          </div>
+          <p class="cfg-desc" id="sbQuotaText" style="margin-top:8px" data-i18n="settings.quota_desc">※無料アカウント登録で1日5語までAI新規生成可能（共有キャッシュは無制限）。複数端末間のクラウド自動同期はProプラン（月480円）でご利用いただけます。</p>
         </div>
-        <p class="cfg-desc" data-i18n="settings.onboarding_desc">印欧祖語（語根）による芋づる式暗記の基礎概念、FSRS-4.5科学的忘却曲線、および表示モードの選択ガイドツアーをいつでも再確認できます。</p>
-        <div style="margin-top:6px">
-          <button type="button" class="btn-o btn-sm" onclick="VocabCore.openWelcomeTour()" data-i18n="settings.onboarding_btn">オンボーディングツアーを開く</button>
-        </div>
-      </div>
 
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.pwa_title">アプリ単体で開く (Chrome等のブラウザ枠なし起動)</span>
-          <span id="pwaStatusBadge" class="badge ok" data-i18n="settings.pwa_badge">単体起動対応</span>
-        </div>
-        <p class="cfg-desc" data-i18n="settings.pwa_desc">ChromeのURLバーやタブを介さず、Mac・Windows・スマホで独立した専用アプリウィンドウとして快適にご利用いただけます。</p>
-        <div class="f-row" style="flex-wrap:wrap;gap:8px">
-          <button type="button" id="btnPwaInstall" class="btn-ac-o" onclick="promptAppInstall()"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-i18n="settings.pwa_install_btn">アプリをインストール（単独起動）</span></button>
-          <button type="button" class="btn-o" onclick="toggleModal('installGuideModal', true)" data-i18n="settings.pwa_guide_btn">OS別セットアップ手順</button>
-        </div>
-        <p class="cfg-desc" style="margin-top:6px;color:var(--ac);font-weight:600" data-i18n="settings.pwa_mac_note">※Macの方は、本フォルダ内の「Vocab Vault.app」または「Vocab Vault.command」をダブルクリックするだけで、ブラウザ枠なしの単体アプリとして直接起動できます。</p>
-      </div>
-
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.account_title">アカウント管理 ＆ クラウド同期</span>
-          <span id="sbStatusBadge" class="badge ng" data-i18n="settings.not_logged_in">未ログイン</span>
-        </div>
-        <div class="f-row" id="sbAuthFormRow">
-          <input type="email" id="sbEmailInput" class="f1" data-i18n-ph="settings.email_ph" placeholder="メールアドレス" autocomplete="username">
-          <input type="password" id="sbPassInput" class="f1" data-i18n-ph="settings.pass_ph" placeholder="パスワード (6文字以上)" autocomplete="current-password">
-          <button type="button" onclick="cloudLogin(false)" data-i18n="settings.login_btn">ログイン</button>
-          <button type="button" class="btn-o" onclick="cloudLogin(true)" data-i18n="settings.signup_btn">新規登録</button>
-        </div>
-        <div id="sbTermsAgreeRow" style="margin-top:4px;font-size:11px;color:var(--s);display:flex;align-items:center;gap:6px">
-          <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
-            <input type="checkbox" id="chkTermsAgree">
-            <span><button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px" data-i18n="settings.link_terms">利用規約</button><span data-i18n="settings.agree_and"> および </span><button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);text-decoration:underline;background:none;border:none;padding:0;cursor:pointer;font-size:11px" data-i18n="settings.link_privacy">プライバシーポリシー</button><span data-i18n="settings.agree_suffix"> に同意する</span></span>
-          </label>
-        </div>
-        <details class="cfg-details" style="margin-top:10px;border:1px solid var(--b);border-radius:6px;padding:6px 10px;background:var(--bg-card)">
-          <summary style="font-size:11.5px;font-weight:600;color:var(--s);cursor:pointer;user-select:none" data-i18n="settings.supabase_selfhost_title">上級者向け: 独自のSupabaseサーバー（セルフホスト）を使用する場合</summary>
-          <div class="f-row" style="margin-top:8px">
+        <!-- 独自Supabaseサーバー (セルフホスト) アコーディオン -->
+        <details class="cfg-details" style="border:1px solid var(--b);border-radius:8px;padding:10px 14px;background:var(--bg-main)">
+          <summary style="font-size:12px;font-weight:600;color:var(--s);cursor:pointer;user-select:none" data-i18n="settings.supabase_selfhost_title">上級者向け: 独自のSupabaseサーバー（セルフホスト）を使用する場合</summary>
+          <div class="f-row" style="margin-top:10px">
             <input type="text" id="sbUrlInput" class="f1" data-i18n-ph="settings.supabase_url_ph" placeholder="Supabase URL (https://xxx.supabase.co)" autocomplete="off">
             <input type="password" id="sbAnonInput" class="f1" data-i18n-ph="settings.supabase_anon_ph" placeholder="Supabase Anon Public Key" autocomplete="off">
           </div>
-          <p class="cfg-desc" style="font-size:10.5px;margin:4px 0 0" data-i18n="settings.supabase_selfhost_desc">※通常は入力不要です。公式クラウドサーバー（TLS/SSL完全暗号化）に自動接続されます。</p>
+          <p class="cfg-desc" style="font-size:11px;margin:6px 0 0" data-i18n="settings.supabase_selfhost_desc">※通常は入力不要です。公式クラウドサーバー（TLS/SSL完全暗号化）に自動接続されます。</p>
         </details>
-        <div class="flx-sb" id="sbLoggedInRow" style="display:none;margin-top:8px">
-          <span id="sbUserText" style="font-size:12px;font-weight:600;color:var(--ok)"></span>
-          <div class="f-row">
-            <button type="button" class="btn-ac-o btn-xs" onclick="syncCloudNow(true)" data-i18n="settings.sync_now_btn">今すぐ差分同期</button>
-            <button type="button" class="btn-o btn-xs" onclick="cloudLogout()" data-i18n="settings.logout_btn">ログアウト</button>
+
+        <!-- アカウント完全削除（退会） -->
+        <div class="cfg-card-group cfg-danger-group" id="sbDeleteAccountSec" style="display:none">
+          <div class="flx-sb">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--r)" data-i18n="settings.delete_acct_title">アカウント完全削除（退会）</div>
+              <p class="cfg-desc" data-i18n="settings.delete_acct_desc">クラウド上の全ての単語データ・学習履歴・アカウント情報を恒久的に抹消します。この操作は取り消せません。</p>
+            </div>
+            <button type="button" onclick="deleteAccountPermanently()" style="background:var(--r);white-space:nowrap" data-i18n="settings.delete_acct_btn">退会・データ抹消</button>
           </div>
         </div>
-        <p class="cfg-desc" id="sbQuotaText" style="margin-top:8px" data-i18n="settings.quota_desc">※無料アカウント登録で1日5語までAI新規生成可能（共有キャッシュは無制限）。複数端末間のクラウド自動同期はProプラン（月480円）でご利用いただけます。</p>
       </div>
 
-      <!-- ステップ6: Stripe 課金・プラン管理 -->
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.plan_heading">プラン ＆ サブスクリプション (Stripe決済)</span>
-          <span id="curPlanBadge" class="badge ok" data-i18n="settings.free_plan">Free プラン</span>
-        </div>
-        <!-- 課金サイクル切替 (Monthly / Annual) -->
-        <div style="display:flex;justify-content:center;margin:8px 0 14px">
-          <div style="display:inline-flex;align-items:center;background:var(--bg-hov);padding:3px;border-radius:20px;border:1px solid var(--b);gap:4px">
-            <button type="button" class="btn-xs active" id="settingsBillingMonthlyBtn" onclick="VocabI18n.setBillingInterval('month')" style="border-radius:16px;padding:3px 12px;font-size:11px;font-weight:700" data-i18n="settings.plan_monthly">月払い</button>
-            <button type="button" class="btn-xs btn-o" id="settingsBillingAnnualBtn" onclick="VocabI18n.setBillingInterval('year')" style="border-radius:16px;padding:3px 12px;font-size:11px;font-weight:700;border:none">年払い <span style="color:var(--ok);font-size:10px">(2ヶ月無料)</span></button>
+      <!-- 3. プラン・課金タブ -->
+      <div class="settings-panel" id="cfgPanelPlans">
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.plan_heading">プラン ＆ サブスクリプション (Stripe決済)</h3>
+            <span id="curPlanBadge" class="badge ok" data-i18n="settings.free_plan">Free プラン</span>
           </div>
-        </div>
-        <div class="plan-grid">
-          <div class="plan-card current" id="planCardFree">
-            <div>
-              <div style="font-weight:700;font-size:13px" data-i18n="settings.free_plan">Free プラン</div>
-              <div class="plan-price" id="settingsFreePriceText">¥0 <small>/ 月</small></div>
-              <ul class="plan-features" style="margin-top:8px">
-                <li data-i18n="settings.free_feat1">1日 5 語までのAI新規生成</li>
-                <li data-i18n="settings.free_feat2">共有辞書キャッシュの利用（無制限）</li>
-                <li data-i18n="settings.free_feat3">1端末ローカル保持（手動JSON保存対応）</li>
-                <li data-i18n="settings.free_feat4">SM-2/FSRS暗記復習・スワイプUI</li>
-              </ul>
+
+          <!-- 課金サイクル切替 (Monthly / Annual) -->
+          <div style="display:flex;justify-content:center;margin:6px 0 12px">
+            <div style="display:inline-flex;align-items:center;background:var(--bg-hov);padding:3px;border-radius:20px;border:1px solid var(--b);gap:4px">
+              <button type="button" class="btn-xs active" id="settingsBillingMonthlyBtn" onclick="VocabI18n.setBillingInterval('month')" style="border-radius:16px;padding:4px 14px;font-size:11px;font-weight:700" data-i18n="settings.plan_monthly">月払い</button>
+              <button type="button" class="btn-xs btn-o" id="settingsBillingAnnualBtn" onclick="VocabI18n.setBillingInterval('year')" style="border-radius:16px;padding:4px 14px;font-size:11px;font-weight:700;border:none">年払い <span style="color:var(--ok);font-size:10px">(2ヶ月無料)</span></button>
             </div>
-            <div style="font-size:11px;color:var(--m)" data-i18n="settings.current_plan">現在のプラン</div>
           </div>
-          <div class="plan-card pro" id="planCardPro">
-            <span class="plan-badge" data-i18n="settings.recommended">おすすめ</span>
-            <div>
-              <div style="font-weight:700;font-size:13px" data-i18n="settings.pro_plan">Pro プラン</div>
-              <div class="plan-price" id="settingsProPriceText">¥480 <small>/ 月 (年額 ¥4,800)</small></div>
-              <ul class="plan-features" style="margin-top:8px">
-                <li data-i18n="settings.pro_feat1">AI新規生成・概念史深掘り 無制限</li>
-                <li data-i18n="settings.pro_feat2">長文・画像OCR抽出 無制限</li>
-                <li data-i18n="settings.pro_feat3">複数端末クラウド自動差分同期</li>
-                <li data-i18n="settings.pro_feat4">優先サポート</li>
-              </ul>
-            </div>
-            <div style="display:flex;flex-direction:column;gap:6px">
-              <div style="font-size:10px;line-height:1.4;color:var(--m);background:var(--bg);padding:6px 8px;border-radius:4px;border:1px solid var(--bd)">
-                <strong data-i18n="settings.legal_notice_title">【定期課金・解約に関する法定明示】</strong><br>
-                <span data-i18n="settings.legal_notice_1">・月額480円（税込）または年額4,800円（税込）の自動更新</span><br>
-                <span data-i18n="settings.legal_notice_2">・次回更新日の前日までに設定画面（またはStripeポータル）よりいつでも解約可能</span><br>
-                <span data-i18n="settings.legal_notice_3">・解約後も次回更新日まではPro機能を利用可能（日割り精算なし）</span>
+
+          <div class="plan-grid">
+            <div class="plan-card current" id="planCardFree">
+              <div>
+                <div style="font-weight:700;font-size:13px" data-i18n="settings.free_plan">Free プラン</div>
+                <div class="plan-price" id="settingsFreePriceText">¥0 <small>/ 月</small></div>
+                <ul class="plan-features" style="margin-top:8px">
+                  <li data-i18n="settings.free_feat1">1日 5 語までのAI新規生成</li>
+                  <li data-i18n="settings.free_feat2">共有辞書キャッシュの利用（無制限）</li>
+                  <li data-i18n="settings.free_feat3">1端末ローカル保持（手動JSON保存対応）</li>
+                  <li data-i18n="settings.free_feat4">SM-2/FSRS暗記復習・スワイプUI</li>
+                </ul>
               </div>
-              <button type="button" id="btnUpgradePro" onclick="startStripeCheckout()" style="width:100%" data-i18n="settings.upgrade_btn">Proにアップグレード (¥480/月)</button>
-              <button type="button" id="btnManageSub" class="btn-o btn-xs" onclick="openStripePortal()" style="display:none;width:100%" data-i18n="settings.portal_btn">契約管理・領収書 (Stripe)</button>
+              <div style="font-size:11px;color:var(--m)" data-i18n="settings.current_plan">現在のプラン</div>
+            </div>
+            <div class="plan-card pro" id="planCardPro">
+              <span class="plan-badge" data-i18n="settings.recommended">おすすめ</span>
+              <div>
+                <div style="font-weight:700;font-size:13px" data-i18n="settings.pro_plan">Pro プラン</div>
+                <div class="plan-price" id="settingsProPriceText">¥480 <small>/ 月 (年額 ¥4,800)</small></div>
+                <ul class="plan-features" style="margin-top:8px">
+                  <li data-i18n="settings.pro_feat1">AI新規生成・概念史深掘り 無制限</li>
+                  <li data-i18n="settings.pro_feat2">長文・画像OCR抽出 無制限</li>
+                  <li data-i18n="settings.pro_feat3">複数端末クラウド自動差分同期</li>
+                  <li data-i18n="settings.pro_feat4">優先サポート</li>
+                </ul>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="font-size:10px;line-height:1.4;color:var(--m);background:var(--bg-hov);padding:6px 8px;border-radius:4px;border:1px solid var(--b)">
+                  <strong data-i18n="settings.legal_notice_title">【定期課金・解約に関する法定明示】</strong><br>
+                  <span data-i18n="settings.legal_notice_1">・月額480円（税込）または年額4,800円（税込）の自動更新</span><br>
+                  <span data-i18n="settings.legal_notice_2">・次回更新日の前日までに設定画面（またはStripeポータル）よりいつでも解約可能</span><br>
+                  <span data-i18n="settings.legal_notice_3">・解約後も次回更新日まではPro機能を利用可能（日割り精算なし）</span>
+                </div>
+                <button type="button" id="btnUpgradePro" onclick="startStripeCheckout()" style="width:100%" data-i18n="settings.upgrade_btn">Proにアップグレード (¥480/月)</button>
+                <button type="button" id="btnManageSub" class="btn-o btn-xs" onclick="openStripePortal()" style="display:none;width:100%" data-i18n="settings.portal_btn">契約管理・領収書 (Stripe)</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="flx-sb" style="margin-top:12px;font-size:11px;color:var(--m);flex-wrap:wrap;gap:6px">
+            <span data-i18n="settings.stripe_secure_note">※決済はStripeのSSL暗号化決済ページで行われます。</span>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline" data-i18n="settings.link_terms">利用規約</button>
+              <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline" data-i18n="settings.link_privacy">プライバシー</button>
+              <button type="button" class="btn-link" onclick="openLegalModal('tokusho')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline" data-i18n="settings.link_tokusho">特定商取引法</button>
             </div>
           </div>
         </div>
-        <div class="flx-sb" style="margin-top:8px;font-size:11px;color:var(--m);flex-wrap:wrap;gap:6px">
-          <span data-i18n="settings.stripe_secure_note">※決済はStripeのSSL暗号化決済ページで行われます。</span>
-          <div style="display:flex;gap:8px">
-            <button type="button" class="btn-link" onclick="openLegalModal('terms')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline" data-i18n="settings.link_terms">利用規約</button>
-            <button type="button" class="btn-link" onclick="openLegalModal('privacy')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline" data-i18n="settings.link_privacy">プライバシー</button>
-            <button type="button" class="btn-link" onclick="openLegalModal('tokusho')" style="color:var(--ac);background:none;border:none;padding:0;font-size:11px;cursor:pointer;text-decoration:underline" data-i18n="settings.link_tokusho">特定商取引法</button>
-          </div>
-        </div>
       </div>
 
-      <!-- 項目9: AI生成・トークン消費メトリクス & キャッシュ節約可視化 -->
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.metrics_title">AI生成・トークン消費メトリクス ＆ 節約量</span>
-          <span id="metricsEfficiencyBadge" class="badge ok" data-i18n="settings.metrics_badge_cache">高効率キャッシュ稼働中</span>
+      <!-- 4. AI・忘却曲線タブ -->
+      <div class="settings-panel" id="cfgPanelAi">
+        <!-- AI生成・トークン消費メトリクス -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.metrics_title">AI生成・トークン消費メトリクス ＆ 節約量</h3>
+            <span id="metricsEfficiencyBadge" class="badge ok" data-i18n="settings.metrics_badge_cache">高効率キャッシュ稼働中</span>
+          </div>
+          <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:8px 0;">
+            <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:var(--s)" data-i18n="settings.metric_total_words">総生成リクエスト</div>
+              <div id="metricTotalWords" style="font-size:18px;font-weight:700;color:var(--t);margin-top:2px">0 <small style="font-size:11px">語</small></div>
+            </div>
+            <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:var(--s)" data-i18n="settings.metric_cache_rate">共有キャッシュヒット率</div>
+              <div id="metricCacheRate" style="font-size:18px;font-weight:700;color:var(--ok);margin-top:2px">0%</div>
+            </div>
+            <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+              <div style="font-size:11px;color:var(--s)" data-i18n="settings.metric_tokens_saved">削減トークン推定</div>
+              <div id="metricTokensSaved" style="font-size:18px;font-weight:700;color:var(--ac);margin-top:2px">0 <small style="font-size:11px">tok</small></div>
+            </div>
+            <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
+              <div class="f-lbl" data-i18n="settings.metric_daily_quota">本日AI新規生成残枠</div>
+              <div id="metricDailyQuota" style="font-size:18px;font-weight:700;color:var(--t);margin-top:2px">5 <small style="font-size:11px">/ 5語</small></div>
+            </div>
+          </div>
+          <p class="cfg-desc" style="font-size:11px;margin:0" data-i18n="settings.metrics_desc">※共有辞書キャッシュから即時展開された単語は、Gemini APIトークンを消費せず待ち時間ゼロ(0ms)で高速登録されます。</p>
         </div>
-        <div class="metrics-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:10px 0;">
-          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
-            <div style="font-size:11px;color:var(--s)" data-i18n="settings.metric_total_words">総生成リクエスト</div>
-            <div id="metricTotalWords" style="font-size:18px;font-weight:700;color:var(--t);margin-top:2px">0 <small style="font-size:11px">語</small></div>
-          </div>
-          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
-            <div style="font-size:11px;color:var(--s)" data-i18n="settings.metric_cache_rate">共有キャッシュヒット率</div>
-            <div id="metricCacheRate" style="font-size:18px;font-weight:700;color:var(--ok);margin-top:2px">0%</div>
-          </div>
-          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
-            <div style="font-size:11px;color:var(--s)" data-i18n="settings.metric_tokens_saved">削減トークン推定</div>
-            <div id="metricTokensSaved" style="font-size:18px;font-weight:700;color:var(--ac);margin-top:2px">0 <small style="font-size:11px">tok</small></div>
-          </div>
-          <div style="background:var(--bg-card);border:1px solid var(--b);border-radius:6px;padding:10px;text-align:center;">
-            <div class="f-lbl" data-i18n="settings.metric_daily_quota">本日AI新規生成残枠</div>
-            <div id="metricDailyQuota" style="font-size:18px;font-weight:700;color:var(--t);margin-top:2px">5 <small style="font-size:11px">/ 5語</small></div>
-          </div>
-        </div>
-        <p class="cfg-desc" style="font-size:11px;margin:0" data-i18n="settings.metrics_desc">※共有辞書キャッシュから即時展開された単語は、Gemini APIトークンを消費せず待ち時間ゼロ(0ms)で高速登録されます。</p>
-      </div>
 
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.ai_engine_title">AI生成エンジン ＆ プライバシー機密保護</span>
-          <span id="apiBadge" class="badge ok" data-i18n="settings.ai_engine_badge">内蔵AI稼働中 (完全機密保護)</span>
-        </div>
-        <p class="cfg-desc" style="line-height:1.6;color:var(--t)">
-          <strong data-i18n="settings.ai_engine_title">AI生成エンジン ＆ プライバシー機密保護:</strong> <span data-i18n="settings.ai_engine_desc">本アプリは内部にAIエンジンが埋め込まれており、個人のAPIキーを入力することなく安全にご利用いただけます。すべての通信はTLS/SSL暗号化され、プライバシーは厳格に保護されます。</span>
-        </p>
+        <!-- AIエンジン ＆ プライバシー機密保護 -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.ai_engine_title">AI生成エンジン ＆ プライバシー機密保護</h3>
+            <span id="apiBadge" class="badge ok" data-i18n="settings.ai_engine_badge">内蔵AI稼働中 (完全機密保護)</span>
+          </div>
+          <p class="cfg-desc" style="line-height:1.6;color:var(--t)">
+            <strong data-i18n="settings.ai_engine_title">AI生成エンジン ＆ プライバシー機密保護:</strong> <span data-i18n="settings.ai_engine_desc">本アプリは内部にAIエンジンが埋め込まれており、個人のAPIキーを入力することなく安全にご利用いただけます。すべての通信はTLS/SSL暗号化され、プライバシーは厳格に保護されます。</span>
+          </p>
 
-        <!-- 上級者向けカスタムAPIキー (BYOK) アコーディオン -->
-        <details class="byok-details" style="margin-top:10px;border:1px solid var(--b);border-radius:6px;padding:8px 12px;background:var(--bg-card)">
-          <summary style="font-size:12px;font-weight:600;color:var(--s);cursor:pointer;user-select:none" data-i18n="settings.byok_title">
-            上級者向け設定: カスタムGemini APIキー (BYOK: HTTPS直接通信)
-          </summary>
-          <div style="margin-top:10px">
+          <!-- 上級者向けカスタムAPIキー (BYOK) アコーディオン -->
+          <details class="byok-details" style="margin-top:8px;border:1px solid var(--b);border-radius:6px;padding:8px 12px;background:var(--bg-card)">
+            <summary style="font-size:12px;font-weight:600;color:var(--s);cursor:pointer;user-select:none" data-i18n="settings.byok_title">
+              上級者向け設定: カスタムGemini APIキー (BYOK: HTTPS直接通信)
+            </summary>
+            <div style="margin-top:10px">
+              <div style="display:flex;gap:6px">
+                <input type="password" id="apiKeyInput" class="f1" data-i18n-ph="settings.byok_ph" placeholder="AIzaSy... (通常は未入力で問題ありません)" autocomplete="off">
+                <button type="button" class="btn-o btn-xs" id="btnToggleApiKey" onclick="const i=$('apiKeyInput'),p=i.type==='password';i.type=p?'text':'password';this.textContent=p?(VocabI18n.getLocale()==='en'?'Hide':'隠す'):(VocabI18n.getLocale()==='en'?'Show':'表示')" data-i18n="settings.byok_show">表示</button>
+                <button type="button" onclick="saveKeyFromModal()" data-i18n="settings.byok_save">保存・確認</button>
+              </div>
+              <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;color:var(--s);cursor:pointer">
+                <input type="checkbox" id="chkApiKeySessionOnly">
+                <span data-i18n="settings.byok_session_only">ブラウザを閉じたら消去する（このセッションのみ有効 / sessionStorage）</span>
+              </label>
+              <p class="cfg-desc" style="margin-top:6px;font-size:11px" data-i18n="settings.byok_desc">※ご自身のGoogle AI Studio発行キーで直接通信したい場合のみ設定してください。キーはローカルブラウザ内にのみ保持され、Google Gemini APIとのHTTPS通信にのみ使用されます。</p>
+              <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
+                <span style="font-size:11.5px;color:var(--s);font-weight:600" data-i18n="settings.byok_model_lbl">使用AIモデル:</span>
+                <select id="modelSel" class="f1" onchange="lsSet('vv_gemini_model', this.value)" style="font-size:12px"><option value="auto" data-i18n="settings.byok_model_auto">自動（モード別最適モデル）</option></select>
+                <button type="button" class="btn-o btn-xs" onclick="App.cachedModels=null;fetchModels(getKey()).then(m=>alert('更新完了:'+m.length+'件')).catch(e=>alert(e.message))" data-i18n="settings.byok_reload">再取得</button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+        <!-- 個人適応型 FSRS 重みオプティマイザ -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.fsrs_title">個人適応型 FSRS 重みオプティマイザ (Personalized FSRS)</h3>
+            <span id="fsrsOptBadge" class="badge ok" data-i18n="settings.fsrs_badge">FSRS-4.5 最適化済</span>
+          </div>
+          <p class="cfg-desc" id="fsrsOptDesc" data-i18n="settings.fsrs_desc">復習履歴ログに基づき、想起予測誤差（MSE）を最小化する個人専用の忘却曲線係数を動的に適用します。</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b);flex-wrap:wrap">
+            <div>
+              <div style="font-size:12px;font-weight:700" data-i18n="settings.fsrs_manual_opt">FSRS重み手動最適化</div>
+              <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.fsrs_manual_opt_desc">直近500件の復習ログから忘却速度を再計算し、係数を最新化します。</p>
+            </div>
             <div style="display:flex;gap:6px">
-              <input type="password" id="apiKeyInput" class="f1" data-i18n-ph="settings.byok_ph" placeholder="AIzaSy... (通常は未入力で問題ありません)" autocomplete="off">
-              <button type="button" class="btn-o btn-xs" id="btnToggleApiKey" onclick="const i=$('apiKeyInput'),p=i.type==='password';i.type=p?'text':'password';this.textContent=p?(VocabI18n.getLocale()==='en'?'Hide':'隠す'):(VocabI18n.getLocale()==='en'?'Show':'表示')" data-i18n="settings.byok_show">表示</button>
-              <button type="button" onclick="saveKeyFromModal()" data-i18n="settings.byok_save">保存・確認</button>
-            </div>
-            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11.5px;color:var(--s);cursor:pointer">
-              <input type="checkbox" id="chkApiKeySessionOnly">
-              <span data-i18n="settings.byok_session_only">ブラウザを閉じたら消去する（このセッションのみ有効 / sessionStorage）</span>
-            </label>
-            <p class="cfg-desc" style="margin-top:6px;font-size:11px" data-i18n="settings.byok_desc">※ご自身のGoogle AI Studio発行キーで直接通信したい場合のみ設定してください。キーはローカルブラウザ内にのみ保持され、Google Gemini APIとのHTTPS通信にのみ使用されます。</p>
-            <div style="display:flex;gap:6px;align-items:center;margin-top:8px">
-              <span style="font-size:11.5px;color:var(--s);font-weight:600" data-i18n="settings.byok_model_lbl">使用AIモデル:</span>
-              <select id="modelSel" class="f1" onchange="lsSet('vv_gemini_model', this.value)" style="font-size:12px"><option value="auto" data-i18n="settings.byok_model_auto">自動（モード別最適モデル）</option></select>
-              <button type="button" class="btn-o btn-xs" onclick="App.cachedModels=null;fetchModels(getKey()).then(m=>alert('更新完了:'+m.length+'件')).catch(e=>alert(e.message))" data-i18n="settings.byok_reload">再取得</button>
+              <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()" data-i18n="settings.fsrs_opt_now">今すぐ最適化</button>
+              <button type="button" class="btn-o btn-xs" onclick="VocabAnkiView.triggerResetWeights()" data-i18n="settings.fsrs_reset_weights">初期値にリセット</button>
             </div>
           </div>
-        </details>
-      </div>
+        </div>
 
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb"><span data-i18n="settings.storage_title">データ管理・大容量IndexedDB主ストア</span><span id="storageBadge" class="badge ok" data-i18n="settings.storage_badge">保存正常</span></div>
-        <p class="cfg-desc" id="dataStatText"></p>
-        <p class="cfg-desc" id="lastBackupText"></p>
-        <div class="cfg-grid">
-          <button type="button" class="cfg-card" onclick="exportJSON()"><span data-i18n="settings.export_json">JSON保存</span><small data-i18n="settings.export_json_desc">全言語データを保存</small></button>
-          <button type="button" class="cfg-card" onclick="$('fileIn').click()"><span data-i18n="settings.import_json">JSON復元</span><small data-i18n="settings.import_json_desc">バックアップを統合</small></button>
-          <button type="button" class="cfg-card" onclick="exportAnkiTSV()"><span data-i18n="settings.export_tsv">Anki / TSV出力</span><small data-i18n="settings.export_tsv_desc">表示中リストを出力</small></button>
-          <button type="button" class="cfg-card" onclick="exportAnkiAPKG()"><span data-i18n="settings.export_apkg">Anki (.apkg) 出力</span><small data-i18n="settings.export_apkg_desc">公式Ankiパッケージ保存</small></button>
-          <button type="button" class="cfg-card" onclick="exportObsidianMarkdown()"><span data-i18n="settings.export_obsidian">Obsidian出力</span><small data-i18n="settings.export_obsidian_desc">Wikiリンク・語根付き.md</small></button>
-          <button type="button" class="cfg-card" onclick="syncObsidianVaultDirect()"><span data-i18n="settings.sync_obsidian">Obsidian直接同期</span><small data-i18n="settings.sync_obsidian_desc">Vaultフォルダへ直書き出し</small></button>
-          <button type="button" class="cfg-card" onclick="generateCurrentShareDeckUrl()"><span data-i18n="settings.share_deck_url">共有デッキURL発行</span><small data-i18n="settings.share_deck_url_desc">URLで友人に単語配布</small></button>
-          <button type="button" class="cfg-card" onclick="VocabModal.openStarterPackModal()"><span data-i18n="settings.starter_pack">スターターパック</span><small data-i18n="settings.starter_pack_desc">厳選学術パックを導入</small></button>
-          <button type="button" class="cfg-card" onclick="VocabModal.openAnkiImportModal()"><span data-i18n="settings.anki_import">Ankiインポート</span><small data-i18n="settings.anki_import_desc">APKG/TSVから取り込み</small></button>
-          <button type="button" class="cfg-card" onclick="salvageAll(true)" style="border-color:var(--ac-b)"><span data-i18n="settings.salvage_all">全ストレージ救出</span><small data-i18n="settings.salvage_all_desc">退避スナップショットを含め復元</small></button>
+        <!-- 忘却臨界点スマートPush通知 -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.notify_title">忘却臨界点スマートPush通知 (Smart Retention Reminder)</h3>
+            <span id="smartNotifyBadge" class="badge ok" data-i18n="settings.notify_badge">スマート待機中</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+            <div>
+              <div style="font-size:12px;font-weight:700" data-i18n="settings.notify_heading">臨界点（記憶定着率 90% 直前）自動介入</div>
+              <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.notify_desc">固定時間アラームではなく、登録単語の想起率が90%を下回る直前に自動通知します。</p>
+            </div>
+            <label class="chk-lbl" style="margin:0"><input type="checkbox" id="chkSmartNotify" checked onchange="VocabSRS.setSmartNotifyEnabled(this.checked); if(window.updateSmartNotifyUI) window.updateSmartNotifyUI();"><span data-i18n="settings.notify_enable">有効</span></label>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
+            <div>
+              <div style="font-size:12px;font-weight:700" data-i18n="settings.notify_perm_heading">ブラウザ通知の許可状態</div>
+              <p class="cfg-desc" style="margin:2px 0 0" id="smartNotifyPermDesc" data-i18n="settings.notify_perm_desc">Web Notification API によるデスクトップ・スマホ通知</p>
+            </div>
+            <button type="button" class="btn-o btn-xs" id="btnReqNotify" onclick="requestSmartNotifyPermission()" data-i18n="settings.notify_perm_btn">通知を許可する</button>
+          </div>
         </div>
-        <input type="file" id="fileIn" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
-      </div>
 
-      <!-- 暗記復習 (FSRS / SM-2) 個人適応＆学習継続設定 -->
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.fsrs_title">個人適応型 FSRS 重みオプティマイザ (Personalized FSRS)</span>
-          <span id="fsrsOptBadge" class="badge ok" data-i18n="settings.fsrs_badge">FSRS-4.5 最適化済</span>
-        </div>
-        <p class="cfg-desc" id="fsrsOptDesc" data-i18n="settings.fsrs_desc">復習履歴ログに基づき、想起予測誤差（MSE）を最小化する個人専用の忘却曲線係数を動的に適用します。</p>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b);flex-wrap:wrap">
-          <div>
-            <div style="font-size:12px;font-weight:700" data-i18n="settings.fsrs_manual_opt">FSRS重み手動最適化</div>
-            <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.fsrs_manual_opt_desc">直近500件の復習ログから忘却速度を再計算し、係数を最新化します。</p>
+        <!-- 復習上限 ＆ スヌーズ均等再配分 (FSRS-4.5 SRS) -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.cap_title">復習上限 ＆ スヌーズ均等再配分 (FSRS-4.5 SRS)</h3>
+            <span class="badge ok" data-i18n="settings.cap_badge">最適化済</span>
           </div>
-          <div style="display:flex;gap:6px">
-            <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()" data-i18n="settings.fsrs_opt_now">今すぐ最適化</button>
-            <button type="button" class="btn-o btn-xs" onclick="VocabAnkiView.triggerResetWeights()" data-i18n="settings.fsrs_reset_weights">初期値にリセット</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+            <div>
+              <div style="font-size:12px;font-weight:700" data-i18n="settings.cap_heading">1日の最大復習上限 (Daily Review Cap)</div>
+              <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.cap_desc">復習が溜まりすぎて学習破綻するのを防ぐため、1日のセッション数を制限します。</p>
+            </div>
+            <select id="selDailyCap" class="sort-sel" onchange="setDailyReviewCap(this.value)">
+              <option value="20" data-i18n="settings.cap_opt_20">20 語 (ゆったり)</option>
+              <option value="30" selected data-i18n="settings.cap_opt_30">30 語 (推奨・標準)</option>
+              <option value="50" data-i18n="settings.cap_opt_50">50 語 (集中)</option>
+              <option value="99999" data-i18n="settings.cap_opt_unlimited">無制限 (すべて)</option>
+            </select>
           </div>
-        </div>
-      </div>
-
-      <!-- 忘却臨界点スマートPush通知 -->
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.notify_title">忘却臨界点スマートPush通知 (Smart Retention Reminder)</span>
-          <span id="smartNotifyBadge" class="badge ok" data-i18n="settings.notify_badge">スマート待機中</span>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
-          <div>
-            <div style="font-size:12px;font-weight:700" data-i18n="settings.notify_heading">臨界点（記憶定着率 90% 直前）自動介入</div>
-            <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.notify_desc">固定時間アラームではなく、登録単語の想起率が90%を下回る直前に自動通知します。</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
+            <div>
+              <div style="font-size:12px;font-weight:700" data-i18n="settings.snooze_heading">溜まった復習のなだらかな再分散 (Snooze)</div>
+              <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.snooze_desc">長期不在等で溜まった復習期日超過単語を、今後7日間に均等になだらかに再配分します。</p>
+            </div>
+            <button type="button" class="btn-o btn-xs" onclick="rescheduleOverdueReviews()" data-i18n="settings.snooze_btn">均等に再配分</button>
           </div>
-          <label class="chk-lbl" style="margin:0"><input type="checkbox" id="chkSmartNotify" checked onchange="VocabSRS.setSmartNotifyEnabled(this.checked); if(window.updateSmartNotifyUI) window.updateSmartNotifyUI();"><span data-i18n="settings.notify_enable">有効</span></label>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
-          <div>
-            <div style="font-size:12px;font-weight:700" data-i18n="settings.notify_perm_heading">ブラウザ通知の許可状態</div>
-            <p class="cfg-desc" style="margin:2px 0 0" id="smartNotifyPermDesc" data-i18n="settings.notify_perm_desc">Web Notification API によるデスクトップ・スマホ通知</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
+            <div>
+              <div style="font-size:12px;font-weight:700" data-i18n="settings.diagnostics_heading">データベース整合性診断 & 自己修復 (Self-Healing)</div>
+              <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.diagnostics_desc">全単語レコードの整合性、重複ID、無効な日付、および不要Tombstoneを自動スキャンし最適化します。</p>
+            </div>
+            <button type="button" class="btn-o btn-xs" onclick="runDatabaseDiagnosticsAndRepair()" data-i18n="settings.diagnostics_btn">診断 & 修復を実行</button>
           </div>
-          <button type="button" class="btn-o btn-xs" id="btnReqNotify" onclick="requestSmartNotifyPermission()" data-i18n="settings.notify_perm_btn">通知を許可する</button>
         </div>
       </div>
 
-      <!-- 暗記復習 (FSRS-4.5 SRS) キャッチアップ設定 -->
-      <div class="cfg-sec">
-        <div class="cfg-title flx-sb">
-          <span data-i18n="settings.cap_title">復習上限 ＆ スヌーズ均等再配分 (FSRS-4.5 SRS)</span>
-          <span class="badge ok" data-i18n="settings.cap_badge">最適化済</span>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
-          <div>
-            <div style="font-size:12px;font-weight:700" data-i18n="settings.cap_heading">1日の最大復習上限 (Daily Review Cap)</div>
-            <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.cap_desc">復習が溜まりすぎて学習破綻するのを防ぐため、1日のセッション数を制限します。</p>
+      <!-- 5. データ管理タブ -->
+      <div class="settings-panel" id="cfgPanelStorage">
+        <!-- 大容量IndexedDB主ストアカード -->
+        <div class="cfg-card-group">
+          <div class="cfg-card-group-hd">
+            <h3 class="cfg-card-group-title" data-i18n="settings.storage_title">データ管理・大容量IndexedDB主ストア</h3>
+            <span id="storageBadge" class="badge ok" data-i18n="settings.storage_badge">保存正常</span>
           </div>
-          <select id="selDailyCap" class="sort-sel" onchange="setDailyReviewCap(this.value)">
-            <option value="20" data-i18n="settings.cap_opt_20">20 語 (ゆったり)</option>
-            <option value="30" selected data-i18n="settings.cap_opt_30">30 語 (推奨・標準)</option>
-            <option value="50" data-i18n="settings.cap_opt_50">50 語 (集中)</option>
-            <option value="99999" data-i18n="settings.cap_opt_unlimited">無制限 (すべて)</option>
-          </select>
-        </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
-          <div>
-            <div style="font-size:12px;font-weight:700" data-i18n="settings.snooze_heading">溜まった復習のなだらかな再分散 (Snooze)</div>
-            <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.snooze_desc">長期不在等で溜まった復習期日超過単語を、今後7日間に均等になだらかに再配分します。</p>
+          <p class="cfg-desc" id="dataStatText"></p>
+          <p class="cfg-desc" id="lastBackupText"></p>
+          <div class="cfg-grid" style="margin-top:6px">
+            <button type="button" class="cfg-card" onclick="exportJSON()"><span data-i18n="settings.export_json">JSON保存</span><small data-i18n="settings.export_json_desc">全言語データを保存</small></button>
+            <button type="button" class="cfg-card" onclick="$('fileIn').click()"><span data-i18n="settings.import_json">JSON復元</span><small data-i18n="settings.import_json_desc">バックアップを統合</small></button>
+            <button type="button" class="cfg-card" onclick="exportAnkiTSV()"><span data-i18n="settings.export_tsv">Anki / TSV出力</span><small data-i18n="settings.export_tsv_desc">表示中リストを出力</small></button>
+            <button type="button" class="cfg-card" onclick="exportAnkiAPKG()"><span data-i18n="settings.export_apkg">Anki (.apkg) 出力</span><small data-i18n="settings.export_apkg_desc">公式Ankiパッケージ保存</small></button>
+            <button type="button" class="cfg-card" onclick="exportObsidianMarkdown()"><span data-i18n="settings.export_obsidian">Obsidian出力</span><small data-i18n="settings.export_obsidian_desc">Wikiリンク・語根付き.md</small></button>
+            <button type="button" class="cfg-card" onclick="syncObsidianVaultDirect()"><span data-i18n="settings.sync_obsidian">Obsidian直接同期</span><small data-i18n="settings.sync_obsidian_desc">Vaultフォルダへ直書き出し</small></button>
+            <button type="button" class="cfg-card" onclick="generateCurrentShareDeckUrl()"><span data-i18n="settings.share_deck_url">共有デッキURL発行</span><small data-i18n="settings.share_deck_url_desc">URLで友人に単語配布</small></button>
+            <button type="button" class="cfg-card" onclick="VocabModal.openStarterPackModal()"><span data-i18n="settings.starter_pack">スターターパック</span><small data-i18n="settings.starter_pack_desc">厳選学術パックを導入</small></button>
+            <button type="button" class="cfg-card" onclick="VocabModal.openAnkiImportModal()"><span data-i18n="settings.anki_import">Ankiインポート</span><small data-i18n="settings.anki_import_desc">APKG/TSVから取り込み</small></button>
+            <button type="button" class="cfg-card" onclick="salvageAll(true)" style="border-color:var(--ac-b)"><span data-i18n="settings.salvage_all">全ストレージ救出</span><small data-i18n="settings.salvage_all_desc">退避スナップショットを含め復元</small></button>
           </div>
-          <button type="button" class="btn-o btn-xs" onclick="rescheduleOverdueReviews()" data-i18n="settings.snooze_btn">均等に再配分</button>
+          <input type="file" id="fileIn" accept=".json,application/json" style="display:none" onchange="importJSON(event)">
         </div>
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--b)">
-          <div>
-            <div style="font-size:12px;font-weight:700" data-i18n="settings.diagnostics_heading">データベース整合性診断 & 自己修復 (Self-Healing)</div>
-            <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.diagnostics_desc">全単語レコードの整合性、重複ID、無効な日付、および不要Tombstoneを自動スキャンし最適化します。</p>
+
+        <!-- データ主権と永久無料保証 -->
+        <div class="cfg-card-group" style="background:var(--bg-hov);border-left:3px solid var(--ok)">
+          <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:2px" data-i18n="settings.sovereignty_title">データ主権と永久無料の安心保証</div>
+          <p class="cfg-desc" style="margin:0;color:var(--s);line-height:1.55" data-i18n="settings.sovereignty_desc">
+            有料Proプランをご解約された後でも、これまでに登録・生成されたすべての単語データ、暗記復習機能（Anki SRS）、およびJSON / TSV / Obsidianエクスポート機能は<strong>永久に完全無料</strong>でご利用いただけます。お客様の大切な知的学習資産がロックされることは一切ありません。
+          </p>
+        </div>
+
+        <!-- 開発者マスター権限（完全無制限・課金不要） -->
+        <div class="cfg-card-group" style="border-left:3px solid var(--ac)">
+          <div class="flx-sb">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--t)" data-i18n="settings.dev_title">開発者マスター権限 (Developer Mode)</div>
+              <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.dev_desc">開発者・管理者向けに課金制限・クォータ制限を完全解除し、全機能を無制限・無料で利用します。</p>
+            </div>
+            <button type="button" class="btn-xs btn-ac" onclick="toggleDevMasterMode()" style="white-space:nowrap;padding:5px 12px" data-i18n="settings.dev_btn">権限を切替</button>
           </div>
-          <button type="button" class="btn-o btn-xs" onclick="runDatabaseDiagnosticsAndRepair()" data-i18n="settings.diagnostics_btn">診断 & 修復を実行</button>
         </div>
-      </div>
 
-      <!-- データ主権と永久無料保証 -->
-      <div class="cfg-sec" style="background:var(--bg-hov);padding:10px 12px;border-radius:6px;border-left:3px solid var(--ok)">
-        <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:2px" data-i18n="settings.sovereignty_title">データ主権と永久無料の安心保証</div>
-        <p class="cfg-desc" style="margin:0;color:var(--s);line-height:1.55" data-i18n="settings.sovereignty_desc">
-          有料Proプランをご解約された後でも、これまでに登録・生成されたすべての単語データ、暗記復習機能（Anki SRS）、およびJSON / TSV / Obsidianエクスポート機能は<strong>永久に完全無料</strong>でご利用いただけます。お客様の大切な知的学習資産がロックされることは一切ありません。
-        </p>
-      </div>
-
-      <!-- 開発者マスター権限（完全無制限・課金不要） -->
-      <div class="cfg-sec" style="background:var(--bg-card);padding:10px 12px;border-radius:6px;border-left:3px solid var(--ac);border:1px solid var(--b)">
-        <div class="flx-sb">
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--t)" data-i18n="settings.dev_title">開発者マスター権限 (Developer Mode)</div>
-            <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.dev_desc">開発者・管理者向けに課金制限・クォータ制限を完全解除し、全機能を無制限・無料で利用します。</p>
+        <!-- 危険領域: 現在の言語データを全削除 -->
+        <div class="cfg-card-group cfg-danger-group">
+          <div class="flx-sb">
+            <div>
+              <div style="font-size:12px;font-weight:700;color:var(--r)" data-i18n="settings.clear_lang_title">現在の言語データを全削除</div>
+              <p class="cfg-desc"><span data-i18n="settings.clear_lang_desc_pre">選択中の言語（</span><span id="curLangLabel">English</span><span data-i18n="settings.clear_lang_desc_post">）を消去します（リロードしても復活しません）。</span></p>
+            </div>
+            <button type="button" onclick="clearCurrentLang()" style="background:var(--r)" data-i18n="settings.clear_lang_btn">全削除</button>
           </div>
-          <button type="button" class="btn-xs btn-ac" onclick="toggleDevMasterMode()" style="white-space:nowrap;padding:5px 12px" data-i18n="settings.dev_btn">権限を切替</button>
         </div>
       </div>
+    </div>
 
-      <div class="cfg-sec" style="border-top:1px dashed var(--b);padding-top:10px">
-        <div class="flx-sb">
-          <div><div style="font-size:12px;font-weight:700;color:var(--r)" data-i18n="settings.clear_lang_title">現在の言語データを全削除</div><p class="cfg-desc"><span data-i18n="settings.clear_lang_desc_pre">選択中の言語（</span><span id="curLangLabel">English</span><span data-i18n="settings.clear_lang_desc_post">）を消去します（リロードしても復活しません）。</span></p></div>
-          <button type="button" onclick="clearCurrentLang()" style="background:var(--r)" data-i18n="settings.clear_lang_btn">全削除</button>
-        </div>
-      </div>
-
-      <div class="cfg-sec" id="sbDeleteAccountSec" style="border-top:1px dashed var(--b);padding-top:10px;display:none">
-        <div class="flx-sb">
-          <div>
-            <div style="font-size:12px;font-weight:700;color:var(--r)" data-i18n="settings.delete_acct_title">アカウント完全削除（退会）</div>
-            <p class="cfg-desc" data-i18n="settings.delete_acct_desc">クラウド上の全ての単語データ・学習履歴・アカウント情報を恒久的に抹消します。この操作は取り消せません。</p>
-          </div>
-          <button type="button" onclick="deleteAccountPermanently()" style="background:var(--r);white-space:nowrap" data-i18n="settings.delete_acct_btn">退会・データ抹消</button>
-        </div>
-      </div>
-
-      <div style="display:flex;justify-content:flex-end;margin-top:6px;padding-top:8px;border-top:1px solid var(--b)">
-        <button type="button" class="btn-o" onclick="toggleModal('settingsModal',false)" data-i18n="settings.close_btn">設定を閉じる</button>
-      </div>
+    <!-- モーダルフッター -->
+    <div class="settings-modal-ft">
+      <button type="button" class="btn-o" onclick="toggleModal('settingsModal',false)" data-i18n="settings.close_btn">設定を閉じる</button>
     </div>
   </div>
 </div>

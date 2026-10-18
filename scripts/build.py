@@ -91,10 +91,12 @@ def sync_web_package():
 
 def package_distributions():
     """vocab-vault-web.zip をパッケージング"""
-    res = subprocess.run(["zip", "-rq", "vocab-vault-web.zip", "vocab-vault-web/"], cwd=BASE_DIR)
-    if res.returncode != 0:
-        log_fail("Failed to zip vocab-vault-web.zip")
-        return False
+    web_zip = os.path.join(BASE_DIR, "vocab-vault-web.zip")
+    web_in_web_zip = os.path.join(BASE_DIR, "vocab-vault-web", "vocab-vault-web.zip")
+    if os.path.exists(web_zip):
+        os.remove(web_zip)
+    if os.path.exists(web_in_web_zip):
+        os.remove(web_in_web_zip)
 
     # Macアプリの同期コピー
     mac_zip = os.path.join(BASE_DIR, "VocabVault-Mac.zip")
@@ -102,8 +104,11 @@ def package_distributions():
     if os.path.exists(mac_zip):
         shutil.copy2(mac_zip, web_mac_zip)
 
-    web_zip = os.path.join(BASE_DIR, "vocab-vault-web.zip")
-    web_in_web_zip = os.path.join(BASE_DIR, "vocab-vault-web", "vocab-vault-web.zip")
+    res = subprocess.run(["zip", "-rq", "vocab-vault-web.zip", "vocab-vault-web/"], cwd=BASE_DIR)
+    if res.returncode != 0:
+        log_fail("Failed to zip vocab-vault-web.zip")
+        return False
+
     if os.path.exists(web_zip):
         shutil.copy2(web_zip, web_in_web_zip)
 

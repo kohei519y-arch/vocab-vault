@@ -88,6 +88,11 @@
       // 設定・プラン
       'settings.title': '設定 & アカウント',
       'settings.modal_title': '設定・クラウド同期・データ管理',
+      'settings.tab_general': '一般・表示',
+      'settings.tab_account': 'アカウント・同期',
+      'settings.tab_plans': 'プラン・課金',
+      'settings.tab_ai': 'AI・忘却曲線',
+      'settings.tab_storage': 'データ管理',
       'settings.lang_heading': '表示言語 (Language)',
       'settings.lang_desc': 'UIおよびメニューの表示言語を選択します。',
       'settings.theme_heading': '表示・音声設定',
@@ -396,6 +401,11 @@
       // Settings & Plans
       'settings.title': 'Settings & Account',
       'settings.modal_title': 'Settings & Cloud Sync & Data Management',
+      'settings.tab_general': 'General & Display',
+      'settings.tab_account': 'Account & Sync',
+      'settings.tab_plans': 'Plans & Billing',
+      'settings.tab_ai': 'AI & Retention',
+      'settings.tab_storage': 'Data & Storage',
       'settings.lang_heading': 'Interface Language',
       'settings.lang_desc': 'Choose the display language for UI controls and menus.',
       'settings.theme_heading': 'Display & Audio Settings',
