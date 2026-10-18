@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v45-modular-graph';
+const CACHE_NAME = 'vocab-vault-v46-modular-graph';
 
 // [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
 function fetchWithTimeout(request, timeoutMs = 3000) {
@@ -43,6 +43,9 @@ const PRECACHE_ASSETS = [
   './js/events.js',
   './js/app.js',
   './manifest.json',
+  './legal/terms.html',
+  './legal/privacy.html',
+  './legal/tokushoho.html',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',

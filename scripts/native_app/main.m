@@ -219,7 +219,8 @@
     [panel setAllowsMultipleSelection:parameters.allowsMultipleSelection];
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-    [panel setAllowedFileTypes:@[@"json", @"txt", @"csv", @"tsv"]];
+    [panel setAllowedFileTypes:@[@"json", @"txt", @"csv", @"tsv", @"apkg", @"png", @"jpg", @"jpeg", @"webp", @"gif"]];
+    [panel setAllowsOtherFileTypes:YES];
 #pragma clang diagnostic pop
     [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result) {
         if (result == NSModalResponseOK) {

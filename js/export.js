@@ -824,7 +824,7 @@
       throw new Error('APKGファイル内に読み取り可能なカードデータが見つかりませんでした。');
     } else {
       // プレーンテキスト（TSV / CSV）として処理
-      const text = textDecoder.decode(u8);
+      const text = decodeUtf8(u8);
       return importAnkiText(text, ctx);
     }
   }

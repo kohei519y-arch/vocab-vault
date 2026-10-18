@@ -2134,6 +2134,38 @@ def test_items_45_to_50_integrity():
     else:
         log_fail("index.html: missing independent legal page links")
 
+    # Deep verification of recent bugfixes
+    if 'setAllowedFileTypes:@[@"json", @"txt", @"csv", @"tsv", @"apkg", @"png"' in main_m_code:
+        log_pass("scripts/native_app/main.m: NSOpenPanel supports .apkg and image files for OCR/Anki")
+    else:
+        log_fail("scripts/native_app/main.m: missing .apkg or image types in NSOpenPanel")
+
+    if 'const text = decodeUtf8(u8);' in export_code and 'textDecoder.decode' not in export_code:
+        log_pass("js/export.js: importAnkiFile safely uses decodeUtf8 without undefined textDecoder")
+    else:
+        log_fail("js/export.js: importAnkiFile still has undefined textDecoder or missing decodeUtf8")
+
+    if 'tombMap.delete(`word:${wLower}`)' in modal_code and 'pairKey = (activeCfg && (global.App?.lang === lang' in modal_code:
+        log_pass("js/modal.js: executeShareDeckImport clears tombstones and resolves pairKey accurately")
+    else:
+        log_fail("js/modal.js: executeShareDeckImport missing tombstone clearing or pairKey resolution")
+
+    ext_content_path = os.path.join(BASE_DIR, "extension", "content.js")
+    with open(ext_content_path, "r", encoding="utf-8") as f:
+        ext_content_code = f.read()
+    if 'sel.rangeCount > 0' in ext_content_code:
+        log_pass("extension/content.js: guards sel.rangeCount before calling getRangeAt(0)")
+    else:
+        log_fail("extension/content.js: missing sel.rangeCount guard")
+
+    sw_path = os.path.join(BASE_DIR, "sw.js")
+    with open(sw_path, "r", encoding="utf-8") as f:
+        sw_code = f.read()
+    if "'./legal/terms.html'" in sw_code and "'./legal/privacy.html'" in sw_code and "'./legal/tokushoho.html'" in sw_code:
+        log_pass("sw.js: precaches standalone legal pages for offline availability")
+    else:
+        log_fail("sw.js: missing legal pages in PRECACHE_ASSETS")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")

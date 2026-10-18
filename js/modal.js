@@ -848,7 +848,10 @@
     if (!pendingShareDeck || !pendingShareDeck.items) return;
     const items = pendingShareDeck.items;
     const lang = pendingShareDeck.lang || 'en';
-    const pairKey = `distinction_entries_${lang}_ja`;
+    const activeCfg = global.VocabCore?.getActivePairConfig?.();
+    const pairKey = (activeCfg && (global.App?.lang === lang || activeCfg.sourceLang === lang))
+      ? activeCfg.key
+      : (global.LANGS?.[lang]?.key || (lang === 'en' ? 'distinction_entries' : `distinction_entries_${lang}_ja`));
     const cur = (global.VocabStorage ? global.VocabStorage.getJson(pairKey) : null) || (lang === (global.App?.lang || 'en') ? (global.App?.entries || []) : []);
     const existingWords = new Set(cur.map(i => String(i.word || '').toLowerCase()));
     let added = 0;
@@ -856,8 +859,14 @@
     const toAdd = [];
     let maxNum = cur.reduce((m, i) => Math.max(m, i.num || 0), 0);
 
+    const tombMap = global.VocabStorage ? global.VocabStorage.getTombstones(pairKey) : null;
+
     items.forEach(it => {
       const wLower = String(it.word || '').toLowerCase();
+      if (tombMap) {
+        tombMap.delete(`word:${wLower}`);
+        if (it.id) tombMap.delete(`id:${it.id}`);
+      }
       if (existingWords.has(wLower)) {
         skipped++;
       } else {
@@ -868,6 +877,10 @@
         added++;
       }
     });
+
+    if (tombMap && global.VocabStorage) {
+      global.VocabStorage.saveTombstones(pairKey, tombMap);
+    }
 
     const merged = [...cur, ...toAdd];
     if (global.setJson) {

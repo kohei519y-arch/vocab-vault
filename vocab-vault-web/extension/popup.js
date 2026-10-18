@@ -101,12 +101,33 @@ document.addEventListener("DOMContentLoaded", () => {
       const list = res.collectedWords || [];
       if (list.length === 0) return;
       const text = list.map((i) => i.word).join("\n");
-      navigator.clipboard.writeText(text).then(() => {
+      const done = () => {
         copyAllBtn.textContent = "コピー完了!";
         setTimeout(() => { copyAllBtn.textContent = "一括コピー"; }, 1200);
-      });
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => {
+          copyFallback(text);
+          done();
+        });
+      } else {
+        copyFallback(text);
+        done();
+      }
     });
   });
+
+  function copyFallback(str) {
+    const el = document.createElement('textarea');
+    el.value = str;
+    el.setAttribute('readonly', '');
+    el.style.position = 'absolute';
+    el.style.left = '-9999px';
+    document.body.appendChild(el);
+    el.select();
+    try { document.execCommand('copy'); } catch(e) {}
+    document.body.removeChild(el);
+  }
 
   // クリア
   clearBtn.addEventListener("click", () => {

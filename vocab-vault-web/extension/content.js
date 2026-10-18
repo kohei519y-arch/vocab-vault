@@ -25,7 +25,7 @@
     const text = (sel ? sel.toString() : '').trim();
 
     // 1〜3単語程度（2〜40文字の英単語・ラテン文字・単語）を対象とする
-    if (text.length >= 2 && text.length <= 40 && !text.includes('\n') && /^[A-Za-zÀ-ÿ\s'-]+$/.test(text)) {
+    if (sel && sel.rangeCount > 0 && text.length >= 2 && text.length <= 40 && !text.includes('\n') && /^[A-Za-zÀ-ÿ\s'-]+$/.test(text)) {
       activeSelectedWord = text;
       const range = sel.getRangeAt(0);
       const rect = range.getBoundingClientRect();
