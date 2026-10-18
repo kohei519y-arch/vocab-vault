@@ -1744,6 +1744,75 @@ def test_global_i18n_and_multi_currency():
     else:
         log_fail("sw.js: missing ./js/i18n.js precache or v24+ bump")
 
+    # 15-5. Settings modal & main UI comprehensive data-i18n attributes
+    settings_i18n_keys = [
+        'settings.modal_title',
+        'settings.onboarding_title',
+        'settings.pwa_title',
+        'settings.account_title',
+        'settings.metrics_title',
+        'settings.ai_engine_title',
+        'settings.storage_title',
+        'settings.fsrs_title',
+        'settings.notify_title',
+        'settings.cap_title',
+        'settings.sovereignty_title',
+        'settings.clear_lang_title',
+        'settings.delete_acct_title'
+    ]
+    for k in settings_i18n_keys:
+        if f'data-i18n="{k}"' in idx_html:
+            log_pass(f"index.html: settings modal element tagged with data-i18n=\"{k}\"")
+        else:
+            log_fail(f"index.html: missing data-i18n=\"{k}\" in settings modal")
+
+    # 15-6. JSC verification: English & Japanese translations complete and bidirectional
+    jsc_code = """
+    var window = this;
+    var globalThis = this;
+    var localStorage = {
+        _d: {},
+        getItem: function(k) { return this._d[k] || null; },
+        setItem: function(k, v) { this._d[k] = String(v); }
+    };
+    """ + i18n_code + """
+    VocabI18n.setLocale('en');
+    var enTitle = VocabI18n.t('settings.modal_title');
+    var enOnboard = VocabI18n.t('settings.onboarding_title');
+    var enPwa = VocabI18n.t('settings.pwa_title');
+    var enAcct = VocabI18n.t('settings.account_title');
+    var enCap = VocabI18n.t('settings.cap_opt_30');
+
+    if (enTitle !== 'Settings & Cloud Sync & Data Management') {
+        throw new Error('enTitle mismatch: ' + enTitle);
+    }
+    if (enOnboard !== 'Initial Onboarding & User Guide') {
+        throw new Error('enOnboard mismatch: ' + enOnboard);
+    }
+    if (enPwa !== 'Open as Standalone App (Borderless Window)') {
+        throw new Error('enPwa mismatch: ' + enPwa);
+    }
+    if (enAcct !== 'Account Management & Cloud Sync') {
+        throw new Error('enAcct mismatch: ' + enAcct);
+    }
+    if (enCap !== '30 words (Recommended)') {
+        throw new Error('enCap mismatch: ' + enCap);
+    }
+
+    VocabI18n.setLocale('ja');
+    var jaTitle = VocabI18n.t('settings.modal_title');
+    if (jaTitle !== '設定・クラウド同期・データ管理') {
+        throw new Error('jaTitle mismatch: ' + jaTitle);
+    }
+    print('JSC_I18N_VERIFIED');
+    """
+    res = run_jsc(jsc_code)
+    if res and res.returncode == 0 and "JSC_I18N_VERIFIED" in res.stdout:
+        log_pass("JSC verification: VocabI18n bidirectional English/Japanese switching flawless")
+    else:
+        err = res.stderr if res else "Unknown error"
+        log_fail(f"JSC verification failed for VocabI18n bidirectional switching: {err}")
+
 def test_onboarding_cloze_fuzzy_and_sw_banner():
     print("\n--- 16. Onboarding Tour, Cloze Fuzzy & Inflection, SW Banner Integrity ---")
     with open(os.path.join(BASE_DIR, "index.html"), "r", encoding="utf-8") as f:
