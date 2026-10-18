@@ -4048,7 +4048,6 @@
         if (isTree) {
           const isParentFocused = focusNode && (focusNode.label === n.parentWord || focusNode === n);
           if (!isParentFocused) {
-            ctx.restore();
             continue;
           }
         }
