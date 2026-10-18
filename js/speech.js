@@ -15,10 +15,40 @@
   const PREF_VOICE_NAMES = [
     'samantha', 'ava', 'allison', 'alex', 'victoria', 'daniel', 'karen', 'moira', 'serena', 'thomas',
     'amelie', 'audrey', 'aurelie', 'anna', 'petra', 'marlene', 'viktor',
-    'google us english', 'google uk english', 'google français', 'google deutsch',
+    'monica', 'paulina', 'jorge', 'alice', 'luca', 'federica', 'luciana', 'joana', 'ellen', 'xander',
+    'ting-ting', 'meijia', 'sin-ji', 'yuna', 'sora',
+    'google us english', 'google uk english', 'google français', 'google deutsch', 'google español',
+    'google italiano', 'google português', 'google nederlands', 'google 普通话', 'google 한국의',
     'microsoft aria', 'microsoft jenny', 'microsoft guy', 'microsoft ryan', 'microsoft sonia',
-    'microsoft denise', 'microsoft henri', 'microsoft katja', 'microsoft conrad'
+    'microsoft denise', 'microsoft henri', 'microsoft katja', 'microsoft conrad', 'microsoft elvira',
+    'microsoft elsa', 'microsoft francisca', 'microsoft colette', 'microsoft xiaoxiao', 'microsoft sunhi'
   ];
+
+  const VOICE_LOCALE_PREFS = {
+    en: ['en-us', 'en-gb'],
+    fr: ['fr-fr', 'fr-ca'],
+    de: ['de-de', 'de-at'],
+    es: ['es-es', 'es-mx'],
+    it: ['it-it', 'it-ch'],
+    pt: ['pt-br', 'pt-pt'],
+    nl: ['nl-nl', 'nl-be'],
+    zh: ['zh-cn', 'zh-tw'],
+    ko: ['ko-kr'],
+    ja: ['ja-jp']
+  };
+
+  const DEFAULT_BCP47_TAGS = {
+    en: 'en-US',
+    fr: 'fr-FR',
+    de: 'de-DE',
+    es: 'es-ES',
+    it: 'it-IT',
+    pt: 'pt-BR',
+    nl: 'nl-NL',
+    zh: 'zh-CN',
+    ko: 'ko-KR',
+    ja: 'ja-JP'
+  };
 
   let voicesCache = [];
   let bestVoiceMap = {};
@@ -48,7 +78,7 @@
   function pickBestVoice(tLang) {
     if (bestVoiceMap[tLang]) return bestVoiceMap[tLang];
     if (!voicesCache.length) loadVoices();
-    const pref = tLang === 'fr' ? ['fr-fr', 'fr-ca'] : tLang === 'de' ? ['de-de', 'de-at'] : tLang === 'ja' ? ['ja-jp'] : ['en-us', 'en-gb'];
+    const pref = VOICE_LOCALE_PREFS[tLang] || ['en-us', 'en-gb'];
     const cands = voicesCache.filter(v => {
       const l = String(v.lang || '').replace('_', '-').toLowerCase();
       const full = `${v.name} ${v.voiceURI} ${l}`.toLowerCase();
@@ -58,7 +88,7 @@
     if (!cands.length) return null;
     const scoreVoice = v => {
       const n = `${v.name} ${v.voiceURI}`.toLowerCase(), l = String(v.lang || '').replace('_', '-').toLowerCase();
-      let pt = l === pref[0] ? 100 : l === pref[1] ? 85 : l.startsWith(tLang + '-') ? 70 : 40;
+      let pt = l === pref[0] ? 100 : (pref[1] && l === pref[1]) ? 85 : l.startsWith(tLang + '-') ? 70 : 40;
       if (QUALITY_TOKENS.some(tok => n.includes(tok))) pt += 50;
       if (PREF_VOICE_NAMES.some(tok => n.includes(tok))) pt += 40;
       if (n.includes('compact') || n.includes('espeak')) pt -= 30;
@@ -109,11 +139,12 @@
     // A. Intl.Segmenter によるネイティブ言語処理（Safari 14.1+, Chrome 87+）
     if (typeof Intl !== 'undefined' && Intl.Segmenter) {
       try {
-        const segLang = tLang === 'ja' ? 'ja' : tLang === 'fr' ? 'fr' : tLang === 'de' ? 'de' : 'en';
+        const validSegLangs = ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko', 'ja'];
+        const segLang = validSegLangs.includes(tLang) ? tLang : 'en';
         const segmenter = new Intl.Segmenter(segLang, { granularity: 'word' });
         const rawSegments = Array.from(segmenter.segment(text));
 
-        // フランス語エリジオン（l', d', c', j', n', s', qu' 等）や短縮形（don't, it's）の結合処理
+        // フランス語・イタリア語エリジオン（l', d', c', j', n', s', qu' 等）や短縮形（don't, it's）の結合処理
         const mergedWords = [];
         let cur = 0;
         while (cur < rawSegments.length) {
@@ -133,7 +164,7 @@
             }
           }
 
-          const isWord = seg.isWordLike || (tLang === 'ja' && wordStr.trim() && !/^[、。！？\s]+$/.test(wordStr));
+          const isWord = seg.isWordLike || (['ja', 'zh', 'ko'].includes(tLang) && wordStr.trim() && !/^[、。！？，．\s]+$/.test(wordStr));
           mergedWords.push({ word: wordStr, start: startIndex, end: endIndex, isWord });
           cur++;
         }
@@ -162,7 +193,7 @@
 
     // B. 正規表現フォールバック（JSC環境やIntl.Segmenter非対応環境）
     const spansHtml = [];
-    const wordRegex = tLang === 'ja'
+    const wordRegex = ['ja', 'zh'].includes(tLang)
       ? /[\u4E00-\u9FFF]+|[\u30A0-\u30FF]+|[\u3040-\u309F]+|[\p{L}\p{N}\p{M}œŒæÆ'-]+|[、。！？\n]/gu
       : /[\p{L}\p{N}\p{M}œŒæÆ]+(?:['’][\p{L}\p{N}\p{M}œŒæÆ]+)*|[\p{L}\p{N}\p{M}œŒæÆ'-]+/gu;
 
@@ -419,7 +450,7 @@
 
       // 2. 時間補間ハイブリッドフォールバック（Watchdog方式: boundary未発火環境または途絶時のみ介入）
       if (targetEl && typeof setInterval === 'function') {
-        const msPerChar = l === 'ja' ? 110 : l === 'fr' ? 52 : l === 'de' ? 68 : 58;
+        const msPerChar = ['ja', 'zh', 'ko'].includes(l) ? 115 : ['fr', 'es', 'it', 'pt'].includes(l) ? 52 : ['de', 'nl'].includes(l) ? 68 : 58;
         const totalEstimatedDuration = Math.max(700, (clean.length * msPerChar) / (Number(ttsRate) || 0.95));
 
         progressTimer = setInterval(() => {
@@ -512,8 +543,8 @@
       if (typeof onEnd === 'function') onEnd();
       return;
     }
-    const l = ['en', 'fr', 'de', 'ja'].includes(tLang) ? tLang : 'en';
-    const defTag = l === 'fr' ? 'fr-FR' : l === 'de' ? 'de-DE' : l === 'ja' ? 'ja-JP' : 'en-US';
+    const l = DEFAULT_BCP47_TAGS[tLang] ? tLang : 'en';
+    const defTag = DEFAULT_BCP47_TAGS[l] || 'en-US';
 
     const effectiveRate = Number(ttsRate) || (typeof localStorage !== 'undefined' ? parseFloat(localStorage.getItem('vv_tts_rate') || '0.95') : 0.95) || 0.95;
 

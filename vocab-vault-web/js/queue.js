@@ -13,7 +13,11 @@
     'to','for','from','with','of','at','by','into','onto','upon','without','within','against','between','among','after','before',
     'a','an','the','one\'s','oneself','somebody','someone','something',
     'de','du','des','à','au','aux','en','sur','sous','avec','sans','pour','par','dans','se','s\'','ne','pas','le','la','les','un','une',
-    'der','die','das','den','dem','ein','eine','einen','einem','sich','zu','von','mit','auf','für','an','ab','aus','bei','nach','um','vor'
+    'der','die','das','den','dem','ein','eine','einen','einem','sich','zu','von','mit','auf','für','an','ab','aus','bei','nach','um','vor',
+    'el','los','las','una','del','al','por','para','con','sin','sobre','entre','hacia',
+    'il','lo','gli','di','da','su','per','tra','fra',
+    'o','os','as','um','uma','do','no','na','em','com','sem',
+    'het','een','van','op','voor','met','aan','uit','bij','naar','tot','zich'
   ]);
 
   /**

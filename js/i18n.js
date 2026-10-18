@@ -7,7 +7,7 @@
   'use strict';
 
   const STORAGE_KEY = 'vv_ui_locale';
-  const SUPPORTED_LOCALES = ['en', 'ja', 'fr', 'de', 'es'];
+  const SUPPORTED_LOCALES = ['en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'];
 
   // 多言語対照辞書 (Translation Lexicon)
   const TRANSLATIONS = {
@@ -1505,6 +1505,296 @@
       'toast.sync_success': 'Sincronización con la nube completada',
       'toast.unlocked': 'Habilidad aprendida y añadida al vocabulario',
       'toast.eiken_all_unlocked': 'Todas las habilidades de esta raíz aprendidas'
+    },
+    it: {
+      'app.title': 'Vocab Vault',
+      'app.tagline': 'Vocabolario etimologico e storia dei concetti per studiosi ed esploratori',
+      'nav.explore': 'Esplora',
+      'nav.list': 'Elenco',
+      'nav.extract': 'Estrai',
+      'nav.review': 'Ripasso',
+      'nav.analytics': 'Analisi',
+      'nav.mask': 'Maschera',
+      'side.explorer': 'Esplora e Cerca',
+      'nav.all_words': 'Tutte le parole',
+      'nav.anki': 'Ripasso Anki',
+      'nav.graph': 'Albero Etimologico',
+      'nav.settings': 'Impostazioni',
+      'nav.add_word': 'Aggiungi parola',
+      'nav.search_ph': 'Cerca: parola, significato, *radice, #pos, @cat...',
+      'nav.sync_cloud': 'Sincronizza Cloud',
+      'nav.mode_academic': 'Accademico',
+      'nav.mode_simple': 'Semplice',
+      'anki.recog': 'Riconoscimento',
+      'anki.cloze': 'Produzione (Cloze)',
+      'anki.show_ans': 'Mostra risposta (Space)',
+      'anki.again': 'Di nuovo (1)',
+      'anki.hard': 'Difficile (2)',
+      'anki.good': 'Bene (3)',
+      'anki.easy': 'Facile (4)',
+      'graph.title': 'Albero Genealogico ed Etimologico',
+      'graph.tab_network': 'Rete',
+      'graph.tab_tree': 'Albero Genealogico',
+      'graph.tab_mindmap': 'Mappa Mentale',
+      'graph.tab_matrix': 'Prefisso × Radice',
+      'settings.title': 'Impostazioni e Account',
+      'settings.modal_title': 'Impostazioni, Sincronizzazione Cloud e Dati',
+      'settings.tab_general': 'Generale',
+      'settings.tab_account': 'Account e Sync',
+      'settings.tab_plans': 'Piani e Prezzi',
+      'settings.tab_ai': 'IA e Memoria',
+      'settings.tab_storage': 'Dati e Backup',
+      'settings.lang_heading': 'Lingua dell\'interfaccia (Language)',
+      'settings.lang_desc': 'Seleziona la lingua di visualizzazione dei menu:',
+      'settings.theme_heading': 'Aspetto e Voce',
+      'settings.theme_dark': 'Modalità scura',
+      'settings.auto_speak': 'Pronuncia automatica nel ripasso',
+      'settings.close_btn': 'Chiudi impostazioni',
+      'toolbar.wordbook': 'Vocabolario',
+      'addbar.submit': 'Aggiungi',
+      'list.all_words': 'Tutte le parole',
+      'side.lang_pairs': 'Coppie di lingue',
+      'side.settings': 'Impostazioni',
+      'cat.philosophy': 'Filosofia e Pensiero',
+      'cat.psychology': 'Psicologia e Mente',
+      'cat.science': 'Scienza e Tecnologia',
+      'cat.politics': 'Politica e Diritto',
+      'cat.business': 'Economia e Affari',
+      'cat.arts': 'Letteratura e Arti',
+      'cat.daily': 'Quotidiano e Generale',
+      'cat.general': 'Generale'
+    },
+    pt: {
+      'app.title': 'Vocab Vault',
+      'app.tagline': 'Cofre de vocabulário etimológico e história conceitual',
+      'nav.explore': 'Explorar',
+      'nav.list': 'Lista',
+      'nav.extract': 'Extrair',
+      'nav.review': 'Revisão',
+      'nav.analytics': 'Análise',
+      'nav.mask': 'Máscara',
+      'side.explorer': 'Explorador e Busca',
+      'nav.all_words': 'Todas as palavras',
+      'nav.anki': 'Revisão Anki',
+      'nav.graph': 'Árvore Etimológica',
+      'nav.settings': 'Configurações',
+      'nav.add_word': 'Adicionar palavra',
+      'nav.search_ph': 'Buscar: palavra, sentido, *raiz, #pos, @cat...',
+      'nav.sync_cloud': 'Sincronizar Nuvem',
+      'nav.mode_academic': 'Acadêmico',
+      'nav.mode_simple': 'Simples',
+      'anki.recog': 'Reconhecimento',
+      'anki.cloze': 'Produção (Cloze)',
+      'anki.show_ans': 'Mostrar resposta (Space)',
+      'anki.again': 'Novamente (1)',
+      'anki.hard': 'Difícil (2)',
+      'anki.good': 'Bom (3)',
+      'anki.easy': 'Fácil (4)',
+      'graph.title': 'Árvore Genealógica e Etimológica',
+      'graph.tab_network': 'Rede',
+      'graph.tab_tree': 'Árvore Genealógica',
+      'graph.tab_mindmap': 'Mapa Mental',
+      'graph.tab_matrix': 'Prefixo × Raiz',
+      'settings.title': 'Configurações e Conta',
+      'settings.modal_title': 'Configurações, Sincronização na Nuvem e Dados',
+      'settings.tab_general': 'Geral',
+      'settings.tab_account': 'Conta e Sync',
+      'settings.tab_plans': 'Planos e Preços',
+      'settings.tab_ai': 'IA e Memória',
+      'settings.tab_storage': 'Dados e Backup',
+      'settings.lang_heading': 'Idioma da Interface (Language)',
+      'settings.lang_desc': 'Selecione o idioma de exibição dos menus:',
+      'settings.theme_heading': 'Aparência e Voz',
+      'settings.theme_dark': 'Modo escuro',
+      'settings.auto_speak': 'Pronúncia automática na revisão',
+      'settings.close_btn': 'Fechar configurações',
+      'toolbar.wordbook': 'Vocabulário',
+      'addbar.submit': 'Adicionar',
+      'list.all_words': 'Todas as palavras',
+      'side.lang_pairs': 'Pares de idiomas',
+      'side.settings': 'Configurações',
+      'cat.philosophy': 'Filosofia e Pensamento',
+      'cat.psychology': 'Psicologia e Mente',
+      'cat.science': 'Ciência e Tecnologia',
+      'cat.politics': 'Política e Direito',
+      'cat.business': 'Economia e Negócios',
+      'cat.arts': 'Literatura e Artes',
+      'cat.daily': 'Cotidiano e Geral',
+      'cat.general': 'Geral'
+    },
+    nl: {
+      'app.title': 'Vocab Vault',
+      'app.tagline': 'Etymologische woordenschat en begripsgeschiedenis',
+      'nav.explore': 'Verkennen',
+      'nav.list': 'Lijst',
+      'nav.extract': 'Extractie',
+      'nav.review': 'Herhalen',
+      'nav.analytics': 'Analyse',
+      'nav.mask': 'Masker',
+      'side.explorer': 'Verkennen & Zoeken',
+      'nav.all_words': 'Alle woorden',
+      'nav.anki': 'Anki Herhaling',
+      'nav.graph': 'Etymologische Boom',
+      'nav.settings': 'Instellingen',
+      'nav.add_word': 'Woord toevoegen',
+      'nav.search_ph': 'Zoek: woord, betekenis, *wortel, #pos, @cat...',
+      'nav.sync_cloud': 'Cloud Sync',
+      'nav.mode_academic': 'Academisch',
+      'nav.mode_simple': 'Eenvoudig',
+      'anki.recog': 'Herkenning',
+      'anki.cloze': 'Productie (Cloze)',
+      'anki.show_ans': 'Toon antwoord (Space)',
+      'anki.again': 'Opnieuw (1)',
+      'anki.hard': 'Moeilijk (2)',
+      'anki.good': 'Goed (3)',
+      'anki.easy': 'Makkelijk (4)',
+      'graph.title': 'Etymologische Stamboom & Netwerk',
+      'graph.tab_network': 'Netwerk',
+      'graph.tab_tree': 'Stamboom',
+      'graph.tab_mindmap': 'Mindmap',
+      'graph.tab_matrix': 'Voorvoegsel × Wortel',
+      'settings.title': 'Instellingen & Account',
+      'settings.modal_title': 'Instellingen, Cloudsynchronisatie & Gegevens',
+      'settings.tab_general': 'Algemeen',
+      'settings.tab_account': 'Account & Sync',
+      'settings.tab_plans': 'Abonnementen',
+      'settings.tab_ai': 'AI & Geheugen',
+      'settings.tab_storage': 'Gegevensbeheer',
+      'settings.lang_heading': 'Weergavetaal (Language)',
+      'settings.lang_desc': 'Selecteer de taal voor menu\'s en interface:',
+      'settings.theme_heading': 'Weergave & Spraak',
+      'settings.theme_dark': 'Donkere modus',
+      'settings.auto_speak': 'Automatisch uitspreken bij herhaling',
+      'settings.close_btn': 'Instellingen sluiten',
+      'toolbar.wordbook': 'Woordenboek',
+      'addbar.submit': 'Toevoegen',
+      'list.all_words': 'Alle woorden',
+      'side.lang_pairs': 'Taalparen',
+      'side.settings': 'Instellingen',
+      'cat.philosophy': 'Filosofie & Denken',
+      'cat.psychology': 'Psychologie & Geest',
+      'cat.science': 'Wetenschap & Technologie',
+      'cat.politics': 'Politiek & Recht',
+      'cat.business': 'Economie & Zaken',
+      'cat.arts': 'Literatuur & Kunst',
+      'cat.daily': 'Dagelijks & Algemeen',
+      'cat.general': 'Algemeen'
+    },
+    zh: {
+      'app.title': 'Vocab Vault',
+      'app.tagline': '以词源学与概念史深耕记忆的学术级词汇宝库',
+      'nav.explore': '探索',
+      'nav.list': '列表',
+      'nav.extract': '提取',
+      'nav.review': '复习',
+      'nav.analytics': '分析',
+      'nav.mask': '遮罩',
+      'side.explorer': '导航与搜索',
+      'nav.all_words': '全部词汇',
+      'nav.anki': 'Anki 复习',
+      'nav.graph': '词根谱系树',
+      'nav.settings': '设置',
+      'nav.add_word': '添加词汇',
+      'nav.search_ph': '搜索: 词汇, 释义, *词根/字源, #词性, @分类...',
+      'nav.sync_cloud': '云端同步',
+      'nav.mode_academic': '学术详尽',
+      'nav.mode_simple': '精简模式',
+      'anki.recog': '认读模式',
+      'anki.cloze': '产出填空 (Cloze)',
+      'anki.show_ans': '显示答案 (Space)',
+      'anki.again': '重来 (1)',
+      'anki.hard': '困难 (2)',
+      'anki.good': '掌握 (3)',
+      'anki.easy': '轻松 (4)',
+      'graph.title': '印欧词根与汉字字源网络',
+      'graph.tab_network': '星系网络',
+      'graph.tab_tree': '谱系树',
+      'graph.tab_mindmap': '思维导图',
+      'graph.tab_matrix': '前缀 × 词根',
+      'settings.title': '设置与账户',
+      'settings.modal_title': '设置・云端同步・数据管理',
+      'settings.tab_general': '常规与显示',
+      'settings.tab_account': '账户与同步',
+      'settings.tab_plans': '订阅方案',
+      'settings.tab_ai': 'AI 与记忆算法',
+      'settings.tab_storage': '数据管理',
+      'settings.lang_heading': '界面语言 (Display Language)',
+      'settings.lang_desc': '选择界面与菜单的显示语言:',
+      'settings.theme_heading': '外观与语音设置',
+      'settings.theme_dark': '深色模式',
+      'settings.auto_speak': '复习时自动发音',
+      'settings.close_btn': '关闭设置',
+      'toolbar.wordbook': '词汇本',
+      'addbar.submit': '添加',
+      'list.all_words': '全部词汇',
+      'side.lang_pairs': '学习语言对',
+      'side.settings': '设置',
+      'cat.philosophy': '哲学与思想',
+      'cat.psychology': '心理与精神',
+      'cat.science': '科学与技术',
+      'cat.politics': '政治与法律',
+      'cat.business': '经济与商业',
+      'cat.arts': '文学与艺术',
+      'cat.daily': '日常与综合',
+      'cat.general': '综合'
+    },
+    ko: {
+      'app.title': 'Vocab Vault',
+      'app.tagline': '어원학과 개념사로 깊이 각인하는 학술 어휘 아카이브',
+      'nav.explore': '탐색',
+      'nav.list': '목록',
+      'nav.extract': '추출',
+      'nav.review': '복습',
+      'nav.analytics': '분석',
+      'nav.mask': '가림막',
+      'side.explorer': '탐색 및 검색',
+      'nav.all_words': '모든 단어',
+      'nav.anki': 'Anki 복습',
+      'nav.graph': '어근 계통수',
+      'nav.settings': '설정',
+      'nav.add_word': '단어 추가',
+      'nav.search_ph': '검색: 단어, 의미, *어근/자원, #품사, @분류...',
+      'nav.sync_cloud': '클라우드 동기화',
+      'nav.mode_academic': '학술 상세',
+      'nav.mode_simple': '심플 모드',
+      'anki.recog': '인식 모드',
+      'anki.cloze': '산출 빈칸 (Cloze)',
+      'anki.show_ans': '정답 보기 (Space)',
+      'anki.again': '다시 (1)',
+      'anki.hard': '어려움 (2)',
+      'anki.good': '기억함 (3)',
+      'anki.easy': '쉬움 (4)',
+      'graph.title': '인도유럽 어근 및 한자 자원 네트워크',
+      'graph.tab_network': '네트워크',
+      'graph.tab_tree': '계통수 트리',
+      'graph.tab_mindmap': '마인드맵',
+      'graph.tab_matrix': '접두사 × 어근',
+      'settings.title': '설정 및 계정',
+      'settings.modal_title': '설정・클라우드 동기화・데이터 관리',
+      'settings.tab_general': '일반 및 표시',
+      'settings.tab_account': '계정 및 동기화',
+      'settings.tab_plans': '요금제 및 결제',
+      'settings.tab_ai': 'AI 및 망각곡선',
+      'settings.tab_storage': '데이터 관리',
+      'settings.lang_heading': '표시 언어 (Display Language)',
+      'settings.lang_desc': 'UI 및 메뉴 표시 언어를 선택합니다:',
+      'settings.theme_heading': '화면 및 음성 설정',
+      'settings.theme_dark': '다크 모드',
+      'settings.auto_speak': '복습 시 자동 발음',
+      'settings.close_btn': '설정 닫기',
+      'toolbar.wordbook': '단어장',
+      'addbar.submit': '등록',
+      'list.all_words': '모든 단어',
+      'side.lang_pairs': '언어 쌍',
+      'side.settings': '설정',
+      'cat.philosophy': '철학 및 사상',
+      'cat.psychology': '심리 및 정신',
+      'cat.science': '과학 및 기술',
+      'cat.politics': '정치 및 법학',
+      'cat.business': '경제 및 비즈니스',
+      'cat.arts': '문학 및 예술',
+      'cat.daily': '일상 및 일반',
+      'cat.general': '일반'
     }
   };
 
@@ -1542,6 +1832,11 @@
       if (navLang.startsWith('fr')) return 'fr';
       if (navLang.startsWith('de')) return 'de';
       if (navLang.startsWith('es')) return 'es';
+      if (navLang.startsWith('it')) return 'it';
+      if (navLang.startsWith('pt')) return 'pt';
+      if (navLang.startsWith('nl')) return 'nl';
+      if (navLang.startsWith('zh')) return 'zh';
+      if (navLang.startsWith('ko')) return 'ko';
     }
     return 'en'; // デフォルトは世界展開を見据えて英語
   }
@@ -1751,7 +2046,18 @@
     }
     const uiLangBadge = document.getElementById('uiLangBadge');
     if (uiLangBadge) {
-      const badgeNames = { en: 'Global (EN)', ja: '日本語 (JA)', fr: 'Français (FR)', de: 'Deutsch (DE)', es: 'Español (ES)' };
+      const badgeNames = {
+        en: 'Global (EN)',
+        ja: '日本語 (JA)',
+        fr: 'Français (FR)',
+        de: 'Deutsch (DE)',
+        es: 'Español (ES)',
+        it: 'Italiano (IT)',
+        pt: 'Português (PT)',
+        nl: 'Nederlands (NL)',
+        zh: '中文 (ZH)',
+        ko: '한국어 (KO)'
+      };
       uiLangBadge.textContent = badgeNames[currentLocale] || 'Global';
     }
 
@@ -1870,16 +2176,39 @@
   function translateMainUI(isEn) {
     if (typeof document === 'undefined') return;
 
+    const langLabelsEn = {
+      en: 'English (EN)',
+      fr: 'French (FR)',
+      de: 'German (DE)',
+      es: 'Spanish (ES)',
+      it: 'Italian (IT)',
+      pt: 'Portuguese (PT)',
+      nl: 'Dutch (NL)',
+      zh: 'Chinese (ZH)',
+      ko: 'Korean (KO)',
+      ja: 'Japanese (JA)'
+    };
+    const langLabelsJa = {
+      en: '英語 (EN)',
+      fr: '仏語 (FR)',
+      de: '独語 (DE)',
+      es: '西語 (ES)',
+      it: '伊語 (IT)',
+      pt: '葡語 (PT)',
+      nl: '蘭語 (NL)',
+      zh: '中国語 (ZH)',
+      ko: '韓国語 (KO)',
+      ja: '日本語 (JA)'
+    };
+
     // 1. 言語ペアセレクタの表示ラベル
     const srcLangSel = document.getElementById('srcLangSel');
     if (srcLangSel && srcLangSel.options) {
       try {
         Array.from(srcLangSel.options).forEach(opt => {
           if (!opt) return;
-          if (opt.value === 'en') opt.textContent = isEn ? 'English (EN)' : '英語 (EN)';
-          else if (opt.value === 'fr') opt.textContent = isEn ? 'French (FR)' : '仏語 (FR)';
-          else if (opt.value === 'de') opt.textContent = isEn ? 'German (DE)' : '独語 (DE)';
-          else if (opt.value === 'ja') opt.textContent = isEn ? 'Japanese (JA)' : '日本語 (JA)';
+          const lbl = isEn ? langLabelsEn[opt.value] : langLabelsJa[opt.value];
+          if (lbl) opt.textContent = lbl;
         });
       } catch (e) {}
     }
@@ -1888,10 +2217,8 @@
       try {
         Array.from(tgtLangSel.options).forEach(opt => {
           if (!opt) return;
-          if (opt.value === 'ja') opt.textContent = isEn ? 'Japanese (JA)' : '日本語 (JA)';
-          else if (opt.value === 'en') opt.textContent = isEn ? 'English (EN)' : '英語 (EN)';
-          else if (opt.value === 'fr') opt.textContent = isEn ? 'French (FR)' : '仏語 (FR)';
-          else if (opt.value === 'de') opt.textContent = isEn ? 'German (DE)' : '独語 (DE)';
+          const lbl = isEn ? langLabelsEn[opt.value] : langLabelsJa[opt.value];
+          if (lbl) opt.textContent = lbl;
         });
       } catch (e) {}
     }
@@ -1911,16 +2238,39 @@
     }
 
     // 3. グラフ内言語フィルタセレクタ
+    const graphFilterEn = {
+      all: 'All Languages',
+      en: 'English Only',
+      fr: 'French Only',
+      de: 'German Only',
+      es: 'Spanish Only',
+      it: 'Italian Only',
+      pt: 'Portuguese Only',
+      nl: 'Dutch Only',
+      zh: 'Chinese Only',
+      ko: 'Korean Only',
+      ja: 'Japanese Only'
+    };
+    const graphFilterJa = {
+      all: '全言語',
+      en: '英語のみ',
+      fr: '仏語のみ',
+      de: '独語のみ',
+      es: '西語のみ',
+      it: '伊語のみ',
+      pt: '葡語のみ',
+      nl: '蘭語のみ',
+      zh: '中国語のみ',
+      ko: '韓国語のみ',
+      ja: '日本語のみ'
+    };
     const graphLangFilterSel = document.getElementById('graphLangFilterSel');
     if (graphLangFilterSel && graphLangFilterSel.options) {
       try {
         Array.from(graphLangFilterSel.options).forEach(opt => {
           if (!opt) return;
-          if (opt.value === 'all') opt.textContent = isEn ? 'All Languages' : '全言語';
-          else if (opt.value === 'en') opt.textContent = isEn ? 'English Only' : '英語のみ';
-          else if (opt.value === 'fr') opt.textContent = isEn ? 'French Only' : '仏語のみ';
-          else if (opt.value === 'de') opt.textContent = isEn ? 'German Only' : '独語のみ';
-          else if (opt.value === 'ja') opt.textContent = isEn ? 'Japanese Only' : '日本語のみ';
+          const lbl = isEn ? graphFilterEn[opt.value] : graphFilterJa[opt.value];
+          if (lbl) opt.textContent = lbl;
         });
       } catch (e) {}
     }
@@ -2004,6 +2354,7 @@
     getPlanPriceInfo,
     updatePricingUI,
     applyI18nToDOM,
+    SUPPORTED_LOCALES,
     TRANSLATIONS
   };
 

@@ -9,6 +9,12 @@
     en: '#38bdf8',
     fr: '#a78bfa',
     de: '#fbbf24',
+    es: '#fb923c',
+    it: '#2dd4bf',
+    pt: '#84cc16',
+    nl: '#f472b6',
+    zh: '#f43f5e',
+    ko: '#60a5fa',
     ja: '#34d399'
   };
 
@@ -551,11 +557,8 @@
             nodeColor = '#fb7185'; // 要復習: 上品なネオンローズコーラル（生々しい血赤を排除）
           }
         } else {
-          // 通常表示: 言語系統・ジュエルトーン（赤点混在を完全に根絶）
-          if (n.lang === 'fr') nodeColor = '#a78bfa'; // フランス語: ラベンダー
-          else if (n.lang === 'de') nodeColor = '#fbbf24'; // ドイツ語: アンバー
-          else if (n.lang === 'ja') nodeColor = '#34d399'; // 日本語: ミント
-          else nodeColor = '#38bdf8'; // 英語・ゲルマン系: エレガントなシアンアクア
+          // 通常表示: 10言語系統・ジュエルトーン
+          nodeColor = LANG_GRAPH_COLORS[n.lang] || '#38bdf8';
         }
       } else if (n.type === 'branch') {
         nodeColor = isDark ? '#fbbf24' : '#d97706'; // 古典分岐: 真鍮・黄金

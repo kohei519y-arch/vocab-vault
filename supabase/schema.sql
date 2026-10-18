@@ -78,7 +78,7 @@ CREATE TRIGGER on_auth_user_created
 CREATE TABLE IF NOT EXISTS public.user_vocab_entries (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   id TEXT NOT NULL,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')),
   pair TEXT NOT NULL DEFAULT 'en_ja',
   word_key TEXT NOT NULL,
   num INTEGER NOT NULL DEFAULT 1,
@@ -108,7 +108,7 @@ CREATE INDEX IF NOT EXISTS idx_uve_user_wordkey
 -- 3. user_tombstones テーブル（旧互換用削除ログ）
 CREATE TABLE IF NOT EXISTS public.user_tombstones (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')),
   pair TEXT NOT NULL DEFAULT 'en_ja',
   tomb_key TEXT NOT NULL,
   deleted_at BIGINT NOT NULL,
@@ -121,7 +121,7 @@ CREATE INDEX IF NOT EXISTS idx_ut_user_lang_del ON public.user_tombstones (user_
 -- 4. user_lang_watermarks テーブル（言語全削除ウォーターマーク）
 CREATE TABLE IF NOT EXISTS public.user_lang_watermarks (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')),
   pair TEXT NOT NULL DEFAULT 'en_ja',
   cleared_at BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, pair)
@@ -184,7 +184,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_user_app_settings_key
 -- 5. global_dictionary_cache テーブル（共有辞書キャッシュ: コスト0円化＆高速化）
 CREATE TABLE IF NOT EXISTS public.global_dictionary_cache (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')),
   word TEXT NOT NULL,
   homograph_index INTEGER NOT NULL DEFAULT 1,
   word_key TEXT NOT NULL,
@@ -202,7 +202,7 @@ CREATE INDEX IF NOT EXISTS idx_gdc_lang_wordkey ON public.global_dictionary_cach
 -- 6. wiktionary_references テーブル（Wiktionary事前取り込み用）
 CREATE TABLE IF NOT EXISTS public.wiktionary_references (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')),
   word TEXT NOT NULL,
   clean_ipa TEXT,
   section_extract TEXT,
@@ -827,7 +827,7 @@ BEGIN
       COALESCE((elem->>'is_deleted')::BOOLEAN, FALSE) AS is_deleted
     FROM jsonb_array_elements(p_entries) AS elem
     WHERE elem->>'id' IS NOT NULL 
-      AND elem->>'lang' IN ('en', 'ja', 'fr', 'de')
+      AND elem->>'lang' IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')
       -- [P0-3 解決] ストレージ枯渇攻撃（巨大文字列・巨大JSONBペイロード注入）を遮断
       AND length(COALESCE(elem->>'word', '')) <= 255
       AND length(COALESCE(elem->'card_data', '{}'::JSONB)::TEXT) <= 50000

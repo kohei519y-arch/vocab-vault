@@ -604,8 +604,8 @@ serve(async (req) => {
       });
     }
 
-    // 言語ペアの決定（4言語: en, ja, fr, de）
-    const validLangs = ["en", "ja", "fr", "de"];
+    // 言語ペアの決定（10言語: en, ja, fr, de, es, it, pt, nl, zh, ko）
+    const validLangs = ["en", "ja", "fr", "de", "es", "it", "pt", "nl", "zh", "ko"];
     const sLang = validLangs.includes(rawSrc || "") ? (rawSrc as string) : (validLangs.includes(lang) ? lang : "en");
     const tLang = validLangs.includes(rawTgt || rawTgt2 || "") ? ((rawTgt || rawTgt2) as string) : "ja";
 
@@ -633,25 +633,38 @@ serve(async (req) => {
     }
 
     // 言語名の多言語表記マッピング
-    const LANG_INFO: Record<string, { ja: string; en: string; fr: string; de: string; pos: string }> = {
+    const LANG_INFO: Record<string, { ja: string; en: string; fr: string; de: string; pos: string; isCjk?: boolean }> = {
       en: { ja: "英語", en: "English", fr: "Anglais", de: "Englisch", pos: "N[C], N[U], V[T], V[I], Adj, Adv" },
-      ja: { ja: "日本語", en: "Japanese", fr: "Japonais", de: "Japanisch", pos: "名詞, 動詞, 形容詞, 副詞, 熟語" },
+      ja: { ja: "日本語", en: "Japanese", fr: "Japonais", de: "Japanisch", pos: "名詞, 動詞, 形容詞, 副詞, 熟語", isCjk: true },
       fr: { ja: "フランス語", en: "French", fr: "Français", de: "Französisch", pos: "N[m], N[f], V[T], V[I], Adj, Adv" },
       de: { ja: "ドイツ語", en: "German", fr: "Allemand", de: "Deutsch", pos: "N[m], N[f], N[n], V[T], V[I], Adj, Adv" },
+      es: { ja: "スペイン語", en: "Spanish", fr: "Espagnol", de: "Spanisch", pos: "N[m], N[f], V[T], V[I], Adj, Adv" },
+      it: { ja: "イタリア語", en: "Italian", fr: "Italien", de: "Italienisch", pos: "N[m], N[f], V[T], V[I], Adj, Adv" },
+      pt: { ja: "ポルトガル語", en: "Portuguese", fr: "Portugais", de: "Portugiesisch", pos: "N[m], N[f], V[T], V[I], Adj, Adv" },
+      nl: { ja: "オランダ語", en: "Dutch", fr: "Néerlandais", de: "Niederländisch", pos: "N[de], N[het], V[T], V[I], Adj, Adv" },
+      zh: { ja: "中国語", en: "Chinese", fr: "Chinois", de: "Chinesisch", pos: "名詞, 動詞, 形容詞, 副詞, 成語", isCjk: true },
+      ko: { ja: "韓国語", en: "Korean", fr: "Coréen", de: "Koreanisch", pos: "名詞, 動詞, 形容詞, 副詞, 熟語", isCjk: true },
     };
 
     const sInfo = LANG_INFO[sLang] || LANG_INFO.en;
     const tInfo = LANG_INFO[tLang] || LANG_INFO.ja;
+    const isCjkSource = Boolean(sInfo.isCjk);
+    const rootInstructionJa = isCjkSource
+      ? "【対象見出し語自身】の核となる漢字字源（1文字・日本新字体基準、例: \"*政\", \"*経\", \"*理\", \"*権\", \"*信\"）をアスタリスク付きでetymologyTagsに出力し、grammar_formsに対応漢字表記（韓国語なら漢字表記『정책 (政策)』、中国語なら繁体/日本漢字対照『经济 (経済 / 經濟)』等）を明記すること。"
+      : "【対象見出し語自身】の真の印欧祖語(PIE)語根のみをアスタリスク付き(例: \"*sta-\", \"*kap-\", \"*bher-\")でetymologyTagsに出力。例文や派生語に出てくる別語の語根は絶対に含めない。";
+    const rootInstructionEn = isCjkSource
+      ? "Include core CJK character roots prefixed with an asterisk (e.g., \"*政\", \"*経\", \"*理\", \"*権\") in etymologyTags, and include the Hanja/Kanji/Traditional character form in grammar_forms."
+      : "Include ONLY verified Proto-Indo-European (PIE) roots of the headword itself prefixed with an asterisk (e.g., \"*sta-\", \"*kap-\", \"*bher-\") in etymologyTags.";
 
-    // --- [4×4 全16ペア対応] 動的システムプロンプト生成 ---
+    // --- [10×10 全100ペア対応] 動的システムプロンプト生成 ---
     let serverSystemPrompt = "";
     if (sLang === tLang) {
-      // 同言語ペア（英英、仏仏、独独、国語・概念史）
+      // 同言語ペア（英英、仏仏、独独、西西、伊伊、葡葡、蘭蘭、中中、韓韓、国語・概念史）
       if (sLang === "en") {
         serverSystemPrompt = `You are an authoritative academic English monolingual etymological dictionary and conceptual history lexicon (such as Oxford English Dictionary / Merriam-Webster Unabridged).
 Explain each English word STRICTLY IN ENGLISH with deep Indo-European roots, Greek/Latin cognates, philosophical/institutional evolution, and precise definitions.
 Requirements:
-1. Etymology: reconstruct PIE roots (*root), Proto-Germanic/Latin pathways, and semantic shifts in English.
+1. Etymology: reconstruct PIE roots (*root), Proto-Germanic/Latin pathways, and semantic shifts in English. ${rootInstructionEn}
 2. Meanings: provide rigorous academic English definitions and core imagery.
 3. Example: provide an authentic English sentence (example.foreign) and an explanatory English paraphrase (example.ja & example.trans). Keep example.foreign as plain text without HTML tags.
 4. Part of speech: strictly follow ${sInfo.pos}.
@@ -659,70 +672,83 @@ ${safeFName ? `Subject field: ${safeFName}` : ""}`;
       } else if (sLang === "fr") {
         serverSystemPrompt = `Vous êtes un dictionnaire étymologique académique et un lexique d'histoire des concepts de langue française (style Littré / Le Robert).
 Expliquez chaque mot français STRICTEMENT EN FRANÇAIS avec ses racines indo-européennes, origines gréco-latines et son évolution philosophique.
-1. Étymologie et image centrale (core) rédigées en français.
+1. Étymologie et image centrale (core) rédigées en français. ${rootInstructionEn}
 2. Définitions rigoureuses (meanings.text) en français.
 3. Exemple en français (example.foreign) et explication/reformulation en français (example.ja & example.trans).
 ${safeFName ? `Domaine: ${safeFName}` : ""}`;
       } else if (sLang === "de") {
         serverSystemPrompt = `Sie sind ein maßgebliches deutsches Begriffsgeschichte- und etymologisches Wörterbuch (Stil Duden / Grimm).
 Erklären Sie deutsche Stichwörter AUSSCHLIESSLICH AUF DEUTSCH mit indogermanischen Wurzeln und geistesgeschichtlichen Zusammenhängen.
-1. Etymologie und semantischer Kern auf Deutsch.
+1. Etymologie und semantischer Kern auf Deutsch. ${rootInstructionEn}
 2. Präzise Definitionen (meanings.text) auf Deutsch.
 3. Deutsches Beispiel (example.foreign) und deutsche Paraphrase (example.ja & example.trans).
 ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
-      } else {
+      } else if (sLang === "ja") {
         serverSystemPrompt = `あなたは学術的な日本語の語源・概念史・国語大辞典エンジンです。
-各日本語の見出し語について、漢字・漢語の成り立ち、仏教・東洋思想・近代西欧語翻訳史（明治期の翻訳語形成）の変遷を深く日本語で解説してください。
-1. 語源（etymology）およびコアイメージ（core）の解説。
+各日本語の見出し語について、漢字・漢語の成り立ち（字源）、仏教・東洋思想・近代西欧語翻訳史（明治期の翻訳語形成）の変遷を深く日本語で解説してください。
+1. 語源（etymology）およびコアイメージ（core）の解説。${rootInstructionJa}
 2. 現代および歴史的な語義の解説。
 3. 自然な用例・例文（example.foreign）とその現代語解説（example.ja & example.trans）。
 ${safeFName ? `分野: ${safeFName}` : ""}`;
+      } else {
+        serverSystemPrompt = `You are an authoritative academic monolingual etymological and conceptual history dictionary for ${sInfo.en}.
+Explain each ${sInfo.en} headword STRICTLY IN ${sInfo.en} with its deep etymological roots, historical evolution, and precise definitions.
+1. ${rootInstructionEn}
+2. Provide definitions (meanings.text), core imagery (core), and example paraphrases (example.ja & example.trans) in ${sInfo.en}.
+${safeFName ? `Field: ${safeFName}` : ""}`;
       }
     } else {
-      // 異言語ペア（英和、仏和、独和、和英、仏独、仏英、独英、和仏、和独など）
+      // 異言語ペア（英和、仏和、独和、西和、伊和、葡和、蘭和、中和、韓和、その他全ペア）
       if (tLang === "ja") {
         serverSystemPrompt = `あなたは最高峰の学術的${sInfo.ja}から日本語への語源・概念史辞典および高度な単語帳データ生成エンジンです。
 各${sInfo.ja}の対象語について、以下の学術的基準を厳守した正確なJSON配列を出力してください。
 
 【厳格な学術基準・ハルシネーション完全排除】
-1. 印欧祖語(PIE)や古典諸語の照合:
-   - 実在が言語学的に広く認められている真の語根のみを記載（Pokorny, LIV, Mallory-Adams, OED, Wiktionary Etymology準拠）。
-   - 実在しない語根の捏造・無理なこじつけ（ハルシネーション）を厳禁。語根が不詳の単語（借用語、新造語、オノマトペ等）は率直に「PIE語根不明」または借用元の言語から解説し、etymologyConfidenceを "disputed" または "unknown" とすること。
+1. 語源・字源の照合:
+   - ${isCjkSource ? "東アジア漢字文化圏の字源（説文解字・形声文字の音符と意符・近代日韓中翻訳語史）を正確に解説すること。" : "印欧祖語(PIE)や古典諸語（ラテン語・ギリシャ語・ゲルマン祖語等）の実在が言語学的に広く認められている真の語根のみを記載（Pokorny, LIV, Mallory-Adams, OED, Wiktionary Etymology準拠）。"}
+   - 実在しない語根の捏造・無理なこじつけ（ハルシネーション）を厳禁。語根が不詳の単語は率直に「語根不明」または借用元の言語から解説し、etymologyConfidenceを "disputed" または "unknown" とすること。
    - 民間語源（俗説）を事実として解説することを厳禁。
 2. etymologyTagsの厳格化:
-   - 【対象見出し語自身】の真の語根のみをアスタリスク付き(例: "*sta-", "*leuk-")で出力。例文や派生語に出てくる別語の語根は絶対に含めない。
+   - ${rootInstructionJa}
 3. 【歴史的・文脈的用法の反映】:
-   - 見出し語に特定の時代・歴史的出来事（例: wet＝米国禁酒法下の反禁酒派、dry＝禁酒派、dove＝冷戦期の反戦ハト派、quarantine＝ベネチアの40日検疫等）に根ざす顕著な歴史的・政治的・制度的用法がある場合、現代標準語義に加えて必ずmeaningsに歴史的語義（【歴史】や【禁酒法】等のラベル付き）を含め、history_noteに時代背景や制度的文脈を具体的に記述すること（最大70字）。特筆すべき歴史的用法がない一般的な語彙はhistory_noteを空文字""とすること。架空の歴史的事実を捏造しないこと。
+   - 見出し語に特定の時代・歴史的出来事・制度的変遷に根ざす顕著な歴史的・政治的・思想的用法がある場合、現代標準語義に加えて必ずmeaningsに歴史的語義を含め、history_noteに時代背景や制度的文脈を具体的に記述すること（最大70字）。特筆すべき歴史的用法がない一般的な語彙はhistory_noteを空文字""とすること。
 4. 自然な例文(example.foreign)と日本語訳(example.ja & example.trans):
    - 例文には必ず見出し語を含めること。外国語例文(example.foreign)はHTMLタグを付与せずプレーンテキストとすること。
    - 日本語訳(example.ja)では、見出し語に対応する訳語箇所を必ず <b>訳語</b> のように <b> タグで囲むこと。
    - used_form には外国語例文中で実際に使われている活用形を記載すること。
 ${!useHist ? "※歴史補足(history_note)は簡潔にとどめ、現代の主要語義と基本語根を優先すること。\n" : ""}
 5. Unicode文字化け防止:
-   - 発音記号(IPA)、ウムラウト、アクサン記号、長音記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること。
+   - 発音記号(IPA・ピンイン・ハングル発音変化)、ウムラウト、アクサン記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること。
 6. 品詞(pos)は ${sInfo.pos} 等に準拠すること。
 ${safeFName ? `分野の指定: ${safeFName}` : ""}`;
       } else if (tLang === "en") {
         serverSystemPrompt = `You are a high-level academic dictionary from ${sInfo.en} to English specializing in etymology, cognate networks, and conceptual history.
-For each ${sInfo.en} word, provide definitions, PIE root connections, and historical context STRICTLY IN ENGLISH.
-1. Etymology and core semantic concept explained in English.
+For each ${sInfo.en} word, provide definitions, root connections, and historical context STRICTLY IN ENGLISH.
+1. Etymology and core semantic concept explained in English. ${rootInstructionEn}
 2. English translation and definition (meanings.text).
 3. Example in ${sInfo.en} (example.foreign) with accurate English translation (example.ja & example.trans). Keep example.foreign as plain text.
 ${safeFName ? `Field: ${safeFName}` : ""}`;
       } else if (tLang === "fr") {
         serverSystemPrompt = `Vous êtes un dictionnaire académique de ${sInfo.fr} vers le français, spécialisé en étymologie et histoire conceptuelle.
-Expliquez les mots ${sInfo.fr} EN FRANÇAIS avec leurs racines indo-européennes et leurs équivalents français.
-1. Étymologie et concept central expliqués en français.
+Expliquez les mots ${sInfo.fr} EN FRANÇAIS avec leurs racines étymologiques et leurs équivalents français.
+1. Étymologie et concept central expliqués en français. ${rootInstructionEn}
 2. Définition et traduction en français (meanings.text).
 3. Exemple en ${sInfo.fr} (example.foreign) avec traduction française (example.ja & example.trans).
 ${safeFName ? `Domaine: ${safeFName}` : ""}`;
-      } else {
+      } else if (tLang === "de") {
         serverSystemPrompt = `Sie sind ein akademisches Wörterbuch von ${sInfo.de} ins Deutsche, spezialisiert auf Etymologie und Begriffsgeschichte.
-Erklären Sie ${sInfo.de} Wörter AUF DEUTSCH mit indogermanischen Wurzeln und semantischen Vergleichen.
-1. Etymologie und Kernkonzept auf Deutsch erklärt.
+Erklären Sie ${sInfo.de} Wörter AUF DEUTSCH mit ihren Wurzeln und semantischen Vergleichen.
+1. Etymologie und Kernkonzept auf Deutsch erklärt. ${rootInstructionEn}
 2. Deutsche Übersetzung und Definition (meanings.text).
 3. Beispiel auf ${sInfo.de} (example.foreign) mit deutscher Übersetzung (example.ja & example.trans).
 ${safeFName ? `Fachbereich: ${safeFName}` : ""}`;
+      } else {
+        serverSystemPrompt = `You are a high-level academic dictionary from ${sInfo.en} to ${tInfo.en} specializing in etymology, cognate networks, and conceptual history.
+For each ${sInfo.en} word, provide definitions, root connections, and historical context STRICTLY IN ${tInfo.en}.
+1. Etymology and core semantic concept explained in ${tInfo.en}. ${rootInstructionEn}
+2. ${tInfo.en} translation and definition (meanings.text).
+3. Example in ${sInfo.en} (example.foreign) with accurate ${tInfo.en} translation (example.ja & example.trans). Keep example.foreign as plain text.
+${safeFName ? `Field: ${safeFName}` : ""}`;
       }
     }
     serverSystemPrompt += `\nCategory ID (category): MUST be an integer from 0 to 29 matching: ${CAT_PROMPT_MAP}.`;

@@ -2423,6 +2423,122 @@ def test_perfection_features():
     else:
         log_fail("Item C3: missing scripts/e2e_webkit_runner.m or scripts/webkit_e2e_spec.js")
 
+def test_10_language_pie_and_cjk_lineage_tree():
+    print("\n--- 24. 10-Language Expansion (NL, ES, IT, PT, ZH, KO) & Dual PIE/CJK Tree Engine ---")
+
+    index_path = os.path.join(BASE_DIR, "index.html")
+    with open(index_path, "r", encoding="utf-8") as f:
+        index_html = f.read()
+
+    # 1. Verify all 10 languages in HTML selectors and schema.sql
+    ten_langs = ["en", "fr", "de", "es", "it", "pt", "nl", "zh", "ko", "ja"]
+    all_opts_ok = all(f'value="{l}"' in index_html for l in ten_langs)
+    if all_opts_ok:
+        log_pass("Item 24-1: index.html language selectors contain all 10 languages (en, fr, de, es, it, pt, nl, zh, ko, ja)")
+    else:
+        log_fail("Item 24-1: index.html missing one or more of the 10 language option values")
+
+    schema_path = os.path.join(BASE_DIR, "supabase/schema.sql")
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
+    if all(f"'{l}'" in schema_sql for l in ten_langs):
+        log_pass("Item 24-2: supabase/schema.sql CHECK constraints support all 10 languages")
+    else:
+        log_fail("Item 24-2: supabase/schema.sql missing one or more of the 10 languages")
+
+    vg_path = os.path.join(BASE_DIR, "supabase/functions/vocab-generate/index.ts")
+    with open(vg_path, "r", encoding="utf-8") as f:
+        vg_code = f.read()
+    if all(f'"{l}"' in vg_code for l in ten_langs) and "rootInstructionJa" in vg_code:
+        log_pass("Item 24-3: vocab-generate Edge Function supports all 100 language pairs and dual PIE/CJK root prompts")
+    else:
+        log_fail("Item 24-3: vocab-generate Edge Function missing 10-language support or dual root prompts")
+
+    # 2. JSC Runtime Verification of 10 Languages, Starter Packs, PIE Romance/Germanic Tree & CJK Sinospheric Tree
+    jsc_script = f"""
+    const localStorageMock = {{
+      _store: {{}},
+      getItem: function(k) {{ return this._store.hasOwnProperty(k) ? this._store[k] : null; }},
+      setItem: function(k, v) {{ this._store[k] = String(v); }},
+      removeItem: function(k) {{ delete this._store[k]; }},
+      clear: function() {{ this._store = {{}}; }}
+    }};
+    globalThis.window = globalThis;
+    globalThis.localStorage = localStorageMock;
+    globalThis.document = {{
+      documentElement: {{ lang: 'ja' }},
+      getElementById: function() {{ return null; }},
+      querySelectorAll: function() {{ return []; }}
+    }};
+    load("{BASE_DIR}/js/i18n.js");
+    load("{BASE_DIR}/js/storage.js");
+    load("{BASE_DIR}/js/morphology.js");
+    load("{BASE_DIR}/js/dictionary.js");
+    load("{BASE_DIR}/js/starter_pack.js");
+    load("{BASE_DIR}/js/graph_layout.js");
+
+    // Verify 10 locales in VocabI18n
+    const expectedLangs = ['en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'];
+    for (const l of expectedLangs) {{
+      if (!VocabI18n.SUPPORTED_LOCALES.includes(l)) throw new Error("Missing locale in VocabI18n: " + l);
+      if (!VocabStorage.LANG_KEYS.includes(l)) throw new Error("Missing lang in VocabStorage: " + l);
+    }}
+
+    // Verify 6 new starter packs (es, it, pt, nl, zh, ko)
+    for (const l of ['es', 'it', 'pt', 'nl', 'zh', 'ko']) {{
+      const pack = VocabStarterPack.getStarterPack(l);
+      if (!Array.isArray(pack) || pack.length < 5) throw new Error("Starter pack too small for " + l);
+      if (!pack.every(w => w.lang === l && w.word && w.etymologyTags && w.etymologyTags.length > 0)) {{
+        throw new Error("Invalid starter pack entries for " + l);
+      }}
+      // Populate into localStorage for graph test
+      const cfg = VocabStorage.resolveConfig(l);
+      localStorageMock.setItem(cfg.key, JSON.stringify(pack));
+    }}
+    // Also populate en, fr, de
+    for (const l of ['en', 'fr', 'de']) {{
+      const pack = VocabStarterPack.getStarterPack(l);
+      const cfg = VocabStorage.resolveConfig(l);
+      localStorageMock.setItem(cfg.key, JSON.stringify(pack));
+    }}
+
+    // Verify Simplified Chinese & Korean Hanja canonicalization in VocabMorphology
+    if (VocabMorphology.normRootKey("*经") !== "*経") throw new Error("Simplified *经 did not canonicalize to *経: " + VocabMorphology.normRootKey("*经"));
+    if (VocabMorphology.normRootKey("*权") !== "*権") throw new Error("Simplified *权 did not canonicalize to *権: " + VocabMorphology.normRootKey("*权"));
+    if (VocabMorphology.normRootKey("*观") !== "*観") throw new Error("Simplified *观 did not canonicalize to *観: " + VocabMorphology.normRootKey("*观"));
+
+    // Build combined multi-language graph data across all 10 languages
+    const gd = VocabGraphLayout.buildGraphData('', false, 'all');
+    const roots = gd.nodes.filter(n => n.type === 'root');
+
+    // Check Indo-European *sta- root connects English, French, German, Spanish, Italian, Portuguese, Dutch
+    const staRoot = roots.find(r => r.label === '*sta-');
+    if (!staRoot) throw new Error("*sta- root node not found in graph");
+    const staLangs = new Set((staRoot.connectedWords || []).map(w => w.lang));
+    for (const ieLang of ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl']) {{
+      if (!staLangs.has(ieLang)) throw new Error("*sta- root missing connected word from IE language: " + ieLang);
+    }}
+
+    // Check East Asian CJK roots (*政, *経, *権) connect both Chinese (zh) and Korean (ko)
+    for (const cjkRootLabel of ['*政', '*経', '*権']) {{
+      const cjkRoot = roots.find(r => r.label === cjkRootLabel);
+      if (!cjkRoot) throw new Error("CJK root node not found: " + cjkRootLabel);
+      const cjkLangs = new Set((cjkRoot.connectedWords || []).map(w => w.lang));
+      if (!cjkLangs.has('zh') || !cjkLangs.has('ko')) {{
+        throw new Error(cjkRootLabel + " did not connect both zh and ko. Found: " + Array.from(cjkLangs).join(','));
+      }}
+    }}
+
+    print("TEN_LANG_TREE_OK");
+    """
+    res = subprocess.run([JSC_PATH, "-e", jsc_script], capture_output=True, text=True)
+    if res.returncode == 0 and "TEN_LANG_TREE_OK" in res.stdout:
+        log_pass("Item 24-4: JSC verified all 10 languages in VocabI18n & VocabStorage and all 6 new starter packs (es, it, pt, nl, zh, ko)")
+        log_pass("Item 24-5: JSC verified PIE root *sta- cross-connects all 7 Indo-European languages (en, fr, de, es, it, pt, nl)")
+        log_pass("Item 24-6: JSC verified CJK roots (*政, *経, *権) canonicalize Simplified/Hanja/Kanji and cross-connect zh & ko")
+    else:
+        log_fail(f"Item 24-4..6 failed: {res.stderr or res.stdout}")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -2451,6 +2567,7 @@ def main():
     test_items_45_to_50_integrity()
     test_items_1_to_15_deep_enhancements()
     test_perfection_features()
+    test_10_language_pie_and_cjk_lineage_tree()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")

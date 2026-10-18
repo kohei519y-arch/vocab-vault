@@ -20,7 +20,7 @@
     assert(document.getElementById("graphWebGLCanvas") !== null, "#graphWebGLCanvas GPU layer mounted");
     assert(document.getElementById("settingsModal") !== null, "#settingsModal mounted");
 
-    // 2. 5-Locale Switching (EN, JA, FR, DE, ES)
+    // 2. 10-Locale Switching (EN, JA, FR, DE, ES, IT, PT, NL, ZH, KO)
     VocabI18n.setLocale("fr");
     assert(document.documentElement.lang === "fr", "fr: html lang updated to fr");
     assert(VocabI18n.t("nav.review") === "Réviser", "fr: translation dictionary verified");
@@ -32,6 +32,26 @@
     VocabI18n.setLocale("es");
     assert(document.documentElement.lang === "es", "es: html lang updated to es");
     assert(VocabI18n.t("nav.review") === "Repasar", "es: translation dictionary verified");
+
+    VocabI18n.setLocale("it");
+    assert(document.documentElement.lang === "it", "it: html lang updated to it");
+    assert(VocabI18n.t("nav.review") === "Ripasso", "it: translation dictionary verified");
+
+    VocabI18n.setLocale("pt");
+    assert(document.documentElement.lang === "pt", "pt: html lang updated to pt");
+    assert(VocabI18n.t("nav.review") === "Revisão", "pt: translation dictionary verified");
+
+    VocabI18n.setLocale("nl");
+    assert(document.documentElement.lang === "nl", "nl: html lang updated to nl");
+    assert(VocabI18n.t("nav.review") === "Herhalen", "nl: translation dictionary verified");
+
+    VocabI18n.setLocale("zh");
+    assert(document.documentElement.lang === "zh", "zh: html lang updated to zh");
+    assert(VocabI18n.t("nav.review") === "复习", "zh: translation dictionary verified");
+
+    VocabI18n.setLocale("ko");
+    assert(document.documentElement.lang === "ko", "ko: html lang updated to ko");
+    assert(VocabI18n.t("nav.review") === "복습", "ko: translation dictionary verified");
 
     VocabI18n.setLocale("en");
     assert(document.documentElement.lang === "en", "en: html lang updated to en");
@@ -78,6 +98,19 @@
     if (typeof setPage === "function") {
       setPage(1);
       assert((window.App?.currentPage || 1) === 1, "Pagination sliding window verified");
+    }
+
+    // 7. 10-Language Starter Packs & Dual PIE/CJK Etymology Tree Verification
+    if (window.VocabStarterPack && window.VocabMorphology) {
+      const zhPack = VocabStarterPack.getStarterPack("zh");
+      const koPack = VocabStarterPack.getStarterPack("ko");
+      const esPack = VocabStarterPack.getStarterPack("es");
+      const nlPack = VocabStarterPack.getStarterPack("nl");
+      assert(Array.isArray(zhPack) && zhPack.length >= 5 && zhPack[0].lang === "zh", "Chinese (zh) starter pack verified");
+      assert(Array.isArray(koPack) && koPack.length >= 5 && koPack[0].lang === "ko", "Korean (ko) starter pack verified");
+      assert(Array.isArray(esPack) && esPack.length >= 5 && esPack[0].lang === "es", "Spanish (es) starter pack verified");
+      assert(Array.isArray(nlPack) && nlPack.length >= 5 && nlPack[0].lang === "nl", "Dutch (nl) starter pack verified");
+      assert(VocabMorphology.normRootKey("*经") === "*経", "CJK Simplified-to-Canonical root unification verified");
     }
 
     return JSON.stringify({ ok: true, results: results });

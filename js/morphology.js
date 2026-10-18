@@ -18,18 +18,54 @@
 
   const ROOT_PREFIXES = [
     '語根', '語幹', '印欧祖語', 'pie', 'ゲルマン祖語', '古高ドイツ語', '中高ドイツ語',
-    '古フランス語', '接頭辞', '前綴り', '接尾辞', 'ラテン語', 'ギリシャ語', '古英語',
-    '同族語', '由来', '借用', '語源'
+    '古フランス語', '古オランダ語', '中世オランダ語', '古スペイン語', 'イタリア語', 'ポルトガル語',
+    '接頭辞', '前綴り', '接尾辞', 'ラテン語', 'ギリシャ語', '古英語',
+    '同族語', '由来', '借用', '語源', '字源', '部首', '音符', '語素', '漢字', '漢字語', '한자', '字'
   ];
 
+  // 東アジア漢字圏（中・韓・日）の異体字・簡体字・繁体字を共通の字源ルートへ統合する正規化マップ
+  const CJK_CANONICAL_ROOT_MAP = {
+    '经':'経', '經':'経', '济':'済', '濟':'済',
+    '权':'権', '權':'権', '观':'観', '觀':'観',
+    '动':'動', '動':'動', '学':'学', '學':'学',
+    '发':'発', '發':'発', '义':'義', '義':'義',
+    '识':'識', '識':'識', '论':'論', '論':'論',
+    '变':'変', '變':'変', '实':'実', '實':'実',
+    '体':'体', '體':'体', '国':'国', '國':'国',
+    '会':'会', '會':'会', '政':'政', '治':'治',
+    '信':'信', '理':'理', '法':'法', '生':'生',
+    '心':'心', '言':'言', '水':'水', '手':'手',
+    '行':'行', '定':'定', '相':'相', '交':'交',
+    '主':'主', '道':'道', '気':'気', '氣':'気', '气':'気',
+    '制':'制', '製':'制', '立':'立', '明':'明',
+    '正':'正', '通':'通', '成':'成', '力':'力',
+    '合':'合', '文':'文', '化':'化', '社':'社',
+    '公':'公', '共':'共', '自':'自', '由':'由',
+    '平':'平', '等':'等', '認':'認', '认':'認',
+    '証':'証', '证':'証', '證':'証', '構':'構', '构':'構',
+    '造':'造', '規':'規', '规':'規', '則':'則', '则':'則',
+    '責':'責', '责':'責', '任':'任', '価':'価', '价':'価', '價':'価',
+    '値':'値', '值':'値', '質':'質', '质':'質', '量':'量'
+  };
+
+  function canonicalizeCjkChar(ch) {
+    return CJK_CANONICAL_ROOT_MAP[ch] || ch;
+  }
+
   /**
-   * 印欧祖語(PIE)等の語根キーを正規化 (*sta-, *genh₁-)
+   * 印欧祖語(PIE)および漢字圏(CJK字源・部首・音符)の語根キーを正規化 (*sta-, *genh₁-, *政, *信)
    */
   function normRootKey(s) {
     const raw = String(s ?? '').trim();
     if (!raw) return '';
 
-    // 1. 文字列内にアスタリスク (*) が存在する場合、その *語根 トークンを最優先抽出
+    // 1. アスタリスク直後の漢字字源トークン（例: "*政", "字源: *経 (治める)"）を最優先抽出
+    const starCjkMatch = raw.match(/\*([\u4E00-\u9FFF\u3400-\u4DBF\u2E80-\u2EFF\uF900-\uFAFF])/);
+    if (starCjkMatch) {
+      return '*' + canonicalizeCjkChar(starCjkMatch[1]);
+    }
+
+    // 2. アスタリスク直後の印欧祖語(PIE)・欧文語根トークン（例: "*sta- (立つ)", "印欧祖語: *genh₁-"）を最優先抽出
     const starMatch = raw.match(/\*([a-zA-Z0-9_äöüßÄÖÜāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗ₁₂₃₄ḱǵʷʰ-]+)/);
     if (starMatch) {
       let root = '*' + starMatch[1].toLowerCase().replace(/h[1-3₁-₃]/g, '').replace(/-$/, '');
@@ -37,7 +73,7 @@
       return foldAscii(root);
     }
 
-    // 2. コロン以降の抽出 (例: "印欧祖語: sta-")
+    // 3. コロン以降の抽出 (例: "印欧祖語: sta-", "字源: 政")
     let k = raw;
     const ci = k.search(/[:：]/);
     if (ci !== -1 && ROOT_PREFIXES.includes(k.slice(0, ci).trim().toLowerCase())) {
@@ -45,7 +81,17 @@
     }
 
     // 括弧内の日本語解説を除去
-    k = (k.replace(/\s*[\(（].*?[\)）]\s*/g, ' ').trim().toLowerCase().split(/[\s\/,、]+/)[0]) || '';
+    const kNoParen = k.replace(/\s*[\(（].*?[\)）]\s*/g, ' ').trim();
+
+    // 4. 欧文を含まない単一漢字・字源指定（例: "政", "字源:政"）の場合のみ漢字ルートとして採用
+    if (!/[a-zA-Z]/.test(kNoParen)) {
+      const cjkMatch = kNoParen.match(/[\u4E00-\u9FFF\u3400-\u4DBF\u2E80-\u2EFF\uF900-\uFAFF]/);
+      if (cjkMatch) {
+        return '*' + canonicalizeCjkChar(cjkMatch[0]);
+      }
+    }
+
+    k = (kNoParen.toLowerCase().split(/[\s\/,、]+/)[0]) || '';
     k = foldAscii(k);
 
     // 単なる言語名や空文字のガード
@@ -62,7 +108,15 @@
    */
   function matchRootInText(tag, textFold) {
     const k = normRootKey(tag).replace(/^\*/, '');
-    if (k.length < 2 || !textFold) return false;
+    if (!k || !textFold) return false;
+    if (/[\u4E00-\u9FFF\u3400-\u4DBF\u2E80-\u2EFF]/.test(k)) {
+      const canon = canonicalizeCjkChar(k[0]);
+      for (let i = 0; i < textFold.length; i++) {
+        if (canonicalizeCjkChar(textFold[i]) === canon) return true;
+      }
+      return textFold.includes(k);
+    }
+    if (k.length < 2) return false;
     const probe = k.length >= 4 ? k.slice(0, 4) : k;
     return textFold.includes(probe);
   }
@@ -75,6 +129,12 @@
     const cleanKey = normRootKey(rootKey);
     if (!cleanKey) return false;
     const rawRoot = cleanKey.replace(/^\*/, '');
+    const isCjk = /[\u4E00-\u9FFF\u3400-\u4DBF\u2E80-\u2EFF]/.test(rawRoot);
+    if (isCjk) {
+      // CJK字源ルートは見出し語・文法欄（漢字表記）・語源解説のいずれかに含まれれば有効
+      const blob = `${item.word || ''} ${item.grammar_forms || ''} ${item.etymology || ''} ${item.core || ''}`;
+      return matchRootInText(cleanKey, blob) || Boolean(Array.isArray(item.etymologyTags) && item.etymologyTags.length > 0);
+    }
     if (rawRoot.length < 2) return false;
 
     // 1. 語根が見出し語そのものと完全一致する場合は語根ではない
@@ -118,7 +178,7 @@
     });
   }
 
-  // 補充法（不規則動詞・名詞）マッピング
+  // 補充法（不規則動詞・名詞）マッピング (10言語対応)
   const SUPPLETIVE_MAP = {
     be: ['am', 'is', 'are', 'was', 'were', 'been', 'being'],
     go: ['went', 'gone', 'goes', 'going'],
@@ -137,18 +197,37 @@
     sein: ['bin', 'bist', 'ist', 'sind', 'seid', 'war', 'waren', 'gewesen', 'sei', 'waere'],
     haben: ['habe', 'hast', 'hat', 'hatte', 'hatten', 'gehabt', 'haette'],
     werden: ['werde', 'wirst', 'wird', 'wurde', 'wurden', 'geworden', 'wuerde'],
-    wissen: ['weiss', 'weisst', 'wusste', 'gewusst']
+    wissen: ['weiss', 'weisst', 'wusste', 'gewusst'],
+    ser: ['soy', 'eres', 'es', 'somos', 'sois', 'son', 'era', 'fui', 'fue', 'fueron', 'sea', 'sido', 'sou', 'sao', 'foi', 'fomos', 'foram', 'seja'],
+    estar: ['estoy', 'estas', 'esta', 'estamos', 'estan', 'estuve', 'estuvo', 'estado', 'estou', 'estao', 'estive', 'esteve'],
+    ir: ['voy', 'vas', 'va', 'vamos', 'van', 'iba', 'ido', 'vaya', 'vou', 'vai', 'vao'],
+    tener: ['tengo', 'tienes', 'tiene', 'tenemos', 'tienen', 'tuve', 'tuvo', 'tenido', 'tendre'],
+    hacer: ['hago', 'haces', 'hace', 'hacemos', 'hacen', 'hice', 'hizo', 'hecho', 'hare'],
+    essere: ['sono', 'sei', 'siamo', 'siete', 'ero', 'era', 'erano', 'fui', 'fu', 'furono', 'stato', 'stata', 'stati', 'sia'],
+    avere: ['ho', 'hai', 'ha', 'abbiamo', 'hanno', 'avevo', 'aveva', 'ebbi', 'ebbe', 'avuto', 'abbi'],
+    andare: ['vado', 'vai', 'va', 'andiamo', 'vanno', 'andato', 'andro', 'vada'],
+    zijn: ['ben', 'bent', 'is', 'waren', 'was', 'geweest', 'zij'],
+    hebben: ['heb', 'hebt', 'heeft', 'hadden', 'had', 'gehad'],
+    gaan: ['ga', 'gaat', 'ging', 'gingen', 'gegaan'],
+    staan: ['sta', 'staat', 'stond', 'stonden', 'gestaan']
   };
 
   const DE_SEP_PREFIXES = [
     'ab', 'an', 'auf', 'aus', 'bei', 'ein', 'fest', 'her', 'hin', 'los', 'mit',
-    'nach', 'statt', 'teil', 'um', 'vor', 'weg', 'weiter', 'zu', 'zurück', 'zusammen'
+    'nach', 'statt', 'teil', 'um', 'vor', 'weg', 'weiter', 'zu', 'zurück', 'zusammen',
+    'aan', 'uit', 'voor', 'over', 'onder', 'mee', 'tegen', 'terug', 'samen'
   ];
 
   const POS_BY_LANG = {
     en: /^(N\[(?:C|U|C\/U|pl)\]|N(?:oun)?|V\[(?:T|I|T\/I)\]|V(?:erb)?|Adj|Adv|Prep|Conj|Pron|Idiom|Phrasal V|All)$/i,
     fr: /^(N\[(?:m|f|pl)\]|n\.\s*[mf]|V\[(?:T|I|T\/I|refl)\]|v\.\s*(?:tr\.|intr\.|pr\.)(?:\s*\/\s*v\.\s*(?:tr\.|intr\.|pr\.))?|Adj\.?|Adv\.?|Prep|Conj|Pron|Idiom|All)$/i,
     de: /^(N\[(?:m|f|n|pl)\]|Subst\.\s*[mfn]\.|V\[(?:T|I|T\/I|refl)\]|V(?:t|i|pr)(?:\s*\/\s*V(?:t|i|pr))*|Adj\.?|Adv\.?|Prep|Conj|Pron|Idiom|All)$/i,
+    es: /^(N\[(?:m|f|pl)\]|n\.\s*[mf]|V\[(?:T|I|T\/I|refl)\]|Adj\.?|Adv\.?|Prep|Conj|Pron|Idiom|All)$/i,
+    it: /^(N\[(?:m|f|pl)\]|n\.\s*[mf]|V\[(?:T|I|T\/I|refl)\]|Adj\.?|Adv\.?|Prep|Conj|Pron|Idiom|All)$/i,
+    pt: /^(N\[(?:m|f|pl)\]|n\.\s*[mf]|V\[(?:T|I|T\/I|refl)\]|Adj\.?|Adv\.?|Prep|Conj|Pron|Idiom|All)$/i,
+    nl: /^(N\[(?:m|f|n|pl|C|U)\]|Subst\.\s*[mfn]\.|V\[(?:T|I|T\/I|refl)\]|Adj\.?|Adv\.?|Prep|Conj|Pron|Idiom|All)$/i,
+    zh: /^(N\[(?:C|U|C\/U|pl)\]|V\[(?:T|I|T\/I)\]|名詞|動詞|形容詞|副詞|成語|熟語|Adj|Adv|Prep|Conj|Pron|Idiom|All)$/i,
+    ko: /^(N\[(?:C|U|C\/U|pl)\]|V\[(?:T|I|T\/I)\]|名詞|動詞|形容詞|副詞|熟語|Adj|Adv|Prep|Conj|Pron|Idiom|All)$/i,
     ja: /^(N\[(?:C|U|C\/U|pl)\]|V\[(?:T|I|T\/I)\]|名詞|動詞|形容詞|副詞|熟語|Adj|Adv|Prep|Conj|Pron|Idiom|All)$/i
   };
 

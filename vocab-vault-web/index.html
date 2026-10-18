@@ -153,6 +153,12 @@
             <option value="en">英語 (EN)</option>
             <option value="fr">仏語 (FR)</option>
             <option value="de">独語 (DE)</option>
+            <option value="es">西語 (ES)</option>
+            <option value="it">伊語 (IT)</option>
+            <option value="pt">葡語 (PT)</option>
+            <option value="nl">蘭語 (NL)</option>
+            <option value="zh">中国語 (ZH)</option>
+            <option value="ko">韓国語 (KO)</option>
             <option value="ja">日本語 (JA)</option>
           </select>
           <button type="button" class="btn-swap-compact" id="btnSwapLang" onclick="swapLanguagePair()" data-i18n-title="toolbar.swap_lang" title="言語を入れ替え (⇄)" aria-label="入れ替え">
@@ -163,6 +169,12 @@
             <option value="en">英語 (EN)</option>
             <option value="fr">仏語 (FR)</option>
             <option value="de">独語 (DE)</option>
+            <option value="es">西語 (ES)</option>
+            <option value="it">伊語 (IT)</option>
+            <option value="pt">葡語 (PT)</option>
+            <option value="nl">蘭語 (NL)</option>
+            <option value="zh">中国語 (ZH)</option>
+            <option value="ko">韓国語 (KO)</option>
           </select>
         </div>
       </div>
@@ -555,6 +567,11 @@
               <option value="fr">Français (French)</option>
               <option value="de">Deutsch (German)</option>
               <option value="es">Español (Spanish)</option>
+              <option value="it">Italiano (Italian)</option>
+              <option value="pt">Português (Portuguese)</option>
+              <option value="nl">Nederlands (Dutch)</option>
+              <option value="zh">中文 (Chinese)</option>
+              <option value="ko">한국어 (Korean)</option>
             </select>
           </div>
         </div>
@@ -1142,6 +1159,12 @@
           <option value="en">英語のみ</option>
           <option value="fr">仏語のみ</option>
           <option value="de">独語のみ</option>
+          <option value="es">西語のみ</option>
+          <option value="it">伊語のみ</option>
+          <option value="pt">葡語のみ</option>
+          <option value="nl">蘭語のみ</option>
+          <option value="zh">中国語のみ</option>
+          <option value="ko">韓国語のみ</option>
           <option value="ja">日本語のみ</option>
         </select>
         <select id="graphRootJumpSel" style="font-size:11px;padding:2px 6px;height:26px;max-width:130px;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="主要語根へ直接フォーカス">
@@ -1213,12 +1236,18 @@
       </aside>
 
       <!-- 凡例 (Legend) -->
-      <div id="graphLegend" class="graph-legend" style="position:absolute;bottom:12px;left:12px;background:var(--bg-side);border:1px solid var(--b);border-radius:6px;padding:6px 10px;font-size:10.5px;display:flex;gap:10px;align-items:center;pointer-events:none;z-index:30">
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ac)"></span>語根(Root)</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#2563eb"></span>英語</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#06b6d4"></span>仏語</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#f59e0b"></span>独語</span>
-        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#10b981"></span>日本語</span>
+      <div id="graphLegend" class="graph-legend" style="position:absolute;bottom:12px;left:12px;background:var(--bg-side);border:1px solid var(--b);border-radius:6px;padding:6px 10px;font-size:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;z-index:30;max-width:78%">
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:var(--ac)"></span>語根(PIE/漢字)</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#38bdf8"></span>英</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#818cf8"></span>仏</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#34d399"></span>独</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#fb923c"></span>西</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#2dd4bf"></span>伊</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#84cc16"></span>葡</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#f472b6"></span>蘭</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#f43f5e"></span>中</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#60a5fa"></span>韓</span>
+        <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#fb7185"></span>日</span>
       </div>
 
       <!-- 年代タイムトラベルスライダーバー -->

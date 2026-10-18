@@ -289,11 +289,11 @@
     const getJsonFn = global.getJson || (global.VocabStorage ? global.VocabStorage.getJson : (() => []));
     const activePairKey = global.getActivePairConfig ? global.getActivePairConfig().key : '';
 
-    // 基本4言語キー + 保存されている全言語ペアキーを統合走査
+    // 基本10言語キー + 保存されている全言語ペアキーを統合走査
     const allPairs = getAllKnownPairConfigs(App);
     const keysToScan = new Map();
     const langs = global.LANGS || {};
-    ['en', 'fr', 'de', 'ja'].forEach(l => {
+    ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko', 'ja'].forEach(l => {
       const k = langs[l]?.key || (l === 'en' ? 'distinction_entries' : `distinction_entries_${l}`);
       keysToScan.set(k, l);
     });
@@ -367,16 +367,13 @@
    * 言語ペア短縮表示ラベル
    */
   function getPairShortLabel(src, tgt) {
-    const sMap = { en: '英', ja: '日', fr: '仏', de: '独' };
+    const sMap = { en: '英', ja: '日', fr: '仏', de: '独', es: '西', it: '伊', pt: '葡', nl: '蘭', zh: '中', ko: '韓' };
     const s = sMap[src] || String(src || '').toUpperCase();
     const t = sMap[tgt] || String(tgt || '').toUpperCase();
     if (src === 'en' && tgt === 'ja') return '英和';
     if (src === 'ja' && tgt === 'en') return '和英';
     if (src === tgt) {
-      if (src === 'en') return '英英';
-      if (src === 'fr') return '仏仏';
-      if (src === 'de') return '独独';
-      if (src === 'ja') return '日日';
+      return `${s}${s}`;
     }
     return `${s}${t}`;
   }

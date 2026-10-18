@@ -10,6 +10,12 @@
     en: { key: 'distinction_entries', snap: 'vocab_snapshot_en', tomb: 'vv_tombstones_en', clearKey: 'vv_cleared_at_en', srcLang: 'en', tgtLang: 'ja', pairId: 'en_ja' },
     fr: { key: 'distinction_entries_fr', snap: 'vocab_snapshot_fr', tomb: 'vv_tombstones_fr', clearKey: 'vv_cleared_at_fr', srcLang: 'fr', tgtLang: 'ja', pairId: 'fr_ja' },
     de: { key: 'distinction_entries_de', snap: 'vocab_snapshot_de', tomb: 'vv_tombstones_de', clearKey: 'vv_cleared_at_de', srcLang: 'de', tgtLang: 'ja', pairId: 'de_ja' },
+    es: { key: 'distinction_entries_es', snap: 'vocab_snapshot_es', tomb: 'vv_tombstones_es', clearKey: 'vv_cleared_at_es', srcLang: 'es', tgtLang: 'ja', pairId: 'es_ja' },
+    it: { key: 'distinction_entries_it', snap: 'vocab_snapshot_it', tomb: 'vv_tombstones_it', clearKey: 'vv_cleared_at_it', srcLang: 'it', tgtLang: 'ja', pairId: 'it_ja' },
+    pt: { key: 'distinction_entries_pt', snap: 'vocab_snapshot_pt', tomb: 'vv_tombstones_pt', clearKey: 'vv_cleared_at_pt', srcLang: 'pt', tgtLang: 'ja', pairId: 'pt_ja' },
+    nl: { key: 'distinction_entries_nl', snap: 'vocab_snapshot_nl', tomb: 'vv_tombstones_nl', clearKey: 'vv_cleared_at_nl', srcLang: 'nl', tgtLang: 'ja', pairId: 'nl_ja' },
+    zh: { key: 'distinction_entries_zh', snap: 'vocab_snapshot_zh', tomb: 'vv_tombstones_zh', clearKey: 'vv_cleared_at_zh', srcLang: 'zh', tgtLang: 'ja', pairId: 'zh_ja' },
+    ko: { key: 'distinction_entries_ko', snap: 'vocab_snapshot_ko', tomb: 'vv_tombstones_ko', clearKey: 'vv_cleared_at_ko', srcLang: 'ko', tgtLang: 'ja', pairId: 'ko_ja' },
     ja: { key: 'distinction_entries_ja', snap: 'vocab_snapshot_ja', tomb: 'vv_tombstones_ja', clearKey: 'vv_cleared_at_ja', srcLang: 'ja', tgtLang: 'ja', pairId: 'ja_ja' }
   };
   const LANG_KEYS = Object.keys(LANGS);
@@ -215,7 +221,7 @@
   }
 
   function parseAnyWords(raw, defL = 'en', strict = false) {
-    const out = { en:[], fr:[], de:[], ja:[] };
+    const out = { en:[], fr:[], de:[], es:[], it:[], pt:[], nl:[], zh:[], ko:[], ja:[] };
     let p;
     try {
       p = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -271,7 +277,7 @@
     return out;
   }
 
-  const safeParseWords = (raw, defL = 'en') => { try { return parseAnyWords(raw, defL, false); } catch { return { en:[], fr:[], de:[], ja:[] }; } };
+  const safeParseWords = (raw, defL = 'en') => { try { return parseAnyWords(raw, defL, false); } catch { return { en:[], fr:[], de:[], es:[], it:[], pt:[], nl:[], zh:[], ko:[], ja:[] }; } };
 
   const Storage = {
     dbInst: null,
@@ -409,8 +415,8 @@
   function getPairConfig(srcLang = 'en', tgtLang = 'ja') {
     const s = String(srcLang || 'en').toLowerCase();
     const t = String(tgtLang || 'ja').toLowerCase();
-    // 既存データ（en->ja, fr->ja, de->ja, ja->ja）への後方互換性エイリアス
-    if (t === 'ja' && (s === 'en' || s === 'fr' || s === 'de' || s === 'ja')) {
+    // 既存データ（->ja）への後方互換性エイリアス
+    if (t === 'ja' && LANGS[s]) {
       return LANGS[s];
     }
     const pairId = `${s}_${t}`;
@@ -433,12 +439,18 @@
     if (!k) return 'en';
     const str = String(k).trim().toLowerCase();
     if (LANGS[str]) return str;
-    const pairMatch = str.match(/(?:^|_)(en|fr|de|ja)_(en|fr|de|ja)$/);
+    const pairMatch = str.match(/(?:^|_)(en|fr|de|es|it|pt|nl|zh|ko|ja)_(en|fr|de|es|it|pt|nl|zh|ko|ja)$/);
     if (pairMatch) return pairMatch[1];
-    const singleMatch = str.match(/(?:entries|snapshot|tombstones|cleared_at)_(en|fr|de|ja)$/);
+    const singleMatch = str.match(/(?:entries|snapshot|tombstones|cleared_at)_(en|fr|de|es|it|pt|nl|zh|ko|ja)$/);
     if (singleMatch) return singleMatch[1];
     if (str.includes('_fr') || str.endsWith('_fr') || str.includes('french')) return 'fr';
     if (str.includes('_de') || str.endsWith('_de') || str.includes('german')) return 'de';
+    if (str.includes('_es') || str.endsWith('_es') || str.includes('spanish')) return 'es';
+    if (str.includes('_it') || str.endsWith('_it') || str.includes('italian')) return 'it';
+    if (str.includes('_pt') || str.endsWith('_pt') || str.includes('portuguese')) return 'pt';
+    if (str.includes('_nl') || str.endsWith('_nl') || str.includes('dutch')) return 'nl';
+    if (str.includes('_zh') || str.endsWith('_zh') || str.includes('chinese')) return 'zh';
+    if (str.includes('_ko') || str.endsWith('_ko') || str.includes('korean')) return 'ko';
     if (str.includes('_ja') || str.endsWith('_ja') || str.includes('japanese')) return 'ja';
     return 'en';
   }
@@ -448,10 +460,10 @@
     const str = String(k).trim().toLowerCase();
     if (LANGS[str]) return { srcLang: LANGS[str].srcLang, tgtLang: LANGS[str].tgtLang };
     if (str === 'distinction_entries') return { srcLang: 'en', tgtLang: 'ja' };
-    if (str === 'distinction_entries_fr') return { srcLang: 'fr', tgtLang: 'ja' };
-    if (str === 'distinction_entries_de') return { srcLang: 'de', tgtLang: 'ja' };
-    if (str === 'distinction_entries_ja') return { srcLang: 'ja', tgtLang: 'ja' };
-    const directPair = str.match(/^(en|fr|de|ja)_(en|fr|de|ja)$/);
+    for (const lk of LANG_KEYS) {
+      if (str === LANGS[lk].key) return { srcLang: LANGS[lk].srcLang, tgtLang: LANGS[lk].tgtLang };
+    }
+    const directPair = str.match(/^(en|fr|de|es|it|pt|nl|zh|ko|ja)_(en|fr|de|es|it|pt|nl|zh|ko|ja)$/);
     if (directPair) return { srcLang: directPair[1], tgtLang: directPair[2] };
     const m = str.match(/^(?:distinction_entries|vocab_snapshot|vv_tombstones|vv_cleared_at)_([a-z]{2})_([a-z]{2})/);
     if (m && LANGS[m[1]] && LANGS[m[2]]) return { srcLang: m[1], tgtLang: m[2] };

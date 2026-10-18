@@ -6,7 +6,7 @@
 -- 1. global_dictionary_cache テーブル作成
 CREATE TABLE IF NOT EXISTS public.global_dictionary_cache (
   id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de')),
+  lang TEXT NOT NULL CHECK (lang IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')),
   word TEXT NOT NULL,
   homograph_index INTEGER NOT NULL DEFAULT 1,
   word_key TEXT NOT NULL,

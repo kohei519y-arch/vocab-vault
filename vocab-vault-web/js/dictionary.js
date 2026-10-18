@@ -85,7 +85,20 @@
       '*tragh-': { label: '*tragh-', meaning: '引く、引っ張る、進む', words: ['drag', 'draw', 'tractor', 'attract', 'contract', 'extract', 'distract', 'retract', 'treat', 'trait', 'trace', 'traiter', 'attirer', 'trecken', 'vertrag'] },
       '*sent-': { label: '*sent-', meaning: '感じる、知覚する、向かう', words: ['sense', 'scent', 'sentiment', 'consent', 'resent', 'assent', 'dissent', 'sentence', 'sensitive', 'sentir', 'sentiment', 'sinn', 'sinne', 'senden'] },
       '*vert-': { label: '*vert-', meaning: '回る、向きを変える、転換する', words: ['convert', 'revert', 'divert', 'advertise', 'universe', 'version', 'vertical', 'reverse', 'controversy', 'introvert', 'extrovert', 'convertir', 'verser', 'werden', 'antwort'] },
-      '*ye-': { label: '*ye-', meaning: '投げる、放つ、送る', words: ['objective', 'subject', 'project', 'reject', 'inject', 'object', 'adjacent', 'trajectory'] }
+      '*ye-': { label: '*ye-', meaning: '投げる、放つ、送る', words: ['objective', 'subject', 'project', 'reject', 'inject', 'object', 'adjacent', 'trajectory'] },
+      // 東アジア漢字文化圏・共通字源ルート (Sinospheric CJK Character Roots: 中・韓・日横断)
+      '*政': { label: '*政', meaning: '正しく治める、統治、行政 (正＋攴)', words: ['政治', '政策', '政府', '行政', '財政', '정치', '정책', '행정'] },
+      '*経': { label: '*経', meaning: '縦糸を通す、治める、筋道 (糸＋巠)', words: ['経済', '経験', '経営', '経緯', '神经', '经济', '经验', '경제', '경험', '경영'] },
+      '*理': { label: '*理', meaning: '玉の筋目を磨く、道理、法則 (玉＋里)', words: ['理論', '理解', '理性', '合理', '管理', '心理', '理论', '이론', '이해', '합리'] },
+      '*信': { label: '*信', meaning: '言葉に偽りがない、誠、託す (人＋言)', words: ['信頼', '信念', '信用', '確信', '通信', '信任', '信念', '신뢰', '신념', '통신'] },
+      '*観': { label: '*観', meaning: '広く見渡す、本質を見極める (雚＋見)', words: ['観察', '観点', '価値観', '客観', '主観', '直観', '观念', '客观', '관찰', '관점', '객관'] },
+      '*権': { label: '*権', meaning: 'はかりの分銅、釣り合い、力 (木＋雚)', words: ['権利', '権力', '人権', '主権', '政権', '権威', '权利', '权力', '권리', '권력', '인권'] },
+      '*法': { label: '*法', meaning: '水のように平らに裁く、規範 (水＋廌)', words: ['法律', '憲法', '方法', '法則', '合法', '司法', '法律', '方法', '법률', '헌법', '방법'] },
+      '*識': { label: '*識', meaning: '見分ける、心に記す、知る (言＋戠)', words: ['知識', '意識', '認識', '常識', '良識', '識別', '知识', '意识', '认识', '지식', '의식', '인식'] },
+      '*動': { label: '*動', meaning: '重いものを動かす、働きかける (重＋力)', words: ['行動', '運動', '活動', '変動', '動機', '自動', '行动', '活动', '행동', '활동', '운동'] },
+      '*制': { label: '*制', meaning: '枝を切り揃える、整える、定める (未＋刀)', words: ['制度', '制限', '体制', '統制', '抑制', '強制', '制度', '体制', '제도', '체제', '통제'] },
+      '*生': { label: '*生', meaning: '草木が芽吹く、生きる、産み出す', words: ['生活', '生命', '生産', '発生', '生態', '生涯', '生活', '生产', '생활', '생명', '생산'] },
+      '*心': { label: '*心', meaning: '心臓、こころ、思考と感情の核', words: ['心理', '関心', '中心', '良心', '核心', '決心', '心理', '核心', '심리', '관심', '중심'] }
     },
     historical: {
       'objective': {
@@ -271,7 +284,11 @@
   function extractWiktLangSection(fullText, targetLang = 'en', host = 'en') {
     const text = String(fullText ?? '');
     if (!text) return null;
-    const langNames = { en: 'English', fr: 'French', de: 'German', ja: 'Japanese' };
+    const langNames = {
+      en: 'English', fr: 'French', de: 'German', es: 'Spanish',
+      it: 'Italian', pt: 'Portuguese', nl: 'Dutch', zh: 'Chinese',
+      ko: 'Korean', ja: 'Japanese'
+    };
     const langName = (global.LANGS && global.LANGS[targetLang]?.wiktName) || langNames[targetLang] || 'English';
     let section = text;
     if (host === 'en') {
@@ -282,7 +299,7 @@
       section = nextL2 !== -1 ? rest.slice(0, nextL2) : rest;
     }
     const ipa = extractCleanIpa(section);
-    const etyM = /^===+\s*(?:Etymology|Étymologie|Herkunft)[^=]*===+\s*$/im.exec(section);
+    const etyM = /^===+\s*(?:Etymology|Étymologie|Herkunft|Etimología|Etimologia|Herkomst|어원|字源)[^=]*===+\s*$/im.exec(section);
     const snippet = etyM ? `${section.slice(0, Math.min(400, etyM.index))}\n${section.slice(etyM.index, etyM.index + 1200)}`.trim() : section.slice(0, 1400).trim();
     return snippet ? { extract: snippet.slice(0, 1500), ipa } : null;
   }

@@ -129,6 +129,12 @@
     en: { label:'English', wiktName:'English', ja:'英語', short:'英語', badge:'English (英語)', key:'distinction_entries', snap:'vocab_snapshot_en', tomb:'vv_tombstones_en', clearKey:'vv_cleared_at_en', posHint:'', gramHint:'不規則複数形や不規則動詞活用がある場合のみ記載(例: "went, gone" / 無ければ空文字"")', levels:mkLevels('CEFR B1 / 英検2級 / TOEIC 500-650','CEFR B2 / 英検準1級 / TOEIC 700-850','CEFR C1 / 英検1級 / TOEFL 100+','英語の学術論文・GRE・専門書（法政・哲学・歴史・科学等）') },
     fr: { label:'Français', wiktName:'French', ja:'フランス語', short:'仏語', badge:'Français (仏語)', key:'distinction_entries_fr', snap:'vocab_snapshot_fr', tomb:'vv_tombstones_fr', clearKey:'vv_cleared_at_fr', posHint:'（仏語名詞は N[m], N[f], N[pl] を使用）', gramHint:'名詞は冠詞(エリジオン含む)・複数形(例: "l\'arbre, pl. -s")、有音のhは"*h aspiré"、不規則動詞は主要活用', levels:mkLevels('DELF A2-B1 / 仏検3〜2級','DELF B2 / 仏検準1級','DALF C1-C2 / 仏検1級','仏語の学術論文・思想・歴史・法政分野') },
     de: { label:'Deutsch', wiktName:'German', ja:'ドイツ語', short:'独語', badge:'Deutsch (独語)', key:'distinction_entries_de', snap:'vocab_snapshot_de', tomb:'vv_tombstones_de', clearKey:'vv_cleared_at_de', posHint:'（独語名詞は N[m], N[f], N[n], N[pl]、再帰動詞は V[refl] を使用）', gramHint:'名詞は「定冠詞 語, 複数形」(例: "der Staat, -en")、動詞は三基本形(例: "spricht, sprach, hat gesprochen")', levels:mkLevels('Goethe A2-B1 / 独検3〜2級','Goethe B2 / 独検準1級','Goethe C1-C2 / 独検1級','独語の学術論文・哲学・概念史・法学・科学分野') },
+    es: { label:'Español', wiktName:'Spanish', ja:'スペイン語', short:'西語', badge:'Español (西語)', key:'distinction_entries_es', snap:'vocab_snapshot_es', tomb:'vv_tombstones_es', clearKey:'vv_cleared_at_es', posHint:'（西語名詞は N[m], N[f], N[pl]、再帰動詞は V[refl] を使用）', gramHint:'名詞は冠詞・複数形(例: "el estado, pl. -s")、不規則動詞は主要活用', levels:mkLevels('DELE A2-B1 / 西検4〜3級','DELE B2 / 西検2級','DELE C1-C2 / 西検1級','西語の学術論文・思想・歴史・法政分野') },
+    it: { label:'Italiano', wiktName:'Italian', ja:'イタリア語', short:'伊語', badge:'Italiano (伊語)', key:'distinction_entries_it', snap:'vocab_snapshot_it', tomb:'vv_tombstones_it', clearKey:'vv_cleared_at_it', posHint:'（伊語名詞は N[m], N[f], N[pl]、再帰動詞は V[refl] を使用）', gramHint:'名詞は冠詞・複数形(例: "lo stato, pl. gli stati")、不規則動詞は主要活用', levels:mkLevels('CILS A2-B1 / 伊検3〜2級','CILS B2 / 伊検準1級','CILS C1-C2 / 伊検1級','伊語の学術論文・人文・芸術・法政分野') },
+    pt: { label:'Português', wiktName:'Portuguese', ja:'ポルトガル語', short:'葡語', badge:'Português (葡語)', key:'distinction_entries_pt', snap:'vocab_snapshot_pt', tomb:'vv_tombstones_pt', clearKey:'vv_cleared_at_pt', posHint:'（葡語名詞は N[m], N[f], N[pl]、再帰動詞は V[refl] を使用）', gramHint:'名詞は冠詞・複数形(例: "o estado, pl. -s")、不規則動詞は主要活用', levels:mkLevels('CELPE-Bras 中級 / B1','CELPE-Bras 中上級 / B2','CELPE-Bras 上級 / C1-C2','葡語の学術論文・国際関係・経済・法政分野') },
+    nl: { label:'Nederlands', wiktName:'Dutch', ja:'オランダ語', short:'蘭語', badge:'Nederlands (蘭語)', key:'distinction_entries_nl', snap:'vocab_snapshot_nl', tomb:'vv_tombstones_nl', clearKey:'vv_cleared_at_nl', posHint:'（蘭語名詞は de-語 N[m]/N[f]、het-語 N[n] を使用）', gramHint:'名詞は定冠詞(de/het)・複数形(例: "de staat, pl. staten")、動詞は過去・完了形', levels:mkLevels('NT2 A2-B1 / CNaVT','NT2 B2 / Staatsexamen I','NT2 C1-C2 / Staatsexamen II','蘭語の学術論文・法学・歴史・経済分野') },
+    zh: { label:'中文', wiktName:'Chinese', ja:'中国語', short:'中語', badge:'中文 (中国語)', key:'distinction_entries_zh', snap:'vocab_snapshot_zh', tomb:'vv_tombstones_zh', clearKey:'vv_cleared_at_zh', posHint:'（中国語名詞 N[C]/N[U]、動詞 V[T]/V[I]、形容詞 Adj、成語 Idiom）', gramHint:'ピンイン声調、繁体字・異体字、離合詞や量詞の搭配があれば記載', levels:mkLevels('HSK 3-4級 / 中検3級','HSK 5級 / 中検2級','HSK 6級-7〜9級 / 中検準1〜1級','中国語の学術論文・古典・政治経済・思想分野') },
+    ko: { label:'한국어', wiktName:'Korean', ja:'韓国語', short:'韓語', badge:'한국어 (韓国語)', key:'distinction_entries_ko', snap:'vocab_snapshot_ko', tomb:'vv_tombstones_ko', clearKey:'vv_cleared_at_ko', posHint:'（韓国語名詞、他動詞 V[T]、自動詞 V[I]、形容詞 Adj）', gramHint:'漢字語の場合は対応する漢字表記(例: "政治")、不規則活用(ㅂ/ㄷ/르変則等)を記載', levels:mkLevels('TOPIK I-II (3級) / ハングル検定3級','TOPIK II (4〜5級) / ハングル検定準2〜2級','TOPIK II (6級) / ハングル検定1級','韓国語の学術論文・言論・法政・歴史分野') },
     ja: { label:'日本語', wiktName:'Japanese', ja:'日本語', short:'日語', badge:'日本語 (Japanese)', key:'distinction_entries_ja', snap:'vocab_snapshot_ja', tomb:'vv_tombstones_ja', clearKey:'vv_cleared_at_ja', posHint:'（日本語名詞、動詞五段・一段・サ変等）', gramHint:'活用形、敬語、文語表現等があれば記載', levels:mkLevels('JLPT N3-N2 / 基礎・日常語','JLPT N2-N1 / 常用語・慣用句','JLPT N1超過 / 高度語彙・四字熟語','日本語の学術論文・近現代文学・法政・哲学・論説文') }
   };
   const LANG_KEYS = Object.keys(LANGS);
@@ -151,6 +157,12 @@
     en: mkPosReg('C|U|C\\/U|pl', 'T|I|T\\/I', '|Phrasal V'),
     fr: mkPosReg('m|f|pl', 'T|I|T\\/I|refl'),
     de: mkPosReg('m|f|n|pl', 'T|I|T\\/I|refl'),
+    es: mkPosReg('m|f|pl', 'T|I|T\\/I|refl'),
+    it: mkPosReg('m|f|pl', 'T|I|T\\/I|refl'),
+    pt: mkPosReg('m|f|pl', 'T|I|T\\/I|refl'),
+    nl: mkPosReg('m|f|n|pl|C|U', 'T|I|T\\/I|refl'),
+    zh: mkPosReg('C|U|C\\/U|pl', 'T|I|T\\/I', ''),
+    ko: mkPosReg('C|U|C\\/U|pl', 'T|I|T\\/I', ''),
     ja: mkPosReg('C|U|C\\/U|pl', 'T|I|T\\/I', '')
   };
   const IPA_OK = /^[\p{L}\p{M}ˈˌːˑ.\-‿ ()/]+$/u;
@@ -233,8 +245,8 @@
   // --- データモデル・サニタイズ・マージ（js/storage.js へ委譲） ---
   const sanitizeItem = (raw, idx, defLang = 'en') => global.VocabStorage ? global.VocabStorage.sanitizeItem(raw, idx, defLang) : raw;
   const mergeWords = (arrA, arrB, l = 'en', ignoreTombstones = false, customTombMap = null, customClearedAt = null) => global.VocabStorage ? global.VocabStorage.mergeWords(arrA, arrB, l, ignoreTombstones, customTombMap, customClearedAt) : (Array.isArray(arrA) ? arrA : []);
-  const parseAnyWords = (raw, defL = 'en', strict = false) => global.VocabStorage ? global.VocabStorage.parseAnyWords(raw, defL, strict) : { en:[], fr:[], de:[], ja:[] };
-  const safeParseWords = (raw, defL = 'en') => global.VocabStorage ? global.VocabStorage.safeParseWords(raw, defL) : { en:[], fr:[], de:[], ja:[] };
+  const parseAnyWords = (raw, defL = 'en', strict = false) => global.VocabStorage ? global.VocabStorage.parseAnyWords(raw, defL, strict) : { en:[], fr:[], de:[], es:[], it:[], pt:[], nl:[], zh:[], ko:[], ja:[] };
+  const safeParseWords = (raw, defL = 'en') => global.VocabStorage ? global.VocabStorage.safeParseWords(raw, defL) : { en:[], fr:[], de:[], es:[], it:[], pt:[], nl:[], zh:[], ko:[], ja:[] };
 
   function notifyOtherTabs(keyOrLang) {
     if (global.VocabStorage?.state?.bc) {

@@ -110,16 +110,31 @@
   };
 
   /**
-   * 語根キーの安全な正規化 & 表記ゆれ・同根統合（日本語言語名コロン等のノイズを完全排除）
+   * 語根キーの安全な正規化 & 表記ゆれ・同根統合（印欧祖語PIEおよび東アジア漢字字源 *政 等に両対応）
    */
   function cleanRootKey(k) {
     if (!k) return '';
-    const s = String(k).trim().toLowerCase();
-    // 日本語の言語名ラベル（フランス語:, 中世ラテン語:, etc.）やコロン付きテキストは語根ではないので完全に排除
-    if (/[:：]/.test(s) || /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(s)) {
+    let s = String(k).trim();
+    // 漢字字源ラベル（「字源: *政」「한자: *政」等）のプレフィックスは除去して正規化へ通す
+    s = s.replace(/^(?:字源|漢字|한자|hanzi|hanja|kanji|cjk|root)\s*[:：]\s*/i, '').trim();
+    // 言語名ラベル（フランス語:, 中世ラテン語:, etc.）やコロン付きテキストは語根ではないので完全に排除
+    if (/[:：]/.test(s)) {
       return '';
     }
-    const rawClean = s.replace(/^\*/, '').replace(/-$/, '').trim();
+
+    // 東アジア漢字字源ルート（*政, *経, *信 等の単一漢字ルート）の判定と繁体・簡体・新字体統合
+    const cjkClean = s.replace(/^\*/, '').replace(/-$/, '').trim();
+    if (/^[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(cjkClean)) {
+      const canonFn = global.VocabMorphology?.canonicalizeCjkChar;
+      const cChar = typeof canonFn === 'function' ? canonFn(cjkClean) : cjkClean;
+      return `*${cChar}`;
+    }
+
+    const sLower = s.toLowerCase();
+    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/.test(sLower)) {
+      return '';
+    }
+    const rawClean = sLower.replace(/^\*/, '').replace(/-$/, '').trim();
     if (rawClean.length < 2) return '';
 
     const flat = rawClean
@@ -136,12 +151,16 @@
     const normFn = global.VocabMorphology?.normRootKey || global.normRootKey || global.VocabCore?.normRootKey;
     if (typeof normFn === 'function') {
       const res = normFn(k);
-      if (!res || /[:：]/.test(res) || /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(res)) return '';
-      const resFlat = res.replace(/^\*/, '').replace(/-$/, '');
-      if (CANONICAL_ROOT_ALIASES[resFlat]) return CANONICAL_ROOT_ALIASES[resFlat];
+      if (!res || /[:：]/.test(res)) return '';
+      const resRaw = res.replace(/^\*/, '').replace(/-$/, '');
+      if (/^[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(resRaw)) {
+        return `*${resRaw}`;
+      }
+      if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/.test(res)) return '';
+      if (CANONICAL_ROOT_ALIASES[resRaw]) return CANONICAL_ROOT_ALIASES[resRaw];
       return res.startsWith('*') ? res : `*${res}`;
     }
-    return s.startsWith('*') ? s : `*${s}`;
+    return sLower.startsWith('*') ? sLower : `*${sLower}`;
   }
 
   /**
@@ -213,27 +232,30 @@
   /**
    * 系統樹モードにおける古典分岐（Branch）の正規化・集約
    * - 重複する同義接頭辞（con- / com-, in- / im- 等）を統合し、過密と文字衝突を根絶
-   * - ラテン語とロマンス語で同源の接頭辞を同一ブランチに統合
+   * - ラテン語とロマンス語（仏・西・伊・葡）、西ゲルマン語（英・独・蘭）、東アジア漢字文化圏（中・韓・日）を統合
    */
   function normalizeBranch(bLabel) {
     if (!bLabel) return 'Germanic: 西ゲルマン語群根幹 (Old English)';
     let clean = String(bLabel).trim();
-    clean = clean.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic):\s*/i, '');
+    if (clean.startsWith('Sinospheric:')) return clean;
+    clean = clean.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric):\s*/i, '');
 
     if (clean.startsWith('con-') || clean.startsWith('com-')) return 'Italic: con- / com- (共に)';
     if (clean.startsWith('in-') || clean.startsWith('im-') || clean.startsWith('il-') || clean.startsWith('ir-')) return 'Italic: in- / im- (中に/否定)';
     if (clean.startsWith('ad-') || clean.startsWith('ac-') || clean.startsWith('ap-') || clean.startsWith('at-')) return 'Italic: ad- (向かって)';
-    if (clean.startsWith('sub-') || clean.startsWith('suc-') || clean.startsWith('suf-') || clean.startsWith('sup-') || clean.startsWith('sus-')) return 'Italic: sub- (下に)';
-    if (clean.startsWith('per-') || clean.startsWith('par-')) return 'Italic: per- (完全に)';
+    if (clean.startsWith('sub-') || clean.startsWith('suc-') || clean.startsWith('suf-') || clean.startsWith('sup-') || clean.startsWith('sus-') || clean.startsWith('sotto-')) return 'Italic: sub- (下に)';
+    if (clean.startsWith('per-') || clean.startsWith('par-') || clean.startsWith('por-')) return 'Italic: per- (完全に)';
     if (clean.startsWith('ob-') || clean.startsWith('op-')) return 'Italic: ob- (対して)';
-    if (clean.startsWith('ex-') || clean.startsWith('ef-')) return 'Italic: ex- (外に)';
-    if (clean.startsWith('re-')) return 'Italic: re- (再び/後)';
+    if (clean.startsWith('ex-') || clean.startsWith('ef-') || clean.startsWith('es-')) return 'Italic: ex- (外に)';
+    if (clean.startsWith('re-') || clean.startsWith('ri-')) return 'Italic: re- (再び/後)';
     if (clean.startsWith('de-') || clean.startsWith('dis-') || clean.startsWith('dé-') || clean.startsWith('des-')) return 'Italic: de- / dis- (分離/解除)';
     if (clean.startsWith('pro-') || clean.startsWith('pre-') || clean.startsWith('pour-')) return 'Italic: pre- / pro- (前に)';
-    if (clean.startsWith('trans-') || clean.startsWith('tra-')) return 'Italic: trans- (越えて)';
-    if (clean.startsWith('フランス') || clean.startsWith('ロマンス') || clean.includes('romance') || clean.includes('french')) return 'Romance: フランス・ロマンス語根幹';
+    if (clean.startsWith('trans-') || clean.startsWith('tra-') || clean.startsWith('tras-')) return 'Italic: trans- (越えて)';
+    if (clean.startsWith('sur-') || clean.startsWith('sobre-') || clean.startsWith('sopra-')) return 'Italic: sur- / sobre- (上に/超越)';
+    if (clean.startsWith('フランス') || clean.startsWith('ロマンス') || clean.startsWith('イベロ') || clean.startsWith('イタリア') || clean.includes('romance') || clean.includes('french')) return 'Romance: ロマンス諸語根幹 (仏・西・伊・葡)';
     if (clean.startsWith('西ゲルマン') || clean.startsWith('古英語') || clean.includes('old english')) return 'Germanic: 西ゲルマン語群根幹 (Old English)';
-    if (clean.startsWith('ドイツ') || ['ver-', 'be-', 'auf-', 'ent-', 'er-', 'ge-', 'ab-', 'vor-', 'nach-', 'aus-', 'zer-'].some(x => clean.startsWith(x))) return 'Germanic: ドイツ語群本来語幹';
+    if (clean.startsWith('オランダ') || ['ont-', 'her-', 'aan-', 'uit-', 'tegen-', 'wan-'].some(x => clean.startsWith(x))) return 'Germanic: オランダ・低地ゲルマン語幹';
+    if (clean.startsWith('ドイツ') || ['ver-', 'be-', 'auf-', 'ent-', 'er-', 'ge-', 'ab-', 'vor-', 'nach-', 'aus-', 'zer-'].some(x => clean.startsWith(x))) return 'Germanic: ドイツ・西ゲルマン語幹';
     if (clean.startsWith('ギリシャ') || ['dia-', 'anti-', 'tele-', 'photo-', 'syn-', 'sym-', 'auto-', 'micro-', 'macro-', 'poly-', 'mono-', 'hyper-', 'hypo-'].some(x => clean.startsWith(x))) return 'Greek: ギリシャ古典語幹';
 
     return bLabel;
@@ -241,11 +263,32 @@
 
   /**
    * 語源テキスト・接頭辞から古典分岐（第2階層: Branch）を抽出
+   * 印欧祖語（英・仏・独・西・伊・葡・蘭）および東アジア漢字字源（中・韓・日）の双方に対応
    */
   function extractBranchInfo(item, rootKey, itemLang = '') {
     const ety = String(item?.etymology || '').toLowerCase();
     const word = String(item?.word || '').toLowerCase();
+    const rawWord = String(item?.word || '');
+    const gram = String(item?.grammar_forms || '');
     const lang = String(itemLang || item?.lang || 'en').toLowerCase();
+    const isCjkRoot = Boolean(rootKey && /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(String(rootKey).trim()));
+
+    // 0. 東アジア漢字文化圏（中国語・韓国語・日本語の漢字語・字源系統）
+    if (isCjkRoot || lang === 'zh' || lang === 'ko' || (lang === 'ja' && /[\u4E00-\u9FFF]/.test(rawWord))) {
+      const cjkText = `${rawWord} ${gram} ${item?.etymology || ''}`;
+      if (/^[不非無未反否]|(?:불|비|무|미|반)/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
+        return 'Sinospheric: 不-/非-/無- (否定・対抗接頭系)';
+      }
+      if (/[化性的度力権観論法制権]$|(?:화|성|적|도|력|권|관|론|법|제)$/.test(rawWord) || /[化性的度力権観論法制]$/.test(gram)) {
+        return 'Sinospheric: -化/-性/-論/-制 (抽象・制度派生系)';
+      }
+      if (/^[超全多総高大新再共国際]|(?:초|전|다|총|고|대|신|재|공)/.test(rawWord)) {
+        return 'Sinospheric: 超-/全-/共- (程度・統合接頭系)';
+      }
+      if (lang === 'zh') return 'Sinospheric: 中国語・漢語本源構文 (Chinese)';
+      if (lang === 'ko') return 'Sinospheric: 韓国漢字語・東アジア共有語幹 (Korean Hanja)';
+      return 'Sinospheric: 和製漢語・東アジア漢字複合語 (Japanese Kanji)';
+    }
 
     // 1. 古典ラテン語系の主要接頭辞（同義異形を統合し、過密と衝突を根絶）
     const latinPrefixes = [
@@ -280,14 +323,21 @@
       { p: 'counter', label: 'counter- (対抗)' }
     ];
 
-    // 2. フランス・ロマンス諸語固有の変形・接頭辞階層
+    // 2. ロマンス諸語（フランス・スペイン・イタリア・ポルトガル）固有の変形・接頭辞階層
     const romancePrefixes = [
-      { p: 'sur', label: 'sur- (上に/超越)' },
+      { p: 'sur', label: 'sur- / sobre- (上に/超越)' },
+      { p: 'sobre', label: 'sur- / sobre- (上に/超越)' },
+      { p: 'sopra', label: 'sur- / sobre- (上に/超越)' },
+      { p: 'sotto', label: 'sub- (下に)' },
       { p: 'en', label: 'en- / em- (内部化/促成)' },
       { p: 'em', label: 'en- / em- (内部化/促成)' },
       { p: 'dé', label: 'de- / dis- (分離/解除)' },
       { p: 'des', label: 'de- / dis- (分離/解除)' },
+      { p: 'ri', label: 're- (再び/後)' },
       { p: 'par', label: 'per- (完全に)' },
+      { p: 'por', label: 'per- (完全に)' },
+      { p: 'tras', label: 'trans- (越えて)' },
+      { p: 'tra', label: 'trans- (越えて)' },
       { p: 'entre', label: 'entre- (相互/中間)' },
       { p: 'més', label: 'més- (過誤/悪)' },
       { p: 'pour', label: 'pre- / pro- (前に)' }
@@ -304,18 +354,27 @@
       { p: 'after', label: 'after- (追従/後)' }
     ];
 
-    // 4. ドイツ語群（現代・古高ドイツ語）固有の前綴り階層
-    const germanPrefixes = [
+    // 4. ドイツ語・オランダ語（西ゲルマン大陸諸語）固有の前綴り階層
+    const germanDutchPrefixes = [
       { p: 'ver', label: 'ver- (変化/完了)' },
-      { p: 'ent', label: 'ent- (分離/開始)' },
+      { p: 'ent', label: 'ent- / ont- (分離/開始)' },
+      { p: 'ont', label: 'ent- / ont- (分離/開始)' },
       { p: 'zer', label: 'zer- (解体/破壊)' },
-      { p: 'er', label: 'er- (獲得/生起)' },
+      { p: 'er', label: 'er- / her- (獲得/再起)' },
+      { p: 'her', label: 'er- / her- (獲得/再起)' },
       { p: 'ge', label: 'ge- (集合/完了)' },
-      { p: 'auf', label: 'auf- (上方/開始)' },
-      { p: 'aus', label: 'aus- (脱出/徹底)' },
-      { p: 'ab', label: 'ab- (離脱/減少)' },
-      { p: 'vor', label: 'vor- (前方/事前)' },
-      { p: 'nach', label: 'nach- (追従/後)' },
+      { p: 'auf', label: 'auf- / op- (上方/開始)' },
+      { p: 'op', label: 'auf- / op- (上方/開始)' },
+      { p: 'aus', label: 'aus- / uit- (脱出/徹底)' },
+      { p: 'uit', label: 'aus- / uit- (脱出/徹底)' },
+      { p: 'ab', label: 'ab- / af- (離脱/減少)' },
+      { p: 'af', label: 'ab- / af- (離脱/減少)' },
+      { p: 'vor', label: 'vor- / voor- (前方/事前)' },
+      { p: 'voor', label: 'vor- / voor- (前方/事前)' },
+      { p: 'nach', label: 'nach- / na- (追従/後)' },
+      { p: 'aan', label: 'an- / aan- (接触/開始)' },
+      { p: 'onder', label: 'under- (下層/基底)' },
+      { p: 'tegen', label: 'tegen- / wider- (対抗)' },
       { p: 'be', label: 'be- (他動化/強調)' }
     ];
 
@@ -338,10 +397,10 @@
 
     // --- 分岐判定 ---
 
-    // A. フランス語 / ロマンス諸語
-    const isRomance = lang === 'fr' || ety.includes('french') || ety.includes('français') || ety.includes('fr.') || ety.includes('old french') || ety.includes('anglo-norman');
+    // A. ロマンス諸語（フランス語・スペイン語・イタリア語・ポルトガル語）
+    const isRomance = ['fr', 'es', 'it', 'pt'].includes(lang) || ety.includes('french') || ety.includes('spanish') || ety.includes('italian') || ety.includes('portuguese') || ety.includes('français') || ety.includes('old french') || ety.includes('anglo-norman');
     if (isRomance) {
-      // 1) フランス語固有変形接頭辞
+      // 1) ロマンス語固有変形接頭辞
       const matchedRomance = romancePrefixes.find(pr => {
         if (word.startsWith(pr.p) || ety.includes(`${pr.p}-`)) {
           if (pr.p === 'en' && ['end', 'enemy', 'entire', 'entry'].includes(word)) return false;
@@ -356,15 +415,15 @@
       const matchedLatin = latinPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
       if (matchedLatin) return `Italic: ${matchedLatin.label}`;
 
-      return 'Romance: フランス・ロマンス語根幹';
+      return 'Romance: ロマンス諸語根幹 (仏・西・伊・葡)';
     }
 
-    // B. ドイツ語群
-    const isGerman = lang === 'de' || ety.includes('german') || ety.includes('deutsch') || ety.includes('old high german');
-    if (isGerman) {
-      const matchedGerman = germanPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+    // B. ドイツ語・オランダ語（大陸西ゲルマン語群）
+    const isGermanDutch = lang === 'de' || lang === 'nl' || ety.includes('german') || ety.includes('dutch') || ety.includes('deutsch') || ety.includes('nederlands') || ety.includes('old high german');
+    if (isGermanDutch) {
+      const matchedGerman = germanDutchPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
       if (matchedGerman) return `Germanic: ${matchedGerman.label}`;
-      return 'Germanic: ドイツ語本来語幹';
+      return lang === 'nl' ? 'Germanic: オランダ・低地ゲルマン語幹' : 'Germanic: ドイツ・西ゲルマン語幹';
     }
 
     // C. ギリシャ古典語系
@@ -383,7 +442,7 @@
       if (matchedGmc) return `Germanic: ${matchedGmc.label}`;
 
       // 2) 特殊語根 (*sta- 等)
-      if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh'))) {
+      if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh') || word.includes('staan'))) {
         return 'Germanic: *standaną (立つ)';
       }
 
@@ -427,7 +486,7 @@
     if (word.startsWith('un') && word.length > 3 && !['unit', 'unite', 'uncle', 'under', 'unique', 'union', 'until'].some(w => word.startsWith(w))) {
       return 'Germanic: un- (否定/反転)';
     }
-    if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh'))) {
+    if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh') || word.includes('staan'))) {
       return 'Germanic: *standaną (立つ)';
     }
 
@@ -451,13 +510,19 @@
     });
     const isValidRootFn = global.VocabMorphology?.isValidRootForEntry || global.isValidRootForEntry || global.VocabCore?.isValidRootForEntry || (() => true);
 
-    // 全登録言語ペア辞書、または標準言語キーから単語を収集
+    // 全登録言語ペア辞書、または標準10言語キーから単語を収集
     const allPairs = (global.VocabCore?.getAllKnownPairConfigs || global.getAllKnownPairConfigs)?.() || [];
-    const defaultLangs = (global.LANG_KEYS || global.VocabStorage?.LANG_KEYS || global.VocabCore?.LANG_KEYS || ['en', 'fr', 'de', 'ja']);
+    const defaultLangs = (global.LANG_KEYS || global.VocabStorage?.LANG_KEYS || global.VocabCore?.LANG_KEYS || ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko', 'ja']);
     const langMap = global.LANGS || global.VocabStorage?.LANGS || global.VocabCore?.LANGS || {
       en: { key: 'distinction_entries' },
       fr: { key: 'distinction_entries_fr' },
       de: { key: 'distinction_entries_de' },
+      es: { key: 'distinction_entries_es' },
+      it: { key: 'distinction_entries_it' },
+      pt: { key: 'distinction_entries_pt' },
+      nl: { key: 'distinction_entries_nl' },
+      zh: { key: 'distinction_entries_zh' },
+      ko: { key: 'distinction_entries_ko' },
       ja: { key: 'distinction_entries_ja' }
     };
     const langKeys = (allPairs.length > 0)
@@ -483,9 +548,19 @@
             .filter(r => r && isValidRootFn(r, item));
 
           if (!itemRoots.length && item.etymology) {
-            const matches = String(item.etymology).match(/\*([a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]+(?:-[a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]*)?)/gi);
-            if (matches) {
-              itemRoots = matches.map(cleanRootKey).filter(r => r && isValidRootFn(r, item));
+            const pieMatches = String(item.etymology).match(/\*([a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]+(?:-[a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]*)?)/gi);
+            const cjkMatches = String(item.etymology).match(/\*([\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF])/g);
+            const combined = [...(pieMatches || []), ...(cjkMatches || [])];
+            if (combined.length) {
+              itemRoots = combined.map(cleanRootKey).filter(r => r && isValidRootFn(r, item));
+            }
+          }
+          // 東アジア言語（zh, ko, ja）で語源タグが未設定の場合、見出し語または活用欄の漢字から共通漢字字源を自動抽出
+          if (!itemRoots.length && ['zh', 'ko', 'ja'].includes(srcL)) {
+            const cjkSource = `${item.word || ''}${item.grammar_forms || ''}`;
+            const cjkChars = cjkSource.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g);
+            if (cjkChars && cjkChars.length > 0) {
+              itemRoots = [...new Set(cjkChars.slice(0, 2).map(ch => cleanRootKey(`*${ch}`)))].filter(Boolean);
             }
           }
           item._cachedRoots = itemRoots;

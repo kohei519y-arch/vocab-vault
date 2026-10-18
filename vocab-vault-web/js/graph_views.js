@@ -176,11 +176,12 @@
         `;
       }).join('');
 
+      const isCjkRoot = /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(r.label);
       return `
         <div class="mindmap-root-card">
           <div class="mindmap-root-hd">
             <div class="mindmap-root-title">
-              <span class="mindmap-badge">PIE ROOT</span>
+              <span class="mindmap-badge">${isCjkRoot ? 'CJK ROOT' : 'PIE ROOT'}</span>
               <strong style="font-size:15px;color:var(--ac);font-family:var(--mono)">${escFn(r.label)}</strong>
               <span style="font-size:12px;color:var(--s)">— 全${relWords.length}語</span>
             </div>
@@ -500,9 +501,14 @@
     drawer.style.display = 'flex';
 
     if (node.type === 'root') {
-      badge.textContent = node.isEikenRoot ? '印欧祖語 (PIE Root) ・ 重要語根' : '印欧祖語 (PIE Root)';
-      badge.style.background = node.isEikenRoot ? 'rgba(234, 88, 12, 0.15)' : 'rgba(124, 58, 237, 0.15)';
-      badge.style.color = node.isEikenRoot ? '#ea580c' : '#a78bfa';
+      const isCjkRoot = /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(node.label);
+      badge.textContent = isCjkRoot
+        ? '東アジア漢字字源 (CJK Root)'
+        : (node.isEikenRoot ? '印欧祖語 (PIE Root) ・ 重要語根' : '印欧祖語 (PIE Root)');
+      badge.style.background = isCjkRoot
+        ? 'rgba(244, 63, 94, 0.15)'
+        : (node.isEikenRoot ? 'rgba(234, 88, 12, 0.15)' : 'rgba(124, 58, 237, 0.15)');
+      badge.style.color = isCjkRoot ? '#fb7185' : (node.isEikenRoot ? '#ea580c' : '#a78bfa');
       title.textContent = node.label;
 
       const eStat = node.eikenStats || (global.VocabEikenCatalog ? global.VocabEikenCatalog.calcProgress(getEnglishPairKeyAndEntries().entries).find(s => cleanRootKey(s.rootKey) === cleanRootKey(node.label)) : null);

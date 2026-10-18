@@ -3341,6 +3341,883 @@
     }
   ];
 
+  // --- スペイン語 (Spanish / DELE B2) スターターパック ---
+  const ES_JA_STARTER = [
+    {
+      id: 'es_pre1_concebir',
+      num: 1,
+      word: 'concebir',
+      homographIndex: 1,
+      phonetic: '/konθeˈβiɾ/',
+      grammar_forms: 'concibo, concebí, concebido; V[T]',
+      category: '哲学・認識',
+      meanings: [{ pos: 'V[T]', text: '（思想・計画を）構想する、思い描く、理解する；懐胎する' }],
+      core: '心の中に散らばる要素を「余さず掴み取って（capere）一つの概念を結実させる」こと。',
+      etymology: 'ラテン語 concipere（con- 共に ＋ capere 掴む）に由来し、印欧祖語 *kap-（掴む）に遡る。英語 conceive、フランス語 concevoir と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*kap-'],
+      history_note: 'イベリア・ロマンス語における哲学的・芸術的構想の基幹動詞。',
+      example: {
+        foreign: 'Resulta imposible <b>concebir</b> la modernidad sin el desarrollo del pensamiento crítico.',
+        ja: '批判的思考の発展なしに近代を<b>思い描く（構想する）</b>ことは不可能である。',
+        trans: '批判的思考の発展なしに近代を思い描くことは不可能である。',
+        used_form: 'concebir'
+      },
+      derivatives: [{ word: 'concepción', phonetic: '/konθepˈθjon/', pos: 'N[f]', meaning: '構想、概念、受胎' }],
+      phrases: [{ foreign: 'concebir una idea', ja: 'アイデアを構想する' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_mantener',
+      num: 2,
+      word: 'mantener',
+      homographIndex: 1,
+      phonetic: '/manteˈneɾ/',
+      grammar_forms: 'mantengo, mantuve, mantenido; V[T]',
+      category: '政治・社会',
+      meanings: [{ pos: 'V[T]', text: '維持する、保つ；扶養する；（主張を）堅持する' }],
+      core: '手（mano）でしっかりと張り詰めたまま保持し（tener）、崩れないように支えること。',
+      etymology: 'ラテン語 manu tenere（手で保つ；manus 手 ＋ tenere 保つ）に由来し、印欧祖語 *ten-（伸ばす、張る、保つ）に遡る。英語 maintain と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*ten-'],
+      history_note: '外交秩序や制度の持続可能性を論じるDELE B2/C1最頻出動詞。',
+      example: {
+        foreign: 'El banco central decidió <b>mantener</b> los tipos de interés para controlar la inflación.',
+        ja: '中央銀行はインフレを抑制するために金利を<b>維持する</b>ことを決定した。',
+        trans: '中央銀行はインフレを抑制するために金利を維持することを決定した。',
+        used_form: 'mantener'
+      },
+      derivatives: [{ word: 'mantenimiento', phonetic: '/manteniˈmjento/', pos: 'N[m]', meaning: '維持、保守管理' }],
+      phrases: [{ foreign: 'mantener el equilibrio', ja: '均衡を保つ' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_establecer',
+      num: 3,
+      word: 'establecer',
+      homographIndex: 1,
+      phonetic: '/estaβleˈθeɾ/',
+      grammar_forms: 'establezco, establecí, establecido; V[T]',
+      category: '法学・制度',
+      meanings: [{ pos: 'V[T]', text: '確立する、設立する、（法・基準を）制定する' }],
+      core: '揺らぐことのない堅固な土台の上に立たせる（*sta-）こと。',
+      etymology: 'ラテン語 stabilire（堅固にする；stare 立つ）に由来し、印欧祖語 *sta-（立つ）に遡る。英語 establish、フランス語 établir と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sta-'],
+      history_note: '憲法条文や国際条約において規範・制度を創設する際の標準動詞。',
+      example: {
+        foreign: 'El tratado busca <b>establecer</b> un marco jurídico vinculante para las emisiones de carbono.',
+        ja: 'その条約は炭素排出に対する法的拘束力のある枠組みを<b>確立する</b>ことを目指している。',
+        trans: 'その条約は炭素排出に対する法的拘束力のある枠組みを確立することを目指している。',
+        used_form: 'establecer'
+      },
+      derivatives: [{ word: 'establecimiento', phonetic: '/estaβleθiˈmjento/', pos: 'N[m]', meaning: '設立、施設、機関' }],
+      phrases: [{ foreign: 'establecer un precedente', ja: '先例を確立する' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_transferir',
+      num: 4,
+      word: 'transferir',
+      homographIndex: 1,
+      phonetic: '/tɾansfeˈɾiɾ/',
+      grammar_forms: 'transfiero, transferí, transferido; V[T]',
+      category: '経済・法務',
+      meanings: [{ pos: 'V[T]', text: '移転する、譲渡する、送金する、移管する' }],
+      core: '境界を越えて（trans-）向こう側へと運び渡す（ferre）こと。',
+      etymology: 'ラテン語 transferre（trans- 越えて ＋ ferre 運ぶ）に由来し、印欧祖語 *bher-（運ぶ）に遡る。英語 transfer と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*bher-'],
+      history_note: '権限委譲（transferencia de competencias）などスペインの自治州制度でも核心となる概念。',
+      example: {
+        foreign: 'El Gobierno acordó <b>transferir</b> nuevas competencias fiscales a las regiones autónomas.',
+        ja: '政府は自治州へ新たな財政権限を<b>移管する</b>ことで合意した。',
+        trans: '政府は自治州へ新たな財政権限を移管することで合意した。',
+        used_form: 'transferir'
+      },
+      derivatives: [{ word: 'transferencia', phonetic: '/tɾansfeˈɾenθja/', pos: 'N[f]', meaning: '移転、送金、技術移転' }],
+      phrases: [{ foreign: 'transferencia tecnológica', ja: '技術移転' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_perspectiva',
+      num: 5,
+      word: 'perspectiva',
+      homographIndex: 1,
+      phonetic: '/peɾspekˈtiβa/',
+      grammar_forms: 'pl. perspectivas; N[f]',
+      category: '思想・芸術',
+      meanings: [{ pos: 'N[f]', text: '視点、観点、展望、遠近法' }],
+      core: '障害物を貫いて隅々まで（per-）見通す（specere）視座。',
+      etymology: '後期ラテン語 perspectiva（per- 貫いて ＋ specere 見る）に由来し、印欧祖語 *spec-（見る）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*spec-'],
+      history_note: 'スペイン哲学者オルテガ・イ・ガセットの「視点主義（perspectivismo）」の中核概念。',
+      example: {
+        foreign: 'Debemos analizar el fenómeno demográfico desde una <b>perspectiva</b> histórica e interdisciplinaria.',
+        ja: '我々は歴史的かつ学際的な<b>観点（視座）</b>からその人口動態現象を分析しなければならない。',
+        trans: '我々は歴史的かつ学際的な観点からその人口動態現象を分析しなければならない。',
+        used_form: 'perspectiva'
+      },
+      derivatives: [{ word: 'perspicaz', phonetic: '/peɾspiˈkaθ/', pos: 'Adj', meaning: '洞察力のある、鋭敏な' }],
+      phrases: [{ foreign: 'en perspectiva', ja: '大局的に見て、将来を見据えて' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_contradecir',
+      num: 6,
+      word: 'contradecir',
+      homographIndex: 1,
+      phonetic: '/kontɾaðeˈθiɾ/',
+      grammar_forms: 'contradigo, contradije, contradicho; V[T]',
+      category: '論理・討論',
+      meanings: [{ pos: 'V[T]', text: '〜と矛盾する、反論する、反駁する' }],
+      core: '相手の言明に対して真っ向から（contra-）逆のことを言う（decir）こと。',
+      etymology: 'ラテン語 contradicere（contra- 対抗して ＋ dicere 言う）に由来し、印欧祖語 *dic-（示す・言う）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*dic-'],
+      history_note: '学術討論・法廷弁論における論理的反証の基礎動詞。',
+      example: {
+        foreign: 'Los datos empíricos recopilados parecen <b>contradecir</b> la hipótesis inicial.',
+        ja: '収集された実証データは初期の仮説と<b>矛盾する</b>ように思われる。',
+        trans: '収集された実証データは初期の仮説と矛盾するように思われる。',
+        used_form: 'contradecir'
+      },
+      derivatives: [{ word: 'contradicción', phonetic: '/kontɾaðikˈθjon/', pos: 'N[f]', meaning: '矛盾、反論' }],
+      phrases: [{ foreign: 'caer en contradicción', ja: '自己矛盾に陥る' }],
+      lang: 'es',
+      pair: 'es_ja'
+    }
+  ];
+
+  // --- イタリア語 (Italian / CILS B2) スターターパック ---
+  const IT_JA_STARTER = [
+    {
+      id: 'it_pre1_concepire',
+      num: 1,
+      word: 'concepire',
+      homographIndex: 1,
+      phonetic: '/kontʃeˈpiːre/',
+      grammar_forms: 'concepisco, concepii, concepito; V[T]',
+      category: '哲学・芸術',
+      meanings: [{ pos: 'V[T]', text: '（思想・芸術作品を）構想する、心に描く、理解する' }],
+      core: '多様な着想を心の中で「一つに掴み取る（*kap-）」こと。',
+      etymology: 'ラテン語 concipere（con- 共に ＋ capere 掴む）に由来し、印欧祖語 *kap-（掴む）に遡る。英語 conceive と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*kap-'],
+      history_note: 'ルネサンス芸術論における「構想（concetto）」の源泉となる動詞。',
+      example: {
+        foreign: 'Gli architetti del Rinascimento seppero <b>concepire</b> lo spazio urbano come un’opera d’arte armoniosa.',
+        ja: 'ルネサンスの建築家たちは都市空間を調和のとれた芸術作品として<b>構想する</b>すべを知っていた。',
+        trans: 'ルネサンスの建築家たちは都市空間を調和のとれた芸術作品として構想するすべを知っていた。',
+        used_form: 'concepire'
+      },
+      derivatives: [{ word: 'concetto', phonetic: '/konˈtʃɛtto/', pos: 'N[m]', meaning: '概念、構想、コンセプト' }],
+      phrases: [{ foreign: 'concepire un progetto', ja: 'プロジェクトを構想する' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_sostenere',
+      num: 2,
+      word: 'sostenere',
+      homographIndex: 1,
+      phonetic: '/sosteˈneːre/',
+      grammar_forms: 'sostengo, sostenni, sostenuto; V[T]',
+      category: '論理・環境',
+      meanings: [{ pos: 'V[T]', text: '支える、支持する；（理論・主張を）唱える；（試験などを）受ける' }],
+      core: '下から（sub-）しっかりと保ち続けて（tenere）崩落を防ぐこと。',
+      etymology: 'ラテン語 sustinere（sub- 下から ＋ tenere 保つ）に由来し、印欧祖語 *ten-（張る、保つ）に遡る。英語 sustain と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*ten-'],
+      history_note: '「持続可能な発展（sviluppo sostenibile）」や「論文審査を受ける（sostenere una tesi）」で必須。',
+      example: {
+        foreign: 'Numerosi economisti continuano a <b>sostenere</b> la necessità di riforme strutturali.',
+        ja: '多くの経済学者が構造改革の必要性を<b>主張し（支持し）</b>続けている。',
+        trans: '多くの経済学者が構造改革の必要性を主張し続けている。',
+        used_form: 'sostenere'
+      },
+      derivatives: [{ word: 'sostenibile', phonetic: '/sosteˈniːbile/', pos: 'Adj', meaning: '持続可能な、妥当な' }],
+      phrases: [{ foreign: 'sostenere una tesi', ja: '論旨を主張する・口頭試問を受ける' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_costituire',
+      num: 3,
+      word: 'costituire',
+      homographIndex: 1,
+      phonetic: '/kostiˈtwiːre/',
+      grammar_forms: 'costituisco, costituii, costituito; V[T]',
+      category: '法学・政治',
+      meanings: [{ pos: 'V[T]', text: '構成する、形成する；設立する、制定する' }],
+      core: '複数の要素を「共にしっかりと立たせて（con- + statuere）一つの体系を築く」こと。',
+      etymology: 'ラテン語 constituere（con- 共に ＋ statuere 立たせる）に由来し、印欧祖語 *sta-（立つ）に遡る。英語 constitute と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sta-'],
+      history_note: 'イタリア共和国憲法（Costituzione）の根幹をなす法学・政治学用語。',
+      example: {
+        foreign: 'Il patrimonio artistico e culturale <b>costituisce</b> una risorsa fondamentale per la nazione.',
+        ja: '芸術的・文化的遺産は国家にとって根本的な資源を<b>構成している</b>。',
+        trans: '芸術的・文化的遺産は国家にとって根本的な資源を構成している。',
+        used_form: 'costituisce'
+      },
+      derivatives: [{ word: 'costituzione', phonetic: '/kostitutˈtsjoːne/', pos: 'N[f]', meaning: '憲法、構成、設立' }],
+      phrases: [{ foreign: 'costituire un ostacolo', ja: '障害となる' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_trasferire',
+      num: 4,
+      word: 'trasferire',
+      homographIndex: 1,
+      phonetic: '/trasfeˈriːre/',
+      grammar_forms: 'trasferisco, trasferii, trasferito; V[T]',
+      category: '社会・経済',
+      meanings: [{ pos: 'V[T]', text: '移す、移転する、譲渡する；（再帰 trasferirsi）引っ越す、移住する' }],
+      core: '向こう側へ（tras-）運び渡す（ferre）こと。',
+      etymology: 'ラテン語 transferre（trans- 越えて ＋ ferre 運ぶ）に由来し、印欧祖語 *bher-（運ぶ）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*bher-'],
+      history_note: '中世イタリア都市国家の商業・金融から現代の資金移動まで一貫して使われる動詞。',
+      example: {
+        foreign: 'L’azienda ha deciso di <b>trasferire</b> la propria sede legale a Milano.',
+        ja: 'その企業は登記上の本社をミラノへ<b>移転する</b>ことを決定した。',
+        trans: 'その企業は登記上の本社をミラノへ移転することを決定した。',
+        used_form: 'trasferire'
+      },
+      derivatives: [{ word: 'trasferimento', phonetic: '/trasferiˈmento/', pos: 'N[m]', meaning: '移転、転勤、送金' }],
+      phrases: [{ foreign: 'trasferirsi all’estero', ja: '海外へ移住する' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_prospettiva',
+      num: 5,
+      word: 'prospettiva',
+      homographIndex: 1,
+      phonetic: '/prospetˈtiːva/',
+      grammar_forms: 'pl. prospettive; N[f]',
+      category: '美学・展望',
+      meanings: [{ pos: 'N[f]', text: '遠近法、透視図法；将来の展望、見通し、観点' }],
+      core: '前方（pro-）を遠くまで見通す（specere）視覚と構想。',
+      etymology: 'ラテン語 prospicere（前を見る）に由来し、印欧祖語 *spec-（見る）に遡る。英語 perspective / prospect と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*spec-'],
+      history_note: '15世紀フィレンツェでブルネレスキとアルベルティが確立した「線遠近法（prospettiva lineare）」の歴史語。',
+      example: {
+        foreign: 'L’invenzione della <b>prospettiva</b> rivoluzionò il modo di rappresentare la realtà nel Quattrocento.',
+        ja: '<b>遠近法</b>の発明は、15世紀における現実の描写方法を革命的に変えた。',
+        trans: '遠近法の発明は、15世紀における現実の描写方法を革命的に変えた。',
+        used_form: 'prospettiva'
+      },
+      derivatives: [{ word: 'prospettico', phonetic: '/proˈspɛttiko/', pos: 'Adj', meaning: '遠近法の、将来展望の' }],
+      phrases: [{ foreign: 'prospettive di crescita', ja: '成長の見通し' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_presiedere',
+      num: 6,
+      word: 'presiedere',
+      homographIndex: 1,
+      phonetic: '/preˈzjɛːdere/',
+      grammar_forms: 'presiedo, presiedetti, presieduto; V[T/I]',
+      category: '政治・統治',
+      meanings: [{ pos: 'V[T/I]', text: '議長を務める、主宰する、統括する' }],
+      core: '集団の前方（pre-）に座って（sedere）全体を導き守護すること。',
+      etymology: 'ラテン語 praesidere（前に座る、守る）に由来し、印欧祖語 *sed-（座る）に遡る。英語 preside と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sed-'],
+      history_note: '議会や国際会議の議長権を表す格式高い統治動詞。',
+      example: {
+        foreign: 'Il primo ministro è stato chiamato a <b>presiedere</b> il vertice straordinario europeo.',
+        ja: '首相は欧州臨時首脳会議の<b>議長を務める</b>よう要請された。',
+        trans: '首相は欧州臨時首脳会議の議長を務めるよう要請された。',
+        used_form: 'presiedere'
+      },
+      derivatives: [{ word: 'presidente', phonetic: '/preziˈdɛnte/', pos: 'N[m/f]', meaning: '大統領、議長、会長' }],
+      phrases: [{ foreign: 'presiedere una commissione', ja: '委員会を主宰する' }],
+      lang: 'it',
+      pair: 'it_ja'
+    }
+  ];
+
+  // --- ポルトガル語 (Portuguese / CELPE-Bras) スターターパック ---
+  const PT_JA_STARTER = [
+    {
+      id: 'pt_pre1_conceber',
+      num: 1,
+      word: 'conceber',
+      homographIndex: 1,
+      phonetic: '/kõseˈbeɾ/',
+      grammar_forms: 'concebo, concebi, concebido; V[T]',
+      category: '哲学・構想',
+      meanings: [{ pos: 'V[T]', text: '構想する、考案する、理解する；懐妊する' }],
+      core: '心の中で複数の要素を「共に掴み取って（*kap-）」新たな概念を生み出すこと。',
+      etymology: 'ラテン語 concipere（con- 共に ＋ capere 掴む）に由来し、印欧祖語 *kap-（掴む）に遡る。英語 conceive、スペイン語 concebir と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*kap-'],
+      history_note: 'ブラジル・ポルトガル学術論文における理論構築の基本動詞。',
+      example: {
+        foreign: 'Os urbanistas procuraram <b>conceber</b> um sistema de transporte público totalmente integrado.',
+        ja: '都市計画家たちは完全に統合された公共交通システムを<b>構想しよう</b>と努めた。',
+        trans: '都市計画家たちは完全に統合された公共交通システムを構想しようと努めた。',
+        used_form: 'conceber'
+      },
+      derivatives: [{ word: 'concepção', phonetic: '/kõsepˈsɐ̃w/', pos: 'N[f]', meaning: '構想、概念、見解' }],
+      phrases: [{ foreign: 'mal concebido', ja: '構想が杜撰な' }],
+      lang: 'pt',
+      pair: 'pt_ja'
+    },
+    {
+      id: 'pt_pre1_manter',
+      num: 2,
+      word: 'manter',
+      homographIndex: 1,
+      phonetic: '/mɐ̃ˈteɾ/',
+      grammar_forms: 'mantenho, mantive, mantido; V[T]',
+      category: '社会・経済',
+      meanings: [{ pos: 'V[T]', text: '維持する、保持する、養う、守り抜く' }],
+      core: '手（mão）でしっかりと保ち続ける（ter < tenere）こと。',
+      etymology: 'ラテン語 manu tenere（手で保つ）に由来し、印欧祖語 *ten-（張る、保つ）に遡る。英語 maintain、フランス語 maintenir と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*ten-'],
+      history_note: '環境保全・金融政策・外交関係などあらゆる中上級論説で頻出する不規則動詞。',
+      example: {
+        foreign: 'É essencial <b>manter</b> a biodiversidade da floresta amazônica para o equilíbrio climático global.',
+        ja: '地球規模の気候均衡のためにアマゾン熱帯雨林の生物多様性を<b>維持する</b>ことが不可欠である。',
+        trans: '地球規模の気候均衡のためにアマゾン熱帯雨林の生物多様性を維持することが不可欠である。',
+        used_form: 'manter'
+      },
+      derivatives: [{ word: 'manutenção', phonetic: '/mɐnutẽˈsɐ̃w/', pos: 'N[f]', meaning: '維持、メンテナンス、保守' }],
+      phrases: [{ foreign: 'manter a calma', ja: '冷静さを保つ' }],
+      lang: 'pt',
+      pair: 'pt_ja'
+    },
+    {
+      id: 'pt_pre1_estabelecer',
+      num: 3,
+      word: 'estabelecer',
+      homographIndex: 1,
+      phonetic: '/istabeleˈseɾ/',
+      grammar_forms: 'estabeleço, estabeleci, estabelecido; V[T]',
+      category: '法学・政治',
+      meanings: [{ pos: 'V[T]', text: '確立する、設立する、制定する、定着させる' }],
+      core: '揺るぎない土台の上にしっかりと立たせる（*sta-）こと。',
+      etymology: 'ラテン語 stabilire（堅固にする）に由来し、印欧祖語 *sta-（立つ）に遡る。英語 establish と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sta-'],
+      history_note: '大航海時代の通商拠点の設立から現代の法規範の制定まで広く用いられる。',
+      example: {
+        foreign: 'O acordo visa <b>estabelecer</b> critérios rigorosos de transparência administrativa.',
+        ja: 'その協定は行政の透明性に関する厳格な基準を<b>確立する</b>ことを目的としている。',
+        trans: 'その協定は行政の透明性に関する厳格な基準を確立することを目的としている。',
+        used_form: 'estabelecer'
+      },
+      derivatives: [{ word: 'estabelecimento', phonetic: '/istabelesiˈmẽtu/', pos: 'N[m]', meaning: '設立、施設、店舗' }],
+      phrases: [{ foreign: 'estabelecer metas', ja: '目標を設定する' }],
+      lang: 'pt',
+      pair: 'pt_ja'
+    },
+    {
+      id: 'pt_pre1_transferir',
+      num: 4,
+      word: 'transferir',
+      homographIndex: 1,
+      phonetic: '/tɾɐ̃sfeˈɾiɾ/',
+      grammar_forms: 'transfiro, transferi, transferido; V[T]',
+      category: '経済・法務',
+      meanings: [{ pos: 'V[T]', text: '移転する、移管する、送金する、譲渡する' }],
+      core: '境界を越えて（trans-）向こうへ運ぶ（*bher-）こと。',
+      etymology: 'ラテン語 transferre（trans- 越えて ＋ ferre 運ぶ）に由来し、印欧祖語 *bher-（運ぶ）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*bher-'],
+      history_note: '1808年にポルトガル王室がリオデジャネイロへ宮廷を移転（transferência da corte）した歴史的事件でも知られる。',
+      example: {
+        foreign: 'O governo decidiu <b>transferir</b> recursos adicionais para os municípios afetados pela seca.',
+        ja: '政府は干ばつの被害を受けた自治体へ追加財源を<b>移管（交付）する</b>ことを決定した。',
+        trans: '政府は干ばつの被害を受けた自治体へ追加財源を移管することを決定した。',
+        used_form: 'transferir'
+      },
+      derivatives: [{ word: 'transferência', phonetic: '/tɾɐ̃sfeˈɾẽsjɐ/', pos: 'N[f]', meaning: '移転、振込、譲渡' }],
+      phrases: [{ foreign: 'transferência de renda', ja: '所得移転（社会保障給付）' }],
+      lang: 'pt',
+      pair: 'pt_ja'
+    },
+    {
+      id: 'pt_pre1_perspectiva',
+      num: 5,
+      word: 'perspectiva',
+      homographIndex: 1,
+      phonetic: '/peɾspekˈtʃivɐ/',
+      grammar_forms: 'pl. perspectivas; N[f]',
+      category: '思想・社会',
+      meanings: [{ pos: 'N[f]', text: '視点、観点、展望、見込み、遠近法' }],
+      core: '奥まで貫いて（per-）見通す（*spec-）視界。',
+      etymology: '後期ラテン語 perspectiva に由来し、印欧祖語 *spec-（見る）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*spec-'],
+      history_note: '経済予測や社会学論文で最も頻出する抽象名詞の一つ。',
+      example: {
+        foreign: 'A transição energética abre novas <b>perspectivas</b> para a indústria sul-americana.',
+        ja: 'エネルギー転換は南米の産業に新たな<b>展望（可能性）</b>を切り開いている。',
+        trans: 'エネルギー転換は南米の産業に新たな展望を切り開いている。',
+        used_form: 'perspectivas'
+      },
+      derivatives: [{ word: 'perspicaz', phonetic: '/peɾspiˈkas/', pos: 'Adj', meaning: '洞察力の鋭い' }],
+      phrases: [{ foreign: 'sob a perspectiva de', ja: '〜の観点から' }],
+      lang: 'pt',
+      pair: 'pt_ja'
+    }
+  ];
+
+  // --- オランダ語 (Dutch / NT2 II) スターターパック ---
+  const NL_JA_STARTER = [
+    {
+      id: 'nl_pre1_bestaan',
+      num: 1,
+      word: 'bestaan',
+      homographIndex: 1,
+      phonetic: '/bəˈstaːn/',
+      grammar_forms: 'bestond, heeft bestaan; V[I] / N[n]',
+      category: '哲学・社会',
+      meanings: [
+        { pos: 'V[I]', text: '存在する、実在する、存続する；（uit 〜から）成り立つ、構成される' },
+        { pos: 'N[n]', text: '存在、生存、生計（het bestaan）' }
+      ],
+      core: 'その場にしっかりと「立ち続ける（be- + staan）」こと。',
+      etymology: 'オランダ語接頭辞 be-（強調・状態化）＋ staan（立つ）。印欧祖語 *sta-（立つ）に遡り、ドイツ語 bestehen と完全同根、英語 stand / constitute と同系。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sta-'],
+      history_note: '西ゲルマン語派において英語とドイツ語の中間に位置するオランダ語の核となる動詞。',
+      example: {
+        foreign: 'De commissie <b>bestaat</b> uit onafhankelijke wetenschappers en juristen.',
+        ja: 'その委員会は独立した科学者および法学者から<b>構成されている（成り立っている）</b>。',
+        trans: 'その委員会は独立した科学者および法学者から構成されている。',
+        used_form: 'bestaat'
+      },
+      derivatives: [{ word: 'bestaanszekerheid', phonetic: '/bəˈstaːnsˌzeːkərɦɛit/', pos: 'N[f]', meaning: '生活保障、生存の安定（現代オランダ政治の最重点概念）' }],
+      phrases: [{ foreign: 'bestaan uit', ja: '〜から成る、構成される' }],
+      lang: 'nl',
+      pair: 'nl_ja'
+    },
+    {
+      id: 'nl_pre1_ontstaan',
+      num: 2,
+      word: 'ontstaan',
+      homographIndex: 1,
+      phonetic: '/ɔntˈstaːn/',
+      grammar_forms: 'ontstond, is ontstaan; V[I] / N[n]',
+      category: '歴史・科学',
+      meanings: [{ pos: 'V[I]', text: '生じる、発生する、成立する、起源をもつ' }],
+      core: 'それまで眠っていた状態から「抜け出して立ち上がる（ont- + staan）」こと。',
+      etymology: '接頭辞 ont-（分離・開始；独 ent- と同源）＋ staan（立つ；印欧祖語 *sta-）。ドイツ語 entstehen と完全対応。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sta-'],
+      history_note: '歴史的制度や科学現象の起源（het ontstaan）を記述するNT2プログラムII必須語。',
+      example: {
+        foreign: 'De moderne aandelenbeurs is in het zeventiende-eeuwse Amsterdam <b>ontstaan</b>.',
+        ja: '近代的な証券取引所は17世紀のアムステルダムにおいて<b>誕生した（成立した）</b>。',
+        trans: '近代的な証券取引所は17世紀のアムステルダムにおいて誕生した。',
+        used_form: 'ontstaan'
+      },
+      derivatives: [{ word: 'ontstaansgeschiedenis', phonetic: '/ɔntˈstaːnsxəˌsxidənɪs/', pos: 'N[f]', meaning: '成立史、起源の歴史' }],
+      phrases: [{ foreign: 'laten ontstaan', ja: '生じさせる、引き起こす' }],
+      lang: 'nl',
+      pair: 'nl_ja'
+    },
+    {
+      id: 'nl_pre1_begrijpen',
+      num: 3,
+      word: 'begrijpen',
+      homographIndex: 1,
+      phonetic: '/bəˈɣrɛipə(n)/',
+      grammar_forms: 'begreep, heeft begrepen; V[T]',
+      category: '認識・哲学',
+      meanings: [{ pos: 'V[T]', text: '理解する、把握する、悟る、包含する' }],
+      core: '対象を手でしっかりと「掴み取る（be- + grijpen）」ことで本質を把握すること。',
+      etymology: 'be- ＋ grijpen（掴む；英語 grip/grasp、ドイツ語 greifen と同源）。概念を「掴む」という点でラテン語系 conceive / comprehend（*kap-）と並行する印欧祖語 *ghreib- 由来。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*kap-'],
+      history_note: 'ドイツ語 begreifen / Begriff（概念）と直結するオランダ哲学・学術の基本語。',
+      example: {
+        foreign: 'Om het huidige beleid te <b>begrijpen</b>, moeten we eerst de historische context bestuderen.',
+        ja: '現在の政策を<b>理解する</b>ためには、まず歴史的文脈を研究しなければならない。',
+        trans: '現在の政策を理解するためには、まず歴史的文脈を研究しなければならない。',
+        used_form: 'begrijpen'
+      },
+      derivatives: [{ word: 'begrip', phonetic: '/bəˈɣrɪp/', pos: 'N[n]', meaning: '概念、理解、思いやり' }],
+      phrases: [{ foreign: 'begrip tonen voor', ja: '〜に理解を示す' }],
+      lang: 'nl',
+      pair: 'nl_ja'
+    },
+    {
+      id: 'nl_pre1_overdragen',
+      num: 4,
+      word: 'overdragen',
+      homographIndex: 1,
+      phonetic: '/ˈoːvərˌdraːɣə(n)/',
+      grammar_forms: 'droeg over, heeft overgedragen; V[T] (scheidbaar)',
+      category: '法学・文化',
+      meanings: [{ pos: 'V[T]', text: '（権限・財産・知識を）譲渡する、移管する、引き継ぐ、伝達する' }],
+      core: '境界を越えて（over-）向こう側へ運び渡す（dragen）こと。',
+      etymology: 'over-（越えて）＋ dragen（運ぶ；独 tragen、英 draw/drag と同源、印欧祖語 *tragh- / *bher- 相当）。ラテン語 transferre のゲルマン語造語翻訳（カルク）。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*tragh-', '*bher-'],
+      history_note: '主権移譲（soevereiniteitsoverdracht）や知識伝承で用いられる重要分離動詞。',
+      example: {
+        foreign: 'De hoogleraar wil zijn kennis aan de volgende generatie onderzoekers <b>overdragen</b>.',
+        ja: 'その教授は自らの知識を次世代の研究者たちへ<b>引き継ぎたい（伝達したい）</b>と考えている。',
+        trans: 'その教授は自らの知識を次世代の研究者たちへ引き継ぎたいと考えている。',
+        used_form: 'overdragen'
+      },
+      derivatives: [{ word: 'overdracht', phonetic: '/ˈoːvərˌdrɑxt/', pos: 'N[f]', meaning: '譲渡、移管、伝達' }],
+      phrases: [{ foreign: 'bevoegdheden overdragen', ja: '権限を移譲する' }],
+      lang: 'nl',
+      pair: 'nl_ja'
+    },
+    {
+      id: 'nl_pre1_onderhouden',
+      num: 5,
+      word: 'onderhouden',
+      homographIndex: 1,
+      phonetic: '/ˌɔndərˈɦʌudə(n)/',
+      grammar_forms: 'onderhield, heeft onderhouden; V[T] (onscheidbaar)',
+      category: '経済・外交',
+      meanings: [{ pos: 'V[T]', text: '維持する、保守点検する；（外交関係などを）保つ；扶養する' }],
+      core: '下から（onder-）しっかりと支え保つ（houden）こと。',
+      etymology: 'onder-（下に）＋ houden（保つ；独 halten、英 hold と同源）。フランス語 entretenir / soutenir（*ten-）に対応する西ゲルマン語表現。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*ten-'],
+      history_note: 'オランダの生命線である堤防・治水インフラの維持管理（onderhoud）から外交関係の維持まで使われる。',
+      example: {
+        foreign: 'Nederland <b>onderhoudt</b> al eeuwenlang intensieve handelsbetrekkingen met Azië.',
+        ja: 'オランダは何世紀にもわたりアジアと緊密な通商関係を<b>維持している</b>。',
+        trans: 'オランダは何世紀にもわたりアジアと緊密な通商関係を維持している。',
+        used_form: 'onderhoudt'
+      },
+      derivatives: [{ word: 'onderhoud', phonetic: '/ˈɔndərˌɦʌut/', pos: 'N[n]', meaning: '保守、メンテナンス、生計、会談' }],
+      phrases: [{ foreign: 'contacten onderhouden', ja: '連絡・人脈を保つ' }],
+      lang: 'nl',
+      pair: 'nl_ja'
+    }
+  ];
+
+  // --- 中国語 (Chinese / HSK 5-6級・東アジア共通漢字字源) スターターパック ---
+  const ZH_JA_STARTER = [
+    {
+      id: 'zh_pre1_zhengce',
+      num: 1,
+      word: '政策',
+      homographIndex: 1,
+      phonetic: 'zhèng cè',
+      grammar_forms: '繁体: 政策 / 字源: *政 (正しく治める)',
+      category: '政治・法学',
+      meanings: [{ pos: 'N', text: '政策、ポリシ一、施政方針' }],
+      core: '竹簡に記された計略（策）をもって社会を正しく治める（*政）基本方針。',
+      etymology: '漢字字源 *政（正＋攴：力と規範で社会を正す）＋ 策（竹＋朿：馬を促す竹の鞭・計略）。明治期に日本で英語 policy の訳語として古典から再定義され、中国語（zhèngcè）・韓国語（정책）へ還流した東アジア共有学術語。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*政'],
+      history_note: '日中韓の近代行政・政治学を貫く共通漢字語幹 *政 の中核語。',
+      example: {
+        foreign: '政府正在制定一项旨在促进可再生能源发展的新<b>政策</b>。',
+        ja: '政府は再生可能エネルギーの発展を促進することを目的とした新<b>政策</b>を策定している。',
+        trans: '政府は再生可能エネルギーの発展を促進することを目的とした新政策を策定している。',
+        used_form: '政策'
+      },
+      derivatives: [{ word: '行政', phonetic: 'xíng zhèng', pos: 'N', meaning: '行政、ガバナンス' }],
+      phrases: [{ foreign: '宏观经济政策', ja: 'マクロ経済政策' }],
+      lang: 'zh',
+      pair: 'zh_ja'
+    },
+    {
+      id: 'zh_pre1_jingji',
+      num: 2,
+      word: '经济',
+      homographIndex: 1,
+      phonetic: 'jīng jì',
+      grammar_forms: '繁体: 經濟 / 字源: *経 (縦糸を通す・治める)',
+      category: '実務・経済',
+      meanings: [{ pos: 'N', text: '経済、エコノミー；倹約、経済的であること' }],
+      core: '織物の縦糸を張り巡らすように天下を治め（*経）、困窮する民を救い渡す（済）こと。',
+      etymology: '漢字字源 *経（經：縦糸を通す、秩序立てて治める）に遡る。古典『晋書』の「経世済民（世を治め民を救う）」の略語。日本語「経済」、韓国語「경제」と同一字源で結ばれる。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*経'],
+      history_note: '古代中国の政治哲学概念「経世済民」が西洋の political economy と融合した歴史的記念碑。',
+      example: {
+        foreign: '数字化转型已经成为推动全球<b>经济</b>增长的核心引擎。',
+        ja: 'デジタルトランスフォーメーションはすでに世界<b>経済</b>の成長を推進する中核エンジンとなっている。',
+        trans: 'デジタルトランスフォーメーションはすでに世界経済の成長を推進する中核エンジンとなっている。',
+        used_form: '经济'
+      },
+      derivatives: [{ word: '经验', phonetic: 'jīng yàn', pos: 'N/V', meaning: '経験（する）' }],
+      phrases: [{ foreign: '市场经济', ja: '市場経済' }],
+      lang: 'zh',
+      pair: 'zh_ja'
+    },
+    {
+      id: 'zh_pre1_lilun',
+      num: 3,
+      word: '理论',
+      homographIndex: 1,
+      phonetic: 'lǐ lùn',
+      grammar_forms: '繁体: 理論 / 字源: *理 (玉の筋目・法則)',
+      category: '哲学・科学',
+      meanings: [{ pos: 'N', text: '理論、セオリー、学説' }],
+      core: '原石の玉に潜む美しい筋目（*理）を見極め、体系的に論じる（論）こと。',
+      etymology: '漢字字源 *理（玉＋里：翡翠の模様に沿って磨くことから「物事の筋道・法則」）＋ 論（言＋侖：順序立てて述べる）。日本語「理論」、韓国語「이론」と完全同源。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*理'],
+      history_note: '宋明理学（朱子学）の「理（宇宙の根本法則）」が近代科学の theory の訳語へと昇華した。',
+      example: {
+        foreign: '任何科学<b>理论</b>都必须经过严格的实验验证。',
+        ja: 'いかなる科学<b>理論</b>も厳密な実験による検証を経なければならない。',
+        trans: 'いかなる科学理論も厳密な実験による検証を経なければならない。',
+        used_form: '理论'
+      },
+      derivatives: [{ word: '理解', phonetic: 'lǐ jiě', pos: 'V/N', meaning: '理解（する）' }],
+      phrases: [{ foreign: '理论体系', ja: '理論体系' }],
+      lang: 'zh',
+      pair: 'zh_ja'
+    },
+    {
+      id: 'zh_pre1_guannian',
+      num: 4,
+      word: '观念',
+      homographIndex: 1,
+      phonetic: 'guān niàn',
+      grammar_forms: '繁体: 觀念 / 字源: *観 (広く見極める)',
+      category: '哲学・心理',
+      meanings: [{ pos: 'N', text: '観念、考え方、意識、価値観' }],
+      core: '対象の本質を深く見つめ（*観）、心の中に留めて思う（念）こと。',
+      etymology: '漢字字源 *観（觀：雚＋見、目を凝らして見渡す）＋ 念（今＋心、心に強く留める）。仏教の「観念（真理を観察し念じる）」から近代哲学の idea / conception の訳語となった。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*観'],
+      history_note: '日本語「観念」、韓国語「관념」と共通の字源 *観 を持つ。',
+      example: {
+        foreign: '随着社会的发展，人们的消费<b>观念</b>发生了深刻的变化。',
+        ja: '社会の発展に伴い、人々の消費<b>観念（価値観）</b>には深い変化が生じた。',
+        trans: '社会の発展に伴い、人々の消費観念には深い変化が生じた。',
+        used_form: '观念'
+      },
+      derivatives: [{ word: '客观', phonetic: 'kè guān', pos: 'Adj/N', meaning: '客観的（な）' }],
+      phrases: [{ foreign: '传统观念', ja: '伝統的価値観・固定観念' }],
+      lang: 'zh',
+      pair: 'zh_ja'
+    },
+    {
+      id: 'zh_pre1_quanli',
+      num: 5,
+      word: '权利',
+      homographIndex: 1,
+      phonetic: 'quán lì',
+      grammar_forms: '繁体: 權利 / 字源: *権 (はかりの分銅・力)',
+      category: '法学・政治',
+      meanings: [{ pos: 'N', text: '権利（right ※権力 quánlì 权力 と同音異義）' }],
+      core: '天秤の分銅（*権）のように正当な釣り合いとして認められた利益・資格。',
+      etymology: '漢字字源 *権（權：木＋雚、天秤の重り・バランスを量る力）に遡る。1864年『万国公法』で西洋法学の right の訳語として創出され、日中韓（権利 / 权利 / 권리）の法体系の基礎となった。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*権'],
+      history_note: '中国語では「权利（権利 right）」と「权力（権力 power）」が同音（quánlì）であるため文脈弁別が極めて重要。',
+      example: {
+        foreign: '宪法保障每一位公民依法享有的基本<b>权利</b>。',
+        ja: '憲法はすべての市民が法に基づき享有する基本的<b>権利</b>を保障している。',
+        trans: '憲法はすべての市民が法に基づき享有する基本的権利を保障している。',
+        used_form: '权利'
+      },
+      derivatives: [{ word: '权力', phonetic: 'quán lì', pos: 'N', meaning: '権力、パワー' }],
+      phrases: [{ foreign: '知识产权', ja: '知的財産権' }],
+      lang: 'zh',
+      pair: 'zh_ja'
+    },
+    {
+      id: 'zh_pre1_renshi',
+      num: 6,
+      word: '认识',
+      homographIndex: 1,
+      phonetic: 'rèn shi',
+      grammar_forms: '繁体: 認識 / 字源: *識 (見分ける・心に記す)',
+      category: '認識・社会',
+      meanings: [{ pos: 'V/N', text: '認識する、知る、知り合う；認識、理解' }],
+      core: '言葉と標識によって対象を見分け（*識）、心に刻み込むこと。',
+      etymology: '漢字字源 *識（言＋戠：旗印や言葉で識別し記憶する）。日本語「認識」、韓国語「인식」と共通字源 *識 で結ばれる。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*識'],
+      history_note: '日常の「人と知り合う」から哲学の「認識論（认识论）」まで幅広く機能する重要語。',
+      example: {
+        foreign: '这项研究帮助我们更深入地<b>认识</b>气候变化的复杂机制。',
+        ja: 'この研究は私たちが気候変動の複雑なメカニズムをより深く<b>認識する（理解する）</b>助けとなる。',
+        trans: 'この研究は私たちが気候変動の複雑なメカニズムをより深く認識する助けとなる。',
+        used_form: '认识'
+      },
+      derivatives: [{ word: '知识', phonetic: 'zhī shi', pos: 'N', meaning: '知識' }, { word: '意识', phonetic: 'yì shi', pos: 'N/V', meaning: '意識（する）' }],
+      phrases: [{ foreign: '清醒的认识', ja: '冷静かつ明確な認識' }],
+      lang: 'zh',
+      pair: 'zh_ja'
+    }
+  ];
+
+  // --- 韓国語 (Korean / TOPIK II 中上級・東アジア共通漢字字源) スターターパック ---
+  const KO_JA_STARTER = [
+    {
+      id: 'ko_pre1_jeongchaek',
+      num: 1,
+      word: '정책',
+      homographIndex: 1,
+      phonetic: '[tɕʌŋ.tɕʰɛk]',
+      grammar_forms: '한자: 政策 / 字源: *政 (正しく治める)',
+      category: '政治・社会',
+      meanings: [{ pos: 'N', text: '政策、ポリシー、施政方針' }],
+      core: '社会を正しく治める（*政）ための体系的な方策（策）。',
+      etymology: '韓国漢字語「政策」。漢字字源 *政（正＋攴：規範によって社会を正す）に遡り、日本語「政策」・中国語「政策 (zhèngcè)」と東アジア漢字系統樹で直結する。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*政'],
+      history_note: 'TOPIK II（韓国語能力試験中上級）の論説・ニュース問題で最頻出の社会科学語彙。',
+      example: {
+        foreign: '정부는 저출산 문제를 해결하기 위해 실효성 있는 <b>정책</b>을 마련해야 한다.',
+        ja: '政府は少子化問題を解決するために実効性のある<b>政策</b>を用意しなければならない。',
+        trans: '政府は少子化問題を解決するために実効性のある政策を用意しなければならない。',
+        used_form: '정책'
+      },
+      derivatives: [{ word: '정치', phonetic: '[tɕʌŋ.tɕʰi]', pos: 'N', meaning: '政治 (政治)' }, { word: '행정', phonetic: '[hɛŋ.dʑʌŋ]', pos: 'N', meaning: '行政 (行政)' }],
+      phrases: [{ foreign: '정책을 추진하다', ja: '政策を推進する' }],
+      lang: 'ko',
+      pair: 'ko_ja'
+    },
+    {
+      id: 'ko_pre1_gyeongje',
+      num: 2,
+      word: '경제',
+      homographIndex: 1,
+      phonetic: '[kjʌŋ.dʑe]',
+      grammar_forms: '한자: 經濟 (経済) / 字源: *経 (縦糸・治める)',
+      category: '実務・経済',
+      meanings: [{ pos: 'N', text: '経済' }],
+      core: '縦糸を通して秩序立て（*経）、人々を救済する（済）社会の仕組み。',
+      etymology: '韓国漢字語「經濟（経済）」。漢字字源 *経（縦糸を通す、治める）に遡り、中国語「经济」・日本語「経済」と同一の字源コアを共有する。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*経'],
+      history_note: '「경험（経験）」「경영（経営）」と同じ漢字語根 *経（경）から派生する重要クラスタ。',
+      example: {
+        foreign: '지속 가능한 <b>경제</b> 성장을 위해서는 기술 혁신이 필수적이다.',
+        ja: '持続可能な<b>経済</b>成長のためには技術革新が不可欠である。',
+        trans: '持続可能な経済成長のためには技術革新が不可欠である。',
+        used_form: '경제'
+      },
+      derivatives: [{ word: '경영', phonetic: '[kjʌŋ.jʌŋ]', pos: 'N', meaning: '経営 (経営)' }, { word: '경험', phonetic: '[kjʌŋ.hʌm]', pos: 'N', meaning: '経験 (経験)' }],
+      phrases: [{ foreign: '경제 활성화', ja: '経済の活性化' }],
+      lang: 'ko',
+      pair: 'ko_ja'
+    },
+    {
+      id: 'ko_pre1_iron',
+      num: 3,
+      word: '이론',
+      homographIndex: 1,
+      phonetic: '[i.ɾon]',
+      grammar_forms: '한자: 理論 / 字源: *理 (玉の筋目・法則)',
+      category: '哲学・科学',
+      meanings: [{ pos: 'N', text: '理論、学説、セオリー' }],
+      core: '物事の筋道や法則（*理）を体系的に論じた（論）知的構造。',
+      etymology: '韓国漢字語「理論」（頭音法則により 리 → 이）。漢字字源 *理（玉の筋目、道理）に遡り、中国語「理论」・日本語「理論」と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*理'],
+      history_note: '韓国語では頭音法則により語頭の「理」は「이 (i)」、語中の「理（합리 合理、심리 心理）」は「리 (ri)」と発音されるため、字源ツリーで結ぶことで劇的に記憶効率が向上する。',
+      example: {
+        foreign: '그 학자는 기존의 <b>이론</b>을 뛰어넘는 새로운 가설을 제시했다.',
+        ja: 'その学者は既存の<b>理論</b>を乗り越える新たな仮説を提示した。',
+        trans: 'その学者は既存の理論を乗り越える新たな仮説を提示した。',
+        used_form: '이론'
+      },
+      derivatives: [{ word: '이해', phonetic: '[i.hɛ]', pos: 'N', meaning: '理解 (理解)' }, { word: '합리적', phonetic: '[ham.ni.dʑʌk]', pos: 'N/Adj', meaning: '合理的 (合理的)' }],
+      phrases: [{ foreign: '이론적 배경', ja: '理論的背景' }],
+      lang: 'ko',
+      pair: 'ko_ja'
+    },
+    {
+      id: 'ko_pre1_gwanjeom',
+      num: 4,
+      word: '관점',
+      homographIndex: 1,
+      phonetic: '[kwan.t͈ɕʌm]',
+      grammar_forms: '한자: 觀點 (観点) / 字源: *観 (見渡す)',
+      category: '思想・批評',
+      meanings: [{ pos: 'N', text: '観点、視点、見地' }],
+      core: '対象を広く見渡し観察する（*観）ための立脚点（点）。',
+      etymology: '韓国漢字語「觀點（観点）」。漢字字源 *観（広く見極める）に遡り、日本語「観点」・中国語「观点 / 观念」と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*観'],
+      history_note: 'TOPIK II 記述式（54番論述エッセイ）で「〜の観点から（~의 관점에서）」として必須の表現。',
+      example: {
+        foreign: '이 사회 현상은 다양한 <b>관점</b>에서 심층적으로 분석할 필요가 있다.',
+        ja: 'この社会現象は多様な<b>観点</b>から深層的に分析する必要がある。',
+        trans: 'この社会現象は多様な観点から深層的に分析する必要がある。',
+        used_form: '관점'
+      },
+      derivatives: [{ word: '객관적', phonetic: '[kɛk.k͈wan.dʑʌk]', pos: 'N/Adj', meaning: '客観的 (客観的)' }, { word: '관찰', phonetic: '[kwan.tɕʰal]', pos: 'N', meaning: '観察 (観察)' }],
+      phrases: [{ foreign: '새로운 관점', ja: '新しい観点' }],
+      lang: 'ko',
+      pair: 'ko_ja'
+    },
+    {
+      id: 'ko_pre1_gwolli',
+      num: 5,
+      word: '권리',
+      homographIndex: 1,
+      phonetic: '[kwʌl.li]',
+      grammar_forms: '한자: 權利 (権利) / 字源: *権 (はかりの分銅)',
+      category: '法学・人権',
+      meanings: [{ pos: 'N', text: '権利' }],
+      core: '天秤の分銅（*権）のように正当に主張しうる利益（利）。',
+      etymology: '韓国漢字語「權利（権利）」（流音化により n+r → l+l [kwʌlli] と発音）。漢字字源 *権 に遡り、日本語「権利」・中国語「权利」と直結する。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*権'],
+      history_note: '인권（人権）、주권（主権）、권력（権力）と共に *権 クラスタを形成する。',
+      example: {
+        foreign: '모든 시민은 법 앞에서 평등하며 기본적인 <b>권리</b>를 보장받는다.',
+        ja: 'すべての市民は法の下に平等であり、基本的な<b>権利</b>を保障される。',
+        trans: 'すべての市民は法の下に平等であり、基本的な権利を保障される。',
+        used_form: '권리'
+      },
+      derivatives: [{ word: '인권', phonetic: '[in.k͈wʌn]', pos: 'N', meaning: '人権 (人権)' }, { word: '권력', phonetic: '[kwʌl.ljʌk]', pos: 'N', meaning: '権力 (権力)' }],
+      phrases: [{ foreign: '권리를 행사하다', ja: '権利を行使する' }],
+      lang: 'ko',
+      pair: 'ko_ja'
+    },
+    {
+      id: 'ko_pre1_insik',
+      num: 6,
+      word: '인식',
+      homographIndex: 1,
+      phonetic: '[in.ɕik]',
+      grammar_forms: '한자: 認識 / 字源: *識 (見分ける・記す)',
+      category: '認識・心理',
+      meanings: [{ pos: 'N', text: '認識、理解（인식하다: 認識する）' }],
+      core: '物事の本質を見極めて心に記す（*識）こと。',
+      etymology: '韓国漢字語「認識」。漢字字源 *識 に遡り、日本語「認識」・中国語「认识」と完全同源。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*識'],
+      history_note: '지식（知識）、의식（意識）、상식（常識）と共に *識（식）クラスタを形成。',
+      example: {
+        foreign: '환경 보호의 중요성에 대한 사회 전반의 <b>인식</b>이 크게 높아졌다.',
+        ja: '環境保護の重要性に対する社会全般の<b>認識</b>が大きく高まった。',
+        trans: '環境保護の重要性に対する社会全般の認識が大きく高まった。',
+        used_form: '인식'
+      },
+      derivatives: [{ word: '의식', phonetic: '[ɰi.ɕik]', pos: 'N', meaning: '意識 (意識)' }, { word: '지식', phonetic: '[tɕi.ɕik]', pos: 'N', meaning: '知識 (知識)' }],
+      phrases: [{ foreign: '인식의 전환', ja: '認識の転換' }],
+      lang: 'ko',
+      pair: 'ko_ja'
+    }
+  ];
+
   const PACKS = {
     academic: EN_JA_STARTER,
     classical_roots: CLASSICAL_ROOTS_STARTER,
@@ -3348,7 +4225,13 @@
     business: EN_JA_STARTER_BUSINESS,
     essential: EN_JA_STARTER_ESSENTIAL,
     fr_pre1: FR_JA_STARTER,
-    de_pre1: DE_JA_STARTER
+    de_pre1: DE_JA_STARTER,
+    es_pre1: ES_JA_STARTER,
+    it_pre1: IT_JA_STARTER,
+    pt_pre1: PT_JA_STARTER,
+    nl_pre1: NL_JA_STARTER,
+    zh_pre1: ZH_JA_STARTER,
+    ko_pre1: KO_JA_STARTER
   };
 
   const PACK_METADATA = {
@@ -3362,13 +4245,32 @@
     business: { id: 'business', lang: 'en', name: '実践ビジネス・TOEIC 800+ 20選', desc: '契約・財務・市場分析を支える実務必須語彙', badge: '実務・経済', count: 20, wordsPreview: 'consolidate, diversify, leverage, volatile...' },
     essential: { id: 'essential', lang: 'en', name: '重要語根ファミリー20選', desc: '*speḱ- (見る), *deyk- (言う) など語根で覚える高速基礎群', badge: '語根基礎', count: 20, wordsPreview: 'spectacle, predict, contradict, factory...' },
     fr_pre1: { id: 'fr_pre1', lang: 'fr', name: '仏検準1級・DELF B2 語根コア20選', desc: '*kap-, *sta-, *ten-, *bher- 等ラテン語直系の思考・認識・制度動詞群', badge: '仏検準1級・DELF B2', count: 20, wordsPreview: 'concevoir, percevoir, constater, maintenir, susciter, différer...' },
-    de_pre1: { id: 'de_pre1', lang: 'de', name: '独検準1級・Goethe B2 語根・分離動詞20選', desc: '*sta-, *dʰregʰ-, *dewk-, *kel- 等ゲルマン祖語と接頭辞の構造化動詞群', badge: '独検準1級・Goethe B2', count: 20, wordsPreview: 'bestehen, entstehen, einbeziehen, bewältigen, nachhaltig, übertragen...' }
+    de_pre1: { id: 'de_pre1', lang: 'de', name: '独検準1級・Goethe B2 語根・分離動詞20選', desc: '*sta-, *dʰregʰ-, *dewk-, *kel- 等ゲルマン祖語と接頭辞の構造化動詞群', badge: '独検準1級・Goethe B2', count: 20, wordsPreview: 'bestehen, entstehen, einbeziehen, bewältigen, nachhaltig, übertragen...' },
+    es_pre1: { id: 'es_pre1', lang: 'es', name: 'スペイン語 DELE B2・印欧語根コア選', desc: '*kap-, *ten-, *sta-, *bher-, *spec- で英・仏・羅と繋がる学術スペイン語', badge: 'DELE B2・西検準1級', count: 6, wordsPreview: 'concebir, mantener, establecer, transferir, perspectiva, contradecir' },
+    it_pre1: { id: 'it_pre1', lang: 'it', name: 'イタリア語 CILS B2・ルネサンス語根選', desc: 'ラテン語直系の *kap-, *ten-, *sta-, *spec- を体現するイタリア教養語彙', badge: 'CILS B2・伊検準1級', count: 6, wordsPreview: 'concepire, sostenere, costituire, trasferire, prospettiva, presiedere' },
+    pt_pre1: { id: 'pt_pre1', lang: 'pt', name: 'ポルトガル語 CELPE-Bras・ロマンス語根選', desc: 'イベロ・ロマンス語派の *kap-, *ten-, *sta-, *bher- 基幹語彙', badge: 'CELPE-Bras・B2', count: 5, wordsPreview: 'conceber, manter, estabelecer, transferir, perspectiva' },
+    nl_pre1: { id: 'nl_pre1', lang: 'nl', name: 'オランダ語 NT2 II・西ゲルマン語根選', desc: '英語とドイツ語を架橋する *sta-, *kap-, *tragh-, *ten- 前綴り動詞群', badge: 'NT2 II・CNaVT B2', count: 5, wordsPreview: 'bestaan, ontstaan, begrijpen, overdragen, onderhouden' },
+    zh_pre1: { id: 'zh_pre1', lang: 'zh', name: '中国語 HSK 5-6級・東アジア漢字字源選', desc: '*政, *経, *理, *観, *権, *識 で日中韓を貫く近代学術漢語コア', badge: 'HSK 6級・字源系統樹', count: 6, wordsPreview: '政策, 经济, 理论, 观念, 权利, 认识' },
+    ko_pre1: { id: 'ko_pre1', lang: 'ko', name: '韓国語 TOPIK II・漢字語字源ネットワーク選', desc: '頭音法則・流音化を漢字字源 (*政, *経, *理, *観, *権, *識) で体系攻略', badge: 'TOPIK II・ハン検準2級', count: 6, wordsPreview: '정책, 경제, 이론, 관점, 권리, 인식' }
+  };
+
+  const LANG_TAG_LABELS = {
+    en: '[英語] ',
+    fr: '[仏語] ',
+    de: '[独語] ',
+    es: '[西語] ',
+    it: '[伊語] ',
+    pt: '[葡語] ',
+    nl: '[蘭語] ',
+    zh: '[中語] ',
+    ko: '[韓語] ',
+    ja: '[日語] '
   };
 
   function buildStarterPackGalleryHtml(currentLang = 'all') {
     const packs = Object.values(PACK_METADATA);
     const cards = packs.map(p => {
-      const langLabel = p.lang === 'fr' ? '[仏語] ' : (p.lang === 'de' ? '[独語] ' : '[英語] ');
+      const langLabel = LANG_TAG_LABELS[p.lang] || '[英語] ';
       const isMatch = (currentLang === 'all' || !p.lang || p.lang === currentLang);
       const matchBadge = isMatch ? '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(52,211,153,0.15);color:#10b981;font-weight:600">現在選択中の言語</span>' : '';
       return `
@@ -3391,22 +4293,31 @@
     return `
       <div class="starter-pack-gallery-wrap">
         <div class="spk-gallery-intro">
-          <h3>公式スターターパック ＆ 語根マスター（英語・フランス語・ドイツ語）</h3>
-          <p>単語の手動登録は不要です。言語学者・認知科学者によって厳選・構造化された学術・英検・仏検・独検準1級語彙を1クリックでライブラリへ導入し、すぐにFSRS学習を開始できます。</p>
+          <h3>公式スターターパック ＆ 語根・字源マスター（全10言語対応）</h3>
+          <p>単語の手動登録は不要です。印欧祖語（英・仏・独・西・伊・葡・蘭）および東アジア漢字字源（中・韓・日）によって体系化された厳選語彙を1クリックで導入し、多言語が1つの根で繋がる系統樹とFSRS学習をすぐに体験できます。</p>
         </div>
         <div class="starter-pack-grid">${cards}</div>
       </div>
     `;
   }
 
+  const DEFAULT_PACK_BY_LANG = {
+    fr: 'fr_pre1',
+    de: 'de_pre1',
+    es: 'es_pre1',
+    it: 'it_pre1',
+    pt: 'pt_pre1',
+    nl: 'nl_pre1',
+    zh: 'zh_pre1',
+    ko: 'ko_pre1'
+  };
+
   function getStarterPack(lang = 'en', packType = 'academic') {
-    // フランス語パック解決
-    if (packType === 'fr_pre1' || (lang === 'fr' && (packType === 'academic' || packType === 'default'))) {
-      return JSON.parse(JSON.stringify(FR_JA_STARTER));
+    if ((packType === 'academic' || packType === 'default') && DEFAULT_PACK_BY_LANG[lang] && PACKS[DEFAULT_PACK_BY_LANG[lang]]) {
+      return JSON.parse(JSON.stringify(PACKS[DEFAULT_PACK_BY_LANG[lang]]));
     }
-    // ドイツ語パック解決
-    if (packType === 'de_pre1' || (lang === 'de' && (packType === 'academic' || packType === 'default'))) {
-      return JSON.parse(JSON.stringify(DE_JA_STARTER));
+    if (PACKS[packType]) {
+      return JSON.parse(JSON.stringify(PACKS[packType]));
     }
     // 英検準1級パックの動的構築
     if (packType === 'eiken_pre1_pack1' && global.VocabEikenCatalog) {
@@ -3433,7 +4344,8 @@
       const w3 = global.VocabEikenCatalog.getWordsByRoot('*pel-');
       return JSON.parse(JSON.stringify([...w1, ...w2, ...w3]));
     }
-    const list = PACKS[packType] || (lang === 'fr' ? FR_JA_STARTER : (lang === 'de' ? DE_JA_STARTER : (PACKS.academic || EN_JA_STARTER)));
+    const fallbackKey = DEFAULT_PACK_BY_LANG[lang] || 'academic';
+    const list = PACKS[packType] || PACKS[fallbackKey] || EN_JA_STARTER;
     return JSON.parse(JSON.stringify(list));
   }
 
@@ -3443,9 +4355,8 @@
 
   function populateStarterPack(currentEntries, lang = 'en', packType = 'academic', targetPairKey = null) {
     let resolvedPack = packType;
-    if (packType === 'academic') {
-      if (lang === 'fr') resolvedPack = 'fr_pre1';
-      else if (lang === 'de') resolvedPack = 'de_pre1';
+    if (packType === 'academic' && DEFAULT_PACK_BY_LANG[lang]) {
+      resolvedPack = DEFAULT_PACK_BY_LANG[lang];
     }
     const starterItems = getStarterPack(lang, resolvedPack);
     if (!starterItems.length) return { added: [], merged: currentEntries };
@@ -3471,7 +4382,7 @@
       const k = makeLookupKey(item.word, itemLang, hIdx);
       if (!existingWords.has(k)) {
         maxNum++;
-        const cleanSlug = String(item.word || '').trim().toLowerCase().replace(/[^a-z0-9\u00C0-\u024F\u3040-\u30FF\u4E00-\u9FFF]+/g, '_') || String(maxNum);
+        const cleanSlug = String(item.word || '').trim().toLowerCase().replace(/[^a-z0-9\u00C0-\u024F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]+/g, '_') || String(maxNum);
         const cardId = item.id || `starter_${resolvedPack}_${cleanSlug}${hIdx > 1 ? '_' + hIdx : ''}`;
         const cardWk = item.wordKey || makeWordKey(item.word, itemLang, item.meanings?.[0]?.pos, hIdx);
         const card = {
@@ -3514,7 +4425,7 @@
    * 外部JSON / IndexedDB / バンドルフォールバック対応の非同期スターターパックデータローダー
    */
   async function loadStarterPackData(packId, lang = 'en') {
-    const resolved = resolvePackId(packId, lang);
+    const resolved = packId === 'academic' && DEFAULT_PACK_BY_LANG[lang] ? DEFAULT_PACK_BY_LANG[lang] : packId;
     if (PACKS[resolved] && PACKS[resolved].length > 0) {
       return PACKS[resolved];
     }
@@ -3532,7 +4443,7 @@
         // オフライン・フォールバック
       }
     }
-    return getStarterPack(resolved, lang);
+    return getStarterPack(lang, resolved);
   }
 
   function registerPackData(packId, items) {
@@ -3555,3 +4466,4 @@
   };
 
 })(typeof window !== 'undefined' ? window : globalThis);
+
