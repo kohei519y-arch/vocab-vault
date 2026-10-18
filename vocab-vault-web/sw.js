@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v47-webgl-multilang';
+const CACHE_NAME = 'vocab-vault-v48-10langs';
 
 // [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
 function fetchWithTimeout(request, timeoutMs = 3000) {
