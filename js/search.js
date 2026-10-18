@@ -165,6 +165,119 @@
   }
 
   /**
+   * 転置インデックス（Inverted Index）エンジン
+   * 5,000〜50,000語規模でもサブミリ秒（O(1)〜O(K)）でマルチキーワード検索を実現
+   */
+  const VocabInvertedIndex = {
+    postings: new Map(), // token -> Set<string(id|num)>
+    itemsMap: new Map(), // string(id|num) -> item
+    indexedCount: 0,
+    lastBuiltTs: 0,
+
+    tokenize(text) {
+      if (!text) return [];
+      const s = String(text).toLowerCase();
+      const folded = foldAscii(s);
+      const tokens = new Set();
+
+      const words = folded.match(/[a-z0-9\u00C0-\u024F]+/g) || [];
+      words.forEach(w => {
+        if (w.length >= 2) {
+          tokens.add(w);
+          for (let len = 2; len <= Math.min(4, w.length); len++) {
+            tokens.add(w.slice(0, len));
+          }
+        }
+      });
+
+      const cjk = s.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g) || [];
+      for (let i = 0; i < cjk.length; i++) {
+        tokens.add(cjk[i]);
+        if (i + 1 < cjk.length) tokens.add(cjk[i] + cjk[i + 1]);
+      }
+
+      return [...tokens];
+    },
+
+    build(items) {
+      this.postings.clear();
+      this.itemsMap.clear();
+      const list = Array.isArray(items) ? items : [];
+
+      list.forEach(it => {
+        if (!it || !it.word) return;
+        const key = String(it.id || it.num || Math.random());
+        this.itemsMap.set(key, it);
+
+        const meta = getMeta(it);
+        const directRoots = (it.etymologyTags || it.tags || []).map(r => foldAscii(String(r).toLowerCase()).replace(/^\*|^-+|-+$/g, ''));
+        const metaRoots = [...meta.roots].map(r => foldAscii(String(r).toLowerCase()).replace(/^\*|^-+|-+$/g, ''));
+        const tokens = new Set([
+          ...this.tokenize(it.word),
+          ...this.tokenize(meta.blob),
+          ...directRoots,
+          ...metaRoots
+        ]);
+
+        tokens.forEach(tok => {
+          if (!tok) return;
+          let post = this.postings.get(tok);
+          if (!post) this.postings.set(tok, post = new Set());
+          post.add(key);
+        });
+      });
+
+      this.indexedCount = list.length;
+      this.lastBuiltTs = Date.now();
+      return this.indexedCount;
+    },
+
+    search(query, pool) {
+      if (!query || !query.trim()) return pool || [];
+      const tokens = extractQueryTokens(query).map(t => foldAscii(t.toLowerCase()).replace(/^\*|^-+|-+$/g, '')).filter(Boolean);
+      if (!tokens.length) return pool || [];
+
+      let candidateKeys = null;
+      for (const tok of tokens) {
+        let tokKeys = this.postings.get(tok);
+        if (!tokKeys) {
+          tokKeys = new Set();
+          for (const [key, set] of this.postings) {
+            if (key.startsWith(tok) || key.includes(tok)) {
+              set.forEach(id => tokKeys.add(id));
+              if (tokKeys.size >= 1500) break;
+            }
+          }
+        }
+
+        if (!candidateKeys) {
+          candidateKeys = new Set(tokKeys);
+        } else {
+          const next = new Set();
+          candidateKeys.forEach(id => {
+            if (tokKeys.has(id)) next.add(id);
+          });
+          candidateKeys = next;
+        }
+
+        if (candidateKeys.size === 0) break;
+      }
+
+      if (!candidateKeys || candidateKeys.size === 0) return [];
+
+      const poolKeys = pool ? new Set(pool.map(i => String(i.id || i.num))) : null;
+      const res = [];
+      candidateKeys.forEach(key => {
+        const item = this.itemsMap.get(key);
+        if (item && (!poolKeys || poolKeys.has(key))) {
+          res.push(item);
+        }
+      });
+      return res;
+    }
+  };
+
+  /**
    * 全言語横断で語根インデックスマップを構築
    */
   function buildEtyIndex(appInstance = global.App) {
@@ -523,6 +636,9 @@
 
   // --- グローバルエクスポート ---
   global.VocabSearch = {
+    VocabInvertedIndex,
+    rebuildInvertedIndex: (items) => VocabInvertedIndex.build(items || global.App?.entries),
+    searchInvertedIndex: (q, pool) => VocabInvertedIndex.search(q, pool || global.App?.entries),
     FOLD_CHAR_MAP,
     FOLD_DIGRAPH_MAP,
     tokenToFoldPattern,

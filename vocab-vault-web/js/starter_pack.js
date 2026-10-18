@@ -3510,11 +3510,46 @@
     return { added: toAdd, merged: [...cur, ...toAdd] };
   }
 
+  /**
+   * 外部JSON / IndexedDB / バンドルフォールバック対応の非同期スターターパックデータローダー
+   */
+  async function loadStarterPackData(packId, lang = 'en') {
+    const resolved = resolvePackId(packId, lang);
+    if (PACKS[resolved] && PACKS[resolved].length > 0) {
+      return PACKS[resolved];
+    }
+    if (typeof fetch === 'function') {
+      try {
+        const res = await fetch(`./data/starter_packs/${resolved}.json`);
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json) && json.length > 0) {
+            PACKS[resolved] = json;
+            return json;
+          }
+        }
+      } catch (err) {
+        // オフライン・フォールバック
+      }
+    }
+    return getStarterPack(resolved, lang);
+  }
+
+  function registerPackData(packId, items) {
+    if (packId && Array.isArray(items)) {
+      PACKS[packId] = items;
+      return true;
+    }
+    return false;
+  }
+
   global.VocabStarterPack = {
     getStarterPack,
     getStarterPacksInfo,
     populateStarterPack,
     buildStarterPackGalleryHtml,
+    loadStarterPackData,
+    registerPackData,
     PACKS,
     PACK_METADATA
   };

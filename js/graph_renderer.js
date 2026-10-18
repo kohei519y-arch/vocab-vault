@@ -50,13 +50,58 @@
     }
     return c;
   }
-  // --- 系統樹背景のオフスクリーンCanvas超高速キャッシュ (GPUテクスチャブリット) ---
+  // --- 系統樹背景およびノードラベルのオフスクリーンCanvas超高速キャッシュ (GPUテクスチャブリット) ---
   let treeBgCacheCanvas = null;
   let treeBgCacheDark = null;
+  const labelSpriteCache = new Map(); // key -> { canvas, width, height, dpr }
+  let branchCacheCanvas = null;
+  let branchCacheKey = '';
 
   function invalidateTreeBgCache() {
     treeBgCacheCanvas = null;
     treeBgCacheDark = null;
+    labelSpriteCache.clear();
+    branchCacheCanvas = null;
+    branchCacheKey = '';
+  }
+
+  function getCachedLabelSprite(text, fontSize, color, strokeColor, isDark) {
+    const key = `${text}_${fontSize}_${color}_${strokeColor || ''}_${isDark ? 1 : 0}`;
+    let sprite = labelSpriteCache.get(key);
+    if (!sprite) {
+      if (labelSpriteCache.size > 800) labelSpriteCache.clear();
+      const offCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+      if (!offCanvas) return null;
+      const dpr = typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio || 1) : 1;
+      const sCtx = offCanvas.getContext('2d');
+      if (!sCtx) return null;
+
+      const fontStr = `700 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      sCtx.font = fontStr;
+      const metrics = sCtx.measureText(text);
+      const padX = 8, padY = 4;
+      const w = Math.ceil(metrics.width + padX * 2);
+      const h = Math.ceil(fontSize * 1.5 + padY * 2);
+      offCanvas.width = Math.ceil(w * dpr);
+      offCanvas.height = Math.ceil(h * dpr);
+
+      sCtx.scale(dpr, dpr);
+      sCtx.font = fontStr;
+      sCtx.textBaseline = 'middle';
+      sCtx.textAlign = 'center';
+
+      if (strokeColor) {
+        sCtx.strokeStyle = strokeColor;
+        sCtx.lineWidth = 3.2;
+        sCtx.strokeText(text, w / 2, h / 2);
+      }
+      sCtx.fillStyle = color;
+      sCtx.fillText(text, w / 2, h / 2);
+
+      sprite = { canvas: offCanvas, width: w, height: h, dpr };
+      labelSpriteCache.set(key, sprite);
+    }
+    return sprite;
   }
 
   function getTreeBackgroundCache(isDark) {
@@ -1028,6 +1073,7 @@
     colorToRgba,
     invalidateTreeBgCache,
     getTreeBackgroundCache,
+    getCachedLabelSprite,
     drawGraph
   };
 })(typeof window !== 'undefined' ? window : globalThis);

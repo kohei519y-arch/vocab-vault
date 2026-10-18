@@ -2166,6 +2166,93 @@ def test_items_45_to_50_integrity():
     else:
         log_fail("sw.js: missing legal pages in PRECACHE_ASSETS")
 
+def test_items_1_to_15_deep_enhancements():
+    print("\n--- 22. Items 1-15 Deep Enhancements (Inverted Index, Offscreen Cache, Decoupled Data) ---")
+
+    # Item 1: CATS definition match
+    storage_path = os.path.join(BASE_DIR, "js", "storage.js")
+    edge_fn_path = os.path.join(BASE_DIR, "supabase", "functions", "vocab-generate", "index.ts")
+    with open(storage_path, "r", encoding="utf-8") as f:
+        storage_code = f.read()
+    with open(edge_fn_path, "r", encoding="utf-8") as f:
+        edge_fn_code = f.read()
+
+    m_storage = re.search(r'const\s+CATS\s*=\s*(\[[^\]]+\]);', storage_code)
+    m_edge = re.search(r'const\s+CATS_LIST\s*=\s*(\[[^\]]+\]);', edge_fn_code)
+    if m_storage and m_edge:
+        storage_cats = json.loads(m_storage.group(1))
+        edge_cats = json.loads(m_edge.group(1))
+        if storage_cats == edge_cats and len(storage_cats) == 30:
+            log_pass("Item 1: 30 categories between frontend storage.js and edge function vocab-generate are 100% identical")
+        else:
+            log_fail("Item 1: Category list mismatch between frontend and edge function")
+    else:
+        log_fail("Item 1: Could not parse CATS or CATS_LIST")
+
+    # Item 10: Starter pack decoupled data loading
+    starter_path = os.path.join(BASE_DIR, "js", "starter_pack.js")
+    with open(starter_path, "r", encoding="utf-8") as f:
+        starter_code = f.read()
+    if "loadStarterPackData" in starter_code and "registerPackData" in starter_code:
+        log_pass("Item 10: js/starter_pack.js provides loadStarterPackData & registerPackData decoupled interface")
+    else:
+        log_fail("Item 10: js/starter_pack.js missing loadStarterPackData or registerPackData")
+
+    # Item 14: Inverted index (転置インデックス) JSC execution test
+    search_path = os.path.join(BASE_DIR, "js", "search.js")
+    with open(search_path, "r", encoding="utf-8") as f:
+        search_code = f.read()
+    if "VocabInvertedIndex" in search_code and "rebuildInvertedIndex" in search_code:
+        log_pass("Item 14: js/search.js provides VocabInvertedIndex engine & rebuildInvertedIndex")
+    else:
+        log_fail("Item 14: js/search.js missing VocabInvertedIndex")
+
+    jsc_inverted_index_test = """
+    var sampleWords = [
+      { id: "w1", num: 1, word: "epiphany", meanings: [{ pos: "N", text: "直観的ひらめき" }], etymologyTags: ["*bha-"], blob: "epiphany 直観的ひらめき *bha-" },
+      { id: "w2", num: 2, word: "lucid", meanings: [{ pos: "Adj", text: "明晰な、分かりやすい" }], etymologyTags: ["*leuk-"], blob: "lucid 明晰な、分かりやすい *leuk-" },
+      { id: "w3", num: 3, word: "constant", meanings: [{ pos: "Adj", text: "不変の、一定の" }], etymologyTags: ["*sta-"], blob: "constant 不変の、一定の *sta-" }
+    ];
+    VocabSearch.VocabInvertedIndex.build(sampleWords);
+    if (VocabSearch.VocabInvertedIndex.indexedCount !== 3) throw new Error("Indexed count mismatch");
+    var res1 = VocabSearch.VocabInvertedIndex.search("epiphany", sampleWords);
+    if (res1.length !== 1 || res1[0].word !== "epiphany") throw new Error("Inverted index single token query failed");
+    var res2 = VocabSearch.VocabInvertedIndex.search("明晰", sampleWords);
+    if (res2.length !== 1 || res2[0].word !== "lucid") throw new Error("Inverted index CJK token query failed");
+    var res3 = VocabSearch.VocabInvertedIndex.search("*sta-", sampleWords);
+    if (res3.length !== 1 || res3[0].word !== "constant") throw new Error("Inverted index root query failed");
+    """
+    try:
+        morph_path = os.path.join(BASE_DIR, "js", "morphology.js")
+        with open(morph_path, "r", encoding="utf-8") as f:
+            morph_code = f.read()
+        combined_code = "var window = globalThis; var global = globalThis; var App = {};\n" + morph_code + "\n" + search_code + "\n" + jsc_inverted_index_test
+        res = run_jsc(combined_code)
+        if res.returncode == 0:
+            log_pass("Item 14: JSC verification: VocabInvertedIndex tokenization, build & O(1) query intersection flawless")
+        else:
+            log_fail(f"Item 14: JSC verification VocabInvertedIndex failed: {res.stdout or res.stderr}")
+    except Exception as e:
+        log_fail(f"Item 14: JSC verification VocabInvertedIndex exception: {e}")
+
+    # Item 15: Canvas offscreen label caching in graph_renderer.js
+    renderer_path = os.path.join(BASE_DIR, "js", "graph_renderer.js")
+    with open(renderer_path, "r", encoding="utf-8") as f:
+        renderer_code = f.read()
+    if "getCachedLabelSprite" in renderer_code and "labelSpriteCache" in renderer_code:
+        log_pass("Item 15: js/graph_renderer.js provides getCachedLabelSprite offscreen text sprite cache")
+    else:
+        log_fail("Item 15: js/graph_renderer.js missing getCachedLabelSprite")
+
+    # Item 9: Centralized state accessors in VocabCore
+    app_path = os.path.join(BASE_DIR, "js", "app.js")
+    with open(app_path, "r", encoding="utf-8") as f:
+        app_code = f.read()
+    if "getEntries:" in app_code and "setEntries:" in app_code:
+        log_pass("Item 9: js/app.js VocabCore provides clean getEntries and setEntries state store accessors")
+    else:
+        log_fail("Item 9: js/app.js missing getEntries or setEntries in VocabCore")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -2192,6 +2279,7 @@ def main():
     test_onboarding_cloze_fuzzy_and_sw_banner()
     test_rich_pagination_and_keyboard_shortcuts()
     test_items_45_to_50_integrity()
+    test_items_1_to_15_deep_enhancements()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")

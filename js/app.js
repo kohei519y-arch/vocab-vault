@@ -1566,6 +1566,8 @@
     getJson,
     setJson,
     getAppState: () => App,
+    getEntries: () => App.entries || [],
+    setEntries: (e) => { App.entries = Array.isArray(e) ? e : []; },
     exportAnkiTSV,
     exportObsidianMarkdown,
     startAnki,
