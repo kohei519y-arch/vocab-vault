@@ -4332,7 +4332,8 @@
           "pos": "N",
           "meaning": "行政"
         }
-      ]
+      ],
+      "history_note": "东亚近代公共管理与政治学的共通核心词 (*政)。"
     },
     "de": {
       "meanings": [
@@ -4363,7 +4364,8 @@
           "pos": "N",
           "meaning": "Verwaltung"
         }
-      ]
+      ],
+      "history_note": "Zentralbegriff der ostasiatischen Staats- und Verwaltungswissenschaften (*政)."
     },
     "en": {
       "meanings": [
@@ -4394,7 +4396,8 @@
           "pos": "N",
           "meaning": "administration"
         }
-      ]
+      ],
+      "history_note": "Core public policy and administrative term shared across East Asia (*政)."
     },
     "fr": {
       "meanings": [
@@ -4425,7 +4428,8 @@
           "pos": "N",
           "meaning": "administration"
         }
-      ]
+      ],
+      "history_note": "Terme fondamental de politique publique et d'administration partagé en Asie orientale (*政)."
     },
     "es": {
       "meanings": [
@@ -4456,7 +4460,8 @@
           "pos": "N",
           "meaning": "administración"
         }
-      ]
+      ],
+      "history_note": "Término fundamental de política pública y administración en Asia Oriental (*政)."
     },
     "it": {
       "meanings": [
@@ -4487,7 +4492,8 @@
           "pos": "N",
           "meaning": "amministrazione"
         }
-      ]
+      ],
+      "history_note": "Termine fondamentale di politica pubblica e amministrazione nell'Asia orientale (*政)."
     }
   },
   "경제": {
@@ -4520,7 +4526,8 @@
           "pos": "N",
           "meaning": "经验"
         }
-      ]
+      ],
+      "history_note": "古代政治哲学概念“经世济民”与西方政治经济学融合的近代学术丰碑。"
     },
     "de": {
       "meanings": [
@@ -4551,7 +4558,8 @@
           "pos": "N",
           "meaning": "Erfahrung"
         }
-      ]
+      ],
+      "history_note": "Historische Synthese des klassischen ostasiatischen Staatskonzepts 'jingshi jimin' mit der westlichen Nationalökonomie."
     },
     "en": {
       "meanings": [
@@ -4582,7 +4590,8 @@
           "pos": "N",
           "meaning": "experience"
         }
-      ]
+      ],
+      "history_note": "Historical fusion of the ancient Chinese political concept 'jingshi jimin' (ordering the world, aiding the people) with Western economics."
     },
     "fr": {
       "meanings": [
@@ -4613,7 +4622,8 @@
           "pos": "N",
           "meaning": "expérience"
         }
-      ]
+      ],
+      "history_note": "Synthèse historique du concept classique chinois 'jingshi jimin' et de la science économique occidentale."
     },
     "es": {
       "meanings": [
@@ -4644,7 +4654,8 @@
           "pos": "N",
           "meaning": "experiencia"
         }
-      ]
+      ],
+      "history_note": "Síntesis histórica del concepto clásico 'jingshi jimin' con la economía política occidental."
     },
     "it": {
       "meanings": [
@@ -4675,7 +4686,8 @@
           "pos": "N",
           "meaning": "esperienza"
         }
-      ]
+      ],
+      "history_note": "Sintesi storica tra il concetto classico 'jingshi jimin' e la scienza economica occidentale."
     }
   },
   "이론": {
@@ -4708,7 +4720,8 @@
           "pos": "N/Adj",
           "meaning": "合理（的）"
         }
-      ]
+      ],
+      "history_note": "宋明理学“理（天地根本法则）”升华对应西方近代科学 theory 的典范译词。"
     },
     "de": {
       "meanings": [
@@ -4739,7 +4752,8 @@
           "pos": "N/Adj",
           "meaning": "rational"
         }
-      ]
+      ],
+      "history_note": "Das neokonfuzianische Prinzip *Li (Ordnung der Dinge), erhoben zur Übersetzung westlicher Wissenschaftstheorien."
     },
     "en": {
       "meanings": [
@@ -4770,7 +4784,8 @@
           "pos": "N/Adj",
           "meaning": "rational"
         }
-      ]
+      ],
+      "history_note": "Neo-Confucian concept of *Li (universal underlying principle) elevated to translate Western scientific theory."
     },
     "fr": {
       "meanings": [
@@ -4801,7 +4816,8 @@
           "pos": "N/Adj",
           "meaning": "rationnel"
         }
-      ]
+      ],
+      "history_note": "Principe néo-confucéen du *Li élevé au rang de traduction de la 'théorie' scientifique occidentale."
     },
     "es": {
       "meanings": [
@@ -4832,7 +4848,8 @@
           "pos": "N/Adj",
           "meaning": "racional"
         }
-      ]
+      ],
+      "history_note": "Principio neoconfuciano del *Li elevado a la traducción canónica de la 'teoría' científica."
     },
     "it": {
       "meanings": [
@@ -4863,7 +4880,8 @@
           "pos": "N/Adj",
           "meaning": "razionale"
         }
-      ]
+      ],
+      "history_note": "Principio neoconfuciano del *Li elevato a traduzione canonica della 'teoria' scientifica."
     }
   },
   "관점": {
@@ -4896,7 +4914,8 @@
           "pos": "N",
           "meaning": "观察"
         }
-      ]
+      ],
+      "history_note": "现代东亚认识论中表达观察视角与学术立场的基准核心语汇。"
     },
     "de": {
       "meanings": [
@@ -4927,7 +4946,8 @@
           "pos": "N",
           "meaning": "Beobachtung"
         }
-      ]
+      ],
+      "history_note": "Schlüsselbegriff der modernen Erkenntnistheorie für Standpunkt und Perspektivität."
     },
     "en": {
       "meanings": [
@@ -4958,7 +4978,8 @@
           "pos": "N",
           "meaning": "observation"
         }
-      ]
+      ],
+      "history_note": "Essential philosophical terminology for subjective and objective perspectives in modern academic discourse."
     },
     "fr": {
       "meanings": [
@@ -4989,7 +5010,8 @@
           "pos": "N",
           "meaning": "observation"
         }
-      ]
+      ],
+      "history_note": "Terminologie philosophique essentielle pour la perspective et le point de vue en discours académique."
     },
     "es": {
       "meanings": [
@@ -5020,7 +5042,8 @@
           "pos": "N",
           "meaning": "observación"
         }
-      ]
+      ],
+      "history_note": "Terminología filosófica fundamental para la perspectiva en el discurso académico moderno."
     },
     "it": {
       "meanings": [
@@ -5051,7 +5074,8 @@
           "pos": "N",
           "meaning": "osservazione"
         }
-      ]
+      ],
+      "history_note": "Terminologia filosofica fondamentale per la prospettiva nel discorso accademico moderno."
     }
   },
   "권리": {
@@ -5084,7 +5108,8 @@
           "pos": "N",
           "meaning": "权力"
         }
-      ]
+      ],
+      "history_note": "19世纪东亚近代法学对西方“Right”概念的经典权威翻译。"
     },
     "de": {
       "meanings": [
@@ -5115,7 +5140,8 @@
           "pos": "N",
           "meaning": "Macht"
         }
-      ]
+      ],
+      "history_note": "Kanonische Übersetzung des westlichen Rechtsbegriffs 'Right/Recht' in Ostasien (*權利)."
     },
     "en": {
       "meanings": [
@@ -5146,7 +5172,8 @@
           "pos": "N",
           "meaning": "power"
         }
-      ]
+      ],
+      "history_note": "Canonical 19th-century East Asian translation of Western jurisprudence 'Right' as legitimate authority."
     },
     "fr": {
       "meanings": [
@@ -5177,7 +5204,8 @@
           "pos": "N",
           "meaning": "pouvoir"
         }
-      ]
+      ],
+      "history_note": "Traduction canonique du XIXe siècle du concept juridique occidental de 'Droit'."
     },
     "es": {
       "meanings": [
@@ -5208,7 +5236,8 @@
           "pos": "N",
           "meaning": "poder"
         }
-      ]
+      ],
+      "history_note": "Traducción canónica en Asia Oriental del concepto jurídico occidental de 'Derecho'."
     },
     "it": {
       "meanings": [
@@ -5239,7 +5268,8 @@
           "pos": "N",
           "meaning": "potere"
         }
-      ]
+      ],
+      "history_note": "Traduzione canonica in Asia orientale del concetto giuridico occidentale di 'Diritto'."
     }
   },
   "인식": {
@@ -5272,7 +5302,8 @@
           "pos": "N",
           "meaning": "知识"
         }
-      ]
+      ],
+      "history_note": "从日常认知拓展至哲学认识论（认识论）的核心基石语汇。"
     },
     "de": {
       "meanings": [
@@ -5303,7 +5334,8 @@
           "pos": "N",
           "meaning": "Wissen"
         }
-      ]
+      ],
+      "history_note": "Grundbegriff von alltäglicher Wahrnehmung bis hin zur philosophischen Epistemologie."
     },
     "en": {
       "meanings": [
@@ -5334,7 +5366,8 @@
           "pos": "N",
           "meaning": "knowledge"
         }
-      ]
+      ],
+      "history_note": "Foundational terminology spanning from daily familiarity to philosophical epistemology (episteme)."
     },
     "fr": {
       "meanings": [
@@ -5365,7 +5398,8 @@
           "pos": "N",
           "meaning": "connaissance"
         }
-      ]
+      ],
+      "history_note": "Terme fondamental allant de la perception quotidienne à l'épistémologie philosophique."
     },
     "es": {
       "meanings": [
@@ -5396,7 +5430,8 @@
           "pos": "N",
           "meaning": "conocimiento"
         }
-      ]
+      ],
+      "history_note": "Término fundamental que abarca desde la percepción cotidiana hasta la epistemología filosófica."
     },
     "it": {
       "meanings": [
@@ -5427,7 +5462,8 @@
           "pos": "N",
           "meaning": "conoscenza"
         }
-      ]
+      ],
+      "history_note": "Termine fondamentale che spazia dalla percezione quotidiana all'epistemologia filosofica."
     }
   },
   "政策": {
@@ -5479,7 +5515,8 @@
           "pos": "N",
           "meaning": "Verwaltung, Governance"
         }
-      ]
+      ],
+      "history_note": "Zentralbegriff der ostasiatischen Staats- und Verwaltungswissenschaften (*政)."
     },
     "en": {
       "meanings": [
@@ -5504,7 +5541,8 @@
           "pos": "N",
           "meaning": "administration, governance"
         }
-      ]
+      ],
+      "history_note": "Core public policy and administrative term shared across East Asia (*政)."
     },
     "fr": {
       "meanings": [
@@ -5514,7 +5552,8 @@
         }
       ],
       "core": "Mesures (*政) pour diriger la société avec justice.",
-      "exTrans": "Le gouvernement doit formuler des politiques efficaces."
+      "exTrans": "Le gouvernement doit formuler des politiques efficaces.",
+      "history_note": "Terme fondamental de politique publique et d'administration partagé en Asie orientale (*政)."
     },
     "es": {
       "meanings": [
@@ -5524,7 +5563,8 @@
         }
       ],
       "core": "Medidas (*政) para dirigir con rectitud la sociedad.",
-      "exTrans": "El gobierno debe formular políticas eficaces."
+      "exTrans": "El gobierno debe formular políticas eficaces.",
+      "history_note": "Término fundamental de política pública y administración en Asia Oriental (*政)."
     },
     "it": {
       "meanings": [
@@ -5534,7 +5574,11 @@
         }
       ],
       "core": "Misure (*政) per governare rettamente la società.",
-      "exTrans": "Il governo deve formulare politiche efficaci."
+      "exTrans": "Il governo deve formulare politiche efficaci.",
+      "history_note": "Termine fondamentale di politica pubblica e amministrazione nell'Asia orientale (*政)."
+    },
+    "zh": {
+      "history_note": "东亚近代公共管理与政治学的共通核心词 (*政)。"
     }
   },
   "经济": {
@@ -5586,7 +5630,8 @@
           "pos": "N/V",
           "meaning": "Erfahrung"
         }
-      ]
+      ],
+      "history_note": "Historische Synthese des klassischen ostasiatischen Staatskonzepts 'jingshi jimin' mit der westlichen Nationalökonomie."
     },
     "en": {
       "meanings": [
@@ -5611,7 +5656,8 @@
           "pos": "N/V",
           "meaning": "experience"
         }
-      ]
+      ],
+      "history_note": "Historical fusion of the ancient Chinese political concept 'jingshi jimin' (ordering the world, aiding the people) with Western economics."
     },
     "fr": {
       "meanings": [
@@ -5621,7 +5667,8 @@
         }
       ],
       "core": "Administrer la société et secourir le peuple (*经 + *济).",
-      "exTrans": "L'économie mondiale traverse une mutation rapide."
+      "exTrans": "L'économie mondiale traverse une mutation rapide.",
+      "history_note": "Synthèse historique du concept classique chinois 'jingshi jimin' et de la science économique occidentale."
     },
     "es": {
       "meanings": [
@@ -5631,7 +5678,8 @@
         }
       ],
       "core": "Gobernar la sociedad y auxiliar al pueblo (*经 + *济).",
-      "exTrans": "La economía global atraviesa una rápida transformación."
+      "exTrans": "La economía global atraviesa una rápida transformación.",
+      "history_note": "Síntesis histórica del concepto clásico 'jingshi jimin' con la economía política occidental."
     },
     "it": {
       "meanings": [
@@ -5641,7 +5689,11 @@
         }
       ],
       "core": "Governare la società e sostenere il popolo (*经 + *济).",
-      "exTrans": "L'economia globale attraversa una rapida trasformazione."
+      "exTrans": "L'economia globale attraversa una rapida trasformazione.",
+      "history_note": "Sintesi storica tra il concetto classico 'jingshi jimin' e la scienza economica occidentale."
+    },
+    "zh": {
+      "history_note": "古代政治哲学概念“经世济民”与西方政治经济学融合的近代学术丰碑。"
     }
   },
   "理论": {
@@ -5693,7 +5745,8 @@
           "pos": "V/N",
           "meaning": "Verständnis / verstehen"
         }
-      ]
+      ],
+      "history_note": "Das neokonfuzianische Prinzip *Li (Ordnung der Dinge), erhoben zur Übersetzung westlicher Wissenschaftstheorien."
     },
     "en": {
       "meanings": [
@@ -5718,7 +5771,8 @@
           "pos": "V/N",
           "meaning": "understand / understanding"
         }
-      ]
+      ],
+      "history_note": "Neo-Confucian concept of *Li (universal underlying principle) elevated to translate Western scientific theory."
     },
     "fr": {
       "meanings": [
@@ -5728,7 +5782,8 @@
         }
       ],
       "core": "Exposé méthodique (*论) des principes internes (*理).",
-      "exTrans": "Cette théorie a été vérifiée par application aux données réelles."
+      "exTrans": "Cette théorie a été vérifiée par application aux données réelles.",
+      "history_note": "Principe néo-confucéen du *Li élevé au rang de traduction de la 'théorie' scientifique occidentale."
     },
     "es": {
       "meanings": [
@@ -5738,7 +5793,8 @@
         }
       ],
       "core": "Exposición metódica (*论) de los principios internos (*理).",
-      "exTrans": "Esta teoría se puso a prueba con datos reales."
+      "exTrans": "Esta teoría se puso a prueba con datos reales.",
+      "history_note": "Principio neoconfuciano del *Li elevado a la traducción canónica de la 'teoría' científica."
     },
     "it": {
       "meanings": [
@@ -5748,7 +5804,11 @@
         }
       ],
       "core": "Trattazione sistematica (*论) dei principi intrinseci (*理).",
-      "exTrans": "Questa teoria è stata verificata con dati reali."
+      "exTrans": "Questa teoria è stata verificata con dati reali.",
+      "history_note": "Principio neoconfuciano del *Li elevato a traduzione canonica della 'teoria' scientifica."
+    },
+    "zh": {
+      "history_note": "宋明理学“理（天地根本法则）”升华对应西方近代科学 theory 的典范译词。"
     }
   },
   "观念": {
@@ -5775,7 +5835,8 @@
           "pos": "Adj/N",
           "meaning": "객관적(인)"
         }
-      ]
+      ],
+      "history_note": "정신적 표상과 개념적 틀을 표현하는 동아시아 공통 자원 *관(觀)."
     },
     "de": {
       "meanings": [
@@ -5800,7 +5861,8 @@
           "pos": "Adj/N",
           "meaning": "objektiv"
         }
-      ]
+      ],
+      "history_note": "Gemeinsame kognitive Wurzel *观 für mentale Vorstellungen und Denkmuster."
     },
     "en": {
       "meanings": [
@@ -5825,7 +5887,8 @@
           "pos": "Adj/N",
           "meaning": "objective"
         }
-      ]
+      ],
+      "history_note": "Shared cognitive root *观 expressing mental constructs and conceptual frameworks."
     },
     "fr": {
       "meanings": [
@@ -5835,7 +5898,8 @@
         }
       ],
       "core": "Image mentale durable (*念) issue de l'observation (*观).",
-      "exTrans": "Il faut renouveler nos conceptions traditionnelles."
+      "exTrans": "Il faut renouveler nos conceptions traditionnelles.",
+      "history_note": "Racine cognitive *观 exprimant les représentations mentales et schémas de pensée."
     },
     "es": {
       "meanings": [
@@ -5845,7 +5909,8 @@
         }
       ],
       "core": "Imagen mental fijada (*念) tras la observación (*观).",
-      "exTrans": "Es necesario renovar nuestros conceptos tradicionales."
+      "exTrans": "Es necesario renovar nuestros conceptos tradicionales.",
+      "history_note": "Raíz cognitiva *观 que expresa representaciones mentales y conceptos rectores."
     },
     "it": {
       "meanings": [
@@ -5855,7 +5920,8 @@
         }
       ],
       "core": "Immagine mentale (*念) derivata dall'osservazione (*观).",
-      "exTrans": "È necessario rinnovare i nostri concetti tradizionali."
+      "exTrans": "È necessario rinnovare i nostri concetti tradizionali.",
+      "history_note": "Radice cognitiva *观 che esprime rappresentazioni mentali e concetti guida."
     }
   },
   "权利": {
@@ -5907,7 +5973,8 @@
           "pos": "N",
           "meaning": "Macht, Befugnis"
         }
-      ]
+      ],
+      "history_note": "Kanonische Übersetzung des westlichen Rechtsbegriffs 'Right/Recht' in Ostasien (*權利)."
     },
     "en": {
       "meanings": [
@@ -5932,7 +5999,8 @@
           "pos": "N",
           "meaning": "power, authority"
         }
-      ]
+      ],
+      "history_note": "Canonical 19th-century East Asian translation of Western jurisprudence 'Right' as legitimate authority."
     },
     "fr": {
       "meanings": [
@@ -5942,7 +6010,8 @@
         }
       ],
       "core": "Pouvoir légitime (*权) d'exercer une prérogative (*利).",
-      "exTrans": "Les citoyens ont le droit de défendre leurs intérêts légitimes."
+      "exTrans": "Les citoyens ont le droit de défendre leurs intérêts légitimes.",
+      "history_note": "Traduction canonique du XIXe siècle du concept juridique occidental de 'Droit'."
     },
     "es": {
       "meanings": [
@@ -5952,7 +6021,8 @@
         }
       ],
       "core": "Facultad legítima (*权) para gozar de prerrogativas (*利).",
-      "exTrans": "Los ciudadanos tienen el derecho de defender sus intereses legítimos."
+      "exTrans": "Los ciudadanos tienen el derecho de defender sus intereses legítimos.",
+      "history_note": "Traducción canónica en Asia Oriental del concepto jurídico occidental de 'Derecho'."
     },
     "it": {
       "meanings": [
@@ -5962,7 +6032,11 @@
         }
       ],
       "core": "Facoltà legittima (*权) di esercitare un potere (*利).",
-      "exTrans": "I cittadini hanno il diritto di difendere i propri interessi legittimi."
+      "exTrans": "I cittadini hanno il diritto di difendere i propri interessi legittimi.",
+      "history_note": "Traduzione canonica in Asia orientale del concetto giuridico occidentale di 'Diritto'."
+    },
+    "zh": {
+      "history_note": "19世纪东亚近代法学对西方“Right”概念的经典权威翻译。"
     }
   },
   "认识": {
@@ -6026,7 +6100,8 @@
           "pos": "N/V",
           "meaning": "Bewusstsein"
         }
-      ]
+      ],
+      "history_note": "Grundbegriff von alltäglicher Wahrnehmung bis hin zur philosophischen Epistemologie."
     },
     "en": {
       "meanings": [
@@ -6057,7 +6132,8 @@
           "pos": "N/V",
           "meaning": "consciousness"
         }
-      ]
+      ],
+      "history_note": "Foundational terminology spanning from daily familiarity to philosophical epistemology (episteme)."
     },
     "fr": {
       "meanings": [
@@ -6067,7 +6143,8 @@
         }
       ],
       "core": "Graver dans l'esprit (*认) et discerner (*识).",
-      "exTrans": "La prise de conscience collective de ce problème s'approfondit."
+      "exTrans": "La prise de conscience collective de ce problème s'approfondit.",
+      "history_note": "Terme fondamental allant de la perception quotidienne à l'épistémologie philosophique."
     },
     "es": {
       "meanings": [
@@ -6077,7 +6154,8 @@
         }
       ],
       "core": "Grabar en la mente (*认) y discernir con claridad (*识).",
-      "exTrans": "La conciencia social sobre este asunto se profundiza."
+      "exTrans": "La conciencia social sobre este asunto se profundiza.",
+      "history_note": "Término fundamental que abarca desde la percepción cotidiana hasta la epistemología filosófica."
     },
     "it": {
       "meanings": [
@@ -6087,7 +6165,11 @@
         }
       ],
       "core": "Imprimere nella mente (*认) e discernere (*识).",
-      "exTrans": "La consapevolezza sociale su questa problematica si approfondisce."
+      "exTrans": "La consapevolezza sociale su questa problematica si approfondisce.",
+      "history_note": "Termine fondamentale che spazia dalla percezione quotidiana all'epistemologia filosofica."
+    },
+    "zh": {
+      "history_note": "从日常认知拓展至哲学认识论（认识论）的核心基石语汇。"
     }
   },
   "concebir": {
@@ -6114,7 +6196,8 @@
           "pos": "N[f]",
           "meaning": "Konzeption, Begriff"
         }
-      ]
+      ],
+      "history_note": "Zentrales Verb für philosophische und künstlerische Konzeption in der Ibero-Romania."
     },
     "en": {
       "meanings": [
@@ -6139,7 +6222,8 @@
           "pos": "N[f]",
           "meaning": "conception"
         }
-      ]
+      ],
+      "history_note": "Core verb for philosophical, artistic, and conceptual ideation in Ibero-Romance."
     },
     "ko": {
       "meanings": [
@@ -6168,7 +6252,8 @@
           "pos": "N",
           "meaning": "구상, 임신"
         }
-      ]
+      ],
+      "history_note": "이베로-로맨스어에서 철학적·예술적 구상을 논할 때 사용하는 핵심 동사."
     },
     "zh": {
       "meanings": [
@@ -6197,7 +6282,17 @@
           "pos": "N",
           "meaning": "构想、受孕"
         }
-      ]
+      ],
+      "history_note": "伊比利亚罗曼语支中表达哲学与艺术构想的核心动词。"
+    },
+    "fr": {
+      "history_note": "Verbe fondamental pour la conception philosophique et artistique dans les langues ibéro-romanes."
+    },
+    "es": {
+      "history_note": "Verbo esencial para la conceptualización filosófica y artística en la Iberorromania."
+    },
+    "it": {
+      "history_note": "Verbo essenziale per l'ideazione filosofica e artistica nelle lingue ibero-romanze."
     }
   },
   "mantener": {
@@ -6224,7 +6319,8 @@
           "pos": "N[m]",
           "meaning": "Instandhaltung, Wartung"
         }
-      ]
+      ],
+      "history_note": "Hochfrequentes Verb im DELE B2/C1 zur Erörterung diplomatischer Ordnung und institutioneller Stabilität."
     },
     "en": {
       "meanings": [
@@ -6249,7 +6345,8 @@
           "pos": "N[m]",
           "meaning": "maintenance"
         }
-      ]
+      ],
+      "history_note": "High-frequency verb in DELE B2/C1 for discussing institutional stability and diplomatic order."
     },
     "ko": {
       "meanings": [
@@ -6273,7 +6370,8 @@
           "pos": "N",
           "meaning": "유지, 보수"
         }
-      ]
+      ],
+      "history_note": "외교 질서나 제도의 지속 가능성을 논하는 DELE B2/C1 최고 빈출 동사."
     },
     "zh": {
       "meanings": [
@@ -6297,7 +6395,17 @@
           "pos": "N",
           "meaning": "维持、保养"
         }
-      ]
+      ],
+      "history_note": "DELE B2/C1考试中讨论外交秩序与制度可持续性的高频核心动词。"
+    },
+    "fr": {
+      "history_note": "Verbe très fréquent au DELE B2/C1 pour traiter de l'ordre diplomatique et de la pérennité institutionnelle."
+    },
+    "es": {
+      "history_note": "Verbo de alta frecuencia en DELE B2/C1 para debatir el orden diplomático y la estabilidad institucional."
+    },
+    "it": {
+      "history_note": "Verbo frequente nei contesti diplomatici e istituzionali per discutere la stabilità."
     }
   },
   "establecer": {
@@ -6324,7 +6432,8 @@
           "pos": "N[m]",
           "meaning": "Einrichtung, Niederlassung"
         }
-      ]
+      ],
+      "history_note": "Standardverb zur Begründung von Normen, Institutionen und völkerrechtlichen Verträgen."
     },
     "en": {
       "meanings": [
@@ -6349,7 +6458,8 @@
           "pos": "N[m]",
           "meaning": "establishment"
         }
-      ]
+      ],
+      "history_note": "Standard legal verb for enacting norms, founding institutions, and establishing international treaties."
     },
     "ko": {
       "meanings": [
@@ -6373,7 +6483,8 @@
           "pos": "N",
           "meaning": "확립, 시설"
         }
-      ]
+      ],
+      "history_note": "헌법 조항이나 국제 조약에서 규범과 제도를 창설할 때 사용하는 표준 동사."
     },
     "zh": {
       "meanings": [
@@ -6397,7 +6508,17 @@
           "pos": "N",
           "meaning": "建立、机构"
         }
-      ]
+      ],
+      "history_note": "宪法条文与国际条约中创立规范与制度时的标准动词。"
+    },
+    "fr": {
+      "history_note": "Verbe juridique standard pour instituer des normes et fonder des traités internationaux."
+    },
+    "es": {
+      "history_note": "Verbo canónico para promulgar normas, fundar instituciones y ratificar tratados."
+    },
+    "it": {
+      "history_note": "Verbo canonico per promulgare norme e ratificare trattati internazionali."
     }
   },
   "transferir": {
@@ -6424,7 +6545,8 @@
           "pos": "N[f]",
           "meaning": "Überweisung, Übertragung"
         }
-      ]
+      ],
+      "history_note": "Zentralbegriff für Kompetenzübertragungen im spanischen Autonomiemodell und moderne Finanztransaktionen."
     },
     "en": {
       "meanings": [
@@ -6449,7 +6571,8 @@
           "pos": "N[f]",
           "meaning": "transfer"
         }
-      ]
+      ],
+      "history_note": "Core concept in Spanish administrative devolution (transferencia de competencias) and modern finance."
     },
     "ko": {
       "meanings": [
@@ -6473,7 +6596,8 @@
           "pos": "N",
           "meaning": "이전, 이체"
         }
-      ]
+      ],
+      "history_note": "권한 위임(transferencia de competencias) 등 스페인 자치주 제도와 금융 거래의 핵심 개념."
     },
     "zh": {
       "meanings": [
@@ -6497,7 +6621,17 @@
           "pos": "N",
           "meaning": "转移、转账"
         }
-      ]
+      ],
+      "history_note": "西班牙自治区分权（transferencia de competencias）与金融转账中的核心概念。"
+    },
+    "fr": {
+      "history_note": "Concept clé dans le transfert de compétences de l'administration espagnole et les transactions financières."
+    },
+    "es": {
+      "history_note": "Concepto nuclear en la descentralización administrativa y las transferencias financieras."
+    },
+    "it": {
+      "history_note": "Concetto centrale nel decentramento amministrativo e nelle transazioni finanziarie."
     }
   },
   "perspectiva": {
@@ -6524,7 +6658,8 @@
           "pos": "Adj",
           "meaning": "scharfsinnig"
         }
-      ]
+      ],
+      "history_note": "Schlüsselbegriff im 'Perspektivismus' (perspectivismo) des spanischen Philosophen Ortega y Gasset."
     },
     "en": {
       "meanings": [
@@ -6549,7 +6684,8 @@
           "pos": "Adj",
           "meaning": "perspicacious, shrewd"
         }
-      ]
+      ],
+      "history_note": "Central concept in philosopher Ortega y Gasset's 'perspectivism' (perspectivismo)."
     },
     "ko": {
       "meanings": [
@@ -6573,7 +6709,8 @@
           "pos": "Adj",
           "meaning": "통찰력 있는"
         }
-      ]
+      ],
+      "history_note": "스페인 철학자 오르테가 이 가세트의 '관점주의(perspectivismo)'의 핵심 개념."
     },
     "zh": {
       "meanings": [
@@ -6597,7 +6734,17 @@
           "pos": "Adj",
           "meaning": "敏锐洞察的"
         }
-      ]
+      ],
+      "history_note": "西班牙哲学家奥尔特加·伊·加塞特“视角主义（perspectivismo）”的核心哲学概念。"
+    },
+    "fr": {
+      "history_note": "Concept central du 'perspectivisme' (perspectivismo) du philosophe espagnol Ortega y Gasset."
+    },
+    "es": {
+      "history_note": "Concepto nuclear del perspectivismo filosófico de José Ortega y Gasset."
+    },
+    "it": {
+      "history_note": "Concetto cardine del prospettivismo filosofico di José Ortega y Gasset."
     }
   },
   "contradecir": {
@@ -6624,7 +6771,8 @@
           "pos": "N[f]",
           "meaning": "Widerspruch"
         }
-      ]
+      ],
+      "history_note": "Grundlegendes Verb für die logische Widerlegung in wissenschaftlichen Debatten und juristischen Plädoyers."
     },
     "en": {
       "meanings": [
@@ -6649,7 +6797,8 @@
           "pos": "N[f]",
           "meaning": "contradiction"
         }
-      ]
+      ],
+      "history_note": "Foundational verb for logical refutation in academic debates and legal arguments."
     },
     "ko": {
       "meanings": [
@@ -6673,7 +6822,8 @@
           "pos": "N",
           "meaning": "모순, 반박"
         }
-      ]
+      ],
+      "history_note": "학술 토론 및 법정 변론에서 논리적 반증을 행할 때 사용하는 기초 동사."
     },
     "zh": {
       "meanings": [
@@ -6697,7 +6847,17 @@
           "pos": "N",
           "meaning": "矛盾、抵触"
         }
-      ]
+      ],
+      "history_note": "学术辩论与法庭辩护中进行逻辑反驳的基础核心动词。"
+    },
+    "fr": {
+      "history_note": "Verbe fondamental de la réfutation logique dans les débats académiques et les plaidoiries juridiques."
+    },
+    "es": {
+      "history_note": "Verbo fundamental para la refutación lógica en debates académicos y alegatos judiciales."
+    },
+    "it": {
+      "history_note": "Verbo fondamentale per la confutazione logica nei dibattiti accademici e forensi."
     }
   },
   "bestehen": {
@@ -6710,7 +6870,8 @@
       ],
       "core": "Rester debout solidement (*sta-) face aux épreuves ou perdurer dans l'être.",
       "etymology": "Vieux haut-allemand bistantan (be- + stehen), racine indo-européenne *sta- (être debout).",
-      "exTrans": "Il n'y a aucun doute sur l'existence de cette corrélation."
+      "exTrans": "Il n'y a aucun doute sur l'existence de cette corrélation.",
+      "history_note": "Concept épistémologique fondamental dans la philosophie kantienne et la jurisprudence allemande."
     },
     "en": {
       "meanings": [
@@ -6721,7 +6882,8 @@
       ],
       "core": "Standing firmly (*sta-) enduring tests or remaining in existence.",
       "etymology": "From Old High German bistantan, PIE *sta- (stand). Cognate with English be + stand.",
-      "exTrans": "There is no doubt about the existence of this correlation."
+      "exTrans": "There is no doubt about the existence of this correlation.",
+      "history_note": "Key epistemological concept in Kantian philosophy and German constitutional jurisprudence."
     },
     "ko": {
       "meanings": [
@@ -6750,7 +6912,8 @@
           "pos": "N",
           "meaning": "불변성, 지속성"
         }
-      ]
+      ],
+      "history_note": "칸트 철학의 인식론 및 독일 헌법 판례에서 지속성과 존속을 규정하는 핵심 용어."
     },
     "zh": {
       "meanings": [
@@ -6774,7 +6937,17 @@
           "pos": "N",
           "meaning": "存续、库存、藏量"
         }
-      ]
+      ],
+      "history_note": "康德哲学认识论与德国宪法判例中表述客观存续的核心概念。"
+    },
+    "de": {
+      "history_note": "Zentraler erkenntnistheoretischer Begriff in Kants Philosophie und der deutschen Verfassungsjurisprudenz."
+    },
+    "es": {
+      "history_note": "Concepto epistemológico clave en la filosofía kantiana y la jurisprudencia constitucional alemana."
+    },
+    "it": {
+      "history_note": "Concetto epistemologico fondamentale nella filosofia kantiana e nella giurisprudenza costituzionale."
     }
   },
   "entstehen": {
@@ -6787,7 +6960,8 @@
       ],
       "core": "S'élever et prendre naissance à partir d'une origine (*sta-).",
       "etymology": "Préfixe ent- (séparation/émergence) + stehen (se tenir), racine *sta-.",
-      "exTrans": "De nouvelles opportunités émergent grâce aux avancées technologiques."
+      "exTrans": "De nouvelles opportunités émergent grâce aux avancées technologiques.",
+      "history_note": "Terme fondamental de l'historiographie et de l'épistémologie de l'émergence (Entstehungsgeschichte)."
     },
     "en": {
       "meanings": [
@@ -6798,7 +6972,8 @@
       ],
       "core": "Rising and taking stand (*sta-) from an origin point (ent-).",
       "etymology": "Prefix ent- (away/forth) + stehen (stand), PIE *sta-.",
-      "exTrans": "New opportunities arise through technological advances."
+      "exTrans": "New opportunities arise through technological advances.",
+      "history_note": "Essential terminology in German historiography and evolutionary epistemology (Entstehungsgeschichte)."
     },
     "ko": {
       "meanings": [
@@ -6822,7 +6997,8 @@
           "pos": "N",
           "meaning": "발생, 기원, 형성"
         }
-      ]
+      ],
+      "history_note": "역사학 및 발생론적 인식론(발생사: Entstehungsgeschichte)의 기본 학술 개념."
     },
     "zh": {
       "meanings": [
@@ -6846,7 +7022,17 @@
           "pos": "N",
           "meaning": "产生、起源、成因"
         }
-      ]
+      ],
+      "history_note": "历史学与发生学认识论（发生史：Entstehungsgeschichte）中的基础学术术语。"
+    },
+    "de": {
+      "history_note": "Grundbegriff der Geschichtsschreibung und evolutionären Erkenntnistheorie (Entstehungsgeschichte)."
+    },
+    "es": {
+      "history_note": "Término fundamental de la historiografía y la génesis institucional."
+    },
+    "it": {
+      "history_note": "Termine fondamentale della storiografia e dell'epistemologia genetica."
     }
   },
   "einbeziehen": {
@@ -6858,7 +7044,8 @@
         }
       ],
       "core": "Tirer vers l'intérieur d'un cercle (*dewk- / ziehen) pour englober.",
-      "exTrans": "Tous les facteurs environnementaux doivent être pris en compte."
+      "exTrans": "Tous les facteurs environnementaux doivent être pris en compte.",
+      "history_note": "Verbe procédural essentiel des politiques environnementales européennes et de la concertation."
     },
     "en": {
       "meanings": [
@@ -6868,7 +7055,8 @@
         }
       ],
       "core": "Drawing in (*dewk-) to encompass within the boundary.",
-      "exTrans": "All environmental factors must be taken into account."
+      "exTrans": "All environmental factors must be taken into account.",
+      "history_note": "Crucial procedural verb in modern European environmental policy and stakeholder integration."
     },
     "ko": {
       "meanings": [
@@ -6892,7 +7080,8 @@
           "pos": "N",
           "meaning": "포함, 산입, 고려"
         }
-      ]
+      ],
+      "history_note": "유럽 환경 정책 및 이해관계자 통합 의사결정의 핵심 절차 동사."
     },
     "zh": {
       "meanings": [
@@ -6916,7 +7105,17 @@
           "pos": "N",
           "meaning": "纳入、包含"
         }
-      ]
+      ],
+      "history_note": "欧洲环境政策与利益相关方多边协商决策中的关键程序动词。"
+    },
+    "de": {
+      "history_note": "Zentrales Verfahrensverb der europäischen Umweltpolitik und Stakeholder-Integration."
+    },
+    "es": {
+      "history_note": "Verbo procedimental clave en las políticas ambientales europeas y la gobernanza participativa."
+    },
+    "it": {
+      "history_note": "Verbo procedurale fondamentale nelle politiche ambientali e di consultazione."
     }
   },
   "bewältigen": {
@@ -6928,7 +7127,8 @@
         }
       ],
       "core": "Exercer sa force (*waldan) pour maîtriser une difficulté.",
-      "exTrans": "La société a su surmonter cette crise majeure avec résilience."
+      "exTrans": "La société a su surmonter cette crise majeure avec résilience.",
+      "history_note": "Célèbre pour le débat éthique et mémoriel sur la 'Vergangenheitsbewältigung' (travail de mémoire)."
     },
     "en": {
       "meanings": [
@@ -6938,7 +7138,8 @@
         }
       ],
       "core": "Exercising power (*waldan) to triumph over challenges.",
-      "exTrans": "Society managed to overcome this major crisis with resilience."
+      "exTrans": "Society managed to overcome this major crisis with resilience.",
+      "history_note": "Famous for the post-war German ethical and philosophical discourse on 'Vergangenheitsbewältigung' (coping with the past)."
     },
     "ko": {
       "meanings": [
@@ -6962,7 +7163,8 @@
           "pos": "N",
           "meaning": "극복, 처리, 해결"
         }
-      ]
+      ],
+      "history_note": "전후 독일의 윤리·역사 철학 담론인 '과거극복(Vergangenheitsbewältigung)'으로 널리 알려진 개념."
     },
     "zh": {
       "meanings": [
@@ -6986,7 +7188,17 @@
           "pos": "N",
           "meaning": "克服、化解、处理"
         }
-      ]
+      ],
+      "history_note": "因战后德国伦理与历史哲学反思“清算克服历史（Vergangenheitsbewältigung）”而闻名。"
+    },
+    "de": {
+      "history_note": "Berühmt durch den philosophisch-historischen Diskurs über 'Vergangenheitsbewältigung'."
+    },
+    "es": {
+      "history_note": "Famoso por el debate ético e histórico sobre la asimilación del pasado ('Vergangenheitsbewältigung')."
+    },
+    "it": {
+      "history_note": "Celebre per il dibattito etico e storico sulla rielaborazione del passato ('Vergangenheitsbewältigung')."
     }
   },
   "nachhaltig": {
@@ -6998,7 +7210,8 @@
         }
       ],
       "core": "Maintenir une prise continue (*haldan) qui dure dans le temps.",
-      "exTrans": "Un développement durable est essentiel pour les générations futures."
+      "exTrans": "Un développement durable est essentiel pour les générations futures.",
+      "history_note": "Forgé en 1713 par Carlowitz pour la sylviculture durable, devenu paradigme mondial (Nachhaltigkeit)."
     },
     "en": {
       "meanings": [
@@ -7008,7 +7221,8 @@
         }
       ],
       "core": "Holding (*haldan) continuously so that value endures over time.",
-      "exTrans": "Sustainable development is essential for future generations."
+      "exTrans": "Sustainable development is essential for future generations.",
+      "history_note": "Coined in 1713 by Saxon mining administrator von Carlowitz to formulate sustainable forestry, now a global paradigm (Nachhaltigkeit)."
     },
     "ko": {
       "meanings": [
@@ -7032,7 +7246,8 @@
           "pos": "N",
           "meaning": "지속 가능성"
         }
-      ]
+      ],
+      "history_note": "1713년 작센 광산감독관 카를로비츠가 산림 지속 관리를 위해 제창하여 현대의 글로벌 패러다임이 된 개념 (Nachhaltigkeit)."
     },
     "zh": {
       "meanings": [
@@ -7056,7 +7271,17 @@
           "pos": "N",
           "meaning": "可持续性"
         }
-      ]
+      ],
+      "history_note": "1713年由萨克森林业管理者卡洛维茨提出以维护永续林业，现为全球可持续发展范式。"
+    },
+    "de": {
+      "history_note": "1713 von Hans Carl von Carlowitz für die nachhaltige Forstwirtschaft geprägt; heute weltweites Leitparadigma (Nachhaltigkeit)."
+    },
+    "es": {
+      "history_note": "Acuñado en 1713 por von Carlowitz para la silvicultura sostenible, hoy paradigma global."
+    },
+    "it": {
+      "history_note": "Coniato nel 1713 da von Carlowitz per la silvicoltura sostenibile, oggi paradigma globale."
     }
   },
   "übertragen": {
@@ -7068,7 +7293,8 @@
         }
       ],
       "core": "Porter par-delà les frontières (*dʰregʰ- / tragen).",
-      "exTrans": "Il est difficile de transposer ces résultats directement à la pratique clinique."
+      "exTrans": "Il est difficile de transposer ces résultats directement à la pratique clinique.",
+      "history_note": "Concept fondamental en droit comparé (transposition de directives) et en épistémologie."
     },
     "en": {
       "meanings": [
@@ -7078,7 +7304,8 @@
         }
       ],
       "core": "Carrying (*dʰregʰ-) across (über-) boundaries.",
-      "exTrans": "It is difficult to transfer these results directly into clinical practice."
+      "exTrans": "It is difficult to transfer these results directly into clinical practice.",
+      "history_note": "Foundational concept in comparative law (transposition of directives) and epistemology (transfer of theories)."
     },
     "ko": {
       "meanings": [
@@ -7102,7 +7329,8 @@
           "pos": "N",
           "meaning": "전달, 중계, 전이"
         }
-      ]
+      ],
+      "history_note": "비교법학(지침의 국내법 전환) 및 인식론(이론의 응용 전이)의 기본 개념."
     },
     "zh": {
       "meanings": [
@@ -7126,7 +7354,17 @@
           "pos": "N",
           "meaning": "转让、转播、转移"
         }
-      ]
+      ],
+      "history_note": "比较法学（指令转化）与认识论（理论迁移推广）中的核心基石概念。"
+    },
+    "de": {
+      "history_note": "Grundbegriff der Rechtsvergleichung (Rechtsübertragung) und Erkenntnistheorie (Theorientransfer)."
+    },
+    "es": {
+      "history_note": "Concepto fundamental en el derecho comparado (transposición de directivas) y la epistemología."
+    },
+    "it": {
+      "history_note": "Concetto fondamentale nel diritto comparato (trasposizione di direttive) e nell'epistemologia."
     }
   }
 };
@@ -7146,29 +7384,79 @@
     cloned.tgtLang = t;
     cloned.pair = `${s}_${t}`;
 
+    const hasKana = str => typeof str === 'string' && /[\u3040-\u309f\u30a0-\u30ff]/.test(str);
+
     if (loc) {
       if (loc.meanings) cloned.meanings = JSON.parse(JSON.stringify(loc.meanings));
       if (loc.core) cloned.core = loc.core;
       if (loc.etymology) cloned.etymology = loc.etymology;
+      if (loc.history_note) {
+        cloned.history_note = loc.history_note;
+      } else if (hasKana(cloned.history_note)) {
+        delete cloned.history_note;
+      }
       if (cloned.example) {
         if (loc.exTrans) {
           cloned.example.trans = loc.exTrans;
           cloned.example[t] = loc.exTrans;
+        } else if (hasKana(cloned.example.trans)) {
+          cloned.example.trans = cloned.example.foreign || '';
         }
+        delete cloned.example.ja;
       }
-      if (Array.isArray(cloned.phrases) && Array.isArray(loc.phrases)) {
+      if (Array.isArray(cloned.phrases)) {
         cloned.phrases = cloned.phrases.map((p, idx) => {
-          const lp = loc.phrases[idx];
-          return lp ? { ...p, trans: lp.trans, [t]: lp.trans } : p;
+          const lp = Array.isArray(loc.phrases) ? loc.phrases[idx] : null;
+          const res = { foreign: p.foreign };
+          if (lp && lp.trans) {
+            res.trans = lp.trans;
+            res[t] = lp.trans;
+          } else if (p.trans && !hasKana(p.trans)) {
+            res.trans = p.trans;
+          } else {
+            res.trans = '';
+          }
+          return res;
         });
       }
-      if (Array.isArray(cloned.derivatives) && Array.isArray(loc.derivatives)) {
+      if (Array.isArray(cloned.derivatives)) {
         cloned.derivatives = cloned.derivatives.map((d, idx) => {
-          const ld = loc.derivatives[idx];
-          return ld ? { ...d, meaning: ld.meaning || d.meaning } : d;
+          const ld = Array.isArray(loc.derivatives) ? loc.derivatives[idx] : null;
+          const res = { ...d };
+          if (ld && ld.meaning) {
+            res.meaning = ld.meaning;
+            res[t] = ld.meaning;
+          } else if (hasKana(d.meaning)) {
+            res.meaning = '';
+          }
+          return res;
         });
+      }
+      if (loc.category) cloned.category = loc.category;
+    } else {
+      if (hasKana(cloned.history_note)) delete cloned.history_note;
+      if (cloned.example) {
+        if (hasKana(cloned.example.trans)) cloned.example.trans = cloned.example.foreign || '';
+        delete cloned.example.ja;
+      }
+      if (Array.isArray(cloned.phrases)) {
+        cloned.phrases = cloned.phrases.map(p => ({ foreign: p.foreign, trans: hasKana(p.trans || p.ja) ? '' : (p.trans || '') }));
+      }
+      if (Array.isArray(cloned.derivatives)) {
+        cloned.derivatives = cloned.derivatives.map(d => (hasKana(d.meaning) ? { ...d, meaning: '' } : d));
       }
     }
+
+    if (global.VocabI18n?.translateCategory) {
+      cloned.category = global.VocabI18n.translateCategory(cloned.category, t);
+    }
+    if (hasKana(cloned.folder)) {
+      cloned.folder = `${s.toUpperCase()} Starter Pack`;
+    }
+    if (cloned.example) {
+      delete cloned.example.ja;
+    }
+
     return cloned;
   }
 

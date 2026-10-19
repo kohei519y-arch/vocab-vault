@@ -212,8 +212,13 @@
 
     let etyHtml = '';
     if (hasEty) {
+      const hasKana = str => typeof str === 'string' && /[\u3040-\u309f\u30a0-\u30ff]/.test(str);
       const etyText = item.etymology ? `<p class="anki-ety-text"><strong>${etyLbl}:</strong> ${esc(item.etymology)}</p>` : '';
-      const histText = item.history_note ? `<p class="anki-hist-text"><strong>${histLbl}:</strong> ${esc(item.history_note)}</p>` : '';
+      let hn = item.history_note ? String(item.history_note).trim() : '';
+      if (tL !== 'ja' && hasKana(hn)) {
+        hn = item[`history_note_${tL}`] || item.history_note_trans || '';
+      }
+      const histText = hn ? `<p class="anki-hist-text"><strong>${histLbl}:</strong> ${esc(hn)}</p>` : '';
       const tagsText = (Array.isArray(item.etymologyTags) && item.etymologyTags.length) ? `
         <div class="anki-ety-tags" style="margin:6px 0;">
           ${item.etymologyTags.map(t => `<span class="ety-tag">${esc(t)}</span>`).join(' ')}
@@ -221,7 +226,11 @@
       ` : '';
       const derivsText = (Array.isArray(item.derivatives) && item.derivatives.length) ? `
         <div class="anki-derivs" style="margin-top:6px;font-size:12px;color:var(--s);">
-          <strong>${drvLbl}:</strong> ${item.derivatives.slice(0, 4).map(d => `${esc(d.word)} (${esc(d.meaning || '')})`).join(', ')}
+          <strong>${drvLbl}:</strong> ${item.derivatives.slice(0, 4).map(d => {
+            let m = d.meaning || '';
+            if (tL !== 'ja' && hasKana(m)) m = d[`meaning_${tL}`] || d.meaning_en || '';
+            return `${esc(d.word)}${m ? ` (${esc(m)})` : ''}`;
+          }).join(', ')}
         </div>
       ` : '';
 
@@ -439,19 +448,31 @@
     const tL = item.tgtLang || global.App?.tgtLang || 'ja';
     const coreBadgePrefix = (tL === 'en' ? 'Core: ' : (tL === 'de' ? 'Kern: ' : (tL === 'fr' ? 'Cœur: ' : (tL === 'es' ? 'Núcleo: ' : (tL === 'ko' ? '코아이미지: ' : (tL === 'zh' ? '核心概念: ' : 'コアイメージ: '))))));
     const badges = [];
-    if (item.core) {
-      badges.push(`<div class="cloze-hint-badge core">${CLOZE_IDEA_SVG}${coreBadgePrefix}${esc(item.core)}</div>`);
+    let coreText = item.core;
+    if (tL !== 'ja' && /[\u3040-\u309f\u30a0-\u30ff]/.test(coreText)) {
+      coreText = item[`core_${tL}`] || item.core_en || '';
+      if (/[\u3040-\u309f\u30a0-\u30ff]/.test(coreText)) coreText = '';
+    }
+    if (coreText) {
+      badges.push(`<div class="cloze-hint-badge core">${CLOZE_IDEA_SVG}${coreBadgePrefix}${esc(coreText)}</div>`);
     }
     const pos = item.meanings?.[0]?.pos;
-    const meaning = item.meanings?.[0]?.text;
+    let meaning = item.meanings?.[0]?.text;
+    if (tL !== 'ja' && /[\u3040-\u309f\u30a0-\u30ff]/.test(meaning)) {
+      meaning = item.meanings?.[0]?.[`text_${tL}`] || item.meanings?.[0]?.en || item.meanings?.[0]?.text_en || '';
+      if (/[\u3040-\u309f\u30a0-\u30ff]/.test(meaning)) meaning = '';
+    }
     if (pos || meaning) {
       badges.push(`<div class="cloze-hint-badge">${CLOZE_BOOK_SVG}${pos ? `[${esc(pos)}] ` : ''}${esc(meaning || '')}</div>`);
     }
+    const isJa = tL === 'ja';
     const firstChar = item.word ? item.word.charAt(0) : '';
-    const lenHint = item.word ? `${item.word.length}文字 / 先頭 '${esc(firstChar)}...'` : 'スペルを入力';
+    const lenHint = item.word ? (isJa ? `${item.word.length}文字 / 先頭 '${esc(firstChar)}...'` : `${item.word.length} chars / starts with '${esc(firstChar)}...'`) : (isJa ? 'スペルを入力' : 'Type spelling');
+    const phText = isJa ? `タイピング産出 (${lenHint})` : `Type recall (${lenHint})`;
+    const checkBtnLbl = isJa ? '判定' : 'Check';
     const typeBox = `<div class="cloze-type-wrap" style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center">
-      <input type="text" id="clozeTypeInput" class="cloze-type-input" placeholder="タイピング産出 (${lenHint})" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;width:230px;text-align:center" onkeydown="if(event.key==='Enter' && !event.isComposing && event.keyCode !== 229){event.preventDefault();window.VocabAnkiView?.checkClozeTyping?.();}">
-      <button type="button" class="btn-xs btn-ac-o" onclick="window.VocabAnkiView?.checkClozeTyping?.()">判定</button>
+      <input type="text" id="clozeTypeInput" class="cloze-type-input" placeholder="${phText}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;width:230px;text-align:center" onkeydown="if(event.key==='Enter' && !event.isComposing && event.keyCode !== 229){event.preventDefault();window.VocabAnkiView?.checkClozeTyping?.();}">
+      <button type="button" class="btn-xs btn-ac-o" onclick="window.VocabAnkiView?.checkClozeTyping?.()">${checkBtnLbl}</button>
     </div>`;
     return badges.join('') + typeBox;
   }
@@ -695,9 +716,23 @@
     }
 
     aRat.style.display = 'flex';
-    const predictions = global.VocabSRS?.predictIntervals ? global.VocabSRS.predictIntervals(e) : null;
-    aRat.innerHTML = [['#ef4444', '1: もう一度'], ['#f97316', '2: 難しい'], ['#10b981', '3: 普通'], ['#3b82f6', '4: 簡単']].map((c, idx) => {
-      const label = predictions ? predictions[idx] : (global.VocabSRS?.predDays ? (global.VocabSRS.predDays(e, idx) === 0 ? '1分後' : Math.round(global.VocabSRS.predDays(e, idx)) + '日後') : '1日後');
+    const tL = e?.tgtLang || appState?.tgtLang || global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = tL === 'ja';
+    const predictions = global.VocabSRS?.predictIntervals ? global.VocabSRS.predictIntervals(e, tL) : null;
+    const ratingLabels = isJa ? ['1: もう一度', '2: 難しい', '3: 普通', '4: 簡単'] :
+      (tL === 'ko' ? ['1: 다시', '2: 어려움', '3: 기억함', '4: 쉬움'] :
+      (tL === 'zh' ? ['1: 重来', '2: 困难', '3: 掌握', '4: 容易'] :
+      (tL === 'de' ? ['1: Nochmal', '2: Schwer', '3: Gut', '4: Einfach'] :
+      (tL === 'fr' ? ['1: Encore', '2: Difficile', '3: Bien', '4: Facile'] :
+      (tL === 'es' ? ['1: Otra vez', '2: Difícil', '3: Bien', '4: Fácil'] :
+      (tL === 'it' ? ['1: Ripeti', '2: Difficile', '3: Bene', '4: Facile'] :
+      (tL === 'pt' ? ['1: De novo', '2: Difícil', '3: Bom', '4: Fácil'] :
+      (tL === 'nl' ? ['1: Opnieuw', '2: Moeilijk', '3: Goed', '4: Makkelijk'] :
+      ['1: Again', '2: Hard', '3: Good', '4: Easy']))))))));
+
+    aRat.innerHTML = [['#ef4444', ratingLabels[0]], ['#f97316', ratingLabels[1]], ['#10b981', ratingLabels[2]], ['#3b82f6', ratingLabels[3]]].map((c, idx) => {
+      const defaultPred = global.VocabSRS?.predDays ? (global.VocabSRS.predDays(e, idx) === 0 ? (isJa ? '1分後' : '1m') : Math.round(global.VocabSRS.predDays(e, idx)) + (isJa ? '日後' : 'd')) : (isJa ? '1日後' : '1d');
+      const label = predictions ? predictions[idx] : defaultPred;
       return `<button type="button" class="b-rat" style="background:${c[0]}" data-act="rate" data-rate="${idx}"><span>${c[1]}</span><small>${label}</small></button>`;
     }).join('');
   }
@@ -870,21 +905,33 @@
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 5);
 
+    const tL = global.App?.tgtLang || global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = tL === 'ja';
+    const emptyRootsMsg = isJa ? '語源ネットワークの記憶定着度が向上しました。' : 'Etymological root network retention reinforced.';
+    const sessCompTitle = isJa ? '本日の復習セッション完了' : (tL === 'de' ? 'Tägliche Wiederholung abgeschlossen' : (tL === 'fr' ? 'Session de révision terminée' : (tL === 'es' ? 'Sesión de repaso completada' : (tL === 'ko' ? '오늘의 복습 세션 완료' : (tL === 'zh' ? '今日复习已完成' : 'Daily Review Session Complete')))));
+    const todayReviewedLbl = isJa ? '語復習完了' : 'words reviewed';
+    const accuracyLbl = isJa ? '正答率' : 'Accuracy';
+    const rootsHeading = isJa ? '本日成長した語根ネットワーク領域' : (tL === 'de' ? 'Heute gestärkte Wortwurzeln' : (tL === 'fr' ? 'Racines renforcées aujourd’hui' : (tL === 'es' ? 'Raíces fortalecidas hoy' : (tL === 'ko' ? '오늘 성장한 어근 네트워크' : (tL === 'zh' ? '今日强化的词根网络' : 'Roots Strengthened Today')))));
+    const backBtnLbl = isJa ? '一覧に戻る' : (tL === 'de' ? 'Zurück zur Liste' : (tL === 'fr' ? 'Retour à la liste' : (tL === 'es' ? 'Volver a la lista' : (tL === 'ko' ? '목록으로 돌아가기' : (tL === 'zh' ? '返回列表' : 'Back to List')))));
+    const reinforcedLbl = isJa ? '語 定着強化' : ' words reinforced';
+    const stabilityUpLbl = isJa ? '安定度UP' : 'Stability UP';
+    const treeBtnLbl = isJa ? '系統樹' : (tL === 'de' ? 'Stammbaum' : (tL === 'fr' ? 'Arbre' : (tL === 'es' ? 'Árbol' : (tL === 'ko' ? '계통수' : (tL === 'zh' ? '谱系树' : 'Tree')))));
+
     const rootListHtml = topRoots.length > 0 ? topRoots.map(([r, d]) => {
       const growthPct = Math.min(100, Math.round((d.growth / Math.max(1, d.count)) * 20));
       return `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--bg-hov);border:1px solid var(--b);border-radius:6px;margin-bottom:6px">
           <div style="display:flex;align-items:center;gap:8px">
             <span style="font-family:var(--mono);font-weight:700;color:var(--ac);font-size:13px">${esc(r)}</span>
-            <span style="font-size:11px;color:var(--s)">${d.count}語 定着強化</span>
+            <span style="font-size:11px;color:var(--s)">${d.count}${reinforcedLbl}</span>
           </div>
           <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:11px;font-weight:700;color:var(--ok)">+${Math.max(12, growthPct)}% 安定度UP</span>
-            <button type="button" class="btn-xs btn-o" data-act="open-graph" data-root="${esc(r)}">系統樹</button>
+            <span style="font-size:11px;font-weight:700;color:var(--ok)">+${Math.max(12, growthPct)}% ${stabilityUpLbl}</span>
+            <button type="button" class="btn-xs btn-o" data-act="open-graph" data-root="${esc(r)}">${treeBtnLbl}</button>
           </div>
         </div>
       `;
-    }).join('') : `<div style="font-size:12px;color:var(--s);text-align:center;padding:12px">語源ネットワークの記憶定着度が向上しました。</div>`;
+    }).join('') : `<div style="font-size:12px;color:var(--s);text-align:center;padding:12px">${emptyRootsMsg}</div>`;
 
     if (aCard) {
       aCard.innerHTML = `
@@ -892,16 +939,16 @@
           <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:rgba(16,185,129,0.15);color:var(--ok);margin-bottom:12px">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
-          <h2 style="font-size:18px;font-weight:750;color:var(--t);margin:0 0 6px">本日の復習セッション完了</h2>
-          <p style="font-size:12.5px;color:var(--s);margin:0 0 16px">本日: <strong>${finalGoal.count}</strong> 語復習完了 ${streakTxt ? `（${streakTxt}）` : ''} / 正答率: <strong>${accuracy}%</strong></p>
+          <h2 style="font-size:18px;font-weight:750;color:var(--t);margin:0 0 6px">${sessCompTitle}</h2>
+          <p style="font-size:12.5px;color:var(--s);margin:0 0 16px">${isJa ? `本日: <strong>${finalGoal.count}</strong> ${todayReviewedLbl} ${streakTxt ? `（${streakTxt}）` : ''} / ${accuracyLbl}: <strong>${accuracy}%</strong>` : `Today: <strong>${finalGoal.count}</strong> ${todayReviewedLbl} ${streakTxt ? `(${streakTxt})` : ''} / ${accuracyLbl}: <strong>${accuracy}%</strong>`}</p>
 
           <div style="text-align:left;margin-bottom:18px">
-            <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:8px">本日成長した語根ネットワーク領域</div>
+            <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:8px">${rootsHeading}</div>
             ${rootListHtml}
           </div>
 
           <div style="display:flex;justify-content:center;gap:10px">
-            <button type="button" class="btn-ac" id="btnFinishAnkiSession" style="padding:9px 24px;font-size:13px;font-weight:600">一覧に戻る</button>
+            <button type="button" class="btn-ac" id="btnFinishAnkiSession" style="padding:9px 24px;font-size:13px;font-weight:600">${backBtnLbl}</button>
           </div>
         </div>
       `;

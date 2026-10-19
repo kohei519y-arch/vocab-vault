@@ -304,6 +304,8 @@
       'cat.arts': '文学・芸術',
       'cat.daily': '日常・一般',
       'cat.general': '一般・その他',
+      'cat.logic': '論理・討論',
+      'cat.exam': '検定・試験',
 
       // アップセルモーダル
       'upsell.title': '語彙の限界を突破する — Vocab Vault Pro',
@@ -617,6 +619,8 @@
       'cat.arts': 'Literature & Arts',
       'cat.daily': 'Daily & General',
       'cat.general': 'General',
+      'cat.logic': 'Logic & Debate',
+      'cat.exam': 'Exam Preparation',
 
       // Upsell Modal
       'upsell.title': 'Transcend Rote Memorization with Vocab Vault Pro',
@@ -911,6 +915,8 @@
       'cat.arts': 'Littérature & Arts',
       'cat.daily': 'Quotidien & Général',
       'cat.general': 'Général',
+      'cat.logic': 'Logique & Débat',
+      'cat.exam': 'Examens & Certifications',
       'upsell.title': 'Dépassez la mémorisation mécanique avec Vocab Vault Pro',
       'upsell.subtitle': 'Accédez à l\'étymologie générative illimitée, la synchronisation temps réel et l\'optimisation FSRS.',
       'upsell.feat_ai': 'Génération IA illimitée et histoire conceptuelle approfondie',
@@ -1201,6 +1207,8 @@
       'cat.arts': 'Literatur & Kunst',
       'cat.daily': 'Alltag & Allgemeines',
       'cat.general': 'Allgemein',
+      'cat.logic': 'Logik & Debatte',
+      'cat.exam': 'Prüfungsvorbereitung',
       'upsell.title': 'Überwinden Sie mechanisches Auswendiglernen mit Vocab Vault Pro',
       'upsell.subtitle': 'Nutzen Sie unbegrenzte generative Etymologie, Echtzeit-Synchronisation und adaptive FSRS-Wiederholung.',
       'upsell.feat_ai': 'Unbegrenzte KI-Begriffsgeschichte & Etymologie',
@@ -1491,6 +1499,8 @@
       'cat.arts': 'Literatura y Artes',
       'cat.daily': 'Cotidiano y General',
       'cat.general': 'General',
+      'cat.logic': 'Logic & Debate',
+      'cat.exam': 'Exam Preparation',
       'upsell.title': 'Supere la memorización mecánica con Vocab Vault Pro',
       'upsell.subtitle': 'Desbloquee etimología generativa ilimitada, sincronización en tiempo real y optimización FSRS.',
       'upsell.feat_ai': 'Historia conceptual profunda y etimología IA ilimitadas',
@@ -1562,7 +1572,9 @@
       'cat.business': 'Economia e Affari',
       'cat.arts': 'Letteratura e Arti',
       'cat.daily': 'Quotidiano e Generale',
-      'cat.general': 'Generale'
+      'cat.general': 'Generale',
+      'cat.logic': 'Logica e Dibattito',
+      'cat.exam': 'Preparazione Esami'
     },
     pt: {
       'app.title': 'Vocab Vault',
@@ -1620,7 +1632,9 @@
       'cat.business': 'Economia e Negócios',
       'cat.arts': 'Literatura e Artes',
       'cat.daily': 'Cotidiano e Geral',
-      'cat.general': 'Geral'
+      'cat.general': 'Geral',
+      'cat.logic': 'Lógica e Debate',
+      'cat.exam': 'Preparação para Exames'
     },
     nl: {
       'app.title': 'Vocab Vault',
@@ -1736,7 +1750,9 @@
       'cat.business': '经济与商业',
       'cat.arts': '文学与艺术',
       'cat.daily': '日常与综合',
-      'cat.general': '综合'
+      'cat.general': '综合',
+      'cat.logic': '逻辑与辩论',
+      'cat.exam': '考试认证'
     },
     ko: {
       'app.title': 'Vocab Vault',
@@ -1794,7 +1810,9 @@
       'cat.business': '경제 및 비즈니스',
       'cat.arts': '문학 및 예술',
       'cat.daily': '일상 및 일반',
-      'cat.general': '일반'
+      'cat.general': '일반',
+      'cat.logic': '논리 및 토론',
+      'cat.exam': '시험 및 검정'
     }
   };
 
@@ -1815,7 +1833,51 @@
     '文学・芸術': 'cat.arts',
     '日常・一般': 'cat.daily',
     '一般・その他': 'cat.general',
-    '英検準1級': '英検準1級'
+    '論理・討論': 'cat.logic',
+    '論理・政策': 'cat.logic',
+    '論理・環境': 'cat.logic',
+    '論理・科学': 'cat.logic',
+    '英検準1級': 'cat.exam'
+  };
+
+  const CATEGORY_PART_MAP = {
+    '哲学': 'Philosophy',
+    '思想': 'Thought',
+    '宗教': 'Religion',
+    '心理': 'Psychology',
+    '精神': 'Psychiatry',
+    '科学': 'Science',
+    '技術': 'Technology',
+    '政治': 'Politics',
+    '法学': 'Law',
+    '法律': 'Law',
+    '司法': 'Judiciary',
+    '実務': 'Practice',
+    '経済': 'Economy',
+    'ビジネス': 'Business',
+    '文学': 'Literature',
+    '芸術': 'Arts',
+    '日常': 'Daily',
+    '一般': 'General',
+    '論理': 'Logic',
+    '討論': 'Debate',
+    '政策': 'Policy',
+    '環境': 'Environment',
+    '歴史': 'History',
+    '文化': 'Culture',
+    '社会': 'Society',
+    '医療': 'Medicine',
+    '健康': 'Health',
+    '教育': 'Education',
+    '言語': 'Language',
+    '認知': 'Cognition',
+    '認識': 'Epistemology',
+    '制度': 'Institutions',
+    '財務': 'Finance',
+    '会計': 'Accounting',
+    '監査': 'Audit',
+    '契約': 'Contract',
+    '人権': 'Human Rights'
   };
 
   /**
@@ -1880,12 +1942,33 @@
   }
 
   /**
-   * カテゴリ文字列の多言語翻訳
+   * カテゴリ文字列の多言語翻訳（複合カテゴリの自動分解・他言語フォールバック対応）
    */
-  function translateCategory(rawCat) {
-    if (!rawCat) return t('cat.general');
+  function translateCategory(rawCat, targetLocale = null) {
+    if (!rawCat) return t('cat.general', 'General', targetLocale);
+    const loc = (targetLocale && SUPPORTED_LOCALES.includes(targetLocale)) ? targetLocale : currentLocale;
+    if (loc === 'ja') return rawCat;
+
     const key = CATEGORY_MAP[rawCat];
-    if (key) return t(key);
+    if (key) {
+      const translated = t(key, '', loc);
+      if (translated && translated !== key) return translated;
+    }
+
+    // 複合カテゴリの分解翻訳 (例: '論理・討論' -> 'Logic & Debate')
+    if (rawCat.includes('・')) {
+      const parts = rawCat.split('・').map(p => CATEGORY_PART_MAP[p.trim()] || p.trim());
+      if (parts.length > 0 && !/[\u3040-\u30ff]/.test(parts.join(''))) {
+        return parts.join(' & ');
+      }
+    } else if (CATEGORY_PART_MAP[rawCat]) {
+      return CATEGORY_PART_MAP[rawCat];
+    }
+
+    // 目標言語が非日本語の場合、未翻訳の日本語文字列の露出を防止
+    if (/[\u3040-\u30ff]/.test(rawCat)) {
+      return t('cat.general', 'General', loc);
+    }
     return rawCat;
   }
 

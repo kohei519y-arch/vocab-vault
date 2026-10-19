@@ -495,14 +495,45 @@
     const src = pairCfg.srcLang || App.lang || 'en';
     if (tgt === 'ja' || !global.VocabStarterPack?.localizeStarterItem) return entries;
 
+    const hasKana = str => typeof str === 'string' && /[\u3040-\u309f\u30a0-\u30ff]/.test(str);
     let changed = false;
     const repaired = entries.map(item => {
       if (!item || item.isDeleted) return item;
       const w = String(item.word || '').trim();
       const locDict = global.VocabStarterPack?.STARTER_LOCALIZATIONS?.[w] || global.VocabStarterPack?.STARTER_LOCALIZATIONS?.[w.toLowerCase()];
-      if (locDict && (item.tgtLang !== tgt || !item.example?.trans)) {
+
+      // スターターパック項目で、目標言語不一致や日本語の残存がある場合は完全ローカライズ再適用
+      if (locDict && (item.tgtLang !== tgt || hasKana(item.history_note) || hasKana(item.core) || hasKana(item.example?.trans) || !item.example?.trans)) {
         changed = true;
         return global.VocabStarterPack.localizeStarterItem(item, tgt, src);
+      }
+
+      // 一般登録カードに対する防御的クリーニング
+      let itemChanged = false;
+      const c = { ...item };
+      if (hasKana(c.history_note)) {
+        const transHn = c[`history_note_${tgt}`] || c.history_note_trans;
+        if (transHn) c.history_note = transHn;
+        else delete c.history_note;
+        itemChanged = true;
+      }
+      if (c.category && hasKana(c.category) && global.VocabI18n?.translateCategory) {
+        c.category = global.VocabI18n.translateCategory(c.category, tgt);
+        itemChanged = true;
+      }
+      if (c.folder && hasKana(c.folder)) {
+        c.folder = `${src.toUpperCase()} Starter Pack`;
+        itemChanged = true;
+      }
+      if (c.example && hasKana(c.example.trans)) {
+        const transEx = c.example[`trans_${tgt}`] || c.example.trans_en;
+        if (transEx) c.example.trans = transEx;
+        else c.example.trans = c.example.foreign || '';
+        itemChanged = true;
+      }
+      if (itemChanged) {
+        changed = true;
+        return c;
       }
       return item;
     });

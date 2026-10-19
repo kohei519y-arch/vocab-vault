@@ -273,14 +273,22 @@
   /**
    * 4つの評価ボタンごとの次回日数予測プレビュー
    */
-  function predictIntervals(e) {
+  function predictIntervals(e, targetLocale = null) {
+    const tL = targetLocale || e?.tgtLang || global.App?.tgtLang || global.VocabI18n?.getLocale?.() || 'ja';
     return [0, 1, 2, 3].map(r => {
       const days = predDays(e, r);
-      if (days === 0) return '1分後';
-      if (days < 1) return `${Math.round(days * 24)}時間後`;
-      if (days < 30) return `${Math.round(days)}日後`;
-      if (days < 365) return `${(days / 30).toFixed(1)}ヶ月後`;
-      return `${(days / 365).toFixed(1)}年後`;
+      if (tL === 'ja') {
+        if (days === 0) return '1分後';
+        if (days < 1) return `${Math.round(days * 24)}時間後`;
+        if (days < 30) return `${Math.round(days)}日後`;
+        if (days < 365) return `${(days / 30).toFixed(1)}ヶ月後`;
+        return `${(days / 365).toFixed(1)}年後`;
+      }
+      if (days === 0) return '1m';
+      if (days < 1) return `${Math.round(days * 24)}h`;
+      if (days < 30) return `${Math.round(days)}d`;
+      if (days < 365) return `${(days / 30).toFixed(1)}mo`;
+      return `${(days / 365).toFixed(1)}y`;
     });
   }
 

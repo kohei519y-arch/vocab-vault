@@ -251,19 +251,49 @@
     const posObj = posGroups.find(g => g.id === appState.posF);
     const statObj = statGroups.find(g => g.id === appState.statF);
 
+    const tL = appState.tgtLang || global.App?.tgtLang || global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = tL === 'ja';
+    const FOL_PREFIXES = {
+      ja: 'フォルダ: ',
+      de: 'Ordner: ',
+      fr: 'Dossier : ',
+      es: 'Carpeta: ',
+      it: 'Cartella: ',
+      pt: 'Pasta: ',
+      nl: 'Map: ',
+      ko: '폴더: ',
+      zh: '文件夹: ',
+      en: 'Folder: '
+    };
+    const folPrefix = FOL_PREFIXES[tL] || FOL_PREFIXES.en;
+
     const parts = [
       (appState.posF && appState.posF !== 'all') ? (posObj ? posObj.label || posObj.name : appState.posF) : null,
-      (appState.cat && appState.cat !== 'all') ? appState.cat : ((appState.catF && appState.catF !== 'all') ? appState.catF : null),
-      (appState.fol && appState.fol !== 'all') ? `フォルダ: ${appState.fol}` : ((appState.folF && appState.folF !== 'all') ? `フォルダ: ${appState.folF}` : null),
+      (appState.cat && appState.cat !== 'all') ? (global.VocabI18n?.translateCategory ? global.VocabI18n.translateCategory(appState.cat, tL) : appState.cat) : ((appState.catF && appState.catF !== 'all') ? (global.VocabI18n?.translateCategory ? global.VocabI18n.translateCategory(appState.catF, tL) : appState.catF) : null),
+      (appState.fol && appState.fol !== 'all') ? `${folPrefix}${appState.fol}` : ((appState.folF && appState.folF !== 'all') ? `${folPrefix}${appState.folF}` : null),
       (appState.statF && appState.statF !== 'all') ? (statObj ? statObj.label || statObj.name : appState.statF) : null
     ].filter(Boolean);
 
-    const headingText = parts.length ? parts.join(' › ') : 'すべての単語';
+    const DEFAULT_HEADINGS = {
+      ja: 'すべての単語',
+      de: 'Alle Wörter',
+      fr: 'Tous les mots',
+      es: 'Todas las palabras',
+      it: 'Tutte le parole',
+      pt: 'Todas as palavras',
+      nl: 'Alle woorden',
+      ko: '모든 단어',
+      zh: '全部单词',
+      en: 'All Words'
+    };
+    const defaultHeading = DEFAULT_HEADINGS[tL] || DEFAULT_HEADINGS.en;
+    const countUnit = isJa ? '件' : (tL === 'ko' ? '개' : (tL === 'zh' ? '个' : 'words'));
+    const headingText = parts.length ? parts.join(' › ') : defaultHeading;
     const docHeading = $('docHeading');
     if (docHeading) docHeading.textContent = headingText;
 
     const docSubCount = $('docSubCount');
-    if (docSubCount) docSubCount.textContent = `${f.length} 件`;
+    if (docSubCount) docSubCount.textContent = `${f.length} ${countUnit}`;
 
     const sortSel = $('sortSel');
     if (sortSel) sortSel.value = appState.sortBy || appState.sort || 'new';
@@ -277,16 +307,25 @@
     // 後方互換性フォールバック（#docHeading がなく #docTitle が存在する場合）
     const titleEl = $('docTitle');
     if (titleEl && !docHeading) {
-      titleEl.innerHTML = `<span>${esc(headingText)}</span><small style="margin-left:8px;font-size:12px;color:var(--s)">${f.length} 件</small>`;
+      titleEl.innerHTML = `<span>${esc(headingText)}</span><small style="margin-left:8px;font-size:12px;color:var(--s)">${f.length} ${countUnit}</small>`;
     }
 
-    if ($('sideCount')) $('sideCount').textContent = `${f.length} 件`;
+    if ($('sideCount')) $('sideCount').textContent = `${f.length} ${countUnit}`;
     if ($('resetFiltBtn')) $('resetFiltBtn').style.display = parts.length ? 'inline' : 'none';
 
     // 空状態のハンドリング
     if (!f.length && !hasLoadingCards) {
       const hasFilter = Boolean((appState.q && appState.q.trim()) || (appState.qStr && appState.qStr.trim()) || parts.length);
-      list.innerHTML = `<div class="empty"><span>単語がありません</span><p>${hasFilter ? '条件に一致する単語が見つかりませんでした。<br><button type="button" class="btn-o" style="margin-top:10px;font-size:12px" data-act="reset-filter">フィルタを解除する</button>' : '上のバーから単語を入力して登録するか、厳選された学術スターターパックから即座に学習を開始できます：<br><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;"><button type="button" class="btn-ac" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="academic">学術・教養コア（20選）</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="classical_roots">古典語根マスター（20選）</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="philosophy">西洋哲学・人文学（20選）</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="open-starter-modal">すべてのパックを見る...</button></div>'}</p></div>`;
+      const emptyTitle = isJa ? '単語がありません' : (tL === 'de' ? 'Keine Wörter vorhanden' : (tL === 'fr' ? 'Aucun mot trouvé' : (tL === 'es' ? 'No hay palabras' : (tL === 'ko' ? '단어가 없습니다' : (tL === 'zh' ? '暂无单词' : 'No words found')))));
+      const resetBtnLbl = isJa ? 'フィルタを解除する' : (tL === 'de' ? 'Filter zurücksetzen' : (tL === 'fr' ? 'Réinitialiser les filtres' : (tL === 'es' ? 'Restablecer filtros' : (tL === 'ko' ? '필터 해제' : (tL === 'zh' ? '重置筛选' : 'Reset filters')))));
+      const noMatchMsg = isJa ? '条件に一致する単語が見つかりませんでした。' : (tL === 'de' ? 'Keine passenden Wörter gefunden.' : (tL === 'fr' ? 'Aucun mot ne correspond aux critères.' : (tL === 'es' ? 'No se encontraron palabras que coincidan.' : (tL === 'ko' ? '조건에 일치하는 단어를 찾을 수 없습니다.' : (tL === 'zh' ? '未找到符合条件的单词。' : 'No words matched your search criteria.')))));
+      const starterPrompt = isJa ? '上のバーから単語を入力して登録するか、厳選された学術スターターパックから即座に学習を開始できます：' : 'Enter a word above to add, or start immediately with curated starter packs:';
+      const academicLbl = isJa ? '学術・教養コア（20選）' : 'Academic Core (20)';
+      const rootsLbl = isJa ? '古典語根マスター（20選）' : 'Classical Roots (20)';
+      const philLbl = isJa ? '西洋哲学・人文学（20選）' : 'Philosophy (20)';
+      const allPacksLbl = isJa ? 'すべてのパックを見る...' : 'View all packs...';
+
+      list.innerHTML = `<div class="empty"><span>${emptyTitle}</span><p>${hasFilter ? `${noMatchMsg}<br><button type="button" class="btn-o" style="margin-top:10px;font-size:12px" data-act="reset-filter">${resetBtnLbl}</button>` : `${starterPrompt}<br><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;"><button type="button" class="btn-ac" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="academic">${academicLbl}</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="classical_roots">${rootsLbl}</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="philosophy">${philLbl}</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="open-starter-modal">${allPacksLbl}</button></div>`}</p></div>`;
       pag.innerHTML = '';
       return;
     }
@@ -348,17 +387,28 @@
   /**
    * 最初へ・前へ・番号ピル・クイックジャンプ・次へ・最後へを備えた高機能ページネーションHTMLを生成
    */
-  function renderPaginationHtml(page, tot) {
+  function renderPaginationHtml(page, tot, targetLocale = null) {
     if (tot <= 1) return '';
 
     const isFirst = page === 1;
     const isLast = page === tot;
+    const tL = targetLocale || global.App?.tgtLang || global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = tL === 'ja';
+
+    const lblFirst = isJa ? '最初' : (tL === 'ko' ? '처음' : (tL === 'zh' ? '首页' : (tL === 'de' ? 'Erste' : (tL === 'fr' ? 'Début' : (tL === 'es' ? 'Inicio' : 'First')))));
+    const lblPrev = isJa ? '前へ' : (tL === 'ko' ? '이전' : (tL === 'zh' ? '上一页' : (tL === 'de' ? 'Zurück' : (tL === 'fr' ? 'Préc' : (tL === 'es' ? 'Ant' : 'Prev')))));
+    const lblNext = isJa ? '次へ' : (tL === 'ko' ? '다음' : (tL === 'zh' ? '下一页' : (tL === 'de' ? 'Weiter' : (tL === 'fr' ? 'Suiv' : (tL === 'es' ? 'Sig' : 'Next')))));
+    const lblLast = isJa ? '最後' : (tL === 'ko' ? '마지막' : (tL === 'zh' ? '末页' : (tL === 'de' ? 'Letzte' : (tL === 'fr' ? 'Fin' : (tL === 'es' ? 'Final' : 'Last')))));
+    const lblPageOf = (p, total) => isJa ? `${p} / ${total} ページ` : (tL === 'ko' ? `${p} / ${total} 페이지` : (tL === 'zh' ? `第 ${p} / ${total} 页` : (tL === 'de' ? `Seite ${p} von ${total}` : (tL === 'fr' ? `Page ${p} sur ${total}` : (tL === 'es' ? `Página ${p} de ${total}` : `Page ${p} of ${total}`)))));
+    const navAria = isJa ? 'ページネーション' : 'Pagination';
+    const selectTitle = isJa ? 'クリックしてページを直接選択' : 'Select page';
+    const selectAria = isJa ? 'ページ番号を選択' : 'Select page number';
 
     // 1. 最初へボタン (« 最初)
-    const firstBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="1" ${isFirst ? 'disabled' : ''} title="最初のページへ (1ページ)" aria-label="最初のページへ"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg><span class="pag-btn-lbl">最初</span></button>`;
+    const firstBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="1" ${isFirst ? 'disabled' : ''} title="${lblFirst} (1)" aria-label="${lblFirst}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg><span class="pag-btn-lbl">${lblFirst}</span></button>`;
 
     // 2. 前へボタン (‹ 前へ)
-    const prevBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="-1" ${isFirst ? 'disabled' : ''} title="前のページへ" aria-label="前のページへ"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="15 18 9 12 15 6"/></svg><span class="pag-btn-lbl">前へ</span></button>`;
+    const prevBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="-1" ${isFirst ? 'disabled' : ''} title="${lblPrev}" aria-label="${lblPrev}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="15 18 9 12 15 6"/></svg><span class="pag-btn-lbl">${lblPrev}</span></button>`;
 
     // 3. ページ番号ピル（デスクトップ・タブレット用）
     const pageWindow = buildPageWindow(page, tot);
@@ -367,23 +417,23 @@
         return `<span class="pag-ellipsis">…</span>`;
       }
       const activeCls = p === page ? ' active' : '';
-      return `<button type="button" class="btn-o btn-pag btn-pag-num${activeCls}" data-act="page-jump" data-page="${p}" aria-label="${p}ページへ" ${p === page ? 'aria-current="page"' : ''}>${p}</button>`;
+      return `<button type="button" class="btn-o btn-pag btn-pag-num${activeCls}" data-act="page-jump" data-page="${p}" aria-label="${p}" ${p === page ? 'aria-current="page"' : ''}>${p}</button>`;
     }).join('');
 
     // 4. クイックジャンプセレクター（全端末共通：タップで全ページから瞬時に選択）
     let selectOpts = '';
     for (let p = 1; p <= tot; p++) {
-      selectOpts += `<option value="${p}" ${p === page ? 'selected' : ''}>${p} / ${tot} ページ</option>`;
+      selectOpts += `<option value="${p}" ${p === page ? 'selected' : ''}>${lblPageOf(p, tot)}</option>`;
     }
-    const selectHtml = `<div class="pag-select-wrap" title="クリックしてページを直接選択"><select class="pag-select" data-act="page-select" onchange="window.VocabCore?.setPage?.(this.value)" aria-label="ページ番号を選択">${selectOpts}</select><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" class="pag-select-arr"><polyline points="6 9 12 15 18 9"/></svg></div>`;
+    const selectHtml = `<div class="pag-select-wrap" title="${selectTitle}"><select class="pag-select" data-act="page-select" onchange="window.VocabCore?.setPage?.(this.value)" aria-label="${selectAria}">${selectOpts}</select><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" class="pag-select-arr"><polyline points="6 9 12 15 18 9"/></svg></div>`;
 
     // 5. 次へボタン (次へ ›)
-    const nextBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="1" ${isLast ? 'disabled' : ''} title="次のページへ" aria-label="次のページへ"><span class="pag-btn-lbl">次へ</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="9 18 15 12 9 6"/></svg></button>`;
+    const nextBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="1" ${isLast ? 'disabled' : ''} title="${lblNext}" aria-label="${lblNext}"><span class="pag-btn-lbl">${lblNext}</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="9 18 15 12 9 6"/></svg></button>`;
 
     // 6. 最後へボタン (最後 »)
-    const lastBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="${tot}" ${isLast ? 'disabled' : ''} title="最後のページへ (${tot}ページ)" aria-label="最後のページへ"><span class="pag-btn-lbl">最後</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></button>`;
+    const lastBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="${tot}" ${isLast ? 'disabled' : ''} title="${lblLast} (${tot})" aria-label="${lblLast}"><span class="pag-btn-lbl">${lblLast}</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></button>`;
 
-    return `<div class="pag-bar" role="navigation" aria-label="ページネーション">${firstBtn}${prevBtn}<div class="pag-center">${selectHtml}<div class="pag-pills">${pillsHtml}</div></div>${nextBtn}${lastBtn}</div>`;
+    return `<div class="pag-bar" role="navigation" aria-label="${navAria}">${firstBtn}${prevBtn}<div class="pag-center">${selectHtml}<div class="pag-pills">${pillsHtml}</div></div>${nextBtn}${lastBtn}</div>`;
   }
 
   /**
