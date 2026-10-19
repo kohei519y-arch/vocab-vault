@@ -494,6 +494,13 @@
       'ext.deselect_all': '全解除',
       'ext.commit_btn': '選択した単語を単語帳に登録',
       'ext.commit_batch': '選択した {n} 語を一括登録',
+      'ext.fol_ph': '例: 2026 フランス演習',
+      'ext.camera_title': 'カメラで本・書類を直接撮影',
+      'ext.select_title': 'アルバムまたはファイルから選択',
+      'ext.ocr_ai_desc': '画像・スクショを自動文字起こしするには、無料のGoogle Gemini APIキーを入力してください（Google AI Studioで1分で取得可能・完全無料）。',
+      'ext.ocr_key_ph': 'AIzaSy... (Gemini APIキーを入力)',
+      'ext.processing': '処理中...',
+      'ext.max_option': '最大 {n} 語',
 
       // リスニング・耳学プレイヤー
       'speech.idle': '再生待機中',
@@ -647,7 +654,8 @@
       'btn.save': '保存',
       'btn.delete': '削除',
       'btn.confirm': '確認',
-      'btn.retry': '失敗分を再試行'
+      'btn.retry': '失敗分を再試行',
+      'btn.clear': 'クリア'
     },
 
     en: {
@@ -1133,6 +1141,13 @@
       'ext.deselect_all': 'Deselect All',
       'ext.commit_btn': 'Add Selected Words to Wordbook',
       'ext.commit_batch': 'Add {n} Selected Words',
+      'ext.fol_ph': 'e.g., 2026 French Seminar',
+      'ext.camera_title': 'Take a photo of books or documents',
+      'ext.select_title': 'Choose from photos or files',
+      'ext.ocr_ai_desc': 'To automatically transcribe images or screenshots, enter a free Google Gemini API key (get one in 1 minute on Google AI Studio, 100% free).',
+      'ext.ocr_key_ph': 'AIzaSy... (Enter Gemini API Key)',
+      'ext.processing': 'Processing...',
+      'ext.max_option': 'Max {n} words',
 
       // Audio Listening Mode
       'speech.idle': 'Ready to play',
@@ -1286,7 +1301,8 @@
       'btn.save': 'Save',
       'btn.delete': 'Delete',
       'btn.confirm': 'Confirm',
-      'btn.retry': 'Retry failed'
+      'btn.retry': 'Retry failed',
+      'btn.clear': 'Clear'
     },
 
     fr: {
@@ -1584,7 +1600,15 @@
       'toast.saved': 'Enregistré avec succès',
       'toast.sync_success': 'Synchronisation cloud terminée',
       'toast.unlocked': 'Compétence acquise et ajoutée au vocabulaire',
-      'toast.eiken_all_unlocked': 'Toutes les compétences de cette racine acquises'
+      'toast.eiken_all_unlocked': 'Toutes les compétences de cette racine acquises',
+      'ext.fol_ph': 'ex. : Séminaire français 2026',
+      'ext.camera_title': 'Prendre une photo de livres ou documents',
+      'ext.select_title': 'Choisir dans les photos ou fichiers',
+      'ext.ocr_ai_desc': 'Pour transcrire automatiquement des images ou captures, entrez une clé API Google Gemini gratuite (Google AI Studio, 100% gratuit).',
+      'ext.ocr_key_ph': 'AIzaSy... (Entrez la clé API Gemini)',
+      'ext.processing': 'Traitement en cours...',
+      'ext.max_option': 'Max {n} mots',
+      'btn.clear': 'Effacer'
     },
 
     de: {
@@ -1882,7 +1906,15 @@
       'toast.saved': 'Erfolgreich gespeichert',
       'toast.sync_success': 'Cloud-Synchronisierung abgeschlossen',
       'toast.unlocked': 'Fähigkeit gemeistert und zum Wortschatz hinzugefügt',
-      'toast.eiken_all_unlocked': 'Alle Zweigfähigkeiten dieser Wurzel gemeistert'
+      'toast.eiken_all_unlocked': 'Alle Zweigfähigkeiten dieser Wurzel gemeistert',
+      'ext.fol_ph': 'z. B. Französisch-Seminar 2026',
+      'ext.camera_title': 'Foto von Büchern oder Dokumenten aufnehmen',
+      'ext.select_title': 'Aus Fotos oder Dateien auswählen',
+      'ext.ocr_ai_desc': 'Geben Sie einen kostenlosen Google Gemini-API-Schlüssel ein, um Bilder oder Screenshots automatisch zu transkribieren (Google AI Studio, 100% kostenlos).',
+      'ext.ocr_key_ph': 'AIzaSy... (Gemini-API-Schlüssel eingeben)',
+      'ext.processing': 'Wird verarbeitet...',
+      'ext.max_option': 'Max. {n} Wörter',
+      'btn.clear': 'Löschen'
     },
 
     es: {
@@ -2180,7 +2212,15 @@
       'toast.saved': 'Guardado con éxito',
       'toast.sync_success': 'Sincronización con la nube completada',
       'toast.unlocked': 'Habilidad aprendida y añadida al vocabulario',
-      'toast.eiken_all_unlocked': 'Todas las habilidades de esta raíz aprendidas'
+      'toast.eiken_all_unlocked': 'Todas las habilidades de esta raíz aprendidas',
+      'ext.fol_ph': 'ej.: Seminario de francés 2026',
+      'ext.camera_title': 'Tomar foto de libros o documentos',
+      'ext.select_title': 'Elegir de fotos o archivos',
+      'ext.ocr_ai_desc': 'Para transcribir automáticamente imágenes o capturas, introduzca una clave API gratuita de Google Gemini (Google AI Studio, 100% gratuita).',
+      'ext.ocr_key_ph': 'AIzaSy... (Introduzca clave API Gemini)',
+      'ext.processing': 'Procesando...',
+      'ext.max_option': 'Máx. {n} palabras',
+      'btn.clear': 'Borrar'
     },
     it: {
       'app.title': 'Vocab Vault',
@@ -2256,7 +2296,15 @@
       'cat.daily': 'Quotidiano e Generale',
       'cat.general': 'Generale',
       'cat.logic': 'Logica e Dibattito',
-      'cat.exam': 'Preparazione Esami'
+      'cat.exam': 'Preparazione Esami',
+      'ext.fol_ph': 'es.: Seminario di francese 2026',
+      'ext.camera_title': 'Scatta una foto di libri o documenti',
+      'ext.select_title': 'Scegli da foto o file',
+      'ext.ocr_ai_desc': 'Per trascrivere automaticamente immagini o screenshot, inserisci una chiave API gratuita di Google Gemini (Google AI Studio, 100% gratuita).',
+      'ext.ocr_key_ph': 'AIzaSy... (Inserisci chiave API Gemini)',
+      'ext.processing': 'Elaborazione...',
+      'ext.max_option': 'Max {n} parole',
+      'btn.clear': 'Cancella'
     },
     pt: {
       'common.unlimited': 'Ilimitado',
@@ -2373,7 +2421,15 @@
       'cat.daily': 'Cotidiano e Geral',
       'cat.general': 'Geral',
       'cat.logic': 'Lógica e Debate',
-      'cat.exam': 'Preparação para Exames'
+      'cat.exam': 'Preparação para Exames',
+      'ext.fol_ph': 'ex.: Seminário de francês 2026',
+      'ext.camera_title': 'Tirar foto de livros ou documentos',
+      'ext.select_title': 'Escolher de fotos ou arquivos',
+      'ext.ocr_ai_desc': 'Para transcrever imagens ou capturas automaticamente, insira uma chave de API gratuita do Google Gemini (Google AI Studio, 100% gratuita).',
+      'ext.ocr_key_ph': 'AIzaSy... (Insira a chave de API Gemini)',
+      'ext.processing': 'Processando...',
+      'ext.max_option': 'Máx. {n} palavras',
+      'btn.clear': 'Limpar'
     },
     nl: {
       'app.title': 'Vocab Vault',
@@ -2447,7 +2503,15 @@
       'cat.business': 'Economie & Zaken',
       'cat.arts': 'Literatuur & Kunst',
       'cat.daily': 'Dagelijks & Algemeen',
-      'cat.general': 'Algemeen'
+      'cat.general': 'Algemeen',
+      'ext.fol_ph': 'bijv. Frans seminar 2026',
+      'ext.camera_title': 'Maak een foto van boeken of documenten',
+      'ext.select_title': 'Kies uit foto\'s of bestanden',
+      'ext.ocr_ai_desc': 'Voer een gratis Google Gemini API-sleutel in om afbeeldingen automatisch te transcriberen (Google AI Studio, 100% gratis).',
+      'ext.ocr_key_ph': 'AIzaSy... (Voer Gemini API-sleutel in)',
+      'ext.processing': 'Verwerken...',
+      'ext.max_option': 'Max. {n} woorden',
+      'btn.clear': 'Wissen'
     },
     zh: {
       'app.title': 'Vocab Vault',
@@ -2523,7 +2587,15 @@
       'cat.daily': '日常与综合',
       'cat.general': '综合',
       'cat.logic': '逻辑与辩论',
-      'cat.exam': '考试认证'
+      'cat.exam': '考试认证',
+      'ext.fol_ph': '例：2026 法语研讨',
+      'ext.camera_title': '使用相机直接拍摄书籍或文档',
+      'ext.select_title': '从相册或文件中选择',
+      'ext.ocr_ai_desc': '如需自动识别图片或截屏文字，请输入免费的 Google Gemini API 密钥（在 Google AI Studio 免费获取）。',
+      'ext.ocr_key_ph': 'AIzaSy... (输入 Gemini API 密钥)',
+      'ext.processing': '处理中...',
+      'ext.max_option': '最多 {n} 词',
+      'btn.clear': '清空'
     },
     ko: {
       'app.title': 'Vocab Vault',
@@ -2599,7 +2671,15 @@
       'cat.daily': '일상 및 일반',
       'cat.general': '일반',
       'cat.logic': '논리 및 토론',
-      'cat.exam': '시험 및 검정'
+      'cat.exam': '시험 및 검정',
+      'ext.fol_ph': '예: 2026 프랑스 세미나',
+      'ext.camera_title': '책이나 문서를 카메라로 직접 촬영',
+      'ext.select_title': '앨범 또는 파일에서 선택',
+      'ext.ocr_ai_desc': '이미지나 스크린샷을 자동 텍스트 변환하려면 무료 Google Gemini API 키를 입력하세요 (Google AI Studio에서 무료 발급 가능).',
+      'ext.ocr_key_ph': 'AIzaSy... (Gemini API 키 입력)',
+      'ext.processing': '처리 중...',
+      'ext.max_option': '최대 {n}개 단어',
+      'btn.clear': '지우기'
     }
   };
 
@@ -3241,15 +3321,20 @@
       } catch (e) {}
     }
 
-    // 6. 長文抽出モーダルの最大抽出数セレクタ
+    // 6. 長文抽出モーダルの最大抽出数セレクタ & 対象レベルセレクタ
     const extMaxCnt = document.getElementById('extMaxCnt');
     if (extMaxCnt && extMaxCnt.options) {
       try {
         Array.from(extMaxCnt.options).forEach(opt => {
           if (!opt) return;
-          opt.textContent = isEn ? `Max ${opt.value} words` : `最大 ${opt.value} 語`;
+          opt.textContent = t('ext.max_option', { n: opt.value }) || (isEn ? `Max ${opt.value} words` : `最大 ${opt.value} 語`);
         });
       } catch (e) {}
+    }
+    if (global.VocabModal?.refreshExtractLevelOptions) {
+      try { global.VocabModal.refreshExtractLevelOptions(); } catch (e) {}
+    } else if (global.refreshExtractLevelOptions) {
+      try { global.refreshExtractLevelOptions(); } catch (e) {}
     }
 
     // 7. 言語ペアタブおよびサイドバーの再描画
@@ -3317,6 +3402,15 @@
       if (key) {
         const trans = t(key);
         if (trans) el.setAttribute('placeholder', trans);
+      }
+    });
+
+    // 画像 alt 置換 [data-i18n-alt]
+    scope.querySelectorAll('[data-i18n-alt]').forEach(el => {
+      const key = el.getAttribute('data-i18n-alt');
+      if (key) {
+        const trans = t(key);
+        if (trans) el.setAttribute('alt', trans);
       }
     });
 

@@ -450,7 +450,7 @@
       <div class="f-row" style="align-items:flex-end">
         <div class="f-col" style="flex:1;min-width:220px"><label class="lbl-sm" data-i18n="ext.level_lbl">対象者のレベル</label><select id="extLevelSel" onchange="lsSet('vv_ext_level', this.value)"></select></div>
         <div class="f-col" style="width:120px"><label class="lbl-sm" data-i18n="ext.max_lbl">最大抽出数</label><select id="extMaxCnt"><option value="8">最大 8 語</option><option value="12" selected>最大 12 語</option><option value="18">最大 18 語</option><option value="24">最大 24 語</option></select></div>
-        <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm" data-i18n="ext.fol_lbl">保存先タイトル（任意）</label><input type="text" id="extFolInput" placeholder="例: 2026 フランス演習" autocomplete="off"></div>
+        <div class="f-col" style="flex:1;min-width:150px"><label class="lbl-sm" data-i18n="ext.fol_lbl">保存先タイトル（任意）</label><input type="text" id="extFolInput" placeholder="例: 2026 フランス演習" data-i18n-ph="ext.fol_ph" autocomplete="off"></div>
       </div>
       <div class="ocr-dropzone flx-sb" id="ocrDropzone">
         <div style="display:flex;align-items:center;gap:10px;cursor:pointer;flex:1" onclick="$('ocrFileInput').click()">
@@ -461,8 +461,8 @@
           </div>
         </div>
         <div style="display:flex;gap:6px">
-          <button type="button" class="btn-o btn-xs" onclick="$('ocrCameraInput').click()" title="カメラで本・書類を直接撮影" data-i18n="ext.camera_btn">撮影</button>
-          <button type="button" class="btn-o btn-xs" onclick="$('ocrFileInput').click()" title="アルバムまたはファイルから選択" data-i18n="ext.select_btn">選択</button>
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrCameraInput').click()" title="カメラで本・書類を直接撮影" data-i18n="ext.camera_btn" data-i18n-title="ext.camera_title">撮影</button>
+          <button type="button" class="btn-o btn-xs" onclick="$('ocrFileInput').click()" title="アルバムまたはファイルから選択" data-i18n="ext.select_btn" data-i18n-title="ext.select_title">選択</button>
         </div>
       </div>
       <input type="file" id="ocrFileInput" accept="image/*" style="display:none" onchange="handleOcrImageFile(this.files[0])">
@@ -476,30 +476,30 @@
           </div>
           <div style="display:flex;gap:6px">
             <button type="button" id="btnRunOcrAgain" class="btn-ac btn-xs" onclick="runOcrCurrentFile()" data-i18n="ext.ocr_again">文字起こし</button>
-            <button type="button" class="btn-o btn-xs" onclick="clearOcrPreview()">削除</button>
+            <button type="button" class="btn-o btn-xs" onclick="clearOcrPreview()" data-i18n="btn.delete">削除</button>
           </div>
         </div>
         <div id="ocrApiKeyPrompt" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--b)">
           <div style="font-size:11.5px;color:var(--t);font-weight:600" data-i18n="ext.ocr_ai_title">高精度 AI 文字起こし (Gemini Vision OCR)</div>
-          <div style="font-size:11px;color:var(--s);margin-top:2px;line-height:1.5">
+          <div style="font-size:11px;color:var(--s);margin-top:2px;line-height:1.5" data-i18n="ext.ocr_ai_desc">
             画像・スクショを自動文字起こしするには、無料のGoogle Gemini APIキーを入力してください（Google AI Studioで1分で取得可能・完全無料）。
           </div>
           <div style="display:flex;gap:6px;margin-top:6px">
-            <input type="password" id="ocrInlineApiKey" placeholder="AIzaSy... (Gemini APIキーを入力)" style="flex:1;font-size:11.5px;padding:4px 8px;border:1px solid var(--b);border-radius:4px;background:var(--bg-card);color:var(--t)">
+            <input type="password" id="ocrInlineApiKey" placeholder="AIzaSy... (Gemini APIキーを入力)" data-i18n-ph="ext.ocr_key_ph" style="flex:1;font-size:11.5px;padding:4px 8px;border:1px solid var(--b);border-radius:4px;background:var(--bg-card);color:var(--t)">
             <button type="button" class="btn-ac btn-xs" onclick="saveOcrKeyAndExecute()" data-i18n="ext.ocr_btn_setup">設定して文字起こし</button>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn-o btn-xs" style="text-decoration:none;display:inline-flex;align-items:center">無料キー取得</a>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn-o btn-xs" style="text-decoration:none;display:inline-flex;align-items:center" data-i18n="ext.ocr_get_key">無料キー取得</a>
           </div>
         </div>
       </div>
       <div class="f-col">
-        <div class="flx-sb"><label class="lbl-sm" data-i18n="ext.text_lbl">長文テキスト（最大12,000字）</label><button type="button" class="btn-o btn-xs" onclick="$('extTextarea').value='';$('extResSec').style.display='none';$('extTextarea').focus()">クリア</button></div>
+        <div class="flx-sb"><label class="lbl-sm" data-i18n="ext.text_lbl">長文テキスト（最大12,000字）</label><button type="button" class="btn-o btn-xs" onclick="$('extTextarea').value='';$('extResSec').style.display='none';$('extTextarea').focus()" data-i18n="btn.clear">クリア</button></div>
         <textarea id="extTextarea" rows="6" data-i18n-ph="ext.text_ph" placeholder="長文を貼り付けるか、上の枠から画像を読み込んでください..."></textarea>
       </div>
       <div class="flx-sb">
         <span style="font-size:11px;color:var(--m)" data-i18n="ext.ocr_privacy_note">※入力された本文や画像は解析のため AI エンドポイントへ送信されます。機密情報は入力しないでください。</span>
         <button type="button" id="btnRunExtract" onclick="runPassageExtract()" data-i18n="ext.extract_btn">長文を解析して単語をピックアップ</button>
       </div>
-      <div id="extLoadBox" style="display:none;padding:10px;justify-content:center" class="load"><div class="spin"></div><span id="extLoadText">処理中...</span></div>
+      <div id="extLoadBox" style="display:none;padding:10px;justify-content:center" class="load"><div class="spin"></div><span id="extLoadText" data-i18n="ext.processing">処理中...</span></div>
       <div id="extResSec" class="cfg-sec" style="display:none;border-top:1px solid var(--b);padding-top:10px">
         <div class="cfg-title flx-sb">
           <span id="extResCount" data-i18n="ext.extracted_words">抽出された単語</span>

@@ -666,17 +666,65 @@
     showToast(global.VocabI18n?.t ? global.VocabI18n.t('edit.updated', { word: w }) : `「${w}」を更新しました`, 'ok');
   }
 
-  // --- パッセージ抽出モーダル ---
-  function openExtractModal() {
+  const LEVEL_NAMES = {
+    en: { b1: 'Lower-Intermediate', b2: 'Intermediate', c1: 'Advanced', acad: 'Academic & Specialized (Papers / Concepts & Science)', all_key: 'All Key Terms (Keywords, Nuanced Terms, Idioms)' },
+    fr: { b1: 'Intermédiaire inférieur', b2: 'Intermédiaire', c1: 'Avancé', acad: 'Académique & Spécialisé (Articles / Concepts & Sciences)', all_key: 'Tous les termes clés (Mots-clés, polysémie, locutions)' },
+    de: { b1: 'Untere Mittelstufe', b2: 'Mittelstufe', c1: 'Oberstufe', acad: 'Akademisch & Fachspezifisch (Publikationen / Wissenschaft)', all_key: 'Alle Schlüsselwörter (Fachbegriffe, Mehrdeutige, Idiome)' },
+    es: { b1: 'Intermedio inicial', b2: 'Intermedio', c1: 'Avanzado', acad: 'Académico y especializado (Artículos / Ciencias y leyes)', all_key: 'Todos los términos clave (Palabras clave, giros, modismos)' },
+    it: { b1: 'Intermedio inferiore', b2: 'Intermedio', c1: 'Avanzado', acad: 'Accademico e specialistico (Articoli / Scienze e diritto)', all_key: 'Tutti i termini chiave (Parole chiave, polisemia, idiomi)' },
+    pt: { b1: 'Intermediário inferior', b2: 'Intermediário', c1: 'Avançado', acad: 'Acadêmico e especializado (Artigos / Ciências e leis)', all_key: 'Todos os termos-chave (Palavras-chave, polissemias, expressões)' },
+    nl: { b1: 'Lager gevorderd', b2: 'Gevorderd', c1: 'Vergevorderd', acad: 'Academisch & Vakspecifiek (Publicaties / Wetenschap)', all_key: 'Alle kernwoorden (Trefwoorden, polysemie, uitdrukkingen)' },
+    zh: { b1: '初中级', b2: '中级', c1: '高级', acad: '学术与专业 (学术论文 / 概念史 / 政法与科学)', all_key: '全部核心词 (关键词 / 多义词 / 熟语成语)' },
+    ko: { b1: '초중급', b2: '중급', c1: '고급', acad: '학술·전문 (논문 / 개념사·법정·과학)', all_key: '모든 중요 어휘 (핵심어·다의어·숙어)' },
+    ja: { b1: '初中級', b2: '中級', c1: '上級', acad: '学術・専門 (論文 / 概念史・法政・科学)', all_key: '重要語すべて (キーワード・多義語・熟語)' }
+  };
+
+  const TARGET_LANG_EXAMS_INTL = {
+    en: { b1: 'CEFR B1 / TOEIC 500-650 / EIKEN 2', b2: 'CEFR B2 / TOEIC 700-850 / EIKEN Pre-1', c1: 'CEFR C1 / TOEFL 100+ / EIKEN 1' },
+    fr: { b1: 'DELF A2-B1', b2: 'DELF B2', c1: 'DALF C1-C2' },
+    de: { b1: 'Goethe A2-B1', b2: 'Goethe B2', c1: 'Goethe C1-C2' },
+    es: { b1: 'DELE A2-B1', b2: 'DELE B2', c1: 'DELE C1-C2' },
+    it: { b1: 'CILS A2-B1', b2: 'CILS B2', c1: 'CILS C1-C2' },
+    pt: { b1: 'CELPE-Bras B1', b2: 'CELPE-Bras B2', c1: 'CELPE-Bras C1-C2' },
+    nl: { b1: 'NT2 A2-B1 / CNaVT', b2: 'NT2 B2 / Staatsexamen I', c1: 'NT2 C1-C2 / Staatsexamen II' },
+    zh: { b1: 'HSK 3-4', b2: 'HSK 5', c1: 'HSK 6-9' },
+    ko: { b1: 'TOPIK 3', b2: 'TOPIK 4-5', c1: 'TOPIK 6' },
+    ja: { b1: 'JLPT N3-N2', b2: 'JLPT N2-N1', c1: 'JLPT N1+' }
+  };
+
+  function getLocalizedLevelLabel(targetLang, levelId, uiLocale, fallbackLabel) {
+    if (uiLocale === 'ja') return fallbackLabel || LEVEL_NAMES.ja[levelId] || levelId;
+    const loc = LEVEL_NAMES[uiLocale] ? uiLocale : 'en';
+    if (levelId === 'acad') return LEVEL_NAMES[loc].acad;
+    if (levelId === 'all_key') return LEVEL_NAMES[loc].all_key;
+    const prefix = LEVEL_NAMES[loc][levelId] || LEVEL_NAMES.en[levelId] || levelId;
+    const exam = TARGET_LANG_EXAMS_INTL[targetLang]?.[levelId];
+    return exam ? `${prefix} (${exam})` : prefix;
+  }
+
+  function refreshExtractLevelOptions() {
     const App = global.App || {};
     const cfg = global.LANGS?.[App.lang] || global.LANGS?.en || { badge: 'EN', levels: [] };
     const sel = $('extLevelSel');
-    const saved = global.lsGet ? global.lsGet('vv_ext_level', 'b2') : 'b2';
-    if ($('extLangBadge')) $('extLangBadge').textContent = cfg.badge;
-    if (sel) {
-      sel.innerHTML = '';
-      (cfg.levels || []).forEach(o => { const el = new Option(o.label, o.id); if (o.id === saved) el.selected = true; sel.add(el); });
+    if (!sel) return;
+    const currentVal = sel.value || (global.lsGet ? global.lsGet('vv_ext_level', 'b2') : 'b2');
+    const curLoc = global.VocabI18n?.getLocale ? global.VocabI18n.getLocale() : 'ja';
+    sel.innerHTML = '';
+    (cfg.levels || []).forEach(o => {
+      const lbl = getLocalizedLevelLabel(App.lang, o.id, curLoc, o.label);
+      const el = new Option(lbl, o.id);
+      if (o.id === currentVal) el.selected = true;
+      sel.add(el);
+    });
+    if ($('extLangBadge')) {
+      $('extLangBadge').textContent = (curLoc === 'ja' ? cfg.badge : (cfg.label || cfg.badge));
     }
+  }
+
+  // --- パッセージ抽出モーダル ---
+  function openExtractModal() {
+    const App = global.App || {};
+    refreshExtractLevelOptions();
     if ($('inFol')?.value?.trim() && !$('extFolInput')?.value?.trim() && $('extFolInput')) {
       $('extFolInput').value = $('inFol').value.trim();
     }
@@ -692,21 +740,29 @@
     const n = list.filter(c => c.checked).length;
     const alr = list.filter(c => c.already).length;
     const unadded = list.length - alr;
+    const curLoc = global.VocabI18n?.getLocale ? global.VocabI18n.getLocale() : 'ja';
+    const isEn = curLoc !== 'ja';
     if ($('extResCount')) {
-      $('extResCount').innerHTML = `<span>抽出候補: ${list.length} 語</span> <small style="font-size:11px;color:var(--s);margin-left:6px">（未登録: <strong style="color:var(--ok)">${unadded}</strong> 語 / 登録済: <strong style="color:var(--m)">${alr}</strong> 語）</small>`;
+      if (isEn) {
+        $('extResCount').innerHTML = `<span>Candidates: ${list.length} words</span> <small style="font-size:11px;color:var(--s);margin-left:6px">(New: <strong style="color:var(--ok)">${unadded}</strong> / In wordbook: <strong style="color:var(--m)">${alr}</strong>)</small>`;
+      } else {
+        $('extResCount').innerHTML = `<span>抽出候補: ${list.length} 語</span> <small style="font-size:11px;color:var(--s);margin-left:6px">（未登録: <strong style="color:var(--ok)">${unadded}</strong> 語 / 登録済: <strong style="color:var(--m)">${alr}</strong> 語）</small>`;
+      }
     }
     if ($('btnCommitExt')) {
       $('btnCommitExt').disabled = !n;
-      $('btnCommitExt').textContent = global.VocabI18n?.t ? global.VocabI18n.t('ext.commit_batch', { n }) : `選択した ${n} 語を一括登録`;
+      $('btnCommitExt').textContent = global.VocabI18n?.t ? global.VocabI18n.t('ext.commit_batch', { n }) : (isEn ? `Add ${n} Selected Words` : `選択した ${n} 語を一括登録`);
     }
   }
 
   function renderExtCandidates() {
     const App = global.App || {};
     updateExtCounts();
+    const curLoc = global.VocabI18n?.getLocale ? global.VocabI18n.getLocale() : 'ja';
+    const isEn = curLoc !== 'ja';
     const spkFn = (txt, l) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l, true) : (global.mkSpkBtn ? global.mkSpkBtn(txt, l, true) : '');
     if ($('extCandidateGrid')) {
-      $('extCandidateGrid').innerHTML = (App.extCandidates || []).map((c, i) => `<label class="ext-item ${c.checked ? 'checked' : ''} ${c.already ? 'already' : ''}"><input type="checkbox" data-ext-idx="${i}" ${c.checked ? 'checked' : ''}><div class="ext-info"><div class="ext-w"><span>${esc(c.word)}</span>${c.pos ? `<span class="ext-p">${esc(c.pos)}</span>` : ''}${c.already ? `<span class="ext-alr-badge">登録済</span>` : ''}${spkFn(c.word, App.lang)}</div><div class="ext-m" title="${esc(c.sentence || c.meaning)}">${esc(c.meaning)}</div></div></label>`).join('');
+      $('extCandidateGrid').innerHTML = (App.extCandidates || []).map((c, i) => `<label class="ext-item ${c.checked ? 'checked' : ''} ${c.already ? 'already' : ''}"><input type="checkbox" data-ext-idx="${i}" ${c.checked ? 'checked' : ''}><div class="ext-info"><div class="ext-w"><span>${esc(c.word)}</span>${c.pos ? `<span class="ext-p">${esc(c.pos)}</span>` : ''}${c.already ? `<span class="ext-alr-badge">${isEn ? 'Added' : '登録済'}</span>` : ''}${spkFn(c.word, App.lang)}</div><div class="ext-m" title="${esc(c.sentence || c.meaning)}">${esc(c.meaning)}</div></div></label>`).join('');
     }
   }
 
@@ -1017,6 +1073,8 @@
   global.openShareDeckModal = openShareDeckModal;
   global.executeShareDeckImport = executeShareDeckImport;
   global.switchSettingsTab = switchSettingsTab;
+  global.refreshExtractLevelOptions = refreshExtractLevelOptions;
+  global.getLocalizedLevelLabel = getLocalizedLevelLabel;
 
   // --- グローバルエクスポート ---
   global.VocabModal = {
@@ -1036,6 +1094,8 @@
     openEditModal,
     saveEditCard,
     openExtractModal,
+    refreshExtractLevelOptions,
+    getLocalizedLevelLabel,
     updateExtCounts,
     renderExtCandidates,
     toggleAllExtChecks,
