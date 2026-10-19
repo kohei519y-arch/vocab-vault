@@ -398,6 +398,18 @@
       // アナリティクス・ダッシュボード
       'analytics.title': '忘却予測カレンダー ＆ アナリティクス・ダッシュボード',
       'analytics.retrievability': '現在の記憶維持率:',
+      'analytics.retrievability_title': '全体平均想起率 (Retrievability)',
+      'analytics.memory_health': '記憶健康度',
+      'analytics.stable': '安定定着 (R≥90%):',
+      'analytics.borderline': '境界領域 (70%≤R<90%):',
+      'analytics.critical': '忘却危機 (R<70%):',
+      'analytics.badge_optimized': '最適化中 ({count}件 / 精度+{imp}%)',
+      'analytics.badge_ready': '最適化可能 ({count}件蓄積)',
+      'analytics.badge_init': '初期係数 ({count}/20件蓄積)',
+      'analytics.heatmap_stats': '累計: <strong>{total}語</strong> | 連続: <strong>{streak}日</strong>',
+      'analytics.less': '少',
+      'analytics.more': '多',
+      'analytics.workload_total': '14日合計: <strong>{total}語</strong>',
       'analytics.fsrs_weights': '個人適応型 FSRS 重み',
       'analytics.fsrs_weights_desc': '直近の学習ログに基づき、あなたの忘却速度に数理最適化された間隔で出題します。',
       'analytics.btn_optimize': '今すぐFSRS最適化を実行',
@@ -1045,6 +1057,18 @@
       // Analytics & Dashboard
       'analytics.title': 'Retention Calendar & Analytics Dashboard',
       'analytics.retrievability': 'Current Retention Rate:',
+      'analytics.retrievability_title': 'Overall Retrievability',
+      'analytics.memory_health': 'Memory Health',
+      'analytics.stable': 'Stable Retention (R≥90%):',
+      'analytics.borderline': 'Borderline (70%≤R<90%):',
+      'analytics.critical': 'Critical / Near Forgetting (R<70%):',
+      'analytics.badge_optimized': 'Optimized ({count} reviews / +{imp}% precision)',
+      'analytics.badge_ready': 'Ready to Optimize ({count} reviews logged)',
+      'analytics.badge_init': 'Standard Weights ({count}/20 reviews)',
+      'analytics.heatmap_stats': 'Total: <strong>{total} words</strong> | Streak: <strong>{streak} days</strong>',
+      'analytics.less': 'Less',
+      'analytics.more': 'More',
+      'analytics.workload_total': '14-Day Total: <strong>{total} words</strong>',
       'analytics.fsrs_weights': 'Personalized FSRS Weights',
       'analytics.fsrs_weights_desc': 'Reviews are scheduled based on mathematical optimization of your forgetting curve.',
       'analytics.btn_optimize': 'Run FSRS Optimization Now',
@@ -1608,7 +1632,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (Entrez la clé API Gemini)',
       'ext.processing': 'Traitement en cours...',
       'ext.max_option': 'Max {n} mots',
-      'btn.clear': 'Effacer'
+      'btn.clear': 'Effacer',
+      'analytics.retrievability_title': 'Taux de rappel global',
+      'analytics.memory_health': 'Santé de la mémoire',
+      'analytics.stable': 'Rétention stable (R≥90%) :',
+      'analytics.borderline': 'Zone limite (70%≤R<90%) :',
+      'analytics.critical': 'Risque d\'oubli (R<70%) :',
+      'analytics.badge_optimized': 'Optimisé ({count} révisions / +{imp}% précision)',
+      'analytics.badge_ready': 'Prêt à optimiser ({count} révisions)',
+      'analytics.badge_init': 'Poids standards ({count}/20 révisions)',
+      'analytics.heatmap_stats': 'Total : <strong>{total} mots</strong> | Série : <strong>{streak} jours</strong>',
+      'analytics.less': 'Moins',
+      'analytics.more': 'Plus',
+      'analytics.workload_total': 'Total 14 jours : <strong>{total} mots</strong>'
     },
 
     de: {
@@ -1914,7 +1950,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (Gemini-API-Schlüssel eingeben)',
       'ext.processing': 'Wird verarbeitet...',
       'ext.max_option': 'Max. {n} Wörter',
-      'btn.clear': 'Löschen'
+      'btn.clear': 'Löschen',
+      'analytics.retrievability_title': 'Gesamtabrufbarkeit',
+      'analytics.memory_health': 'Gedächtnis-Fitness',
+      'analytics.stable': 'Stabil verankert (R≥90%):',
+      'analytics.borderline': 'Grenzbereich (70%≤R<90%):',
+      'analytics.critical': 'Vergessensgefahr (R<70%):',
+      'analytics.badge_optimized': 'Optimiert ({count} Wiederholungen / +{imp}% Genauigkeit)',
+      'analytics.badge_ready': 'Bereit zur Optimierung ({count} Einträge)',
+      'analytics.badge_init': 'Standardgewichte ({count}/20 Einträge)',
+      'analytics.heatmap_stats': 'Gesamt: <strong>{total} Wörter</strong> | Serie: <strong>{streak} Tage</strong>',
+      'analytics.less': 'Weniger',
+      'analytics.more': 'Mehr',
+      'analytics.workload_total': '14-Tage-Gesamt: <strong>{total} Wörter</strong>'
     },
 
     es: {
@@ -2220,7 +2268,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (Introduzca clave API Gemini)',
       'ext.processing': 'Procesando...',
       'ext.max_option': 'Máx. {n} palabras',
-      'btn.clear': 'Borrar'
+      'btn.clear': 'Borrar',
+      'analytics.retrievability_title': 'Tasa global de recuerdo',
+      'analytics.memory_health': 'Salud de la memoria',
+      'analytics.stable': 'Retención estable (R≥90%):',
+      'analytics.borderline': 'Zona límite (70%≤R<90%):',
+      'analytics.critical': 'Riesgo de olvido (R<70%):',
+      'analytics.badge_optimized': 'Optimizado ({count} repasos / +{imp}% precisión)',
+      'analytics.badge_ready': 'Listo para optimizar ({count} repasos)',
+      'analytics.badge_init': 'Pesos estándar ({count}/20 repasos)',
+      'analytics.heatmap_stats': 'Total: <strong>{total} palabras</strong> | Racha: <strong>{streak} días</strong>',
+      'analytics.less': 'Menos',
+      'analytics.more': 'Más',
+      'analytics.workload_total': 'Total 14 días: <strong>{total} palabras</strong>'
     },
     it: {
       'app.title': 'Vocab Vault',
@@ -2304,7 +2364,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (Inserisci chiave API Gemini)',
       'ext.processing': 'Elaborazione...',
       'ext.max_option': 'Max {n} parole',
-      'btn.clear': 'Cancella'
+      'btn.clear': 'Cancella',
+      'analytics.retrievability_title': 'Tasso globale di richiamo',
+      'analytics.memory_health': 'Salute della memoria',
+      'analytics.stable': 'Ritenuto stabilmente (R≥90%):',
+      'analytics.borderline': 'Zona limite (70%≤R<90%):',
+      'analytics.critical': 'Rischio di oblio (R<70%):',
+      'analytics.badge_optimized': 'Ottimizzato ({count} ripassi / +{imp}% precisione)',
+      'analytics.badge_ready': 'Pronto per l\'ottimizzazione ({count} ripassi)',
+      'analytics.badge_init': 'Pesi predefiniti ({count}/20 ripassi)',
+      'analytics.heatmap_stats': 'Totale: <strong>{total} parole</strong> | Serie: <strong>{streak} giorni</strong>',
+      'analytics.less': 'Meno',
+      'analytics.more': 'Più',
+      'analytics.workload_total': 'Totale 14 giorni: <strong>{total} parole</strong>'
     },
     pt: {
       'common.unlimited': 'Ilimitado',
@@ -2429,7 +2501,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (Insira a chave de API Gemini)',
       'ext.processing': 'Processando...',
       'ext.max_option': 'Máx. {n} palavras',
-      'btn.clear': 'Limpar'
+      'btn.clear': 'Limpar',
+      'analytics.retrievability_title': 'Taxa global de retenção',
+      'analytics.memory_health': 'Saúde da memória',
+      'analytics.stable': 'Retenção estável (R≥90%):',
+      'analytics.borderline': 'Zona limítrofe (70%≤R<90%):',
+      'analytics.critical': 'Risco de esquecimento (R<70%):',
+      'analytics.badge_optimized': 'Otimizado ({count} revisões / +{imp}% precisão)',
+      'analytics.badge_ready': 'Pronto para otimizar ({count} revisões)',
+      'analytics.badge_init': 'Pesos padrão ({count}/20 revisões)',
+      'analytics.heatmap_stats': 'Total: <strong>{total} palavras</strong> | Sequência: <strong>{streak} dias</strong>',
+      'analytics.less': 'Menos',
+      'analytics.more': 'Mais',
+      'analytics.workload_total': 'Total de 14 dias: <strong>{total} palavras</strong>'
     },
     nl: {
       'app.title': 'Vocab Vault',
@@ -2511,7 +2595,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (Voer Gemini API-sleutel in)',
       'ext.processing': 'Verwerken...',
       'ext.max_option': 'Max. {n} woorden',
-      'btn.clear': 'Wissen'
+      'btn.clear': 'Wissen',
+      'analytics.retrievability_title': 'Algeheel herinneringspercentage',
+      'analytics.memory_health': 'Geheugenfitheid',
+      'analytics.stable': 'Stabiel onthouden (R≥90%):',
+      'analytics.borderline': 'Grensgebied (70%≤R<90%):',
+      'analytics.critical': 'Vergeetrisico (R<70%):',
+      'analytics.badge_optimized': 'Geoptimaliseerd ({count} herhalingen / +{imp}% precisie)',
+      'analytics.badge_ready': 'Klaar voor optimalisatie ({count} herhalingen)',
+      'analytics.badge_init': 'Standaard gewichten ({count}/20 herhalingen)',
+      'analytics.heatmap_stats': 'Totaal: <strong>{total} woorden</strong> | Reeks: <strong>{streak} dagen</strong>',
+      'analytics.less': 'Minder',
+      'analytics.more': 'Meer',
+      'analytics.workload_total': '14-daags totaal: <strong>{total} woorden</strong>'
     },
     zh: {
       'app.title': 'Vocab Vault',
@@ -2595,7 +2691,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (输入 Gemini API 密钥)',
       'ext.processing': '处理中...',
       'ext.max_option': '最多 {n} 词',
-      'btn.clear': '清空'
+      'btn.clear': '清空',
+      'analytics.retrievability_title': '全库平均可提取率',
+      'analytics.memory_health': '记忆健康度',
+      'analytics.stable': '稳定掌握 (R≥90%):',
+      'analytics.borderline': '临界记忆 (70%≤R<90%):',
+      'analytics.critical': '遗忘预警 (R<70%):',
+      'analytics.badge_optimized': '已优化 ({count}次复习 / 精度+{imp}%)',
+      'analytics.badge_ready': '可进行优化 (已积累{count}条)',
+      'analytics.badge_init': '默认权重 (已积累{count}/20条)',
+      'analytics.heatmap_stats': '累计: <strong>{total}词</strong> | 连续: <strong>{streak}天</strong>',
+      'analytics.less': '少',
+      'analytics.more': '多',
+      'analytics.workload_total': '14天合计: <strong>{total}词</strong>'
     },
     ko: {
       'app.title': 'Vocab Vault',
@@ -2679,7 +2787,19 @@
       'ext.ocr_key_ph': 'AIzaSy... (Gemini API 키 입력)',
       'ext.processing': '처리 중...',
       'ext.max_option': '최대 {n}개 단어',
-      'btn.clear': '지우기'
+      'btn.clear': '지우기',
+      'analytics.retrievability_title': '전체 평균 회상률',
+      'analytics.memory_health': '기억 건강도',
+      'analytics.stable': '안정적 정착 (R≥90%):',
+      'analytics.borderline': '경계 영역 (70%≤R<90%):',
+      'analytics.critical': '망각 위기 (R<70%):',
+      'analytics.badge_optimized': '최적화됨 ({count}회 복습 / 정확도+{imp}%)',
+      'analytics.badge_ready': '최적화 가능 ({count}회 축적)',
+      'analytics.badge_init': '기본 가중치 ({count}/20회 축적)',
+      'analytics.heatmap_stats': '누적: <strong>{total}개</strong> | 연속: <strong>{streak}일</strong>',
+      'analytics.less': '적음',
+      'analytics.more': '많음',
+      'analytics.workload_total': '14일 합계: <strong>{total}개</strong>'
     }
   };
 
@@ -3362,6 +3482,12 @@
     }
     if (global.VocabModal?.updateSmartNotifyUI) {
       try { global.VocabModal.updateSmartNotifyUI(); } catch (e) {}
+    }
+
+    // 9. アナリティクス・ダッシュボードの動的再描画
+    const analyticsBody = document.getElementById('analyticsDashboardBody');
+    if (analyticsBody && global.VocabAnkiView?.renderAnalyticsDashboard) {
+      try { global.VocabAnkiView.renderAnalyticsDashboard('analyticsDashboardBody'); } catch (e) {}
     }
   }
 

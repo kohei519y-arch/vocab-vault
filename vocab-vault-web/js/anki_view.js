@@ -1211,6 +1211,10 @@
     const fsrsWeights = global.VocabSRS?.getUserFSRSWeights ? global.VocabSRS.getUserFSRSWeights() : null;
     const reviewLogs = global.VocabSRS?.getReviewHistoryLog ? global.VocabSRS.getReviewHistoryLog() : [];
 
+    const curLoc = options.locale || global.VocabI18n?.getLocale?.() || 'ja';
+    const isEn = curLoc !== 'ja';
+    const t = (k, p, def) => (global.VocabI18n?.t ? global.VocabI18n.t(k, p, def) : def);
+
     const radius = 36;
     const circumference = 2 * Math.PI * radius;
     const offset = circumference * (1 - retrievability.avgR);
@@ -1232,7 +1236,7 @@
     `;
 
     const heatmapCellsHtml = heatmap.cells.map(c => `
-      <div class="heatmap-cell l-${c.level}" title="${c.date}: ${c.count}語復習"></div>
+      <div class="heatmap-cell l-${c.level}" title="${c.date}: ${c.count}${isEn ? ' words reviewed' : '語復習'}"></div>
     `).join('');
 
     const chartBarsHtml = workload.workload.map(w => {
@@ -1240,7 +1244,7 @@
       const isToday = w.dayOffset === 0;
       const isHeavy = w.count >= 30;
       return `
-        <div class="workload-bar-col" title="${w.date} (${w.label}): ${w.count}語">
+        <div class="workload-bar-col" title="${w.date} (${w.label}): ${w.count}${isEn ? ' words' : '語'}">
           <span class="workload-val">${w.count > 0 ? w.count : ''}</span>
           <div class="workload-bar ${isToday ? 'today' : ''} ${isHeavy ? 'heavy' : ''}" style="height:${pct}%;"></div>
           <span class="workload-label">${w.shortDate}</span>
@@ -1249,10 +1253,10 @@
     }).join('');
 
     const optStatusHtml = fsrsWeights
-      ? `<span class="badge ok">最適化中 (${fsrsWeights.logCount || reviewLogs.length}件 / 精度+${fsrsWeights.improvement || '0'}%)</span>`
+      ? `<span class="badge ok">${t('analytics.badge_optimized', { count: fsrsWeights.logCount || reviewLogs.length, imp: fsrsWeights.improvement || '0' }, isEn ? `Optimized (${fsrsWeights.logCount || reviewLogs.length} reviews / +${fsrsWeights.improvement || '0'}% precision)` : `最適化中 (${fsrsWeights.logCount || reviewLogs.length}件 / 精度+${fsrsWeights.improvement || '0'}%)`)}</span>`
       : reviewLogs.length >= 20
-        ? `<span class="badge ok">最適化可能 (${reviewLogs.length}件蓄積)</span>`
-        : `<span class="badge" style="background:var(--b);color:var(--s)">初期係数 (${reviewLogs.length}/20件蓄積)</span>`;
+        ? `<span class="badge ok">${t('analytics.badge_ready', { count: reviewLogs.length }, isEn ? `Ready to Optimize (${reviewLogs.length} reviews logged)` : `最適化可能 (${reviewLogs.length}件蓄積)`)}</span>`
+        : `<span class="badge" style="background:var(--b);color:var(--s)">${t('analytics.badge_init', { count: reviewLogs.length }, isEn ? `Standard Weights (${reviewLogs.length}/20 reviews)` : `初期係数 (${reviewLogs.length}/20件蓄積)`)}</span>`;
 
     const curPair = global.VocabCore?.getActivePairConfig ? global.VocabCore.getActivePairConfig() : null;
     const pairLabel = curPair ? (curPair.name || curPair.label || '') : '';
@@ -1261,16 +1265,16 @@
       <div class="analytics-grid">
         <div class="analytics-card">
           <div class="analytics-card-hd">
-            <span>全体平均想起率 (Retrievability)${pairLabel ? ` <small style="color:var(--s);font-size:11px">(${esc(pairLabel)})</small>` : ''}</span>
-            <span class="badge ok">記憶健康度</span>
+            <span data-i18n="analytics.retrievability_title">全体平均想起率 (Retrievability)${pairLabel ? ` <small style="color:var(--s);font-size:11px">(${esc(pairLabel)})</small>` : ''}</span>
+            <span class="badge ok" data-i18n="analytics.memory_health">記憶健康度</span>
           </div>
           <div class="analytics-retrievability-wrap">
             ${gaugeHtml}
             <div style="flex:1;font-size:12px;line-height:1.6">
               <div style="font-weight:700;color:var(--t)"><span data-i18n="analytics.retrievability">現在の記憶維持率:</span> <strong style="color:${gradeColor}">${retrievability.avgPct}</strong></div>
-              <div style="color:var(--s)">• 安定定着 (R≥90%): <strong>${retrievability.stable}語</strong></div>
-              <div style="color:var(--s)">• 境界領域 (70%≤R&lt;90%): <strong>${retrievability.borderline}語</strong></div>
-              <div style="color:var(--s)">• 忘却危機 (R&lt;70%): <strong style="color:#ef4444">${retrievability.critical}語</strong></div>
+              <div style="color:var(--s)">• <span data-i18n="analytics.stable">安定定着 (R≥90%):</span> <strong>${retrievability.stable} <span data-i18n="common.unit_words">語</span></strong></div>
+              <div style="color:var(--s)">• <span data-i18n="analytics.borderline">境界領域 (70%≤R&lt;90%):</span> <strong>${retrievability.borderline} <span data-i18n="common.unit_words">語</span></strong></div>
+              <div style="color:var(--s)">• <span data-i18n="analytics.critical">忘却危機 (R&lt;70%):</span> <strong style="color:#ef4444">${retrievability.critical} <span data-i18n="common.unit_words">語</span></strong></div>
             </div>
           </div>
         </div>
@@ -1283,11 +1287,11 @@
           <div style="font-size:12px;color:var(--s);line-height:1.6">
             <p style="margin:0 0 8px 0" data-i18n="analytics.fsrs_weights_desc">直近${reviewLogs.length}件の復習ログに基づき、あなたの忘却速度に数理最適化された間隔で出題します。</p>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="安定度スケーリング係数">S-Scale: ${Number(fsrsWeights?.sScale || 1.0).toFixed(2)}x</span>
-              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="忘却曲線の減衰率（負の指数）">Decay: ${Number(fsrsWeights?.decayFactor || -0.5).toFixed(2)}</span>
-              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="Hard評価時の次回係数">Hard: ${Number(fsrsWeights?.wHard || 0.8).toFixed(2)}x</span>
-              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="Good評価時の次回係数">Good: ${Number(fsrsWeights?.wGood || 1.2).toFixed(2)}x</span>
-              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="Easy評価時の次回係数">Easy: ${Number(fsrsWeights?.wEasy || 1.6).toFixed(2)}x</span>
+              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Stability Scaling Factor' : '安定度スケーリング係数'}">S-Scale: ${Number(fsrsWeights?.sScale || 1.0).toFixed(2)}x</span>
+              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Forgetting Curve Decay Rate (Negative Exponent)' : '忘却曲線の減衰率（負の指数）'}">Decay: ${Number(fsrsWeights?.decayFactor || -0.5).toFixed(2)}</span>
+              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Next Interval Multiplier on Hard' : 'Hard評価時の次回係数'}">Hard: ${Number(fsrsWeights?.wHard || 0.8).toFixed(2)}x</span>
+              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Next Interval Multiplier on Good' : 'Good評価時の次回係数'}">Good: ${Number(fsrsWeights?.wGood || 1.2).toFixed(2)}x</span>
+              <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Next Interval Multiplier on Easy' : 'Easy評価時の次回係数'}">Easy: ${Number(fsrsWeights?.wEasy || 1.6).toFixed(2)}x</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()" data-i18n="analytics.btn_optimize">今すぐFSRS最適化を実行</button>
@@ -1300,7 +1304,7 @@
       <div class="analytics-card" style="margin-top:14px">
         <div class="analytics-card-hd">
           <span data-i18n="analytics.heatmap_title">学習コミットヒートマップ (過去9週間)</span>
-          <span style="font-size:12px;color:var(--s)">累計: <strong>${heatmap.totalReviews}語</strong> | 連続: <strong>${heatmap.streak}日</strong></span>
+          <span style="font-size:12px;color:var(--s)">${t('analytics.heatmap_stats', { total: heatmap.totalReviews, streak: heatmap.streak }, isEn ? `Total: <strong>${heatmap.totalReviews} words</strong> | Streak: <strong>${heatmap.streak} days</strong>` : `累計: <strong>${heatmap.totalReviews}語</strong> | 連続: <strong>${heatmap.streak}日</strong>`)}</span>
         </div>
         <div class="heatmap-wrap">
           <div class="heatmap-grid">
@@ -1308,20 +1312,20 @@
           </div>
         </div>
         <div style="display:flex;justify-content:flex-end;align-items:center;gap:4px;font-size:10px;color:var(--m)">
-          <span>少</span>
+          <span data-i18n="analytics.less">少</span>
           <div class="heatmap-cell l-0" style="display:inline-block"></div>
           <div class="heatmap-cell l-1" style="display:inline-block"></div>
           <div class="heatmap-cell l-2" style="display:inline-block"></div>
           <div class="heatmap-cell l-3" style="display:inline-block"></div>
           <div class="heatmap-cell l-4" style="display:inline-block"></div>
-          <span>多</span>
+          <span data-i18n="analytics.more">多</span>
         </div>
       </div>
 
       <div class="analytics-card" style="margin-top:14px">
         <div class="analytics-card-hd">
           <span data-i18n="analytics.workload_title">向こう14日間の日別予測復習負荷 (Workload Forecast)</span>
-          <span style="font-size:12px;color:var(--s)">14日合計: <strong>${workload.totalUpcoming}語</strong></span>
+          <span style="font-size:12px;color:var(--s)">${t('analytics.workload_total', { total: workload.totalUpcoming }, isEn ? `14-Day Total: <strong>${workload.totalUpcoming} words</strong>` : `14日合計: <strong>${workload.totalUpcoming}語</strong>`)}</span>
         </div>
         <div class="workload-chart">
           ${chartBarsHtml}
