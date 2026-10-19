@@ -613,7 +613,15 @@
     }
 
     const aPho = $('aPho');
-    if (aPho) aPho.textContent = [fmtPho(i.phonetic), i.grammar_forms].filter(Boolean).join('  ');
+    if (aPho) {
+      const currentLocale = global.VocabI18n?.getLocale?.() || 'ja';
+      const tL = (ctx.tgtLang && ctx.tgtLang !== 'ja')
+        ? ctx.tgtLang
+        : (currentLocale !== 'ja' ? currentLocale : (i.tgtLang || appState?.tgtLang || 'ja'));
+      const fmtGramFn = global.VocabCardView?.formatGrammarForms || global.formatGrammarForms;
+      const dispGram = fmtGramFn ? fmtGramFn(i.grammar_forms, tL, i.lang) : i.grammar_forms;
+      aPho.textContent = [fmtPho(i.phonetic), dispGram].filter(Boolean).join('  ');
+    }
 
     const aFrontRecog = $('aFrontRecog');
     const aClozeWrap = $('aClozeWrap');

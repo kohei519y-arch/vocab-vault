@@ -179,6 +179,257 @@
   const hasJapaneseKana = str => typeof str === 'string' && /[\u3040-\u309f\u30a0-\u30ff]/.test(str);
 
   /**
+   * 文法・字源行 (grammar_forms) の多言語ローカライズ整形
+   */
+  function formatGrammarForms(raw, targetLocale = 'ja', itemLang = '') {
+    if (!raw || typeof raw !== 'string') return '';
+    const currentLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const tL = targetLocale || (currentLocale !== 'ja' ? currentLocale : (global.App?.tgtLang || 'ja'));
+    if (tL === 'ja') return raw;
+
+    let res = raw;
+
+    // 1. ラベル部分のローカライズ
+    const rootLabels = {
+      de: 'Wurzel:',
+      en: 'Root:',
+      fr: 'Racine :',
+      es: 'Raíz:',
+      it: 'Radice:',
+      pt: 'Raiz:',
+      nl: 'Wortel:',
+      zh: '字源:',
+      ko: '자원:'
+    };
+    const rootLbl = rootLabels[tL] || 'Root:';
+    res = res.replace(/(?:^|\s|\/)字源\s*[:：]/g, match => match.replace(/字源[:：]/, rootLbl));
+
+    const tradLabels = {
+      de: 'Trad.:',
+      en: 'Trad.:',
+      fr: 'Trad. :',
+      es: 'Trad.:',
+      it: 'Trad.:',
+      pt: 'Trad.:',
+      nl: 'Trad.:',
+      zh: '繁体:',
+      ko: '번체:'
+    };
+    const tradLbl = tradLabels[tL] || 'Trad.:';
+    res = res.replace(/(?:^|\s|\/)繁体\s*[:：]/g, match => match.replace(/繁体[:：]/, tradLbl));
+
+    const hanjaLabels = {
+      zh: '汉字:',
+      ko: '한자:'
+    };
+    const hanjaLbl = hanjaLabels[tL] || 'Hanja:';
+    res = res.replace(/(?:^|\s|\/)한자\s*[:：]/g, match => match.replace(/한자[:：]/, hanjaLbl));
+
+    // 2. 漢字直後の日本語新字体併記の除去 (例: "經濟 (経済)" -> "經濟", "觀點 (観点)" -> "觀點", "權利 (権利)" -> "權利")
+    res = res.replace(/([\u4E00-\u9FFF])\s*[\(（][\u4E00-\u9FFF]+[\)）]/g, '$1');
+
+    // 3. 語根・字源解説の多言語辞書
+    const GLOSS_MAP = {
+      '見分ける・記す': {
+        de: 'unterscheiden / erfassen',
+        en: 'discern / record',
+        fr: 'discerner / noter',
+        es: 'discernir / registrar',
+        it: 'distinguere / registrare',
+        pt: 'discernir / registrar',
+        nl: 'onderscheiden / vastleggen',
+        zh: '辨识·记述',
+        ko: '분별하다·기록하다'
+      },
+      '見分ける・心に記す': {
+        de: 'unterscheiden / erfassen',
+        en: 'discern / record',
+        fr: 'discerner / noter',
+        es: 'discernir / registrar',
+        it: 'distinguere / registrare',
+        pt: 'discernir / registrar',
+        nl: 'onderscheiden / vastleggen',
+        zh: '辨识·心记',
+        ko: '분별하다·마음에 새기다'
+      },
+      'はかりの分銅': {
+        de: 'Waagegewicht / Macht',
+        en: 'scale weight / authority',
+        fr: 'poids de balance / autorité',
+        es: 'pesa de balanza / autoridad',
+        it: 'peso della bilancia / autorità',
+        pt: 'peso da balança / autoridade',
+        nl: 'weegschaalgewicht / gezag',
+        zh: '秤砣·权柄',
+        ko: '저울추·권세'
+      },
+      'はかりの分銅・力': {
+        de: 'Waagegewicht / Befugnis',
+        en: 'scale weight / power',
+        fr: 'poids de balance / pouvoir',
+        es: 'pesa de balanza / poder',
+        it: 'peso della bilancia / potere',
+        pt: 'peso da balança / poder',
+        nl: 'weegschaalgewicht / gezag',
+        zh: '秤砣·权力',
+        ko: '저울추·힘'
+      },
+      '正しく治める': {
+        de: 'recht regieren / leiten',
+        en: 'govern justly / rule',
+        fr: 'gouverner droitement',
+        es: 'gobernar con justicia',
+        it: 'governare rettamente',
+        pt: 'governar com justiça',
+        nl: 'rechtvaardig besturen',
+        zh: '正道治理',
+        ko: '바르게 다스리다'
+      },
+      '縦糸・治める': {
+        de: 'Kettfaden / ordnen',
+        en: 'warp thread / manage',
+        fr: 'fil de chaîne / gérer',
+        es: 'hilo de urdimbre / administrar',
+        it: 'ordito / amministrare',
+        pt: 'fio de urdidura / administrar',
+        nl: 'schering / ordenen',
+        zh: '经线·治理',
+        ko: '날실·다스리다'
+      },
+      '縦糸を通す・治める': {
+        de: 'Kettfaden / ordnen',
+        en: 'warp thread / manage',
+        fr: 'fil de chaîne / gérer',
+        es: 'hilo de urdimbre / administrar',
+        it: 'ordito / amministrare',
+        pt: 'fio de urdidura / administrar',
+        nl: 'schering / ordenen',
+        zh: '穿经线·治理',
+        ko: '날실을 꿰다·다스리다'
+      },
+      '玉の筋目・法則': {
+        de: 'Maserung des Jade / Gesetz',
+        en: 'veins in jade / reason',
+        fr: 'veines du jade / principe',
+        es: 'vetas del jade / razón',
+        it: 'venature della giada / principio',
+        pt: 'veios do jade / razão',
+        nl: 'aderen in jade / rede',
+        zh: '玉石纹理·法则',
+        ko: '옥의 결·이치'
+      },
+      '見渡す': {
+        de: 'überblicken / betrachten',
+        en: 'look broadly / observe',
+        fr: 'regarder au large / observer',
+        es: 'contemplar / observar',
+        it: 'guardare ampiamente / osservare',
+        pt: 'contemplar amplamente / observar',
+        nl: 'overzien / observeren',
+        zh: '广泛观察',
+        ko: '넓게 보다'
+      },
+      '広く見極める': {
+        de: 'überblicken / betrachten',
+        en: 'look broadly / observe',
+        fr: 'regarder au large / observer',
+        es: 'contemplar / observar',
+        it: 'guardare ampiamente / osservare',
+        pt: 'contemplar amplamente / observar',
+        nl: 'overzien / observeren',
+        zh: '广泛审视',
+        ko: '널리 살피다'
+      },
+      '立つ': {
+        de: 'stehen',
+        en: 'stand',
+        fr: 'se tenir debout',
+        es: 'estar de pie',
+        it: 'stare',
+        pt: 'ficar de pé',
+        nl: 'staan',
+        zh: '立·站立',
+        ko: '서다'
+      },
+      'つかむ': {
+        de: 'greifen / fassen',
+        en: 'grasp / seize',
+        fr: 'saisir',
+        es: 'agarrar / captar',
+        it: 'afferrare',
+        pt: 'agarrar / captar',
+        nl: 'grijpen',
+        zh: '抓取·把握',
+        ko: '잡다·파악하다'
+      },
+      '保つ': {
+        de: 'halten / bewahren',
+        en: 'hold / maintain',
+        fr: 'tenir / maintenir',
+        es: 'mantener / sostener',
+        it: 'mantenere / sostenere',
+        pt: 'manter / sustentar',
+        nl: 'houden / handhaven',
+        zh: '保持·维持',
+        ko: '유지하다'
+      },
+      '運ぶ': {
+        de: 'tragen / befördern',
+        en: 'carry / transport',
+        fr: 'porter / transporter',
+        es: 'llevar / transportar',
+        it: 'portare / trasportare',
+        pt: 'levar / transportar',
+        nl: 'dragen / vervoeren',
+        zh: '运送·承担',
+        ko: '나르다·운반하다'
+      },
+      '見る': {
+        de: 'sehen / schauen',
+        en: 'look / see',
+        fr: 'regarder / voir',
+        es: 'mirar / ver',
+        it: 'guardare / vedere',
+        pt: 'olhar / ver',
+        nl: 'kijken / zien',
+        zh: '注视·观察',
+        ko: '보다'
+      },
+      '言う': {
+        de: 'sagen / sprechen',
+        en: 'say / speak',
+        fr: 'dire / parler',
+        es: 'decir / hablar',
+        it: 'dire / parlare',
+        pt: 'dizer / falar',
+        nl: 'zeggen / spreken',
+        zh: '诉说·言语',
+        ko: '말하다'
+      },
+      '座る': {
+        de: 'sitzen',
+        en: 'sit',
+        fr: 's\'asseoir',
+        es: 'sentarse',
+        it: 'sedere',
+        pt: 'sentar-se',
+        nl: 'zitten',
+        zh: '就坐·居留',
+        ko: '앉다'
+      }
+    };
+
+    for (const [jaGloss, transObj] of Object.entries(GLOSS_MAP)) {
+      if (res.includes(jaGloss)) {
+        const trans = transObj[tL] || transObj.en || jaGloss;
+        res = res.replace(jaGloss, trans);
+      }
+    }
+
+    return res;
+  }
+
+  /**
    * 意味・語源・歴史文脈のコンパクト整形
    */
   function formatMeaningAndEty(d, targetLocale = null) {
@@ -435,7 +686,10 @@
       const due = Number(i.nextReview || 0) <= Date.now();
       const makeLkFn = global.VocabMorphology?.makeLookupKey || global.makeLookupKey || ((w, l, h) => h > 1 ? `${w}#${h}` : w);
 
-      const tL = i.tgtLang || options.tgtLang || global.App?.tgtLang || 'ja';
+      const currentLocale = global.VocabI18n?.getLocale?.() || 'ja';
+      const tL = (options.tgtLang && options.tgtLang !== 'ja')
+        ? options.tgtLang
+        : (currentLocale !== 'ja' ? currentLocale : (i.tgtLang || global.App?.tgtLang || 'ja'));
       c.className = 'card';
       if (typeof c.setAttribute === 'function') {
         c.setAttribute('role', 'article');
@@ -450,7 +704,8 @@
       const homoHtml = i.homographIndex > 1 ? `<span class="homo-badge" title="${esc(homoTitle)}">#${i.homographIndex}</span>` : '';
       const gender = detectGrammaticalGender(i, iL, tL);
       const genderHtml = gender ? `<span class="gender-badge ${gender.cls}" title="${esc(gender.full)}">${esc(gender.label)}</span>` : '';
-      const gramHtml = i.grammar_forms ? `<div class="gram-line">${hlText(i.grammar_forms, false, options.queryReg)}</div>` : '';
+      const dispGram = formatGrammarForms(i.grammar_forms, tL, iL);
+      const gramHtml = dispGram ? `<div class="gram-line">${hlText(dispGram, false, options.queryReg)}</div>` : '';
       const spkFn = (txt, l) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l) : '';
       const crossPill = options.crossLang ? `<span class="lang-pill">${esc(iL.toUpperCase())}</span>` : '';
 
@@ -621,6 +876,7 @@
     hlText,
     relTime,
     formatMeaningAndEty,
+    formatGrammarForms,
     collectEtyPeers,
     buildRight,
     createCardElement,
