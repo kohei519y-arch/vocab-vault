@@ -13,6 +13,29 @@
   const TRANSLATIONS = {
     ja: {
       // 共通・ナビゲーション
+      'common.unlimited': '無制限',
+      'common.unit_words': '語',
+      'common.unit_word': '語',
+      'common.cloud': 'クラウド',
+      'common.custom_byok': 'カスタムAPI(BYOK)',
+      'common.ai_unlimited': 'AI生成: 無制限',
+      'common.ai_unlimited_title': 'AI生成: 無制限 (Pro / 開発者 / BYOK)',
+      'common.ai_quota_left': 'AI残: {rem}/{limit}語',
+      'common.ai_quota_zero_title': '本日の無料AI生成枠（5語/日）に達しました。Proで無制限',
+      'common.ai_quota_warn_title': '残り{rem}語。Proで無制限解放',
+      'common.ai_quota_rem_title': '本日のAI新規生成残り枠: {rem}語 (キャッシュ時は消費なし)',
+      'common.quota_exhausted_modal': '本日のAI新規生成無料枠（5語/日）をすべて消費しました。Proプラン（月480円）で実質無制限（月3,000語）にアップグレードできます。',
+      'settings.api_err_badge': 'エラー',
+      'settings.byok_active_badge': 'カスタムBYOK設定済',
+      'settings.storage_badge': '保存正常 (IDB+LS)',
+      'settings.storage_idb': 'IDB大容量モード(正常)',
+      'settings.storage_err': '保存エラー(要確認)',
+      'settings.logged_in_pro': 'ログイン済・同期有効 (Pro)',
+      'settings.logged_in_free': 'ログイン中 (Free: 1端末ローカル保持)',
+      'settings.not_logged_in': '未ログイン',
+      'settings.logged_in_as': 'ログイン中:',
+      'settings.quota_unlimited_desc': 'AI新規生成クォータ: 無制限（Pro・BYOK・開発者モード）',
+      'settings.quota_limited_desc': '本日のAI新規生成クォータ残り: {remaining} / {limit} 語（共有辞書キャッシュ・スターターパックは無制限。全自動クラウド同期はPro限定）',
       'app.title': 'Vocab Vault',
       'app.tagline': '語源と概念史で深く刻む、知的探求者のためのボキャブラリー・ヴォールト',
       'nav.explore': '探す',
@@ -625,6 +648,29 @@
 
     en: {
       // Common & Navigation
+      'common.unlimited': 'Unlimited',
+      'common.unit_words': 'words',
+      'common.unit_word': 'word',
+      'common.cloud': 'Cloud',
+      'common.custom_byok': 'Custom API (BYOK)',
+      'common.ai_unlimited': 'AI Gen: Unlimited',
+      'common.ai_unlimited_title': 'AI Gen: Unlimited (Pro / Dev / BYOK)',
+      'common.ai_quota_left': 'AI Left: {rem}/{limit}',
+      'common.ai_quota_zero_title': 'Daily free AI quota reached (5 words/day). Unlimited with Pro',
+      'common.ai_quota_warn_title': '{rem} remaining. Unlock unlimited with Pro',
+      'common.ai_quota_rem_title': 'Daily AI generation remaining: {rem} (Zero cost when cached)',
+      'common.quota_exhausted_modal': 'Daily free AI generation quota exhausted. Upgrade to Pro for unlimited generation.',
+      'settings.api_err_badge': 'Error',
+      'settings.byok_active_badge': 'Custom BYOK Active',
+      'settings.storage_badge': 'Storage Normal (IDB+LS)',
+      'settings.storage_idb': 'IndexedDB High-Cap (OK)',
+      'settings.storage_err': 'Storage Error (Check Required)',
+      'settings.logged_in_pro': 'Logged in & Syncing (Pro)',
+      'settings.logged_in_free': 'Logged in (Free: 1 device)',
+      'settings.not_logged_in': 'Not Logged In',
+      'settings.logged_in_as': 'Logged in as:',
+      'settings.quota_unlimited_desc': 'Daily AI Generation Quota: Unlimited (Pro / BYOK / Dev)',
+      'settings.quota_limited_desc': 'Daily AI Generation Quota remaining: {remaining} / {limit} words (Shared cache & starter packs are unlimited. Cloud Sync is Pro only)',
       'app.title': 'Vocab Vault',
       'app.tagline': 'Deep PIE Etymology & Conceptual History for Intellectual Learners',
       'nav.explore': 'Explore',
@@ -2185,6 +2231,47 @@
       'cat.exam': 'Preparazione Esami'
     },
     pt: {
+      'common.unlimited': 'Ilimitado',
+      'common.unit_words': 'palavras',
+      'common.unit_word': 'palavra',
+      'common.cloud': 'Nuvem',
+      'common.custom_byok': 'API Personalizada (BYOK)',
+      'common.ai_unlimited': 'Geração IA: Ilimitada',
+      'common.ai_unlimited_title': 'Geração IA: Ilimitada (Pro / Dev / BYOK)',
+      'common.ai_quota_left': 'IA Restante: {rem}/{limit}',
+      'common.ai_quota_zero_title': 'Cota diária gratuita de IA atingida (5 palavras/dia). Ilimitada no Pro',
+      'common.ai_quota_warn_title': '{rem} restantes. Desbloqueie ilimitado com o Pro',
+      'common.ai_quota_rem_title': 'Cota diária de IA restante: {rem} (Sem custo no cache)',
+      'common.quota_exhausted_modal': 'Cota gratuita diária de IA esgotada. Atualize para o Pro para geração ilimitada.',
+      'settings.api_err_badge': 'Erro',
+      'settings.byok_active_badge': 'BYOK Personalizado Ativo',
+      'settings.storage_badge': 'Armazenamento Normal (IDB+LS)',
+      'settings.storage_idb': 'Modo Alta Capacidade IDB (OK)',
+      'settings.storage_err': 'Erro de Armazenamento (Verificar)',
+      'settings.logged_in_pro': 'Conectado e Sincronizando (Pro)',
+      'settings.logged_in_free': 'Conectado (Gratuito: 1 dispositivo local)',
+      'settings.not_logged_in': 'Não Conectado',
+      'settings.logged_in_as': 'Conectado como:',
+      'settings.quota_unlimited_desc': 'Cota Diária de Geração de IA: Ilimitada (Pro / BYOK / Modo Dev)',
+      'settings.quota_limited_desc': 'Cota Diária de Geração de IA restante: {remaining} / {limit} palavras (Cache compartilhado e pacotes são ilimitados. Sincronização na nuvem exclusiva do Pro)',
+      'settings.metrics_title': 'Métricas de Geração de IA e Economia de Tokens',
+      'settings.metrics_badge_cache': 'Cache de Alta Eficiência Ativo',
+      'settings.metric_total_words': 'Total de Palavras Solicitadas',
+      'settings.metric_cache_rate': 'Taxa de Acerto do Cache Compartilhado',
+      'settings.metric_tokens_saved': 'Economia Estimada de Tokens',
+      'settings.metric_daily_quota': 'Cota Diária de Geração de IA',
+      'settings.metrics_desc': '*Palavras carregadas do cache compartilhado são instantâneas (0ms) e não consomem tokens.',
+      'settings.ai_engine_title': 'Motor de IA e Privacidade',
+      'settings.ai_engine_badge': 'IA Integrada Ativa (Privacidade Total)',
+      'settings.ai_engine_desc': 'O aplicativo inclui um motor de IA integrado, permitindo uso seguro sem necessidade de chaves de API pessoais. Toda a comunicação é criptografada com TLS/SSL e estritamente privada.',
+      'settings.byok_title': 'Configurações Avançadas: Chave de API Gemini Personalizada (BYOK)',
+      'settings.fsrs_title': 'Otimizador de Pesos FSRS Personalizado',
+      'settings.fsrs_badge': 'FSRS-4.5 Otimizado',
+      'settings.notify_title': 'Lembrete Inteligente de Retenção Crítica (Push)',
+      'settings.notify_badge': 'Modo Inteligente Ativo',
+      'settings.cap_title': 'Limite Diário de Revisão e Redistribuição (FSRS-4.5 SRS)',
+      'settings.cap_badge': 'Otimizado',
+      'settings.cap_opt_unlimited': 'Ilimitado (Tudo)',
       'app.title': 'Vocab Vault',
       'app.tagline': 'Cofre de vocabulário etimológico e história conceitual',
       'nav.explore': 'Explorar',
@@ -2876,13 +2963,40 @@
     const metricsEfficiencyBadge = document.getElementById('metricsEfficiencyBadge');
     if (metricsEfficiencyBadge) metricsEfficiencyBadge.textContent = t('settings.metrics_badge_cache');
     const apiBadge = document.getElementById('apiBadge');
-    if (apiBadge) apiBadge.textContent = t('settings.ai_engine_badge');
+    if (apiBadge) {
+      if (global.updKeyUI) {
+        try { global.updKeyUI(); } catch (e) { apiBadge.textContent = t('settings.ai_engine_badge'); }
+      } else {
+        apiBadge.textContent = t('settings.ai_engine_badge');
+      }
+    }
     const storageBadge = document.getElementById('storageBadge');
-    if (storageBadge) storageBadge.textContent = t('settings.storage_badge');
+    if (storageBadge) {
+      if (global.updateStorageStatusUI) {
+        try { global.updateStorageStatusUI(); } catch (e) { storageBadge.textContent = t('settings.storage_badge'); }
+      } else {
+        storageBadge.textContent = t('settings.storage_badge');
+      }
+    }
     const fsrsOptBadge = document.getElementById('fsrsOptBadge');
-    if (fsrsOptBadge) fsrsOptBadge.textContent = t('settings.fsrs_badge');
+    if (fsrsOptBadge) {
+      if (global.VocabModal?.updateFSRSOptimizerUI) {
+        try { global.VocabModal.updateFSRSOptimizerUI(); } catch (e) { fsrsOptBadge.textContent = t('settings.fsrs_badge'); }
+      } else {
+        fsrsOptBadge.textContent = t('settings.fsrs_badge');
+      }
+    }
     const smartNotifyBadge = document.getElementById('smartNotifyBadge');
-    if (smartNotifyBadge) smartNotifyBadge.textContent = t('settings.notify_badge');
+    if (smartNotifyBadge) {
+      if (global.VocabModal?.updateSmartNotifyUI) {
+        try { global.VocabModal.updateSmartNotifyUI(); } catch (e) { smartNotifyBadge.textContent = t('settings.notify_badge'); }
+      } else {
+        smartNotifyBadge.textContent = t('settings.notify_badge');
+      }
+    }
+    if (global.updCloudUI) {
+      try { global.updCloudUI(); } catch (e) {}
+    }
 
     // 7. 復習上限セレクタ
     const selDailyCap = document.getElementById('selDailyCap');
@@ -3078,6 +3192,25 @@
     }
     if (global.VocabSearch?.renderSidebarTree) {
       try { global.VocabSearch.renderSidebarTree(); } catch (e) {}
+    }
+
+    // 8. クラウドUI・キーUI・統計情報の再描画
+    if (global.VocabEvents?.updCloudUI) {
+      try { global.VocabEvents.updCloudUI(); } catch (e) {}
+    } else if (global.updCloudUI) {
+      try { global.updCloudUI(); } catch (e) {}
+    }
+    if (global.updKeyUI) {
+      try { global.updKeyUI(); } catch (e) {}
+    }
+    if (global.updStats) {
+      try { global.updStats(); } catch (e) {}
+    }
+    if (global.VocabModal?.updateFSRSOptimizerUI) {
+      try { global.VocabModal.updateFSRSOptimizerUI(); } catch (e) {}
+    }
+    if (global.VocabModal?.updateSmartNotifyUI) {
+      try { global.VocabModal.updateSmartNotifyUI(); } catch (e) {}
     }
   }
 

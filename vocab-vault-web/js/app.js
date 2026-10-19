@@ -395,6 +395,10 @@
   function updateStorageStatusUI(state = 'ok', msg = '') {
     const banner = $('storageWarnBanner'), badge = $('storageBadge'), dot = $('cfgDot');
     App.storageError = (state === 'error');
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = curLocale === 'ja';
+    const t = (k, fb) => (global.VocabI18n?.t ? global.VocabI18n.t(k, fb) : fb);
+
     if (banner) {
       if (state === 'error') {
         banner.className = 'storage-warn-banner show';
@@ -402,14 +406,22 @@
         banner.title = msg;
       } else if (state === 'idb-only') {
         banner.className = 'storage-warn-banner info show';
-        banner.textContent = 'IndexedDB大容量モード (5MB超)';
-        banner.title = 'localStorageの5MB上限に達したため、IndexedDB主ストア専有モードで安全に保存されています。';
+        banner.textContent = isJa ? 'IndexedDB大容量モード (5MB超)' : 'IndexedDB High-Capacity Mode (>5MB)';
+        banner.title = isJa
+          ? 'localStorageの5MB上限に達したため、IndexedDB主ストア専有モードで安全に保存されています。'
+          : 'Preserved safely in IndexedDB storage after exceeding localStorage 5MB limit.';
       } else {
         banner.className = 'storage-warn-banner';
       }
     }
     if (badge) {
-      badge.textContent = state === 'error' ? '保存エラー(要確認)' : state === 'idb-only' ? 'IDB大容量モード(正常)' : '保存正常 (IDB+LS)';
+      if (state === 'error') {
+        badge.textContent = isJa ? '保存エラー(要確認)' : (t('settings.storage_err') || 'Storage Error');
+      } else if (state === 'idb-only') {
+        badge.textContent = isJa ? 'IDB大容量モード(正常)' : (t('settings.storage_idb') || 'IndexedDB High-Cap (OK)');
+      } else {
+        badge.textContent = isJa ? '保存正常 (IDB+LS)' : (t('settings.storage_badge') || 'Storage Normal (IDB+LS)');
+      }
       badge.className = `badge ${state === 'error' ? 'ng' : 'ok'}`;
     }
     if (dot) dot.classList.toggle('warn', App.storageError || !canGenerateWords());
@@ -1022,14 +1034,17 @@
     const h = Boolean(getKey()), b = $('apiBadge');
     if ($('cfgDot')) $('cfgDot').classList.toggle('warn', App.storageError);
     if (b) {
+      const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+      const isJa = curLocale === 'ja';
+      const t = (k, fb) => (global.VocabI18n?.t ? global.VocabI18n.t(k, fb) : fb);
       if (ok === false) {
-        b.textContent = 'エラー';
+        b.textContent = isJa ? 'エラー' : (t('settings.api_err_badge') || 'Error');
         b.className = 'badge ng';
       } else if (h) {
-        b.textContent = 'カスタムBYOK設定済';
+        b.textContent = isJa ? 'カスタムBYOK設定済' : (t('settings.byok_active_badge') || 'Custom BYOK Active');
         b.className = 'badge ok';
       } else {
-        b.textContent = '内蔵AI稼働中 (完全機密保護)';
+        b.textContent = isJa ? '内蔵AI稼働中 (完全機密保護)' : (t('settings.ai_engine_badge') || 'Embedded AI Active (Full Privacy)');
         b.className = 'badge ok';
       }
     }
@@ -1145,21 +1160,29 @@
   }
 
   function updStats() {
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = curLocale === 'ja';
+
     if ($('dataStatText')) {
       const allPairs = typeof getAllKnownPairConfigs === 'function' ? getAllKnownPairConfigs() : [];
       const stats = allPairs
         .map(cfg => {
           const count = getJson(cfg.key).length;
-          return count > 0 ? `${cfg.short || cfg.label || cfg.key}:${count}語` : null;
+          const shortCode = global.VocabSearch?.getPairShortLabel ? global.VocabSearch.getPairShortLabel(cfg.src, cfg.tgt, curLocale) : (cfg.short || cfg.label || cfg.key);
+          return count > 0 ? `${shortCode}:${count}` : null;
         })
         .filter(Boolean);
       const totalCount = allPairs.reduce((acc, cfg) => acc + (getJson(cfg.key)?.length || 0), 0);
-      $('dataStatText').textContent = stats.length > 0
-        ? `総登録数: ${totalCount}語 (${stats.join(' / ')})`
-        : `登録数: ${LANG_KEYS.map(l => `${LANGS[l].short}${getJson(LANGS[l].key).length}語`).join(' / ')}`;
+      $('dataStatText').textContent = isJa
+        ? (stats.length > 0 ? `総登録数: ${totalCount}語 (${stats.join(' / ')})` : `登録数: 0語`)
+        : (stats.length > 0 ? `Total Words: ${totalCount} (${stats.join(' / ')})` : `Total Words: 0`);
     }
     const lastBk = lsGet('vv_last_backup_at', '');
-    if ($('lastBackupText')) $('lastBackupText').textContent = lastBk ? `最終JSONバックアップ: ${lastBk}` : '最終JSONバックアップ: 未実行（定期的なJSON保存を推奨）';
+    if ($('lastBackupText')) {
+      $('lastBackupText').textContent = isJa
+        ? (lastBk ? `最終JSONバックアップ: ${lastBk}` : '最終JSONバックアップ: 未実行（定期的なJSON保存を推奨）')
+        : (lastBk ? `Last JSON Backup: ${lastBk}` : 'Last JSON Backup: Never (Regular backups recommended)');
+    }
   }
 
   const saveKeyFromModal = () => global.VocabModal ? global.VocabModal.saveKeyFromModal() : undefined;

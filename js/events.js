@@ -121,24 +121,28 @@
     const quotaTxt = $('sbQuotaText') || $('sbCloudQuotaText');
     const aiQuotaBadge = $('aiQuotaBadge');
 
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = curLocale === 'ja';
+    const t = (k, fb) => (global.VocabI18n?.t ? global.VocabI18n.t(k, fb) : fb);
+
     const usageInfo = global.VocabStorage?.getDailyAiUsageInfo ? global.VocabStorage.getDailyAiUsageInfo({ appState }) : null;
     if (aiQuotaBadge && usageInfo) {
       if (usageInfo.isUnlimited) {
         aiQuotaBadge.className = 'badge ok';
-        aiQuotaBadge.textContent = 'AI生成: 無制限';
-        aiQuotaBadge.title = 'AI生成: 無制限 (Pro / 開発者 / BYOK)';
+        aiQuotaBadge.textContent = isJa ? 'AI生成: 無制限' : (t('common.ai_unlimited') || 'AI Gen: Unlimited');
+        aiQuotaBadge.title = isJa ? 'AI生成: 無制限 (Pro / 開発者 / BYOK)' : (t('common.ai_unlimited_title') || 'AI Gen: Unlimited (Pro / Dev / BYOK)');
       } else {
         const rem = usageInfo.remaining;
-        aiQuotaBadge.textContent = `AI残: ${rem}/${usageInfo.limit}語`;
+        aiQuotaBadge.textContent = isJa ? `AI残: ${rem}/${usageInfo.limit}語` : (t('common.ai_quota_left', { rem, limit: usageInfo.limit }) || `AI Left: ${rem}/${usageInfo.limit}`);
         if (rem === 0) {
           aiQuotaBadge.className = 'badge ng';
-          aiQuotaBadge.title = '本日の無料AI生成枠（5語/日）に達しました。Proで無制限';
+          aiQuotaBadge.title = isJa ? '本日の無料AI生成枠（5語/日）に達しました。Proで無制限' : (t('common.ai_quota_zero_title') || 'Daily free AI quota reached (5 words/day). Unlimited with Pro');
         } else if (rem <= 2) {
           aiQuotaBadge.className = 'badge warn';
-          aiQuotaBadge.title = `残り${rem}語。Proで無制限解放`;
+          aiQuotaBadge.title = isJa ? `残り${rem}語。Proで無制限解放` : (t('common.ai_quota_warn_title', { rem }) || `${rem} remaining. Unlock unlimited with Pro`);
         } else {
           aiQuotaBadge.className = 'badge ok';
-          aiQuotaBadge.title = `本日のAI新規生成残り枠: ${rem}語 (キャッシュ時は消費なし)`;
+          aiQuotaBadge.title = isJa ? `本日のAI新規生成残り枠: ${rem}語 (キャッシュ時は消費なし)` : (t('common.ai_quota_rem_title', { rem }) || `Daily AI generation remaining: ${rem} (Zero cost when cached)`);
         }
       }
     }
@@ -150,14 +154,17 @@
       const mCache = $('metricCacheRate');
       const mTokens = $('metricTokensSaved');
       const mQuota = $('metricDailyQuota');
-      if (mTotal) mTotal.innerHTML = `${summary.totalWords} <small style="font-size:11px">語</small>`;
+      const wordsUnit = isJa ? '語' : (t('common.unit_words') || 'words');
+      if (mTotal) mTotal.innerHTML = `${summary.totalWords} <small style="font-size:11px">${wordsUnit}</small>`;
       if (mCache) mCache.textContent = `${summary.cacheRate}%`;
       if (mTokens) mTokens.innerHTML = `${summary.tokensSaved.toLocaleString()} <small style="font-size:11px">tok</small>`;
       if (mQuota && usageInfo) {
         if (usageInfo.isUnlimited) {
-          mQuota.innerHTML = `無制限 <small style="font-size:11px">(Pro)</small>`;
+          const unlimLabel = isJa ? '無制限' : (t('common.unlimited') || 'Unlimited');
+          mQuota.innerHTML = `${unlimLabel} <small style="font-size:11px">(Pro)</small>`;
         } else {
-          mQuota.innerHTML = `${usageInfo.remaining} <small style="font-size:11px">/ ${usageInfo.limit}語</small>`;
+          const unit = isJa ? `/${usageInfo.limit}語` : `/${usageInfo.limit} ${wordsUnit}`;
+          mQuota.innerHTML = `${usageInfo.remaining} <small style="font-size:11px">${unit}</small>`;
         }
       }
     }
@@ -167,43 +174,56 @@
         const email = sess?.user?.email || '';
         const shortMail = email ? email.split('@')[0] : '';
         topBadge.className = 'badge ok';
-        topBadge.textContent = appState?.isPro ? 'クラウド: Pro会員' : (shortMail ? `クラウド: Free (${shortMail})` : 'クラウド: Free');
+        const cloudLabel = isJa ? 'クラウド' : (t('common.cloud') || 'Cloud');
+        topBadge.textContent = appState?.isPro ? `${cloudLabel}: Pro` : (shortMail ? `${cloudLabel}: Free (${shortMail})` : `${cloudLabel}: Free`);
         topBadge.style.cursor = 'pointer';
         topBadge.onclick = () => {
           if (appState && appState.quotaRemaining === 0 && typeof ctx.openUpsellModal === 'function') {
-            ctx.openUpsellModal('本日のAI新規生成無料枠（5語/日）をすべて消費しました。Proプラン（月480円）で実質無制限（月3,000語）にアップグレードできます。');
+            ctx.openUpsellModal(isJa ? '本日のAI新規生成無料枠（5語/日）をすべて消費しました。Proプラン（月480円）で実質無制限（月3,000語）にアップグレードできます。' : (t('common.quota_exhausted_modal') || 'Daily free AI generation quota exhausted. Upgrade to Pro for unlimited generation.'));
           } else if (typeof ctx.openSettings === 'function') {
             ctx.openSettings();
           }
         };
       } else if (ctx.getKey && ctx.getKey()) {
         topBadge.className = 'badge ok';
-        topBadge.textContent = 'カスタムAPI(BYOK)';
+        topBadge.textContent = isJa ? 'カスタムAPI(BYOK)' : (t('common.custom_byok') || 'Custom API (BYOK)');
         topBadge.style.cursor = 'pointer';
         topBadge.onclick = ctx.openSettings || global.VocabCore?.openSettings;
       } else {
         topBadge.className = 'badge ok';
-        topBadge.textContent = '内蔵AI: 稼働中 (完全機密保護)';
+        topBadge.textContent = isJa ? '内蔵AI: 稼働中 (完全機密保護)' : (t('settings.ai_engine_badge') || 'Embedded AI: Active (Full Privacy)');
         topBadge.style.cursor = 'pointer';
         topBadge.onclick = ctx.openSettings || global.VocabCore?.openSettings;
       }
     }
     if (sbBadge) {
       sbBadge.className = `badge ${ready ? 'ok' : 'ng'}`;
-      sbBadge.textContent = ready ? (appState?.isPro ? 'ログイン済・同期有効 (Pro)' : 'ログイン中 (Free: 1端末ローカル保持)') : '未ログイン';
+      if (ready) {
+        sbBadge.textContent = appState?.isPro
+          ? (isJa ? 'ログイン済・同期有効 (Pro)' : (t('settings.logged_in_pro') || 'Logged in & Syncing (Pro)'))
+          : (isJa ? 'ログイン中 (Free: 1端末ローカル保持)' : (t('settings.logged_in_free') || 'Logged in (Free: 1 device)'));
+      } else {
+        sbBadge.textContent = isJa ? '未ログイン' : (t('settings.not_logged_in') || 'Not Logged In');
+      }
     }
     if (authRow && loggedRow) {
       authRow.style.display = ready ? 'none' : 'flex';
       loggedRow.style.display = ready ? 'flex' : 'none';
     }
     if (userTxt && sess?.user?.email) {
-      userTxt.textContent = `ログイン中: ${sess.user.email} (${appState?.isPro ? 'Proプラン' : 'Freeプラン'})`;
+      userTxt.textContent = isJa
+        ? `ログイン中: ${sess.user.email} (${appState?.isPro ? 'Proプラン' : 'Freeプラン'})`
+        : `${t('settings.logged_in_as') || 'Logged in:'} ${sess.user.email} (${appState?.isPro ? (t('settings.pro_plan') || 'Pro Plan') : (t('settings.free_plan') || 'Free Plan')})`;
     }
     if (quotaTxt && usageInfo) {
       if (usageInfo.isUnlimited) {
-        quotaTxt.textContent = 'AI新規生成クォータ: 無制限（Pro・BYOK・開発者モード）';
+        quotaTxt.textContent = isJa
+          ? 'AI新規生成クォータ: 無制限（Pro・BYOK・開発者モード）'
+          : (t('settings.quota_unlimited_desc') || 'Daily AI Generation Quota: Unlimited (Pro / BYOK / Dev)');
       } else {
-        quotaTxt.textContent = `本日のAI新規生成クォータ残り: ${usageInfo.remaining} / ${usageInfo.limit} 語（共有辞書キャッシュ・スターターパックは無制限。全自動クラウド同期はPro限定）`;
+        quotaTxt.textContent = isJa
+          ? `本日のAI新規生成クォータ残り: ${usageInfo.remaining} / ${usageInfo.limit} 語（共有辞書キャッシュ・スターターパックは無制限。全自動クラウド同期はPro限定）`
+          : (t('settings.quota_limited_desc', { remaining: usageInfo.remaining, limit: usageInfo.limit }) || `Daily AI Generation Quota remaining: ${usageInfo.remaining} / ${usageInfo.limit} words (Shared cache & starter packs are unlimited. Cloud Sync is Pro only)`);
       }
     }
     if ($('cfgDot')) {
