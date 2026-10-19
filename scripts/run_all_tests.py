@@ -2529,6 +2529,35 @@ def test_10_language_pie_and_cjk_lineage_tree():
       }}
     }}
 
+    // Verify Radial Skill Tree Mode Layout with 10 Languages
+    const treeState = {{ layoutMode: 'tree', focusedRootKey: '' }};
+    const treeData = VocabGraphLayout.buildGraphData('', false, 'all', treeState);
+    const treeRoot = treeData.nodes.find(n => n.type === 'root');
+    if (!treeRoot) throw new Error("Tree root not found in tree mode");
+    if (!treeState.dynamicSectorDefs) throw new Error("dynamicSectorDefs not generated on treeState");
+    const sDefs = treeState.dynamicSectorDefs;
+    if (!sDefs.italic_romance) throw new Error("italic_romance sector not in dynamicSectorDefs");
+    if (!sDefs.germanic) throw new Error("germanic sector not in dynamicSectorDefs");
+
+    // Verify Romance sector has expanded angle for multi-language leaves
+    if (sDefs.italic_romance.span < 1.0) throw new Error("italic_romance span too narrow: " + sDefs.italic_romance.span);
+
+    // Verify leaf words maintain non-overlapping radial separation
+    const treeWords = treeData.nodes.filter(n => n.type === 'word');
+    if (treeWords.length < 15) throw new Error("Expected >= 15 tree words, got " + treeWords.length);
+    for (let i = 0; i < treeWords.length; i++) {{
+      for (let j = i + 1; j < treeWords.length; j++) {{
+        const d = Math.hypot(treeWords[i].x - treeWords[j].x, treeWords[i].y - treeWords[j].y);
+        if (d < 30) throw new Error("Overlap detected between " + treeWords[i].label + " and " + treeWords[j].label + " dist=" + d);
+      }}
+    }}
+
+    // Verify CJK focused root generates East Asian sectors
+    const cjkTreeState = {{ layoutMode: 'tree', focusedRootKey: '*政' }};
+    const cjkTreeData = VocabGraphLayout.buildGraphData('*政', false, 'all', cjkTreeState);
+    if (!cjkTreeState.isCjkTree) throw new Error("cjkTreeState.isCjkTree flag not set");
+    if (!cjkTreeState.dynamicSectorDefs?.cjk_core) throw new Error("cjk_core sector not in CJK dynamicSectorDefs");
+
     print("TEN_LANG_TREE_OK");
     """
     res = subprocess.run([JSC_PATH, "-e", jsc_script], capture_output=True, text=True)
@@ -2536,8 +2565,9 @@ def test_10_language_pie_and_cjk_lineage_tree():
         log_pass("Item 24-4: JSC verified all 10 languages in VocabI18n & VocabStorage and all 6 new starter packs (es, it, pt, nl, zh, ko)")
         log_pass("Item 24-5: JSC verified PIE root *sta- cross-connects all 7 Indo-European languages (en, fr, de, es, it, pt, nl)")
         log_pass("Item 24-6: JSC verified CJK roots (*政, *経, *権) canonicalize Simplified/Hanja/Kanji and cross-connect zh & ko")
+        log_pass("Item 24-7: JSC verified Radial Skill Tree dynamic sector allocation & non-overlapping multi-track concentric layout")
     else:
-        log_fail(f"Item 24-4..6 failed: {res.stderr or res.stdout}")
+        log_fail(f"Item 24-4..7 failed: {res.stderr or res.stdout}")
 
 def main():
     print("==================================================")

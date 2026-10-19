@@ -496,10 +496,11 @@
   /**
    * 単語帳データから語根グラフネットワークデータを構築（通常星系 / 4階層系統樹両対応）
    */
-  function buildGraphData(filterRootKey = '', clusterOnly = false, langFilter = 'all') {
+  function buildGraphData(filterRootKey = '', clusterOnly = false, langFilter = 'all', inGraphState = null) {
     const nodes = [];
     const rootMap = new Map();
     const nodeMap = new Map();
+    const graphState = inGraphState || global.VocabGraph?.graphState || {};
     const isTree = (graphState.layoutMode === 'tree');
 
     const getJsonFn = global.getJson || global.VocabCore?.getJson || (k => {
@@ -1016,18 +1017,123 @@
       // r = 250〜: 第2軌道〜 多重同心円スタガーによる現代語ノード (Multi-orbit Staggered Leaves: 250, 286, 322, 358px)
       // r = 380〜: 第3軌道〜 未開拓のつぼみ & 派生小枝 (Ghost Buds & Twigs)
 
-      // セクター（Angle / θ）による言語系統の空間分類:
-      // 1. ゲルマン語系 (Germanic / 古英語): 上部 (10時〜2時の方向: -3π/4 〜 -π/4)
-      // セクター（Angle / θ）による言語系統の空間分類:
-      function classifyBranchSector(bLabel) {
+      // セクター（Angle / θ）メタデータ定義（PIE系統 & 東アジア漢字字源系統 完全対応）
+      const SECTOR_METAS = {
+        germanic: {
+          key: 'germanic',
+          label: 'ゲルマン語派 / Germanic',
+          subLabel: '西ゲルマン語群 (英・独・蘭)',
+          colorDark: 'rgba(132, 204, 22, 0.05)',
+          colorDarkBorder: 'rgba(163, 230, 53, 0.15)',
+          colorLight: 'rgba(101, 163, 13, 0.04)',
+          colorLightBorder: 'rgba(101, 163, 13, 0.12)',
+          textColorDark: '#bef264',
+          textColorLight: '#4d7c0f',
+          subTextColorDark: '#86efac',
+          subTextColorLight: '#15803d'
+        },
+        italic_romance: {
+          key: 'italic_romance',
+          label: 'イタリック・ロマンス語派 / Italic & Romance',
+          subLabel: 'ロマンス諸語 (仏・西・伊・葡)',
+          colorDark: 'rgba(56, 189, 248, 0.05)',
+          colorDarkBorder: 'rgba(56, 189, 248, 0.15)',
+          colorLight: 'rgba(2, 132, 199, 0.04)',
+          colorLightBorder: 'rgba(2, 132, 199, 0.12)',
+          textColorDark: '#7dd3fc',
+          textColorLight: '#0369a1',
+          subTextColorDark: '#a5b4fc',
+          subTextColorLight: '#4338ca'
+        },
+        hellenic: {
+          key: 'hellenic',
+          label: 'ヘレニック・古典諸派 / Hellenic & Classical',
+          subLabel: '古典ギリシャ・国際学術語幹',
+          colorDark: 'rgba(192, 132, 252, 0.05)',
+          colorDarkBorder: 'rgba(192, 132, 252, 0.15)',
+          colorLight: 'rgba(147, 51, 234, 0.04)',
+          colorLightBorder: 'rgba(147, 51, 234, 0.12)',
+          textColorDark: '#d8b4fe',
+          textColorLight: '#7e22ce',
+          subTextColorDark: '#e9d5ff',
+          subTextColorLight: '#6b21a8'
+        },
+        sinospheric: {
+          key: 'sinospheric',
+          label: '東アジア・漢字諸語 / Sinospheric',
+          subLabel: '中・韓・日 漢字語幹体系',
+          colorDark: 'rgba(244, 63, 94, 0.05)',
+          colorDarkBorder: 'rgba(244, 63, 94, 0.15)',
+          colorLight: 'rgba(225, 29, 72, 0.04)',
+          colorLightBorder: 'rgba(225, 29, 72, 0.12)',
+          textColorDark: '#fda4af',
+          textColorLight: '#be123c',
+          subTextColorDark: '#fbcfe8',
+          subTextColorLight: '#9d174d'
+        },
+        cjk_core: {
+          key: 'cjk_core',
+          label: '漢語本源・基本語幹 / Core Syntax',
+          subLabel: '古代漢語字源・東アジア基本語幹',
+          colorDark: 'rgba(251, 191, 36, 0.05)',
+          colorDarkBorder: 'rgba(251, 191, 36, 0.18)',
+          colorLight: 'rgba(217, 119, 6, 0.04)',
+          colorLightBorder: 'rgba(217, 119, 6, 0.14)',
+          textColorDark: '#fde047',
+          textColorLight: '#b45309',
+          subTextColorDark: '#fef08a',
+          subTextColorLight: '#92400e'
+        },
+        cjk_system: {
+          key: 'cjk_system',
+          label: '抽象・制度派生体系 / System & Derivation',
+          subLabel: '近代受容・概念展開 (-化/-性/-制/-論)',
+          colorDark: 'rgba(45, 212, 191, 0.05)',
+          colorDarkBorder: 'rgba(45, 212, 191, 0.18)',
+          colorLight: 'rgba(13, 148, 136, 0.04)',
+          colorLightBorder: 'rgba(13, 148, 136, 0.14)',
+          textColorDark: '#5eead4',
+          textColorLight: '#0f766e',
+          subTextColorDark: '#99f6e4',
+          subTextColorLight: '#115e59'
+        },
+        cjk_prefix: {
+          key: 'cjk_prefix',
+          label: '接頭・修飾構文 / Prefix & Modifier',
+          subLabel: '否定・程度構造 (不-/非-/無-/超-/全-)',
+          colorDark: 'rgba(244, 63, 94, 0.05)',
+          colorDarkBorder: 'rgba(244, 63, 94, 0.18)',
+          colorLight: 'rgba(225, 29, 72, 0.04)',
+          colorLightBorder: 'rgba(225, 29, 72, 0.14)',
+          textColorDark: '#f43f5e',
+          textColorLight: '#be123c',
+          subTextColorDark: '#fda4af',
+          subTextColorLight: '#9d174d'
+        }
+      };
+
+      function classifyBranchSector(bLabel, isCjk) {
         const bl = String(bLabel || '').toLowerCase();
-        if (bl.startsWith('germanic') || bl.includes('german') || bl.includes('old english') || bl.includes('deutsch')) {
+        if (isCjk) {
+          if (bl.includes('制度') || bl.includes('抽象') || bl.includes('-化') || bl.includes('-性') || bl.includes('-制') || bl.includes('-論')) {
+            return 'cjk_system';
+          }
+          if (bl.includes('接頭') || bl.includes('否定') || bl.includes('対抗') || bl.includes('不-') || bl.includes('非-') || bl.includes('無-') || bl.includes('超-') || bl.includes('全-') || bl.includes('共-')) {
+            return 'cjk_prefix';
+          }
+          return 'cjk_core';
+        }
+
+        if (bl.startsWith('germanic') || bl.includes('german') || bl.includes('old english') || bl.includes('deutsch') || bl.includes('dutch') || bl.includes('nederlands')) {
           return 'germanic';
         }
-        if (bl.startsWith('italic') || bl.startsWith('latin') || bl.startsWith('romance') || bl.includes('french') || bl.includes('français')) {
-          return 'latin';
+        if (bl.startsWith('italic') || bl.startsWith('latin') || bl.startsWith('romance') || bl.includes('french') || bl.includes('spanish') || bl.includes('italian') || bl.includes('portuguese') || bl.includes('français') || bl.includes('español') || bl.includes('italiano') || bl.includes('português')) {
+          return 'italic_romance';
         }
-        return 'greek_other';
+        if (bl.startsWith('sinospheric') || bl.includes('chinese') || bl.includes('korean') || bl.includes('hanja') || bl.includes('kanji') || bl.includes('漢字') || bl.includes('漢語')) {
+          return 'sinospheric';
+        }
+        return 'hellenic';
       }
 
       const isSingleRoot = (activeRoots.length === 1);
@@ -1045,23 +1151,26 @@
           rNode.targetY = (row - Math.ceil(activeRoots.length / cols) / 2) * rootSpacing;
         }
 
+        const isCjk = Boolean(rNode.label && /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(String(rNode.label).trim())) || Boolean(rNode.isCjkRoot);
+        const sectorKeys = isCjk
+          ? ['cjk_core', 'cjk_system', 'cjk_prefix']
+          : ['germanic', 'italic_romance', 'hellenic', 'sinospheric'];
+
         const rBranches = Array.from(branchMap.values()).filter(b => b.rootLabel === rNode.label);
-        const sectorBranches = {
-          germanic: [],
-          latin: [],
-          greek_other: []
-        };
+        const sectorBranches = {};
+        sectorKeys.forEach(k => { sectorBranches[k] = []; });
 
         rBranches.forEach(bNode => {
-          const sec = classifyBranchSector(bNode.label);
+          const sec = classifyBranchSector(bNode.label, isCjk);
+          if (!sectorBranches[sec]) sectorBranches[sec] = [];
           sectorBranches[sec].push(bNode);
         });
 
-        // 言語系統ごとの単語数に応じた動的セクター角度割り当て（ラテン系などの過密セクターに十分な角度領域を確保）
+        // 言語系統ごとの単語数に応じた動的セクター角度割り当て（ラテン・ロマンス等の過密セクターに十分な角度領域を確保）
         const secWeights = {};
         let totalWeight = 0;
-        ['germanic', 'latin', 'greek_other'].forEach(k => {
-          const bList = sectorBranches[k];
+        sectorKeys.forEach(k => {
+          const bList = sectorBranches[k] || [];
           const wCount = bList.reduce((acc, b) => acc + Math.max(2, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
           const w = bList.length > 0 ? Math.max(4, wCount) : 0;
           secWeights[k] = w;
@@ -1069,152 +1178,221 @@
         });
 
         const fullCircle = Math.PI * 2;
-        const activeSecKeys = ['germanic', 'latin', 'greek_other'].filter(k => sectorBranches[k].length > 0);
+        const activeSecKeys = sectorKeys.filter(k => (sectorBranches[k] || []).length > 0);
         const dynamicSectorDefs = {};
 
         if (activeSecKeys.length === 1) {
           const onlyKey = activeSecKeys[0];
           dynamicSectorDefs[onlyKey] = {
+            ...SECTOR_METAS[onlyKey],
             start: -Math.PI,
             end: Math.PI,
-            center: 0
+            center: 0,
+            span: fullCircle
           };
-        } else {
-          // 基準開始角度: ゲルマン系を上部（-3π/4）、ラテン系を右〜下部、ギリシャ系を左下へ自然に配分
-          const minAnglePerActive = 0.70; // 最低40度保証
-          const remainingAngle = Math.max(0.5, fullCircle - activeSecKeys.length * minAnglePerActive);
-          let currentStart = -3 * Math.PI / 4;
+        } else if (activeSecKeys.length > 1) {
+          // 最低確保角度（過少セクターでも文字衝突を防ぐ）
+          const minAnglePerActive = Math.max(0.62, fullCircle / (activeSecKeys.length * 2.3));
+          const remainingAngle = Math.max(0.2, fullCircle - activeSecKeys.length * minAnglePerActive);
+          let currentStart = isCjk ? (-Math.PI * 0.5) : (-3 * Math.PI / 4);
 
-          ['germanic', 'latin', 'greek_other'].forEach(secKey => {
-            const bList = sectorBranches[secKey];
-            if (bList.length === 0) return;
+          activeSecKeys.forEach(secKey => {
             const proportion = totalWeight > 0 ? (secWeights[secKey] / totalWeight) : (1 / activeSecKeys.length);
             const span = minAnglePerActive + remainingAngle * proportion;
             dynamicSectorDefs[secKey] = {
+              ...SECTOR_METAS[secKey],
               start: currentStart,
               end: currentStart + span,
-              center: currentStart + span / 2
+              center: currentStart + span / 2,
+              span: span
             };
             currentStart += span;
           });
         }
 
-        // 言語系統ごとにセクターを割り当て、重なりを防止して等間隔・重み付け配置
-        ['germanic', 'latin', 'greek_other'].forEach(secKey => {
+        // セクターごとの厳格な角度正規化・多重同心円スタガー配置
+        activeSecKeys.forEach(secKey => {
           const sDef = dynamicSectorDefs[secKey];
           const bList = sectorBranches[secKey];
           if (!sDef || !bList || bList.length === 0) return;
           const numB = bList.length;
 
-          const pad = 0.06; // 境界線とのパディング
-          const totalSpan = (sDef.end - sDef.start) - pad * 2;
+          const pad = 0.05;
+          const totalSpan = Math.max(0.12, sDef.span - pad * 2);
 
-          // セクター内の各ブランチの単語数（重み）を計算
-          const totalWordsInSector = bList.reduce((sum, b) => sum + Math.max(3, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
+          // セクター内の各ブランチの重みと正規化スパン計算（セクター境界を超えないよう厳格に保証）
+          const totalWordsInSector = bList.reduce((sum, b) => sum + Math.max(2, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
+          const rawSpans = bList.map(b => {
+            const bWords = (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5;
+            return Math.max(1.8, (Math.max(2, bWords) / Math.max(1, totalWordsInSector)) * totalSpan);
+          });
+          const sumRaw = rawSpans.reduce((a, b) => a + b, 0);
+          const normSpans = (numB === 1) ? [totalSpan] : rawSpans.map(s => (s / sumRaw) * totalSpan);
 
           let currentTheta = sDef.start + pad;
 
           bList.forEach((bNode, bIdx) => {
-            const bWords = (bNode.connectedWords?.length || 0) + (bNode.connectedBuds?.length || 0) * 0.5;
-            const rawWeight = Math.max(3, bWords) / Math.max(1, totalWordsInSector);
-            // 最低限の角度スパン（0.18 rad ≈ 10.3度）を確保してテキスト衝突を防止（セクター境界を超えないようクランプ）
-            const branchSpan = (numB === 1) ? totalSpan : (totalSpan < numB * 0.18 ? (totalSpan / numB) : Math.max(0.18, totalSpan * rawWeight));
-            const thetaB = (numB === 1) ? sDef.center : (currentTheta + branchSpan / 2);
+            const branchSpan = normSpans[bIdx];
+            const thetaB = currentTheta + branchSpan / 2;
             currentTheta += branchSpan;
 
-            // 第1軌道: 古典分岐ノード (r = 240, 315, 390 3段階スタガー配置でブランチ同士の接触・重合を解消)
-            const bRadius = (numB <= 2) ? 260 : (240 + (bIdx % 3) * 75);
+            // 第1軌道: 古典分岐ノード (r = 240, 305, 370 3段階スタガー配置でブランチ同士の接触・重合を解消)
+            const bRadius = (numB <= 2) ? 260 : (240 + (bIdx % 3) * 65);
             bNode.targetX = rNode.targetX + bRadius * Math.cos(thetaB);
             bNode.targetY = rNode.targetY + bRadius * Math.sin(thetaB);
             bNode.angle = thetaB;
+            bNode.orbitR = bRadius;
 
-            // 第2軌道〜外周軌道: 現代語の学習済ノード (Multi-Orbit Staggering: 500px〜)
-            // 単語同士の物理距離を十分に空けつつ、親ブランチの放射コーン内に収めて扇状に整然と配置
+            // 第2軌道〜外周軌道: 現代見出し語ノード (Multi-Orbit Concentric Hexagonal Staggering)
             const leaves = bNode.connectedWords || [];
             const leafCount = leaves.length;
+            const baseLeafR = 480;
+            const usableLeafSpan = branchSpan * 0.90;
 
-            const baseLeafR = 500;
-            const leafOrbitGap = 72;
+            if (leafCount > 0) {
+              // 半径480pxにおける単語1個あたりの必要弧長(48px)から1軌道の安全収容数を計算
+              const capacityPerOrbit = Math.max(1, Math.floor((baseLeafR * usableLeafSpan) / 48));
+              // 単語数に応じて軌道数を動的に1〜7軌道に配分
+              const numLeafOrbits = Math.min(7, Math.max(1, Math.ceil(leafCount / Math.max(1, capacityPerOrbit))));
+              const leafOrbitGap = Math.max(56, 76 - numLeafOrbits * 2.5);
 
-            // 軌道数の動的計算（1〜5軌道）
-            const numLeafOrbits = leafCount > 24 ? 5 : (leafCount > 12 ? 4 : (leafCount > 6 ? 3 : (leafCount > 2 ? 2 : 1)));
+              const orbitBuckets = Array.from({ length: numLeafOrbits }, () => []);
+              leaves.forEach((lNode, lIdx) => {
+                orbitBuckets[lIdx % numLeafOrbits].push(lNode);
+              });
 
-            // 親ブランチの角度スパン内に収め、他ブランチの単語領域と交差・重複しないように厳密にバインド
-            const maxAllowedSpan = Math.min(branchSpan * 0.88, 0.45);
-            const lSpan = Math.min(maxAllowedSpan, Math.max(0.06, (leafCount - 1) * 0.035));
-            const lStart = thetaB - lSpan / 2;
+              orbitBuckets.forEach((bucket, oIdx) => {
+                const leafR = baseLeafR + oIdx * leafOrbitGap;
+                const countInBucket = bucket.length;
+                if (countInBucket === 0) return;
 
-            const orbitBuckets = Array.from({ length: numLeafOrbits }, () => []);
-            leaves.forEach((lNode, lIdx) => {
-              orbitBuckets[lIdx % numLeafOrbits].push(lNode);
-            });
+                if (countInBucket === 1) {
+                  const lNode = bucket[0];
+                  lNode.targetX = rNode.targetX + leafR * Math.cos(thetaB);
+                  lNode.targetY = rNode.targetY + leafR * Math.sin(thetaB);
+                  lNode.angle = thetaB;
+                  lNode.orbitR = leafR;
+                } else {
+                  // 必要弧長に基づく正確な角度幅計算
+                  const neededArcSpan = (countInBucket - 1) * (50 / leafR);
+                  const actualSpan = Math.min(usableLeafSpan, Math.max(0.06, neededArcSpan));
+                  const step = actualSpan / (countInBucket - 1);
+                  const staggerOffset = (oIdx % 2 === 1) ? (step * 0.35) : 0;
 
-            orbitBuckets.forEach((bucket, oIdx) => {
-              const leafR = baseLeafR + oIdx * leafOrbitGap;
-              const countInBucket = bucket.length;
-              if (countInBucket === 0) return;
+                  bucket.forEach((lNode, bIdxInOrbit) => {
+                    const offsetFromCenter = (bIdxInOrbit - (countInBucket - 1) / 2) * step;
+                    const thetaL = thetaB + offsetFromCenter + (countInBucket % 2 === 0 ? staggerOffset : 0);
 
-              const step = (countInBucket > 1) ? (lSpan / (countInBucket - 1)) : 0;
-              const staggerShift = (countInBucket > 1 && oIdx % 2 === 1) ? (step * 0.5) : 0;
+                    lNode.targetX = rNode.targetX + leafR * Math.cos(thetaL);
+                    lNode.targetY = rNode.targetY + leafR * Math.sin(thetaL);
+                    lNode.angle = thetaL;
+                    lNode.orbitR = leafR;
+                  });
+                }
+              });
 
-              bucket.forEach((lNode, bIdxInOrbit) => {
-                const thetaL = (countInBucket === 1)
-                  ? thetaB
-                  : (lStart + step * bIdxInOrbit) + staggerShift;
-
-                lNode.targetX = rNode.targetX + leafR * Math.cos(thetaL);
-                lNode.targetY = rNode.targetY + leafR * Math.sin(thetaL);
-                lNode.angle = thetaL;
-
-                // 派生語・成句 (Twigs: 親単語から放射状に48px外側へ分岐)
+              // 派生語・成句 (Twigs: 親単語から放射状に46px外側へ分岐)
+              leaves.forEach(lNode => {
                 const myTwigs = twigs.filter(t => (t.parentWordId ? t.parentWordId === lNode.id : t.parentWord === lNode.label));
                 myTwigs.forEach((tNode, tIdx) => {
                   const twigOffset = (myTwigs.length === 1) ? 0 : (-0.040 + (0.080 / Math.max(1, myTwigs.length - 1)) * tIdx);
-                  const thetaT = thetaL + twigOffset;
-                  tNode.targetX = lNode.targetX + 48 * Math.cos(thetaT);
-                  tNode.targetY = lNode.targetY + 48 * Math.sin(thetaT);
+                  const thetaT = (lNode.angle || 0) + twigOffset;
+                  tNode.targetX = lNode.targetX + 46 * Math.cos(thetaT);
+                  tNode.targetY = lNode.targetY + 46 * Math.sin(thetaT);
                   tNode.angle = thetaT;
                 });
               });
-            });
+            }
 
             // 第3軌道以降: 未開拓のつぼみ (Ghost Buds: 単語軌道の外側にゆったり同心配置)
             const buds = bNode.connectedBuds || [];
             const budCount = buds.length;
+            if (budCount > 0) {
+              const numLeafOrbitsActual = leafCount > 0 ? Math.min(7, Math.max(1, Math.ceil(leafCount / Math.max(1, Math.floor((baseLeafR * usableLeafSpan) / 48))))) : 0;
+              const maxLeafOrbitR = (leafCount > 0) ? (baseLeafR + (numLeafOrbitsActual - 1) * Math.max(56, 76 - numLeafOrbitsActual * 2.5)) : 420;
+              const budBaseR = maxLeafOrbitR + 80;
+              const budSpan = branchSpan * 0.88;
+              const capacityPerBudOrbit = Math.max(1, Math.floor((budBaseR * budSpan) / 48));
+              const numBudOrbits = Math.min(5, Math.max(1, Math.ceil(budCount / Math.max(1, capacityPerBudOrbit))));
+              const budOrbitGap = 65;
 
-            const maxLeafOrbitR = baseLeafR + Math.max(0, numLeafOrbits - 1) * leafOrbitGap;
-            const budBaseR = maxLeafOrbitR + 80;
-            const numBudOrbits = budCount > 12 ? 3 : (budCount > 4 ? 2 : 1);
-            const budOrbitGap = 75;
-
-            const budSpan = Math.min(branchSpan * 0.85, 0.42);
-            const budStart = thetaB - budSpan / 2;
-
-            const budBuckets = Array.from({ length: numBudOrbits }, () => []);
-            buds.forEach((budNode, budIdx) => {
-              budBuckets[budIdx % numBudOrbits].push(budNode);
-            });
-
-            budBuckets.forEach((bBucket, boIdx) => {
-              const budR = budBaseR + boIdx * budOrbitGap;
-              const countInBBucket = bBucket.length;
-              if (countInBBucket === 0) return;
-
-              const bStep = (countInBBucket > 1) ? (budSpan / (countInBBucket - 1)) : 0;
-              const bStaggerShift = (countInBBucket > 1 && boIdx % 2 === 1) ? (bStep * 0.5) : 0;
-
-              bBucket.forEach((budNode, bbIdx) => {
-                const thetaBud = (countInBBucket === 1)
-                  ? thetaB
-                  : (budStart + bStep * bbIdx) + bStaggerShift;
-
-                budNode.targetX = rNode.targetX + budR * Math.cos(thetaBud);
-                budNode.targetY = rNode.targetY + budR * Math.sin(thetaBud);
-                budNode.angle = thetaBud;
+              const budBuckets = Array.from({ length: numBudOrbits }, () => []);
+              buds.forEach((budNode, budIdx) => {
+                budBuckets[budIdx % numBudOrbits].push(budNode);
               });
-            });
+
+              budBuckets.forEach((bBucket, boIdx) => {
+                const budR = budBaseR + boIdx * budOrbitGap;
+                const countInBBucket = bBucket.length;
+                if (countInBBucket === 0) return;
+
+                if (countInBBucket === 1) {
+                  const bNodeSingle = bBucket[0];
+                  bNodeSingle.targetX = rNode.targetX + budR * Math.cos(thetaB);
+                  bNodeSingle.targetY = rNode.targetY + budR * Math.sin(thetaB);
+                  bNodeSingle.angle = thetaB;
+                  bNodeSingle.orbitR = budR;
+                } else {
+                  const neededArcSpan = (countInBBucket - 1) * (48 / budR);
+                  const actualSpan = Math.min(budSpan, Math.max(0.06, neededArcSpan));
+                  const bStep = actualSpan / (countInBBucket - 1);
+                  const bStaggerShift = (boIdx % 2 === 1) ? (bStep * 0.35) : 0;
+
+                  bBucket.forEach((budNode, bbIdx) => {
+                    const offsetFromCenter = (bbIdx - (countInBBucket - 1) / 2) * bStep;
+                    const thetaBud = thetaB + offsetFromCenter + (countInBBucket % 2 === 0 ? bStaggerShift : 0);
+
+                    budNode.targetX = rNode.targetX + budR * Math.cos(thetaBud);
+                    budNode.targetY = rNode.targetY + budR * Math.sin(thetaBud);
+                    budNode.angle = thetaBud;
+                    budNode.orbitR = budR;
+                  });
+                }
+              });
+            }
           });
         });
+
+        // 極座標・同心円保護 緩和パス (Polar Radius-Preserving Angular Relaxation)
+        // 従来のCartesian relaxationが同心円を歪めて球状の塊にしてしまう問題を根絶
+        const placedWords = nodes.filter(n => n.targetX !== undefined && (n.type === 'word' || n.type === 'ghost_bud'));
+        const polarPasses = 2;
+        for (let pass = 0; pass < polarPasses; pass++) {
+          for (let i = 0; i < placedWords.length; i++) {
+            const na = placedWords[i];
+            for (let j = i + 1; j < placedWords.length; j++) {
+              const nb = placedWords[j];
+              if (Math.abs((na.orbitR || 0) - (nb.orbitR || 0)) < 36) {
+                const dx = nb.targetX - na.targetX;
+                const dy = nb.targetY - na.targetY;
+                const distSq = dx * dx + dy * dy;
+                const minDist = 46;
+                if (distSq < minDist * minDist && distSq > 0.001) {
+                  const dist = Math.sqrt(distSq);
+                  const overlap = minDist - dist;
+                  let dAngle = (nb.angle || 0) - (na.angle || 0);
+                  while (dAngle > Math.PI) dAngle -= Math.PI * 2;
+                  while (dAngle < -Math.PI) dAngle += Math.PI * 2;
+                  const sign = dAngle >= 0 ? 1 : -1;
+                  const angleShift = (overlap / (na.orbitR || 500)) * 0.45;
+                  na.angle = (na.angle || 0) - sign * angleShift;
+                  nb.angle = (nb.angle || 0) + sign * angleShift;
+                  na.targetX = rNode.targetX + na.orbitR * Math.cos(na.angle);
+                  na.targetY = rNode.targetY + na.orbitR * Math.sin(na.angle);
+                  nb.targetX = rNode.targetX + nb.orbitR * Math.cos(nb.angle);
+                  nb.targetY = rNode.targetY + nb.orbitR * Math.sin(nb.angle);
+                }
+              }
+            }
+          }
+        }
+
+        rNode.dynamicSectorDefs = dynamicSectorDefs;
+        rNode.isCjkTree = isCjk;
+        if (graphState) {
+          graphState.dynamicSectorDefs = dynamicSectorDefs;
+          graphState.isCjkTree = isCjk;
+        }
       });
 
       // 孤立したtwigがあれば親単語に紐づけて配置
@@ -1226,66 +1404,14 @@
           if (parentNode && parentNode.targetX !== undefined) {
             const pAngle = parentNode.angle || 0;
             const thetaT = pAngle + (tIdx % 2 === 0 ? -0.040 : 0.040);
-            tNode.targetX = parentNode.targetX + 48 * Math.cos(thetaT);
-            tNode.targetY = parentNode.targetY + 48 * Math.sin(thetaT);
+            tNode.targetX = parentNode.targetX + 46 * Math.cos(thetaT);
+            tNode.targetY = parentNode.targetY + 46 * Math.sin(thetaT);
           } else if (parentNode && parentNode.x !== undefined) {
-            tNode.targetX = parentNode.x + 48;
+            tNode.targetX = parentNode.x + 46;
             tNode.targetY = parentNode.y;
           }
         }
       });
-
-      // 緩和パス (O(N) Relaxation Pass): 重なり防止の微小補正
-      const placedNodes = nodes.filter(n => n.targetX !== undefined && n.type !== 'root');
-      const rCell = 80;
-      const passes = 3;
-
-      for (let pass = 0; pass < passes; pass++) {
-        const sGrid = new Map();
-        for (let i = 0; i < placedNodes.length; i++) {
-          const n = placedNodes[i];
-          const cx = Math.floor(n.targetX / rCell);
-          const cy = Math.floor(n.targetY / rCell);
-          const key = (cx + 32768) * 65536 + (cy + 32768);
-          let b = sGrid.get(key);
-          if (!b) { b = []; sGrid.set(key, b); }
-          b.push(n);
-        }
-
-        for (let i = 0; i < placedNodes.length; i++) {
-          const na = placedNodes[i];
-          const cx = Math.floor(na.targetX / rCell);
-          const cy = Math.floor(na.targetY / rCell);
-
-          for (let ox = -1; ox <= 1; ox++) {
-            for (let oy = -1; oy <= 1; oy++) {
-              const k = (cx + ox + 32768) * 65536 + (cy + oy + 32768);
-              const neighborBucket = sGrid.get(k);
-              if (!neighborBucket) continue;
-              for (let m = 0; m < neighborBucket.length; m++) {
-                const nb = neighborBucket[m];
-                if (nb === na) continue;
-                const dx = nb.targetX - na.targetX;
-                const dy = nb.targetY - na.targetY;
-                const distSq = dx * dx + dy * dy;
-                const minDist = (na.type === 'branch' && nb.type === 'branch')
-                  ? 80
-                  : ((na.type === 'word' && nb.type === 'word') ? 60 : 50);
-                if (distSq < minDist * minDist && distSq > 0.001) {
-                  const dist = Math.sqrt(distSq);
-                  const push = Math.min(3.5, (minDist - dist) * 0.25);
-                  const px = (dx / dist) * push;
-                  const py = (dy / dist) * push;
-                  na.targetX -= px;
-                  na.targetY -= py;
-                  nb.targetX += px;
-                  nb.targetY += py;
-                }
-              }
-            }
-          }
-        }
-      }
 
       // 初期位置のセット（系統樹モード時はターゲット確定座標で初期化）
       // 確定座標が付与されなかった孤立ノードを安全に除外して原点(0,0)集中を防止

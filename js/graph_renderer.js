@@ -59,6 +59,7 @@
   // --- 系統樹背景およびノードラベルのオフスクリーンCanvas超高速キャッシュ (GPUテクスチャブリット) ---
   let treeBgCacheCanvas = null;
   let treeBgCacheDark = null;
+  let treeBgCacheKey = '';
   const labelSpriteCache = new Map(); // key -> { canvas, width, height, dpr }
   let branchCacheCanvas = null;
   let branchCacheKey = '';
@@ -66,6 +67,7 @@
   function invalidateTreeBgCache() {
     treeBgCacheCanvas = null;
     treeBgCacheDark = null;
+    treeBgCacheKey = '';
     labelSpriteCache.clear();
     branchCacheCanvas = null;
     branchCacheKey = '';
@@ -110,8 +112,11 @@
     return sprite;
   }
 
-  function getTreeBackgroundCache(isDark) {
-    if (treeBgCacheCanvas && treeBgCacheDark === isDark) {
+  function getTreeBackgroundCache(isDark, sectorDefs = null, isCjk = false) {
+    const sEntries = sectorDefs ? Object.values(sectorDefs) : [];
+    const sSig = sEntries.map(s => `${s.key}:${Number(s.start || 0).toFixed(2)}_${Number(s.end || 0).toFixed(2)}`).join('|');
+    const cacheKey = `${isDark ? 1 : 0}_${isCjk ? 'cjk' : 'pie'}_${sSig}`;
+    if (treeBgCacheCanvas && treeBgCacheKey === cacheKey && treeBgCacheDark === isDark) {
       return treeBgCacheCanvas;
     }
     // 直径3100pxの扇形・同心円エリアを 1550x1550 (0.5倍スケール) のオフスクリーンCanvasに1回だけ事前ベイク
@@ -156,36 +161,99 @@
       }
     }
 
-    // B. 第2階層 サンバースト扇状エリア
-    drawSectorBand(100, 480, -3 * Math.PI / 4, -Math.PI / 4,
-      isDark ? 'rgba(132, 204, 22, 0.05)' : 'rgba(101, 163, 13, 0.04)',
-      isDark ? 'rgba(163, 230, 53, 0.12)' : 'rgba(101, 163, 13, 0.10)'
-    );
-    drawSectorBand(100, 480, -Math.PI / 4, 3 * Math.PI / 5,
-      isDark ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.04)',
-      isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.10)'
-    );
-    drawSectorBand(100, 480, 3 * Math.PI / 5, 5 * Math.PI / 4,
-      isDark ? 'rgba(192, 132, 252, 0.04)' : 'rgba(147, 51, 234, 0.03)',
-      isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(147, 51, 234, 0.08)'
-    );
+    if (sEntries.length > 0) {
+      // 動的セクター扇状エリア・境界線・ラベルの描画
+      sEntries.forEach(sDef => {
+        const startA = Number(sDef.start || 0);
+        const endA = Number(sDef.end || 0);
+        const fillColor = isDark ? (sDef.colorDark || 'rgba(56, 189, 248, 0.05)') : (sDef.colorLight || 'rgba(2, 132, 199, 0.04)');
+        const strokeColor = isDark ? (sDef.colorDarkBorder || 'rgba(56, 189, 248, 0.15)') : (sDef.colorLightBorder || 'rgba(2, 132, 199, 0.12)');
 
-    // C. 第3階層 サンバースト扇状エリア
-    drawSectorBand(495, 780, -3 * Math.PI / 4 + 0.03, -Math.PI / 4 - 0.03,
-      isDark ? 'rgba(34, 197, 94, 0.05)' : 'rgba(22, 163, 74, 0.04)',
-      isDark ? 'rgba(74, 222, 128, 0.14)' : 'rgba(22, 163, 74, 0.10)'
-    );
-    drawSectorBand(495, 780, -Math.PI / 4 + 0.03, 3 * Math.PI / 5 - 0.03,
-      isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(79, 70, 229, 0.04)',
-      isDark ? 'rgba(129, 140, 248, 0.14)' : 'rgba(79, 70, 229, 0.10)'
-    );
-    drawSectorBand(495, 780, 3 * Math.PI / 5 + 0.03, 5 * Math.PI / 4 - 0.03,
-      isDark ? 'rgba(168, 85, 247, 0.04)' : 'rgba(126, 34, 206, 0.03)',
-      isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(126, 34, 206, 0.08)'
-    );
+        // 第2階層 サンバースト扇状エリア
+        drawSectorBand(100, 440, startA + 0.02, endA - 0.02, fillColor, strokeColor);
 
-    // D. 第4階層 ガイドライン
-    const guideOrbits = [560, 750, 940, 1130, 1320];
+        // 第3階層 サンバースト扇状エリア
+        drawSectorBand(455, 960, startA + 0.02, endA - 0.02, fillColor, strokeColor);
+
+        // 放射状セクター境界線
+        bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)';
+        bCtx.lineWidth = 1.0;
+        bCtx.setLineDash([4, 4]);
+        bCtx.beginPath();
+        bCtx.moveTo(cx + 60 * Math.cos(startA), cy + 60 * Math.sin(startA));
+        bCtx.lineTo(cx + 1450 * Math.cos(startA), cy + 1450 * Math.sin(startA));
+        bCtx.stroke();
+        bCtx.setLineDash([]);
+
+        // サンバースト階層ラベル
+        const centerA = Number(sDef.center || (startA + endA) / 2);
+        bCtx.textAlign = 'center';
+        bCtx.font = '700 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        bCtx.fillStyle = isDark ? (sDef.textColorDark || '#7dd3fc') : (sDef.textColorLight || '#0369a1');
+        const t2X = cx + 220 * Math.cos(centerA);
+        const t2Y = cy + 220 * Math.sin(centerA);
+        bCtx.fillText(sDef.label || '', t2X, t2Y);
+
+        bCtx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        bCtx.fillStyle = isDark ? (sDef.subTextColorDark || '#a5b4fc') : (sDef.subTextColorLight || '#4338ca');
+        const t3X = cx + 465 * Math.cos(centerA);
+        const t3Y = cy + 465 * Math.sin(centerA);
+        bCtx.fillText(sDef.subLabel || '', t3X, t3Y);
+      });
+    } else {
+      // フォールバック: 標準3セクター
+      drawSectorBand(100, 440, -3 * Math.PI / 4, -Math.PI / 4,
+        isDark ? 'rgba(132, 204, 22, 0.05)' : 'rgba(101, 163, 13, 0.04)',
+        isDark ? 'rgba(163, 230, 53, 0.12)' : 'rgba(101, 163, 13, 0.10)'
+      );
+      drawSectorBand(100, 440, -Math.PI / 4, 3 * Math.PI / 5,
+        isDark ? 'rgba(56, 189, 248, 0.05)' : 'rgba(2, 132, 199, 0.04)',
+        isDark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(2, 132, 199, 0.10)'
+      );
+      drawSectorBand(100, 440, 3 * Math.PI / 5, 5 * Math.PI / 4,
+        isDark ? 'rgba(192, 132, 252, 0.04)' : 'rgba(147, 51, 234, 0.03)',
+        isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(147, 51, 234, 0.08)'
+      );
+
+      drawSectorBand(455, 960, -3 * Math.PI / 4 + 0.03, -Math.PI / 4 - 0.03,
+        isDark ? 'rgba(34, 197, 94, 0.05)' : 'rgba(22, 163, 74, 0.04)',
+        isDark ? 'rgba(74, 222, 128, 0.14)' : 'rgba(22, 163, 74, 0.10)'
+      );
+      drawSectorBand(455, 960, -Math.PI / 4 + 0.03, 3 * Math.PI / 5 - 0.03,
+        isDark ? 'rgba(99, 102, 241, 0.05)' : 'rgba(79, 70, 229, 0.04)',
+        isDark ? 'rgba(129, 140, 248, 0.14)' : 'rgba(79, 70, 229, 0.10)'
+      );
+      drawSectorBand(455, 960, 3 * Math.PI / 5 + 0.03, 5 * Math.PI / 4 - 0.03,
+        isDark ? 'rgba(168, 85, 247, 0.04)' : 'rgba(126, 34, 206, 0.03)',
+        isDark ? 'rgba(192, 132, 252, 0.10)' : 'rgba(126, 34, 206, 0.08)'
+      );
+
+      const sectorDividers = [-3 * Math.PI / 4, -Math.PI / 4, 3 * Math.PI / 5];
+      bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
+      bCtx.lineWidth = 1.0;
+      bCtx.setLineDash([4, 4]);
+      bCtx.beginPath();
+      sectorDividers.forEach(angle => {
+        bCtx.moveTo(cx + 60 * Math.cos(angle), cy + 60 * Math.sin(angle));
+        bCtx.lineTo(cx + 1450 * Math.cos(angle), cy + 1450 * Math.sin(angle));
+      });
+      bCtx.stroke();
+      bCtx.setLineDash([]);
+
+      bCtx.textAlign = 'center';
+      bCtx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      bCtx.fillStyle = isDark ? '#bef264' : '#4d7c0f';
+      bCtx.fillText('ゲルマン語派 / Germanic', cx, cy - 260);
+
+      bCtx.fillStyle = isDark ? '#7dd3fc' : '#0369a1';
+      bCtx.fillText('イタリック語派 / Italic', cx + 260 * Math.cos(Math.PI / 6), cy + 260 * Math.sin(Math.PI / 6));
+
+      bCtx.fillStyle = isDark ? '#d8b4fe' : '#7e22ce';
+      bCtx.fillText('ギリシャ・古典諸派', cx + 260 * Math.cos(11 * Math.PI / 12), cy + 260 * Math.sin(11 * Math.PI / 12));
+    }
+
+    // D. 同心円ガイドライン
+    const guideOrbits = [480, 560, 640, 720, 800, 880, 960, 1140, 1320];
     bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
     bCtx.lineWidth = 1.0;
     bCtx.setLineDash([3, 5]);
@@ -197,48 +265,11 @@
     bCtx.stroke();
     bCtx.setLineDash([]);
 
-    // E. 放射状セクター境界線
-    const sectorDividers = [-3 * Math.PI / 4, -Math.PI / 4, 3 * Math.PI / 5];
-    bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
-    bCtx.lineWidth = 1.0;
-    bCtx.setLineDash([4, 4]);
-    bCtx.beginPath();
-    sectorDividers.forEach(angle => {
-      bCtx.moveTo(cx + 60 * Math.cos(angle), cy + 60 * Math.sin(angle));
-      bCtx.lineTo(cx + 1450 * Math.cos(angle), cy + 1450 * Math.sin(angle));
-    });
-    bCtx.stroke();
-    bCtx.setLineDash([]);
-
-    // F. サンバースト階層ラベル
-    bCtx.textAlign = 'center';
-    bCtx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    bCtx.fillStyle = isDark ? '#bef264' : '#4d7c0f';
-    bCtx.fillText('ゲルマン語派 / Germanic', cx, cy - 260);
-
-    bCtx.fillStyle = isDark ? '#7dd3fc' : '#0369a1';
-    const itX = cx + 260 * Math.cos(Math.PI / 6);
-    const itY = cy + 260 * Math.sin(Math.PI / 6);
-    bCtx.fillText('イタリック語派 / Italic', itX, itY);
-
-    bCtx.fillStyle = isDark ? '#d8b4fe' : '#7e22ce';
-    const hlX = cx + 260 * Math.cos(11 * Math.PI / 12);
-    const hlY = cy + 260 * Math.sin(11 * Math.PI / 12);
-    bCtx.fillText('ギリシャ・古典諸派', hlX, hlY);
-
-    bCtx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    bCtx.fillStyle = isDark ? '#86efac' : '#15803d';
-    bCtx.fillText('西ゲルマン語群 / West Germanic', cx, cy - 540);
-
-    bCtx.fillStyle = isDark ? '#a5b4fc' : '#4338ca';
-    const roX = cx + 540 * Math.cos(Math.PI / 6);
-    const roY = cy + 540 * Math.sin(Math.PI / 6);
-    bCtx.fillText('ロマンス諸語 / Romance', roX, roY);
-
     bCtx.restore();
 
     treeBgCacheCanvas = offCanvas;
     treeBgCacheDark = isDark;
+    treeBgCacheKey = cacheKey;
     return offCanvas;
   }
 
@@ -305,7 +336,9 @@
         ? treeRoots.map(r => ({ x: r.targetX !== undefined ? r.x : 0, y: r.targetY !== undefined ? r.y : 0 }))
         : [{ x: 0, y: 0 }];
 
-      const bgCache = getTreeBackgroundCache(isDark);
+      const sDefs = graphState.dynamicSectorDefs || treeRoots[0]?.dynamicSectorDefs;
+      const isCjk = Boolean(graphState.isCjkTree || treeRoots[0]?.isCjkTree);
+      const bgCache = getTreeBackgroundCache(isDark, sDefs, isCjk);
       if (bgCache) {
         rootCenters.forEach(center => {
           const cx = center.x;
@@ -494,8 +527,8 @@
 
     // 2. ノード描画 (Semantic Zoom LOD 対応 & 境界半径バッファ付きカリング)
     const totalWordsCount = graphState.nodes.filter(nd => nd.type === 'word').length;
-    // 星団のみモード時や単語数が適度な場合はズーム38%から単語ラベルを美しく表示して実用性を最大化
-    const textThresholdZoom = (graphState.clusterOnly || totalWordsCount < 150) ? 0.38 : (totalWordsCount > 400 ? 0.72 : 0.52);
+    // 星団のみモード時や単語数が適度な場合はズーム38%から単語ラベルを美しく表示して実用性を最大化（系統樹モード時は22%から常時明瞭表示）
+    const textThresholdZoom = isTree ? 0.22 : ((graphState.clusterOnly || totalWordsCount < 150) ? 0.38 : (totalWordsCount > 400 ? 0.72 : 0.52));
     const renderedLabelBoxes = [];
 
     for (let i = 0; i < graphState.nodes.length; i++) {
@@ -753,14 +786,14 @@
         ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
         ctx.fill();
 
-        if (zoom >= 0.40 || isSelected || isHover) {
+        if (zoom >= (isTree ? 0.20 : 0.40) || isSelected || isHover) {
           const bFontSize = Math.round(Math.max(9.5, 11.0 / Math.sqrt(zoom)));
           ctx.font = `700 ${bFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
           ctx.lineJoin = 'round';
           ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)';
           ctx.lineWidth = 3.0;
           ctx.textAlign = 'center';
-          const cleanBranchLabel = n.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic):\s*/i, '');
+          const cleanBranchLabel = n.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric):\s*/i, '');
           const wCount = n.connectedWords?.length || 0;
           const displayBranchText = wCount > 0 ? `${cleanBranchLabel} (${wCount})` : cleanBranchLabel;
           ctx.strokeText(displayBranchText, n.x, n.y + drawRadius + bFontSize + 2);
@@ -899,7 +932,7 @@
 
         // 見出し語ラベル描画（ズームイン時、ホバー・選択時、または検索マッチ時）
         if (zoom >= textThresholdZoom || isFocusHighlight || isMatch) {
-          const wFontSize = Math.round(Math.max(9.5, 10.5 / Math.sqrt(Math.max(0.7, zoom))));
+          const wFontSize = Math.round(Math.max(isTree ? 10.5 : 9.5, 10.5 / Math.sqrt(Math.max(0.7, zoom))));
 
           // 形態素語幹バッジ (Level 4: Morphological Stem)
           if (n.stem && (zoom >= 1.15 || isFocusHighlight)) {
