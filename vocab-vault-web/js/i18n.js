@@ -3071,6 +3071,14 @@
         });
       } catch (e) {}
     }
+
+    // 7. 言語ペアタブおよびサイドバーの再描画
+    if (global.VocabSearch?.renderPairFileTabs) {
+      try { global.VocabSearch.renderPairFileTabs(); } catch (e) {}
+    }
+    if (global.VocabSearch?.renderSidebarTree) {
+      try { global.VocabSearch.renderSidebarTree(); } catch (e) {}
+    }
   }
 
   /**

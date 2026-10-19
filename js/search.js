@@ -366,28 +366,61 @@
   /**
    * 言語ペア短縮表示ラベル
    */
-  function getPairShortLabel(src, tgt) {
-    const sMap = { en: '英', ja: '日', fr: '仏', de: '独', es: '西', it: '伊', pt: '葡', nl: '蘭', zh: '中', ko: '韓' };
-    const s = sMap[src] || String(src || '').toUpperCase();
-    const t = sMap[tgt] || String(tgt || '').toUpperCase();
-    if (src === 'en' && tgt === 'ja') return '英和';
-    if (src === 'ja' && tgt === 'en') return '和英';
-    if (src === tgt) {
-      return `${s}${s}`;
+  function getPairShortLabel(src, tgt, locale = null) {
+    const loc = (locale && global.VocabI18n?.SUPPORTED_LOCALES?.includes(locale))
+      ? locale
+      : (global.VocabI18n ? global.VocabI18n.getLocale() : 'ja');
+
+    if (loc === 'ja') {
+      const sMap = { en: '英', ja: '日', fr: '仏', de: '独', es: '西', it: '伊', pt: '葡', nl: '蘭', zh: '中', ko: '韓' };
+      const s = sMap[src] || String(src || '').toUpperCase();
+      const t = sMap[tgt] || String(tgt || '').toUpperCase();
+      if (src === 'en' && tgt === 'ja') return '英和';
+      if (src === 'ja' && tgt === 'en') return '和英';
+      if (src === tgt) {
+        return `${s}${s}`;
+      }
+      return `${s}${t}`;
     }
-    return `${s}${t}`;
+
+    if (loc === 'zh') {
+      const sMap = { en: '英', ja: '日', fr: '法', de: '德', es: '西', it: '意', pt: '葡', nl: '荷', zh: '中', ko: '韩' };
+      const s = sMap[src] || String(src || '').toUpperCase();
+      const t = sMap[tgt] || String(tgt || '').toUpperCase();
+      return `${s}${t}`;
+    }
+
+    if (loc === 'ko') {
+      const sMap = { en: '영', ja: '일', fr: '불', de: '독', es: '서', it: '이', pt: '포', nl: '화', zh: '중', ko: '한' };
+      const s = sMap[src] || String(src || '').toUpperCase();
+      const t = sMap[tgt] || String(tgt || '').toUpperCase();
+      return `${s}${t}`;
+    }
+
+    // 全ての欧米言語 (en, fr, de, es, it, pt, nl 等): 国際標準の2文字大文字コード (ES-EN, KO-ZH, EN-JA 等)
+    const s = String(src || '').toUpperCase();
+    const t = String(tgt || '').toUpperCase();
+    return `${s}-${t}`;
   }
 
   /**
    * 言語ペア詳細表示ラベル
    */
-  function getPairFullLabel(src, tgt) {
+  function getPairFullLabel(src, tgt, locale = null) {
+    const loc = (locale && global.VocabI18n?.SUPPORTED_LOCALES?.includes(locale))
+      ? locale
+      : (global.VocabI18n ? global.VocabI18n.getLocale() : 'ja');
+    const isJa = loc === 'ja';
     const langs = global.LANGS || {};
-    const sName = langs[src]?.ja || langs[src]?.label || String(src || '').toUpperCase();
-    const tName = langs[tgt]?.ja || langs[tgt]?.label || String(tgt || '').toUpperCase();
-    const short = getPairShortLabel(src, tgt);
+    const sName = isJa
+      ? (langs[src]?.ja || langs[src]?.label || String(src || '').toUpperCase())
+      : (langs[src]?.label || String(src || '').toUpperCase());
+    const tName = isJa
+      ? (langs[tgt]?.ja || langs[tgt]?.label || String(tgt || '').toUpperCase())
+      : (langs[tgt]?.label || String(tgt || '').toUpperCase());
+    const short = getPairShortLabel(src, tgt, loc);
     if (src === tgt) {
-      return `${sName} (${short}辞典)`;
+      return isJa ? `${sName} (${short}辞典)` : `${sName} (${short} Dict)`;
     }
     return `${sName} → ${tName} (${short})`;
   }
@@ -465,8 +498,9 @@
     const container = $('pairFileTabs');
     if (!container) return;
     const files = getActivePairFiles(appInstance);
+    const isJa = global.VocabI18n ? global.VocabI18n.getLocale() === 'ja' : true;
     container.innerHTML = files.map(p => {
-      const countLabel = p.count > 0 ? p.count : '新規';
+      const countLabel = p.count > 0 ? p.count : (isJa ? '新規' : 'New');
       const countClass = p.count > 0 ? 'tab-count' : 'tab-count empty';
       return `<button type="button" class="file-tab ${p.isCur ? 'active' : ''}" onclick="setLanguagePair('${p.src}','${p.tgt}')" title="${esc(p.label)}"><span class="tab-label">${esc(p.short)}</span><span class="${countClass}">${countLabel}</span></button>`;
     }).join('');
