@@ -1221,10 +1221,11 @@
           const totalSpan = Math.max(0.12, sDef.span - pad * 2);
 
           // セクター内の各ブランチの重みと正規化スパン計算（単語数に応じた正確な角度配分で過密を完全解消）
-          const totalWordsInSector = bList.reduce((sum, b) => sum + Math.max(2, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
+          const totalWordsInSector = bList.reduce((sum, b) => sum + Math.max(1, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
           const rawSpans = bList.map(b => {
             const bWords = (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5;
-            return Math.max(0.08, (Math.max(1.5, bWords) / Math.max(1, totalWordsInSector)) * totalSpan);
+            const weight = Math.pow(Math.max(1, bWords), 1.12);
+            return Math.max(0.040, (weight / Math.max(1, totalWordsInSector)) * totalSpan);
           });
           const sumRaw = rawSpans.reduce((a, b) => a + b, 0);
           const normSpans = (numB === 1) ? [totalSpan] : rawSpans.map(s => (s / sumRaw) * totalSpan);
@@ -1236,8 +1237,8 @@
             const thetaB = currentTheta + branchSpan / 2;
             currentTheta += branchSpan;
 
-            // 第1軌道: 古典分岐ノード (r = 240, 305, 370 3段階スタガー配置でブランチ同士の接触・重合を解消)
-            const bRadius = (numB <= 2) ? 260 : (240 + (bIdx % 3) * 65);
+            // 第1軌道: 古典分岐ノード (4段階スタガー配置でブランチ同士の接触・重合を解消)
+            const bRadius = (numB <= 2) ? 260 : (220 + (bIdx % 4) * 62);
             bNode.targetX = rNode.targetX + bRadius * Math.cos(thetaB);
             bNode.targetY = rNode.targetY + bRadius * Math.sin(thetaB);
             bNode.angle = thetaB;
@@ -1246,15 +1247,16 @@
             // 第2軌道〜外周軌道: 現代見出し語ノード (Multi-Orbit Concentric Hexagonal Staggering)
             const leaves = bNode.connectedWords || [];
             const leafCount = leaves.length;
-            const baseLeafR = 480;
-            const usableLeafSpan = branchSpan * 0.90;
+            const baseLeafR = 490;
+            const usableLeafSpan = branchSpan * 0.94;
 
             if (leafCount > 0) {
-              // 半径480pxにおける単語1個あたりの必要弧長(52px)から1軌道の安全収容数を計算
-              const capacityPerOrbit = Math.max(1, Math.floor((baseLeafR * usableLeafSpan) / 52));
-              // 単語数に応じて軌道数を動的に1〜8軌道に配分
-              const numLeafOrbits = Math.min(8, Math.max(1, Math.ceil(leafCount / Math.max(1, capacityPerOrbit))));
-              const leafOrbitGap = Math.max(54, 76 - numLeafOrbits * 2.2);
+              // 単語1個あたりの必要弧長(78px)から1軌道の安全収容数を計算
+              const minArcPerWord = 78;
+              const capacityPerOrbit = Math.max(1, Math.floor((baseLeafR * usableLeafSpan) / minArcPerWord));
+              // 単語数に応じて軌道数を動的に1〜10軌道に配分
+              const numLeafOrbits = Math.min(10, Math.max(1, Math.ceil(leafCount / Math.max(1, capacityPerOrbit))));
+              const leafOrbitGap = Math.max(72, 88 - numLeafOrbits * 1.5);
 
               const orbitBuckets = Array.from({ length: numLeafOrbits }, () => []);
               leaves.forEach((lNode, lIdx) => {
@@ -1274,8 +1276,8 @@
                   lNode.orbitR = leafR;
                 } else {
                   // 必要弧長に基づく正確な角度幅計算
-                  const neededArcSpan = (countInBucket - 1) * (52 / leafR);
-                  const actualSpan = Math.min(usableLeafSpan, Math.max(0.06, neededArcSpan));
+                  const neededArcSpan = (countInBucket - 1) * (minArcPerWord / leafR);
+                  const actualSpan = Math.min(usableLeafSpan, Math.max(0.08, neededArcSpan));
                   const step = actualSpan / (countInBucket - 1);
                   const staggerOffset = (oIdx % 2 === 1) ? (step * 0.5) : 0;
 

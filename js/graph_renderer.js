@@ -807,29 +807,62 @@
           ctx.font = `700 ${bFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          const cleanBranchLabel = n.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric):\s*/i, '');
+          let cleanBranchLabel = n.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric):\s*/i, '');
           const wCount = n.connectedWords?.length || 0;
-          const displayBranchText = wCount > 0 ? `${cleanBranchLabel} (${wCount})` : cleanBranchLabel;
 
+          // 俯瞰時（zoom < 0.80）は接頭辞・語幹を簡潔に表示し、文字同士の衝突・重なりを根絶
+          if (zoom < 0.80 && !isSelected && !isHover) {
+            cleanBranchLabel = cleanBranchLabel
+              .replace(/\s*\([^)]*\)/g, '')
+              .replace(/\s*\/\s*/g, '/')
+              .trim();
+            if (cleanBranchLabel.includes('ロマンス諸語根幹')) cleanBranchLabel = 'ロマンス根幹';
+            if (cleanBranchLabel.includes('西ゲルマン語群根幹')) cleanBranchLabel = '古英語根幹';
+            if (cleanBranchLabel.includes('東アジア漢字複合語')) cleanBranchLabel = '漢語・漢字';
+            if (cleanBranchLabel.includes('ドイツ・西ゲルマン')) cleanBranchLabel = '独語幹';
+            if (cleanBranchLabel.includes('ギリシャ古典')) cleanBranchLabel = '希語幹';
+            if (cleanBranchLabel.includes('外来・学術受容')) cleanBranchLabel = '借用語';
+          }
+
+          const displayBranchText = wCount > 0 ? `${cleanBranchLabel} (${wCount})` : cleanBranchLabel;
           const bTextW = ctx.measureText(displayBranchText).width;
-          const bPadX = 6, bPadY = 3.0;
+          const bPadX = 7, bPadY = 3.5;
           const bY = n.y + drawRadius + bFontSize * 0.7 + 3;
 
-          ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.90)' : 'rgba(255, 255, 255, 0.94)';
-          ctx.beginPath();
-          if (typeof ctx.roundRect === 'function') {
-            ctx.roundRect(n.x - bTextW / 2 - bPadX, bY - bFontSize / 2 - bPadY, bTextW + bPadX * 2, bFontSize + bPadY * 2, 4);
-          } else {
-            ctx.rect(n.x - bTextW / 2 - bPadX, bY - bFontSize / 2 - bPadY, bTextW + bPadX * 2, bFontSize + bPadY * 2);
+          // ブランチラベル同士の衝突回避（Label Collision Avoidance）
+          let shouldDrawBranchLabel = true;
+          if (!isSelected && !isHover) {
+            const bX = n.x - bTextW / 2;
+            const bBoxH = bFontSize + bPadY * 2;
+            for (let bIdx = 0; bIdx < renderedLabelBoxes.length; bIdx++) {
+              const b = renderedLabelBoxes[bIdx];
+              if (Math.abs(b.x - bX) < (b.w + bTextW) * 0.48 && Math.abs(b.y - bY) < (b.h + bBoxH) * 0.48) {
+                shouldDrawBranchLabel = false;
+                break;
+              }
+            }
+            if (shouldDrawBranchLabel) {
+              renderedLabelBoxes.push({ x: bX, y: bY, w: bTextW, h: bBoxH });
+            }
           }
-          ctx.fill();
 
-          ctx.strokeStyle = isDark ? 'rgba(251, 191, 36, 0.45)' : 'rgba(217, 119, 6, 0.35)';
-          ctx.lineWidth = 0.9;
-          ctx.stroke();
+          if (shouldDrawBranchLabel) {
+            ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.98)';
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') {
+              ctx.roundRect(n.x - bTextW / 2 - bPadX, bY - bFontSize / 2 - bPadY, bTextW + bPadX * 2, bFontSize + bPadY * 2, 4);
+            } else {
+              ctx.rect(n.x - bTextW / 2 - bPadX, bY - bFontSize / 2 - bPadY, bTextW + bPadX * 2, bFontSize + bPadY * 2);
+            }
+            ctx.fill();
 
-          ctx.fillStyle = isDark ? '#fbbf24' : '#b45309';
-          ctx.fillText(displayBranchText, n.x, bY);
+            ctx.strokeStyle = isDark ? 'rgba(251, 191, 36, 0.65)' : 'rgba(217, 119, 6, 0.55)';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            ctx.fillStyle = isDark ? '#fbbf24' : '#b45309';
+            ctx.fillText(displayBranchText, n.x, bY);
+          }
         }
 
       } else if (n.type === 'ghost_bud') {
@@ -961,7 +994,7 @@
 
         // 見出し語ラベル描画（ズームイン時、ホバー・選択時、または検索マッチ時）
         if (zoom >= textThresholdZoom || isFocusHighlight || isMatch) {
-          const wFontSize = Math.round(Math.max(isTree ? 10.5 : 9.5, 10.5 / Math.sqrt(Math.max(0.7, zoom))));
+          const wFontSize = Math.round(Math.max(isTree ? 11.0 : 9.5, 11.5 / Math.sqrt(Math.max(0.65, zoom))));
 
           // 形態素語幹バッジ (Level 4: Morphological Stem)
           if (n.stem && (zoom >= 1.15 || isFocusHighlight)) {
@@ -971,7 +1004,7 @@
             const sWidth = ctx.measureText(sText).width;
             const sY = n.y - drawRadius - 4;
 
-            ctx.fillStyle = isDark ? 'rgba(30, 41, 59, 0.88)' : 'rgba(241, 245, 249, 0.90)';
+            ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(241, 245, 249, 0.95)';
             ctx.beginPath();
             if (typeof ctx.roundRect === 'function') {
               ctx.roundRect(n.x - sWidth / 2 - 4, sY - sFontSize, sWidth + 8, sFontSize + 4, 3);
@@ -979,24 +1012,24 @@
               ctx.rect(n.x - sWidth / 2 - 4, sY - sFontSize, sWidth + 8, sFontSize + 4);
             }
             ctx.fill();
-            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.35)' : 'rgba(100, 116, 139, 0.25)';
-            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.40)' : 'rgba(100, 116, 139, 0.30)';
+            ctx.lineWidth = 0.9;
             ctx.stroke();
 
-            ctx.fillStyle = isDark ? '#94a3b8' : '#475569';
+            ctx.fillStyle = isDark ? '#cbd5e1' : '#334155';
             ctx.fillText(sText, n.x, sY - 1);
           }
 
-          // 項目16: ノード密集時のラベル衝突回避（Label Collision Avoidance）
+          // ノード密集時のラベル衝突回避（Label Collision Avoidance）
           let shouldDrawWordLabel = true;
           if (!isFocusHighlight && !isMatch) {
-            const approxW = Math.max(28, n.label.length * wFontSize * 0.62);
-            const approxH = wFontSize + 4;
+            const approxW = Math.max(30, n.label.length * wFontSize * 0.64);
+            const approxH = wFontSize + 5;
             const bX = n.x - approxW / 2;
             const bY = n.y + drawRadius + 2;
             for (let bIdx = 0; bIdx < renderedLabelBoxes.length; bIdx++) {
               const b = renderedLabelBoxes[bIdx];
-              if (Math.abs(b.x - bX) < (b.w + approxW) * 0.48 && Math.abs(b.y - bY) < (b.h + approxH) * 0.48) {
+              if (Math.abs(b.x - bX) < (b.w + approxW) * 0.44 && Math.abs(b.y - bY) < (b.h + approxH) * 0.44) {
                 shouldDrawWordLabel = false;
                 break;
               }
@@ -1007,32 +1040,36 @@
           }
 
           if (shouldDrawWordLabel) {
-            ctx.font = `bold ${wFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+            ctx.font = `600 ${wFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             const wordText = n.label;
             const wWidth = ctx.measureText(wordText).width;
-            const wPadX = 5, wPadY = 2.5;
+            const wPadX = 6, wPadY = 3.0;
             const wLabelY = n.y + drawRadius + wFontSize * 0.6 + 3;
 
-            ctx.fillStyle = isDark ? 'rgba(11, 17, 32, 0.88)' : 'rgba(255, 255, 255, 0.92)';
+            // 不透明度の高い背景ピルにより、背後のエッジ線による文字の断裂を完全に防止
+            ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.96)' : 'rgba(255, 255, 255, 0.98)';
             ctx.beginPath();
             if (typeof ctx.roundRect === 'function') {
-              ctx.roundRect(n.x - wWidth / 2 - wPadX, wLabelY - wFontSize / 2 - wPadY, wWidth + wPadX * 2, wFontSize + wPadY * 2, 3);
+              ctx.roundRect(n.x - wWidth / 2 - wPadX, wLabelY - wFontSize / 2 - wPadY, wWidth + wPadX * 2, wFontSize + wPadY * 2, 4);
             } else {
               ctx.rect(n.x - wWidth / 2 - wPadX, wLabelY - wFontSize / 2 - wPadY, wWidth + wPadX * 2, wFontSize + wPadY * 2);
             }
             ctx.fill();
 
-            ctx.strokeStyle = isFocusHighlight
+            // 言語系統色・定着度色を反映した繊細な縁取り
+            const borderColor = isFocusHighlight
               ? (isDark ? '#38bdf8' : '#0284c7')
-              : (isDark ? 'rgba(148, 163, 184, 0.32)' : 'rgba(100, 116, 139, 0.26)');
-            ctx.lineWidth = isFocusHighlight ? 1.4 : 0.7;
+              : colorToRgba(nodeColor, isDark ? 0.45 : 0.38);
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = isFocusHighlight ? 1.6 : 1.0;
             ctx.stroke();
 
+            // コントラストの高い明瞭なテキスト描画
             ctx.fillStyle = isFocusHighlight
               ? (isDark ? '#38bdf8' : '#0284c7')
-              : (isDark ? '#f8fafc' : '#0f172a');
+              : (isDark ? '#ffffff' : '#0f172a');
             ctx.fillText(wordText, n.x, wLabelY);
           }
 
