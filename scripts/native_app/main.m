@@ -163,20 +163,100 @@
     [alert setInformativeText:message];
     
     NSString *primaryTitle = @"OK";
+    NSString *cancelTitle = @"Cancel";
+    BOOL isDestructive = NO;
+    NSString *lowerMsg = [message lowercaseString];
+    
     if ([message containsString:@"削除"] || [message containsString:@"抹消"]) {
         primaryTitle = @"削除";
+        cancelTitle = @"キャンセル";
+        isDestructive = YES;
+    } else if ([lowerMsg containsString:@"supprimer"] || [lowerMsg containsString:@"effacer"]) {
+        primaryTitle = @"Supprimer";
+        cancelTitle = @"Annuler";
+        isDestructive = YES;
+    } else if ([lowerMsg containsString:@"löschen"] || [lowerMsg containsString:@"entfernen"]) {
+        primaryTitle = @"Löschen";
+        cancelTitle = @"Abbrechen";
+        isDestructive = YES;
+    } else if ([lowerMsg containsString:@"eliminar"] || [lowerMsg containsString:@"borrar"]) {
+        primaryTitle = @"Eliminar";
+        cancelTitle = @"Cancelar";
+        isDestructive = YES;
+    } else if ([lowerMsg containsString:@"eliminare"]) {
+        primaryTitle = @"Elimina";
+        cancelTitle = @"Annulla";
+        isDestructive = YES;
+    } else if ([lowerMsg containsString:@"excluir"]) {
+        primaryTitle = @"Excluir";
+        cancelTitle = @"Cancelar";
+        isDestructive = YES;
+    } else if ([lowerMsg containsString:@"verwijderen"]) {
+        primaryTitle = @"Verwijderen";
+        cancelTitle = @"Annuleren";
+        isDestructive = YES;
+    } else if ([message containsString:@"删除"]) {
+        primaryTitle = @"删除";
+        cancelTitle = @"取消";
+        isDestructive = YES;
+    } else if ([message containsString:@"삭제"]) {
+        primaryTitle = @"삭제";
+        cancelTitle = @"취소";
+        isDestructive = YES;
+    } else if ([lowerMsg containsString:@"delete"] || [lowerMsg containsString:@"remove"]) {
+        primaryTitle = @"Delete";
+        cancelTitle = @"Cancel";
+        isDestructive = YES;
     } else if ([message containsString:@"ダウンロード"] || [message containsString:@"保存"]) {
         primaryTitle = @"保存";
+        cancelTitle = @"キャンセル";
+    } else if ([lowerMsg containsString:@"download"] || [lowerMsg containsString:@"save"]) {
+        primaryTitle = @"Save";
+        cancelTitle = @"Cancel";
+    } else if ([lowerMsg containsString:@"télécharger"] || [lowerMsg containsString:@"enregistrer"]) {
+        primaryTitle = @"Enregistrer";
+        cancelTitle = @"Annuler";
+    } else if ([lowerMsg containsString:@"speichern"]) {
+        primaryTitle = @"Speichern";
+        cancelTitle = @"Abbrechen";
     } else if ([message containsString:@"リセット"]) {
         primaryTitle = @"リセット";
+        cancelTitle = @"キャンセル";
+    } else if ([lowerMsg containsString:@"reset"]) {
+        primaryTitle = @"Reset";
+        cancelTitle = @"Cancel";
+    } else if ([lowerMsg containsString:@"réinitialiser"]) {
+        primaryTitle = @"Réinitialiser";
+        cancelTitle = @"Annuler";
+    } else if ([lowerMsg containsString:@"zurücksetzen"]) {
+        primaryTitle = @"Zurücksetzen";
+        cancelTitle = @"Abbrechen";
     } else if ([message containsString:@"スヌーズ"] || [message containsString:@"再分散"]) {
         primaryTitle = @"再分散する";
+        cancelTitle = @"キャンセル";
     } else if ([message containsString:@"開始しますか"]) {
         primaryTitle = @"開始";
+        cancelTitle = @"キャンセル";
+    } else if ([message containsString:@"ですか"] || [message containsString:@"ますか"] || [message containsString:@"よろしいですか"]) {
+        primaryTitle = @"OK";
+        cancelTitle = @"キャンセル";
+    } else if ([lowerMsg containsString:@"voulez-vous"] || [lowerMsg containsString:@"souhaitez-vous"]) {
+        primaryTitle = @"OK";
+        cancelTitle = @"Annuler";
+    } else if ([lowerMsg containsString:@"möchten sie"]) {
+        primaryTitle = @"OK";
+        cancelTitle = @"Abbrechen";
+    } else if ([lowerMsg containsString:@"¿"]) {
+        primaryTitle = @"Aceptar";
+        cancelTitle = @"Cancelar";
+    } else {
+        primaryTitle = @"OK";
+        cancelTitle = @"Cancel";
     }
+    
     [alert addButtonWithTitle:primaryTitle];
-    [alert addButtonWithTitle:@"キャンセル"];
-    [alert setAlertStyle:([primaryTitle isEqualToString:@"削除"] ? NSAlertStyleWarning : NSAlertStyleInformational)];
+    [alert addButtonWithTitle:cancelTitle];
+    [alert setAlertStyle:(isDestructive ? NSAlertStyleWarning : NSAlertStyleInformational)];
     [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
         completionHandler(returnCode == NSAlertFirstButtonReturn);
     }];
@@ -197,8 +277,19 @@
     NSAlert *alert = [[NSAlert alloc] init];
     [alert setMessageText:@"Vocab Vault"];
     [alert setInformativeText:prompt];
+    NSString *lowerPrompt = [prompt lowercaseString];
+    NSString *cancelTitle = @"Cancel";
+    if ([prompt containsString:@"入力"] || [prompt containsString:@"コード"] || [prompt containsString:@"キャンセル"]) {
+        cancelTitle = @"キャンセル";
+    } else if ([lowerPrompt containsString:@"annuler"] || [lowerPrompt containsString:@"code"]) {
+        cancelTitle = @"Annuler";
+    } else if ([lowerPrompt containsString:@"abbrechen"]) {
+        cancelTitle = @"Abbrechen";
+    } else if ([lowerPrompt containsString:@"cancelar"]) {
+        cancelTitle = @"Cancelar";
+    }
     [alert addButtonWithTitle:@"OK"];
-    [alert addButtonWithTitle:@"キャンセル"];
+    [alert addButtonWithTitle:cancelTitle];
     NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 300, 24)];
     [input setStringValue:defaultText ?: @""];
     [alert setAccessoryView:input];

@@ -513,9 +513,7 @@
       const c = { ...item };
       if (hasKana(c.history_note)) {
         const transHn = c[`history_note_${tgt}`] || c.history_note_trans;
-        if (transHn) c.history_note = transHn;
-        else delete c.history_note;
-        itemChanged = true;
+        if (transHn) { c.history_note = transHn; itemChanged = true; }
       }
       if (c.category && hasKana(c.category) && global.VocabI18n?.translateCategory) {
         c.category = global.VocabI18n.translateCategory(c.category, tgt);
@@ -527,9 +525,7 @@
       }
       if (c.example && hasKana(c.example.trans)) {
         const transEx = c.example[`trans_${tgt}`] || c.example.trans_en;
-        if (transEx) c.example.trans = transEx;
-        else c.example.trans = c.example.foreign || '';
-        itemChanged = true;
+        if (transEx) { c.example.trans = transEx; itemChanged = true; }
       }
       if (itemChanged) {
         changed = true;
@@ -1335,8 +1331,62 @@
     return null;
   }
 
+  const DEL_CONFIRM_MESSAGES = {
+    ja: 'この単語を削除しますか？',
+    en: 'Are you sure you want to delete this word?',
+    fr: 'Voulez-vous vraiment supprimer ce mot ?',
+    de: 'Möchten Sie dieses Wort wirklich löschen?',
+    es: '¿Seguro que deseas eliminar esta palabra?',
+    it: 'Sei sicuro di voler eliminare questa parola?',
+    pt: 'Tem certeza de que deseja excluir esta palavra?',
+    nl: 'Weet u zeker dat u dit woord wilt verwijderen?',
+    zh: '确定要删除这个单词吗？',
+    ko: '이 단어를 삭제하시겠습니까?'
+  };
+
+  const DEL_TOAST_MESSAGES = {
+    ja: w => `「${w}」を削除しました`,
+    en: w => `Deleted "${w}"`,
+    fr: w => `« ${w} » supprimé`,
+    de: w => `„${w}“ gelöscht`,
+    es: w => `"${w}" eliminada`,
+    it: w => `"${w}" eliminata`,
+    pt: w => `"${w}" excluída`,
+    nl: w => `"${w}" verwijderd`,
+    zh: w => `已删除 “${w}”`,
+    ko: w => `'${w}' 단어가 삭제되었습니다`
+  };
+
+  const CLEAR_ALL_CONFIRM_MESSAGES = {
+    ja: lbl => `選択中の単語帳（${lbl}）の全単語を削除しますか？`,
+    en: lbl => `Delete all words in the selected deck (${lbl})?`,
+    fr: lbl => `Supprimer tous les mots du paquet sélectionné (${lbl}) ?`,
+    de: lbl => `Alle Wörter im ausgewählten Deck (${lbl}) wirklich löschen?`,
+    es: lbl => `¿Eliminar todas las palabras del mazo seleccionado (${lbl})?`,
+    it: lbl => `Eliminare tutte le parole del mazzo selezionato (${lbl})?`,
+    pt: lbl => `Excluir todas as palavras do baralho selecionado (${lbl})?`,
+    nl: lbl => `Alle woorden in het geselecteerde deck (${lbl}) verwijderen?`,
+    zh: lbl => `确定要清空所选词库（${lbl}）的所有单词吗？`,
+    ko: lbl => `선택한 단어장(${lbl})의 모든 단어를 삭제하시겠습니까?`
+  };
+
+  const CLEAR_ALL_TOAST_MESSAGES = {
+    ja: 'すべての単語を削除しました',
+    en: 'All words have been deleted',
+    fr: 'Tous les mots ont été supprimés',
+    de: 'Alle Wörter wurden gelöscht',
+    es: 'Todas las palabras han sido eliminadas',
+    it: 'Tutte le parole sono state eliminate',
+    pt: 'Todas as palavras foram excluídas',
+    nl: 'Alle woorden zijn verwijderd',
+    zh: '已清空所有单词',
+    ko: '모든 단어가 삭제되었습니다'
+  };
+
   function delW(idOrNum, tL = App.lang, skipConfirm = false) {
-    if (!skipConfirm && !confirm('この単語を削除しますか？')) return;
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const confirmMsg = DEL_CONFIRM_MESSAGES[curLocale] || DEL_CONFIRM_MESSAGES.en;
+    if (!skipConfirm && !confirm(confirmMsg)) return;
 
     const activePairCfg = getActivePairConfig();
     // [NEW-P0-3 修正] 横断検索中でない限り、常に現在開いている言語ペアのストレージキー (activePairCfg.key) を対象とする
@@ -1374,14 +1424,17 @@
     if (!target) return;
     if (App.aList.length) App.aList = App.aList.filter(item => item.id !== target.id && item.word !== target.word);
     load(App.page);
-    showToast(`「${target.word}」を削除しました`, 'ok');
+    const toastFn = DEL_TOAST_MESSAGES[curLocale] || DEL_TOAST_MESSAGES.en;
+    showToast(toastFn(target.word), 'ok');
   }
 
   function clearCurrentLang() {
     const pairCfg = getActivePairConfig();
     const l = App.srcLang;
     const label = pairCfg.label || LANGS[l]?.label || '現在の単語帳';
-    if (!confirm(`選択中の単語帳（${label}）の全単語を削除しますか？`)) return;
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const confirmFn = CLEAR_ALL_CONFIRM_MESSAGES[curLocale] || CLEAR_ALL_CONFIRM_MESSAGES.en;
+    if (!confirm(confirmFn(label))) return;
     global.VocabStorage?.clearAllWords(pairCfg.key, getJson(pairCfg.key), () => {
       setJson(pairCfg.key, [], true, true);
       App.entries = [];
@@ -1389,7 +1442,8 @@
     });
     load(1);
     toggleModal('settingsModal', false);
-    showToast('すべての単語を削除しました', 'ok');
+    const toastMsg = CLEAR_ALL_TOAST_MESSAGES[curLocale] || CLEAR_ALL_TOAST_MESSAGES.en;
+    showToast(toastMsg, 'ok');
   }
 
   // --- 6. 単語登録・キュー管理 (js/queue.js へ委譲) ---

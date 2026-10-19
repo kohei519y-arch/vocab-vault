@@ -1499,7 +1499,7 @@ try {
     matrixHtml.indexOf('cog-matrix-grid') !== -1 &&
     matrixHtml.indexOf('FR') !== -1 &&
     matrixHtml.indexOf('DE') !== -1 &&
-    matrixHtml.indexOf('日本語') !== -1
+    (matrixHtml.indexOf('日本語') !== -1 || matrixHtml.indexOf('JA') !== -1)
   );
 
   const ankiBackWithMatrix = VocabAnkiView.buildAnkiBack(testWord);

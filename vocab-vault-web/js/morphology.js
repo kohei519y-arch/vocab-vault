@@ -515,7 +515,20 @@
 
     // 見出し語自身がリストになければ先頭に挿入
     const iL = item.lang || 'en';
-    if (langs[iL] && !langs[iL].some(x => x.w === item.word)) {
+    const normItemWord = String(item.word || '').trim().toLowerCase();
+
+    // 既にリスト内に見出し語自身が含まれている場合は isCurrent を確実にマーク
+    let foundCurrent = false;
+    ['en', 'fr', 'de', 'ja'].forEach(l => {
+      (langs[l] || []).forEach(c => {
+        if (l === iL && String(c.w || '').trim().toLowerCase() === normItemWord) {
+          c.isCurrent = true;
+          foundCurrent = true;
+        }
+      });
+    });
+
+    if (!foundCurrent && langs[iL]) {
       langs[iL].unshift({
         w: item.word,
         m: item.meanings?.[0]?.text || item.core || '',
@@ -524,19 +537,20 @@
       });
     }
 
-    // 自分自身以外の同根語が存在し、かつ少なくとも他言語（fr, de, ja）に1つ以上同根語が存在する場合のみ表示
-    let totalOtherCognates = 0;
+    // 自分自身以外の他言語同根語（見出し語言語 iL 以外の言語）が少なくとも1語以上存在する場合のみ表示
+    let otherLangCognatesCount = 0;
     ['en', 'fr', 'de', 'ja'].forEach(l => {
-      (langs[l] || []).forEach(c => {
-        if (!c.isCurrent) totalOtherCognates++;
-      });
+      if (l !== iL) {
+        (langs[l] || []).forEach(c => {
+          if (!c.isCurrent) otherLangCognatesCount++;
+        });
+      }
     });
-    const hasCrossLingual = (langs.fr && langs.fr.length > 0) || (langs.de && langs.de.length > 0) || (langs.ja && langs.ja.length > 0);
-    if (totalOtherCognates === 0 || !hasCrossLingual) return null;
+    if (otherLangCognatesCount === 0) return null;
 
     return {
       root: targetRoot,
-      meaning: matchedKnowledge?.meaning || '語源的根幹概念',
+      meaning: matchedKnowledge?.meaning || '',
       langs
     };
   }
@@ -547,7 +561,8 @@
   function renderCognateMatrixHtml(matrix) {
     if (!matrix || !matrix.root) return '';
     const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-    const isEn = (global.VocabI18n?.getLocale?.() || 'ja') !== 'ja';
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = curLocale === 'ja';
 
     const renderLangCol = (code, label, items) => {
       const list = (items || []).slice(0, 3);
@@ -563,18 +578,33 @@
       return `<div class="cog-matrix-col"><div class="cog-col-hdr ${code}">${label}</div>${itemsHtml}</div>`;
     };
 
-    const badgeLabel = isEn ? '4-Language Cognate Matrix' : '4言語同根語マトリクス';
-    const rootPrefix = isEn ? 'Root: ' : '語根: ';
-    const colEn = isEn ? 'English (EN)' : '英語 (EN)';
-    const colFr = isEn ? 'French (FR)' : 'フランス語 (FR)';
-    const colDe = isEn ? 'German (DE)' : 'ドイツ語 (DE)';
-    const colJa = isEn ? 'Classical / 日本語 (JA)' : '日本語 / 訳語';
+    const ROOT_CONCEPT_LABELS = {
+      ja: '語源的根幹概念',
+      en: 'Core Etymological Concept',
+      fr: 'Concept étymologique fondamental',
+      de: 'Etymologischer Grundbegriff',
+      es: 'Concepto etimológico fundamental',
+      it: 'Concetto etimologico fondamentale',
+      pt: 'Conceito etimológico fundamental',
+      nl: 'Etymologisch basisconcept',
+      ko: '어원적 근간 개념',
+      zh: '词源根本概念'
+    };
+    const defaultRootMeaning = ROOT_CONCEPT_LABELS[curLocale] || ROOT_CONCEPT_LABELS.en;
+    const rootMeaningDisplay = matrix.meaning && matrix.meaning !== '語源的根幹概念' ? matrix.meaning : defaultRootMeaning;
+
+    const badgeLabel = isJa ? '4言語同根語マトリクス' : (curLocale === 'fr' ? 'Matrice de cognats en 4 langues' : (curLocale === 'de' ? '4-Sprachen-Kognatenmatrix' : '4-Language Cognate Matrix'));
+    const rootPrefix = isJa ? '語根: ' : (curLocale === 'fr' ? 'Racine : ' : (curLocale === 'de' ? 'Wurzel: ' : 'Root: '));
+    const colEn = isJa ? '英語 (EN)' : (curLocale === 'fr' ? 'Anglais (EN)' : (curLocale === 'de' ? 'Englisch (EN)' : 'English (EN)'));
+    const colFr = isJa ? 'フランス語 (FR)' : (curLocale === 'fr' ? 'Français (FR)' : (curLocale === 'de' ? 'Französisch (FR)' : 'French (FR)'));
+    const colDe = isJa ? 'ドイツ語 (DE)' : (curLocale === 'fr' ? 'Allemand (DE)' : (curLocale === 'de' ? 'Deutsch (DE)' : 'German (DE)'));
+    const colJa = isJa ? '日本語 / 訳語' : (curLocale === 'fr' ? 'Japonais (日本語 / JA)' : (curLocale === 'de' ? 'Japanisch (日本語 / JA)' : 'Japanese (日本語 / JA)'));
 
     return `
       <div class="cognate-matrix-box">
         <div class="cog-matrix-header">
           <span class="cog-matrix-badge">${badgeLabel}</span>
-          <span class="cog-matrix-root">${rootPrefix}<strong>${esc(matrix.root)}</strong>（${esc(matrix.meaning)}）</span>
+          <span class="cog-matrix-root">${rootPrefix}<strong>${esc(matrix.root)}</strong>（${esc(rootMeaningDisplay)}）</span>
         </div>
         <div class="cog-matrix-grid">
           ${renderLangCol('en', colEn, matrix.langs.en)}

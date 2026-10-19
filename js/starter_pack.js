@@ -7366,6 +7366,96 @@
     "it": {
       "history_note": "Concetto fondamentale nel diritto comparato (trasposizione di direttive) e nell'epistemologia."
     }
+  },
+  "einschränken": {
+    "fr": {
+      "meanings": [
+        { "pos": "Vt", "text": "restreindre, limiter, réduire (droits, budget, liberté)" },
+        { "pos": "Vpr", "text": "se restreindre, réduire ses dépenses, modérer son train de vie" }
+      ],
+      "core": "Poser des barrières (Schranke) tout autour pour restreindre le champ d'action ou de liberté.",
+      "etymology": "ein- (dans, vers l'intérieur) + Schranke (barrière, borne, limite ; proto-germanique *skrankō, PIE *skrenk- \"courber, grille\"). Équivalent du français restreindre, limiter.",
+      "exTrans": "L'État ne peut restreindre la liberté d'expression que sous des conditions exceptionnelles.",
+      "phrases": [
+        { "foreign": "die Ausgaben einschränken", "trans": "réduire les dépenses" }
+      ],
+      "derivatives": [
+        { "word": "Einschränkung", "pos": "Subst. f.", "meaning": "restriction, limitation, réserve" },
+        { "word": "eingeschränkt", "pos": "Adj.", "meaning": "restreint, limité, réduit" }
+      ],
+      "history_note": "Terme juridique et constitutionnel cardinal désignant la limitation légitime des droits fondamentaux (Einschränkung der Grundrechte)."
+    },
+    "en": {
+      "meanings": [
+        { "pos": "Vt", "text": "restrict, limit, curtail (freedom, budget, rights)" },
+        { "pos": "Vpr", "text": "economize, cut down expenses, practice moderation" }
+      ],
+      "core": "Placing barriers (Schranke) around to confine or narrow the scope of action.",
+      "etymology": "ein- (inward) + Schranke (barrier, fence; Proto-Germanic *skrankō, PIE *skrenk- \"to bend, weave\"). Equivalent to English restrict, limit.",
+      "exTrans": "The state may only restrict freedom of expression under extraordinary conditions.",
+      "phrases": [
+        { "foreign": "die Ausgaben einschränken", "trans": "cut down on expenses" }
+      ],
+      "derivatives": [
+        { "word": "Einschränkung", "pos": "Subst. f.", "meaning": "restriction, limitation, constraint" },
+        { "word": "eingeschränkt", "pos": "Adj.", "meaning": "restricted, limited, impaired" }
+      ],
+      "history_note": "Foundational constitutional term in German law for lawful restriction of basic civil rights (Einschränkung der Grundrechte)."
+    },
+    "de": {
+      "meanings": [
+        { "pos": "Vt", "text": "begrenzen, beschränken, reduzieren (Freiheit, Budget, Rechte)" },
+        { "pos": "Vpr", "text": "sich einschränken, die Ausgaben drosseln" }
+      ],
+      "core": "Schranken errichten, um den Handlungsspielraum einzugrenzen.",
+      "etymology": "ein- + Schranke (Begrenzung, Gitter; urgerm. *skrankō, idg. *skrenk-). Verwandt mit restrict, limit.",
+      "exTrans": "Der Staat darf die Meinungsfreiheit nur unter außergewöhnlichen Bedingungen einschränken.",
+      "history_note": "Zentraler Rechts- und Verfassungsbegriff für die Schranken der Grundrechte."
+    }
+  },
+  "vernachlässigen": {
+    "fr": {
+      "meanings": [
+        { "pos": "Vt", "text": "négliger, délaisser, omettre (devoirs, enfants, santé)" }
+      ],
+      "core": "Laisser aller derrière soi (nach-lassen) par inattention ou manque de rigueur.",
+      "etymology": "ver- + nach- (après, en arrière) + lassen (laisser ; proto-germanique *lētaną, PIE *lēid- \"laisser aller\"). Équivalent de négliger.",
+      "exTrans": "On ne doit en aucun cas négliger ses études ou sa santé.",
+      "phrases": [
+        { "foreign": "seine Pflichten vernachlässigen", "trans": "négliger ses devoirs" }
+      ],
+      "derivatives": [
+        { "word": "Vernachlässigung", "pos": "Subst. f.", "meaning": "négligence, abandon" }
+      ],
+      "history_note": "Terme classique en philosophie morale et en pédagogie allemande (Kant, Herbart) opposant le devoir à la négligence."
+    },
+    "en": {
+      "meanings": [
+        { "pos": "Vt", "text": "neglect, disregard, overlook (duties, children, health)" }
+      ],
+      "core": "Letting something drop or slide behind (nach-lassen) out of carelessness.",
+      "etymology": "ver- + nach- (after) + lassen (let, leave; Proto-Germanic *lētaną, PIE *lēid- \"to release, leave\"). Equivalent to neglect.",
+      "exTrans": "Under no circumstances should one neglect one's studies or health.",
+      "phrases": [
+        { "foreign": "seine Pflichten vernachlässigen", "trans": "neglect one's duties" }
+      ],
+      "derivatives": [
+        { "word": "Vernachlässigung", "pos": "Subst. f.", "meaning": "neglect, abandonment, omission" }
+      ],
+      "history_note": "Key ethical concept in German Enlightenment philosophy distinguishing diligent duty from negligence."
+    },
+    "de": {
+      "meanings": [
+        { "pos": "Vt", "text": "außer Acht lassen, versäumen (Pflichten, Kinder, Gesundheit)" }
+      ],
+      "core": "Etwas durch Unaufmerksamkeit nachlässig hinter sich lassen.",
+      "etymology": "ver- + nach- + lassen (urgerm. *lētaną, idg. *lēid-).",
+      "exTrans": "Man sollte keinesfalls seine Studien oder Gesundheit vernachlässigen.",
+      "derivatives": [
+        { "word": "Vernachlässigung", "pos": "Subst. f.", "meaning": "Vernachlässigung, Versäumnis" }
+      ],
+      "history_note": "Wichtiger Begriff der praktischen Philosophie und Rechtslehre bezüglich der Sorgfaltspflicht."
+    }
   }
 };
 
@@ -7384,77 +7474,35 @@
     cloned.tgtLang = t;
     cloned.pair = `${s}_${t}`;
 
-    const hasKana = str => typeof str === 'string' && /[\u3040-\u309f\u30a0-\u30ff]/.test(str);
-
     if (loc) {
       if (loc.meanings) cloned.meanings = JSON.parse(JSON.stringify(loc.meanings));
       if (loc.core) cloned.core = loc.core;
       if (loc.etymology) cloned.etymology = loc.etymology;
-      if (loc.history_note) {
-        cloned.history_note = loc.history_note;
-      } else if (hasKana(cloned.history_note)) {
-        delete cloned.history_note;
+      if (loc.history_note) cloned.history_note = loc.history_note;
+      if (cloned.example && loc.exTrans) {
+        cloned.example.trans = loc.exTrans;
+        cloned.example[t] = loc.exTrans;
       }
-      if (cloned.example) {
-        if (loc.exTrans) {
-          cloned.example.trans = loc.exTrans;
-          cloned.example[t] = loc.exTrans;
-        } else if (hasKana(cloned.example.trans)) {
-          cloned.example.trans = cloned.example.foreign || '';
-        }
-        delete cloned.example.ja;
-      }
-      if (Array.isArray(cloned.phrases)) {
+      if (Array.isArray(cloned.phrases) && Array.isArray(loc.phrases)) {
         cloned.phrases = cloned.phrases.map((p, idx) => {
-          const lp = Array.isArray(loc.phrases) ? loc.phrases[idx] : null;
-          const res = { foreign: p.foreign };
-          if (lp && lp.trans) {
-            res.trans = lp.trans;
-            res[t] = lp.trans;
-          } else if (p.trans && !hasKana(p.trans)) {
-            res.trans = p.trans;
-          } else {
-            res.trans = '';
-          }
-          return res;
+          const lp = loc.phrases[idx];
+          return { foreign: p.foreign, trans: lp?.trans || p.trans || p.ja || '' };
         });
       }
-      if (Array.isArray(cloned.derivatives)) {
+      if (Array.isArray(cloned.derivatives) && Array.isArray(loc.derivatives)) {
         cloned.derivatives = cloned.derivatives.map((d, idx) => {
-          const ld = Array.isArray(loc.derivatives) ? loc.derivatives[idx] : null;
-          const res = { ...d };
-          if (ld && ld.meaning) {
-            res.meaning = ld.meaning;
-            res[t] = ld.meaning;
-          } else if (hasKana(d.meaning)) {
-            res.meaning = '';
-          }
-          return res;
+          const ld = loc.derivatives[idx];
+          return { ...d, meaning: ld?.meaning || d.meaning || '' };
         });
       }
       if (loc.category) cloned.category = loc.category;
-    } else {
-      if (hasKana(cloned.history_note)) delete cloned.history_note;
-      if (cloned.example) {
-        if (hasKana(cloned.example.trans)) cloned.example.trans = cloned.example.foreign || '';
-        delete cloned.example.ja;
-      }
-      if (Array.isArray(cloned.phrases)) {
-        cloned.phrases = cloned.phrases.map(p => ({ foreign: p.foreign, trans: hasKana(p.trans || p.ja) ? '' : (p.trans || '') }));
-      }
-      if (Array.isArray(cloned.derivatives)) {
-        cloned.derivatives = cloned.derivatives.map(d => (hasKana(d.meaning) ? { ...d, meaning: '' } : d));
-      }
     }
 
     if (global.VocabI18n?.translateCategory) {
       cloned.category = global.VocabI18n.translateCategory(cloned.category, t);
     }
-    if (hasKana(cloned.folder)) {
+    if (typeof cloned.folder === 'string' && /[\u3040-\u309f\u30a0-\u30ff]/.test(cloned.folder)) {
       cloned.folder = `${s.toUpperCase()} Starter Pack`;
-    }
-    if (cloned.example) {
-      delete cloned.example.ja;
     }
 
     return cloned;

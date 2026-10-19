@@ -185,14 +185,15 @@
     const raw = String(d.etymology || '').trim(), meanings = d.meanings || [];
     const tL = targetLocale || d.tgtLang || global.App?.tgtLang || 'ja';
     let hn = String(d.history_note || '').trim();
-    if (tL !== 'ja' && hasJapaneseKana(hn)) {
-      hn = d[`history_note_${tL}`] || d.history_note_trans || '';
+    if (tL !== 'ja') {
+      const transHn = d[`history_note_${tL}`] || d.history_note_trans || (tL !== 'en' ? d.history_note_en : '');
+      if (transHn) hn = transHn;
     }
     const histDigest = hn ? (hn.startsWith('（') || hn.startsWith('(') ? hn : `（${hn}）`) : '';
     let compactEty = raw.replace(/[①②③④]?\s*【[^】]+】\s*/g, '').replace(/\s+/g, ' ').trim();
-    if (tL !== 'ja' && hasJapaneseKana(compactEty)) {
-      compactEty = d[`etymology_${tL}`] || d.etymology_en || '';
-      if (hasJapaneseKana(compactEty)) compactEty = '';
+    if (tL !== 'ja') {
+      const transEty = d[`etymology_${tL}`] || (tL !== 'en' ? (d.etymology_en || d.etymology_trans) : d.etymology_trans) || '';
+      if (transEty) compactEty = transEty;
     }
     return { meanings, histDigest, compactEty, isLongEty: compactEty.length > 115 };
   }
@@ -234,9 +235,9 @@
     const { meanings, histDigest, compactEty, isLongEty } = formatMeaningAndEty(d, tL);
     const mHtml = meanings.map((x, idx) => {
       let mText = String(x.text || '').trim();
-      if (tL !== 'ja' && hasJapaneseKana(mText)) {
-        mText = x[`text_${tL}`] || x.en || x.text_en || '';
-        if (hasJapaneseKana(mText)) mText = '';
+      if (tL !== 'ja') {
+        const transM = x[`text_${tL}`] || x[`meaning_${tL}`] || (tL !== 'en' ? (x.en || x.text_en) : '') || x.trans || '';
+        if (transM) mText = transM;
       }
       return `<div class="pos-block"><span class="pos">${esc(x.pos)}</span><span class="m-red" data-act="reveal-mask">${hlText(mText, false, qReg)}${idx === meanings.length - 1 && histDigest ? `<span class="m-hist-note">${hlText(histDigest, false, qReg)}</span>` : ''}</span></div>`;
     }).join('');
@@ -270,26 +271,22 @@
     const histBadgeLabel = HIST_BADGE_LABELS[tL] || HIST_BADGE_LABELS.en;
 
     let coreText = String(d.core || '').trim();
-    if (tL !== 'ja' && hasJapaneseKana(coreText)) {
-      coreText = d[`core_${tL}`] || d.core_en || '';
-      if (hasJapaneseKana(coreText)) coreText = '';
+    if (tL !== 'ja') {
+      const transCore = d[`core_${tL}`] || (tL !== 'en' ? (d.core_en || d.core_trans) : d.core_trans) || '';
+      if (transCore) coreText = transCore;
     }
     const coreHtml = coreText ? `<div class="core-box" data-act="reveal-mask"><span class="core-badge">${coreBadgeLabel}</span><span class="core-text">${hlText(coreText, false, qReg)}</span></div>` : '';
 
     let hn = String(d.history_note || '').trim();
-    if (tL !== 'ja' && hasJapaneseKana(hn)) {
-      hn = d[`history_note_${tL}`] || d.history_note_trans || '';
-      if (hasJapaneseKana(hn)) hn = '';
+    if (tL !== 'ja') {
+      const transHn = d[`history_note_${tL}`] || d.history_note_trans || (tL !== 'en' ? d.history_note_en : '') || '';
+      if (transHn) hn = transHn;
     }
     const histHtml = hn ? `<div class="hist-box" data-act="reveal-mask"><span class="hist-badge">${histBadgeLabel}</span><span>${hlText(hn, false, qReg)}</span></div>` : '';
 
     const spkFn = (txt, l, sm) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l, sm) : '';
 
-    let exTrans = d.example ? (d.example.trans || (tL && d.example[tL]) || d.example.ja || '') : '';
-    if (tL !== 'ja' && hasJapaneseKana(exTrans)) {
-      exTrans = d.example[`trans_${tL}`] || d.example.trans_en || (d.example.en && iL !== 'en' ? d.example.en : '');
-      if (hasJapaneseKana(exTrans)) exTrans = '';
-    }
+    let exTrans = d.example ? (d.example[`trans_${tL}`] || d.example[tL] || (tL !== 'en' ? d.example.trans_en : '') || (d.example.en && iL !== 'en' ? d.example.en : '') || d.example.trans || d.example.ja || '') : '';
     const hasEx = d.example && (d.example.foreign || exTrans);
     const CTX_TAG_LABELS = {
       ja: '文脈',
@@ -308,18 +305,12 @@
     const exHtml = (hasEx || ctxHtml) ? `<div class="ex-block">${hasEx ? `<div class="ex-en">${spkFn(d.example.foreign, iL, true)}<span>${hlText(d.example.foreign, false, qReg)}</span></div><div class="ex-ja" data-act="reveal-mask">${hlText(exTrans, true, qReg)}</div>` : ''}${ctxHtml}</div>` : '';
 
     const phHtml = (d.phrases || []).map(x => {
-      let trans = x.trans || (tL && x[tL]) || x.ja || '';
-      if (tL !== 'ja' && hasJapaneseKana(trans)) {
-        trans = x[`trans_${tL}`] || x.trans_en || '';
-      }
+      let trans = x[`trans_${tL}`] || (tL && x[tL]) || (tL !== 'en' ? x.trans_en : '') || x.trans || x.ja || '';
       return `<div class="ph-line">${spkFn(x.foreign, iL, true)}<strong>${hlText(x.foreign, false, qReg)}</strong> <span>${hlText(trans, false, qReg)}</span></div>`;
     }).join('');
     const drvHtml = (d.derivatives || []).map(x => {
-      let meaning = x.meaning || '';
-      if (tL !== 'ja' && hasJapaneseKana(meaning)) {
-        meaning = x[`meaning_${tL}`] || x.meaning_en || '';
-      }
-      const trans = x.sub_trans || (tL && x[`sub_trans_${tL}`]) || '';
+      let meaning = x[`meaning_${tL}`] || (tL && x[tL]) || (tL !== 'en' ? x.meaning_en : '') || x.meaning || '';
+      const trans = x[`sub_trans_${tL}`] || x.sub_trans || (tL && x[tL]) || '';
       const sub = x.sub_phrase ? `<div class="sub-p">${spkFn(x.sub_phrase, iL, true)}<span>${hlText(x.sub_phrase, false, qReg)}</span> <span>${hlText(trans, false, qReg)}</span></div>` : '';
       return `<div><div class="sub-h">${spkFn(x.word, iL, true)}<strong>${hlText(x.word, false, qReg)}</strong> <span style="font-family:var(--mono);font-size:11px;color:var(--s)">${esc(fmtPho(x.phonetic))}</span><span class="pos-lbl">${esc(x.pos)}</span><span class="sub-m">${hlText(meaning, false, qReg)}</span></div>${sub}</div>`;
     }).join('');
