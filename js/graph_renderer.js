@@ -402,8 +402,8 @@
         continue;
       }
 
-      // 系統樹モード時、派生小枝 (Twig) は親単語がホバー/選択されている時のみ表示して過密を根絶
-      if (isTree && isTwigEdge) {
+      // 派生小枝 (Twig) は親単語がホバー/選択されている時のみ表示して過密を根絶
+      if (isTwigEdge) {
         const pWord = e.source?.label;
         const isParentFocused = focusNode && (focusNode.label === pWord || focusNode === e.source || focusNode === e.target);
         if (!isParentFocused) continue;
@@ -904,12 +904,10 @@
         }
 
       } else if (n.type === 'twig') {
-        // Level 4: 派生小枝 (Twig) - 系統樹モードでは親単語がホバーまたは選択時のみ描画して過密を根絶
-        if (isTree) {
-          const isParentFocused = focusNode && (focusNode.label === n.parentWord || focusNode === n);
-          if (!isParentFocused) {
-            continue;
-          }
+        // Level 4: 派生小枝 (Twig) - 親単語がホバーまたは選択時のみ描画して過密を根絶
+        const isParentFocused = focusNode && (focusNode.label === n.parentWord || focusNode === n);
+        if (!isParentFocused) {
+          continue;
         }
 
         ctx.beginPath();

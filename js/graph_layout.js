@@ -1291,14 +1291,14 @@
                 }
               });
 
-              // 派生語・成句 (Twigs: 親単語から放射状に46px外側へ分岐)
+              // 派生語・成句 (Twigs: 親単語から放射状に78px外側へ分岐し重なりを完全に防止)
               leaves.forEach(lNode => {
                 const myTwigs = twigs.filter(t => (t.parentWordId ? t.parentWordId === lNode.id : t.parentWord === lNode.label));
                 myTwigs.forEach((tNode, tIdx) => {
-                  const twigOffset = (myTwigs.length === 1) ? 0 : (-0.040 + (0.080 / Math.max(1, myTwigs.length - 1)) * tIdx);
+                  const twigOffset = (myTwigs.length === 1) ? 0 : (-0.055 + (0.110 / Math.max(1, myTwigs.length - 1)) * tIdx);
                   const thetaT = (lNode.angle || 0) + twigOffset;
-                  tNode.targetX = lNode.targetX + 46 * Math.cos(thetaT);
-                  tNode.targetY = lNode.targetY + 46 * Math.sin(thetaT);
+                  tNode.targetX = lNode.targetX + 78 * Math.cos(thetaT);
+                  tNode.targetY = lNode.targetY + 78 * Math.sin(thetaT);
                   tNode.angle = thetaT;
                 });
               });
@@ -1403,11 +1403,11 @@
                              nodes.find(n => n.label === tNode.parentWord);
           if (parentNode && parentNode.targetX !== undefined) {
             const pAngle = parentNode.angle || 0;
-            const thetaT = pAngle + (tIdx % 2 === 0 ? -0.040 : 0.040);
-            tNode.targetX = parentNode.targetX + 46 * Math.cos(thetaT);
-            tNode.targetY = parentNode.targetY + 46 * Math.sin(thetaT);
+            const thetaT = pAngle + (tIdx % 2 === 0 ? -0.055 : 0.055);
+            tNode.targetX = parentNode.targetX + 78 * Math.cos(thetaT);
+            tNode.targetY = parentNode.targetY + 78 * Math.sin(thetaT);
           } else if (parentNode && parentNode.x !== undefined) {
-            tNode.targetX = parentNode.x + 46;
+            tNode.targetX = parentNode.x + 78;
             tNode.targetY = parentNode.y;
           }
         }

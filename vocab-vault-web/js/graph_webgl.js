@@ -171,17 +171,30 @@
     return true;
   }
 
-  function updateBuffers(nodes, edges, isDark) {
+  let lastFocusWord = null;
+
+  function updateBuffers(nodes, edges, isDark, focusNode, isTree) {
     if (!gl || !isInitialized) return;
 
     // 1. Line Segments (Edges) Buffer
-    // Each vertex: [x, y, r, g, b, a] = 6 floats per vertex, 2 vertices per edge
-    const lineData = new Float32Array(edges.length * 2 * 6);
+    // Exclude hidden twig edges unless parent word is focused
+    const validEdges = [];
+    for (let i = 0; i < (edges || []).length; i++) {
+      const e = edges[i];
+      if (e.kind === 'leaf_to_twig') {
+        const pWord = e.source?.label;
+        const isParentFocused = focusNode && (focusNode.label === pWord || focusNode === e.source || focusNode === e.target);
+        if (!isParentFocused) continue;
+      }
+      validEdges.push(e);
+    }
+
+    const lineData = new Float32Array(validEdges.length * 2 * 6);
     let lIdx = 0;
     const defaultEdgeAlpha = isDark ? 0.22 : 0.16;
 
-    for (let i = 0; i < edges.length; i++) {
-      const e = edges[i];
+    for (let i = 0; i < validEdges.length; i++) {
+      const e = validEdges[i];
       const s = e.source;
       const t = e.target;
       const col = parseColor(e.color, defaultEdgeAlpha);
@@ -205,30 +218,11 @@
 
     gl.bindBuffer(gl.ARRAY_BUFFER, lineBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, lineData, gl.DYNAMIC_DRAW);
-    cachedEdgeCount = edges.length;
+    cachedEdgeCount = validEdges.length;
 
-    // 2. Point Sprites (Nodes) Buffer
-    // Each vertex: [x, y, r, g, b, a, size] = 7 floats per node
-    const pointData = new Float32Array(nodes.length * 7);
-    let pIdx = 0;
-
-    for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      const col = parseColor(n.color || (n.type === 'root' ? '#7c3aed' : '#38bdf8'), 0.95);
-      const radius = (n.r || (n.type === 'root' ? 14 : 7)) * 2.2;
-
-      pointData[pIdx++] = n.x || 0;
-      pointData[pIdx++] = n.y || 0;
-      pointData[pIdx++] = col[0];
-      pointData[pIdx++] = col[1];
-      pointData[pIdx++] = col[2];
-      pointData[pIdx++] = col[3];
-      pointData[pIdx++] = radius;
-    }
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, pointBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, pointData, gl.DYNAMIC_DRAW);
-    cachedNodeCount = nodes.length;
+    // In hybrid rendering, Canvas 2D is the dedicated renderer for nodes (celestial spheres, halos, typography, icons).
+    // WebGL point sprites are disabled to prevent double-dot collisions and duplicate rendered nodes.
+    cachedNodeCount = 0;
   }
 
   function render(graphState) {
@@ -262,11 +256,22 @@
 
     const isDark = document.body ? document.body.classList.contains('dark') : true;
 
-    // Buffer update if topology changed or nodes moved significantly
+    // Buffer update if topology changed, focus changed, or during dynamic easing/movement
     const curNodes = graphState.nodes || [];
     const curEdges = graphState.edges || [];
-    if (curNodes.length !== cachedNodeCount || curEdges.length !== cachedEdgeCount || graphState.needsBufferUpdate) {
-      updateBuffers(curNodes, curEdges, isDark);
+    const focusNode = graphState.selectedNode || graphState.hoverNode;
+    const curFocusWord = focusNode?.label || null;
+    const isTree = (graphState.layoutMode === 'tree');
+    const isMoving = Boolean(graphState.treeEasingTimer || !graphState.physicsPaused);
+
+    if (
+      curEdges.length !== cachedEdgeCount ||
+      graphState.needsBufferUpdate ||
+      curFocusWord !== lastFocusWord ||
+      isMoving
+    ) {
+      updateBuffers(curNodes, curEdges, isDark, focusNode, isTree);
+      lastFocusWord = curFocusWord;
       graphState.needsBufferUpdate = false;
     }
 
@@ -302,7 +307,9 @@
     }
 
     // --- Draw Nodes (Point Sprites) ---
-    if (cachedNodeCount > 0 && pointProgram) {
+    // In hybrid mode, Canvas 2D renders all celestial nodes and labels.
+    // Point sprites are only drawn if pure WebGL standalone mode is explicitly requested.
+    if (graphState.webglOnlyNodes && cachedNodeCount > 0 && pointProgram) {
       gl.useProgram(pointProgram);
       const uRes = gl.getUniformLocation(pointProgram, 'u_resolution');
       const uPan = gl.getUniformLocation(pointProgram, 'u_pan');
