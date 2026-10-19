@@ -4218,6 +4218,159 @@
     }
   ];
 
+  const JA_JA_STARTER = [
+    {
+      id: 'ja_pre1_seisaku',
+      num: 1,
+      word: '政策',
+      homographIndex: 1,
+      phonetic: 'せいさく [ seisaku ]',
+      grammar_forms: '漢字: 政策 / 字源: *政 (正しく治める)',
+      category: '政治・法学',
+      meanings: [{ pos: 'N', text: '政策、方針、施政方針' }],
+      core: '竹簡に記された計略（策）をもって社会を正しく治める（*政）基本方針。',
+      etymology: '漢字字源 *政（正＋攴：規範で社会を正す）＋ 策（竹＋朿：計略）。明治期に英語 policy の訳語として古典から再定義され、中国語（zhèngcè）・韓国語（정책）と完全に同源で結ばれる。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*政'],
+      history_note: '東アジアの近代行政・政治学を貫く共通漢字字源 *政 の中核語。',
+      example: {
+        foreign: '政府は再生可能エネルギーの発展を促進するための新たな<b>政策</b>を策定している。',
+        ja: '政府は再生可能エネルギーの発展を促進するための新たな政策を策定している。',
+        trans: '政府は再生可能エネルギーの発展を促進するための新たな政策を策定している。',
+        used_form: '政策'
+      },
+      derivatives: [{ word: '行政', phonetic: 'ぎょうせい', pos: 'N', meaning: '行政、ガバナンス' }],
+      phrases: [{ foreign: 'マクロ経済政策', ja: 'マクロ経済政策', trans: 'マクロ経済政策' }],
+      lang: 'ja',
+      pair: 'ja_ja'
+    },
+    {
+      id: 'ja_pre1_keizai',
+      num: 2,
+      word: '経済',
+      homographIndex: 1,
+      phonetic: 'けいざい [ keizai ]',
+      grammar_forms: '漢字: 経済 (舊字: 經濟) / 字源: *経 (縦糸を通す・治める)',
+      category: '実務・経済',
+      meanings: [{ pos: 'N', text: '経済、エコノミー；倹約、無駄を省くこと' }],
+      core: '織物の縦糸を張り巡らすように天下を治め（*経）、困窮する民を救い渡す（済）こと。',
+      etymology: '漢字字源 *経（經：縦糸を通す、秩序立てて治める）に遡る。古典『晋書』の「経世済民（世を治め民を救う）」の略語。中国語「经济」、韓国語「경제」と同一字源で結ばれる。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*経'],
+      history_note: '古代東洋の政治思想「経世済民」が西洋の political economy と融合した歴史的語彙。',
+      example: {
+        foreign: 'デジタル変革はすでに世界<b>経済</b>の成長を推進する中核エンジンとなっている。',
+        ja: 'デジタル変革はすでに世界経済の成長を推進する中核エンジンとなっている。',
+        trans: 'デジタル変革はすでに世界経済の成長を推進する中核エンジンとなっている。',
+        used_form: '経済'
+      },
+      derivatives: [{ word: '経験', phonetic: 'けいけん', pos: 'N/V', meaning: '経験（する）' }],
+      phrases: [{ foreign: '市場経済', ja: '市場経済', trans: '市場経済' }],
+      lang: 'ja',
+      pair: 'ja_ja'
+    },
+    {
+      id: 'ja_pre1_riron',
+      num: 3,
+      word: '理論',
+      homographIndex: 1,
+      phonetic: 'りろん [ riron ]',
+      grammar_forms: '漢字: 理論 / 字源: *理 (玉の筋目・法則)',
+      category: '哲学・科学',
+      meanings: [{ pos: 'N', text: '理論、セオリー、学説' }],
+      core: '原石の玉に潜む美しい筋目（*理）を見極め、体系的に順序立てて論じる（論）こと。',
+      etymology: '漢字字源 *理（玉＋里：翡翠の模様に沿って磨くことから「物事の筋道・法則」）＋ 論（言＋侖：順序立てて述べる）。中国語「理论」、韓国語「이론」と完全同源。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*理'],
+      history_note: '朱子学の「理（宇宙の根本法則）」が近代科学の theory の訳語へと昇華した。',
+      example: {
+        foreign: 'いかなる科学<b>理論</b>も厳密な実験による検証を経なければならない。',
+        ja: 'いかなる科学理論も厳密な実験による検証を経なければならない。',
+        trans: 'いかなる科学理論も厳密な実験による検証を経なければならない。',
+        used_form: '理論'
+      },
+      derivatives: [{ word: '理解', phonetic: 'りかい', pos: 'N/V', meaning: '理解（する）' }],
+      phrases: [{ foreign: '理論体系', ja: '理論体系', trans: '理論体系' }],
+      lang: 'ja',
+      pair: 'ja_ja'
+    },
+    {
+      id: 'ja_pre1_kanten',
+      num: 4,
+      word: '観点',
+      homographIndex: 1,
+      phonetic: 'かんてん [ kanten ]',
+      grammar_forms: '漢字: 観点 (舊字: 觀點) / 字源: *観 (広く見極める)',
+      category: '哲学・心理',
+      meanings: [{ pos: 'N', text: '観点、視点、見地、パースペクティブ' }],
+      core: '高い場所から広く見渡し（*観）、物事を捉える特定の足場・基準（点）。',
+      etymology: '漢字字源 *観（觀：目を凝らして広く見渡す）＋ 点（黒＋占：小さなしるし、位置）。英語 viewpoint / perspective の定訳。中国語「观点」・韓国語「관점」と同一字源。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*観'],
+      history_note: '多角的・客観的な認識論的枠組みを提示する東アジア学術共通語。',
+      example: {
+        foreign: '異なる文化的<b>観点</b>から問題を再検討することが重要である。',
+        ja: '異なる文化的観点から問題を再検討することが重要である。',
+        trans: '異なる文化的観点から問題を再検討することが重要である。',
+        used_form: '観点'
+      },
+      derivatives: [{ word: '観察', phonetic: 'かんさつ', pos: 'N/V', meaning: '観察（する）' }],
+      phrases: [{ foreign: '多角的な観点', ja: '多角的な観点', trans: '多角的な観点' }],
+      lang: 'ja',
+      pair: 'ja_ja'
+    },
+    {
+      id: 'ja_pre1_kenri',
+      num: 5,
+      word: '権利',
+      homographIndex: 1,
+      phonetic: 'けんり [ kenri ]',
+      grammar_forms: '漢字: 権利 (舊字: 權利) / 字源: *権 (はかりの分銅・権力)',
+      category: '政治・法学',
+      meanings: [{ pos: 'N', text: '権利、法的な権能' }],
+      core: '公平に重さを測る分銅（*権）のように、各人に正当に分配される利益・資格（利）。',
+      etymology: '漢字字源 *権（木＋雚：はかりのおもり→物事を適切に差配する力）＋ 利（稲穂を鋭利な刃で刈る→正当な成果・利益）。幕末・明治期に英語 right の訳語として確立し、中国語（quánlì）・韓国語（권리）に共有された近代法学の礎石。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*権'],
+      history_note: '西周・福澤諭吉らが苦心して right を定訳し、東アジア近代法治国家の基盤概念となった。',
+      example: {
+        foreign: 'すべての市民は法の下で言論の自由を享受する<b>権利</b>を有する。',
+        ja: 'すべての市民は法の下で言論の自由を享受する権利を有する。',
+        trans: 'すべての市民は法の下で言論の自由を享受する権利を有する。',
+        used_form: '権利'
+      },
+      derivatives: [{ word: '権力', phonetic: 'けんりょく', pos: 'N', meaning: '権力、パワー' }],
+      phrases: [{ foreign: '基本的人権', ja: '基本的人権', trans: '基本的人権' }],
+      lang: 'ja',
+      pair: 'ja_ja'
+    },
+    {
+      id: 'ja_pre1_ninshiki',
+      num: 6,
+      word: '認識',
+      homographIndex: 1,
+      phonetic: 'にんしき [ ninshiki ]',
+      grammar_forms: '漢字: 認識 / 字源: *識 (見分ける・記す)',
+      category: '認識・心理',
+      meanings: [{ pos: 'N/V', text: '認識、認知、理解；認識する' }],
+      core: '対象を正しく見定め（認）、心に記し分けて知る（*識）こと。',
+      etymology: '漢字字源 *識（言＋戠：目印をつけて区別する、記す）＋ 認（言＋忍：見極めて受け入れる）。仏教の唯識論から近代哲学の cognition / recognition の訳語となった東アジア共通語。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*識'],
+      history_note: '哲学の認識論（epistemology）からAIの画像認識まで幅広く使用される中核概念。',
+      example: {
+        foreign: '問題の深刻さを正しく<b>認識</b>することが解決への第一歩である。',
+        ja: '問題の深刻さを正しく認識することが解決への第一歩である。',
+        trans: '問題の深刻さを正しく認識することが解決への第一歩である。',
+        used_form: '認識'
+      },
+      derivatives: [{ word: '意識', phonetic: 'いしき', pos: 'N', meaning: '意識、コンシャスネス' }],
+      phrases: [{ foreign: '共通認識', ja: '共通認識', trans: '共通認識' }],
+      lang: 'ja',
+      pair: 'ja_ja'
+    }
+  ];
+
   const PACKS = {
     academic: EN_JA_STARTER,
     classical_roots: CLASSICAL_ROOTS_STARTER,
@@ -4231,7 +4384,8 @@
     pt_pre1: PT_JA_STARTER,
     nl_pre1: NL_JA_STARTER,
     zh_pre1: ZH_JA_STARTER,
-    ko_pre1: KO_JA_STARTER
+    ko_pre1: KO_JA_STARTER,
+    ja_pre1: JA_JA_STARTER
   };
 
   const PACK_METADATA = {
@@ -4251,7 +4405,8 @@
     pt_pre1: { id: 'pt_pre1', lang: 'pt', name: 'ポルトガル語 CELPE-Bras・ロマンス語根選', desc: 'イベロ・ロマンス語派の *kap-, *ten-, *sta-, *bher- 基幹語彙', badge: 'CELPE-Bras・B2', count: 5, wordsPreview: 'conceber, manter, estabelecer, transferir, perspectiva' },
     nl_pre1: { id: 'nl_pre1', lang: 'nl', name: 'オランダ語 NT2 II・西ゲルマン語根選', desc: '英語とドイツ語を架橋する *sta-, *kap-, *tragh-, *ten- 前綴り動詞群', badge: 'NT2 II・CNaVT B2', count: 5, wordsPreview: 'bestaan, ontstaan, begrijpen, overdragen, onderhouden' },
     zh_pre1: { id: 'zh_pre1', lang: 'zh', name: '中国語 HSK 5-6級・東アジア漢字字源選', desc: '*政, *経, *理, *観, *権, *識 で日中韓を貫く近代学術漢語コア', badge: 'HSK 6級・字源系統樹', count: 6, wordsPreview: '政策, 经济, 理论, 观念, 权利, 认识' },
-    ko_pre1: { id: 'ko_pre1', lang: 'ko', name: '韓国語 TOPIK II・漢字語字源ネットワーク選', desc: '頭音法則・流音化を漢字字源 (*政, *経, *理, *観, *権, *識) で体系攻略', badge: 'TOPIK II・ハン検準2級', count: 6, wordsPreview: '정책, 경제, 이론, 관점, 권리, 인식' }
+    ko_pre1: { id: 'ko_pre1', lang: 'ko', name: '韓国語 TOPIK II・漢字語字源ネットワーク選', desc: '頭音法則・流音化を漢字字源 (*政, *経, *理, *観, *権, *識) で体系攻略', badge: 'TOPIK II・ハン検準2級', count: 6, wordsPreview: '정책, 경제, 이론, 관점, 권리, 인식' },
+    ja_pre1: { id: 'ja_pre1', lang: 'ja', name: '日本語能力試験 N1・東アジア漢字字源選', desc: '*政, *経, *理, *観, *権, *識 など東アジア共通漢字字源ネットワーク', badge: 'JLPT N1・字源', count: 6, wordsPreview: '政策, 経済, 理論, 観点, 権利, 認識' }
   };
 
   const LANG_TAG_LABELS = {
@@ -7459,6 +7614,13 @@
   }
 };
 
+  // 日本語新字体のエイリアス定義 (STARTER_LOCALIZATIONS)
+  STARTER_LOCALIZATIONS['経済'] = STARTER_LOCALIZATIONS['经济'];
+  STARTER_LOCALIZATIONS['理論'] = STARTER_LOCALIZATIONS['理论'];
+  STARTER_LOCALIZATIONS['観点'] = STARTER_LOCALIZATIONS['관점'];
+  STARTER_LOCALIZATIONS['権利'] = STARTER_LOCALIZATIONS['权利'];
+  STARTER_LOCALIZATIONS['認識'] = STARTER_LOCALIZATIONS['认识'];
+
   function localizeStarterItem(item, tgtLang = 'ja', srcLang = null) {
     if (!item || typeof item !== 'object') return item;
     const t = String(tgtLang || 'ja').toLowerCase();
@@ -7516,7 +7678,8 @@
     pt: 'pt_pre1',
     nl: 'nl_pre1',
     zh: 'zh_pre1',
-    ko: 'ko_pre1'
+    ko: 'ko_pre1',
+    ja: 'ja_pre1'
   };
 
   function getStarterPack(lang = 'en', packType = 'academic') {
@@ -7584,7 +7747,7 @@
     let tombChanged = false;
 
     starterItems.forEach(item => {
-      const itemLang = item.lang || lang;
+      const itemLang = item.lang || (meta && meta.lang ? meta.lang : 'en');
       const hIdx = Number(item.homographIndex) || 1;
       const k = makeLookupKey(item.word, itemLang, hIdx);
       if (!existingWords.has(k)) {

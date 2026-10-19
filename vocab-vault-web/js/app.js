@@ -505,6 +505,20 @@
     if (!Array.isArray(entries) || !pairCfg) return entries;
     const tgt = pairCfg.tgtLang || App.tgtLang || 'ja';
     const src = pairCfg.srcLang || App.lang || 'en';
+
+    // 日本語学習ペア（ja_*）に誤って混入した英語スターターパック項目の検出・パージ
+    if (src === 'ja') {
+      const hasBogusEnglishStarter = entries.some(it => it && !it.isDeleted && String(it.id || '').startsWith('starter_') && /^[a-zA-Z\s-]+$/.test(String(it.word || '')));
+      if (hasBogusEnglishStarter) {
+        const cleaned = entries.filter(it => !(it && String(it.id || '').startsWith('starter_') && /^[a-zA-Z\s-]+$/.test(String(it.word || ''))));
+        const pairId = pairCfg.pairId || `ja_${tgt}`;
+        lsSet(`vv_starter_loaded_${pairId}`, '1');
+        const { merged } = global.VocabStarterPack?.populateStarterPack ? global.VocabStarterPack.populateStarterPack(cleaned, 'ja', 'ja_pre1', pairCfg.key, tgt) : { merged: cleaned };
+        setJson(pairCfg.key, merged, true, false);
+        return merged;
+      }
+    }
+
     if (tgt === 'ja' || !global.VocabStarterPack?.localizeStarterItem) return entries;
 
     const hasKana = str => typeof str === 'string' && /[\u3040-\u309f\u30a0-\u30ff]/.test(str);
@@ -512,6 +526,13 @@
     const repaired = entries.map(item => {
       if (!item || item.isDeleted) return item;
       const w = String(item.word || '').trim();
+
+      // 言語属性の自己修復（非日本語デッキで英語単語に lang: ja が誤付与されていた場合の修正）
+      if (src !== 'ja' && item.lang === 'ja' && /^[a-zA-Z\s-]+$/.test(w)) {
+        item.lang = src;
+        changed = true;
+      }
+
       const locDict = global.VocabStarterPack?.STARTER_LOCALIZATIONS?.[w] || global.VocabStarterPack?.STARTER_LOCALIZATIONS?.[w.toLowerCase()];
 
       // スターターパック項目で、目標言語不一致や日本語の残存がある場合は完全ローカライズ再適用
@@ -716,6 +737,7 @@
       else if (App.lang === 'nl') actualPackType = 'nl_pre1';
       else if (App.lang === 'zh') actualPackType = 'zh_pre1';
       else if (App.lang === 'ko') actualPackType = 'ko_pre1';
+      else if (App.lang === 'ja') actualPackType = 'ja_pre1';
     }
     const pairCfg = getActivePairConfig();
     const cur = getJson(pairCfg.key);

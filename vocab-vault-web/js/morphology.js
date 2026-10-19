@@ -529,8 +529,9 @@
       });
     });
 
-    if (!foundCurrent && langs[iL]) {
-      langs[iL].unshift({
+    const effectiveLang = (iL === 'ja' && /^[a-zA-Z\s-]+$/.test(normItemWord)) ? 'en' : iL;
+    if (!foundCurrent && langs[effectiveLang]) {
+      langs[effectiveLang].unshift({
         w: item.word,
         m: item.meanings?.[0]?.text || item.core || '',
         inLibrary: true,
@@ -541,7 +542,7 @@
     // 自分自身以外の他言語同根語（見出し語言語 iL 以外の言語）が少なくとも1語以上存在する場合のみ表示
     let otherLangCognatesCount = 0;
     ['en', 'fr', 'de', 'ja'].forEach(l => {
-      if (l !== iL) {
+      if (l !== effectiveLang) {
         (langs[l] || []).forEach(c => {
           if (!c.isCurrent) otherLangCognatesCount++;
         });
@@ -594,12 +595,41 @@
     const defaultRootMeaning = ROOT_CONCEPT_LABELS[curLocale] || ROOT_CONCEPT_LABELS.en;
     const rootMeaningDisplay = matrix.meaning && matrix.meaning !== '語源的根幹概念' ? matrix.meaning : defaultRootMeaning;
 
-    const badgeLabel = isJa ? '4言語同根語マトリクス' : (curLocale === 'fr' ? 'Matrice de cognats en 4 langues' : (curLocale === 'de' ? '4-Sprachen-Kognatenmatrix' : '4-Language Cognate Matrix'));
-    const rootPrefix = isJa ? '語根: ' : (curLocale === 'fr' ? 'Racine : ' : (curLocale === 'de' ? 'Wurzel: ' : 'Root: '));
-    const colEn = isJa ? '英語 (EN)' : (curLocale === 'fr' ? 'Anglais (EN)' : (curLocale === 'de' ? 'Englisch (EN)' : 'English (EN)'));
-    const colFr = isJa ? 'フランス語 (FR)' : (curLocale === 'fr' ? 'Français (FR)' : (curLocale === 'de' ? 'Französisch (FR)' : 'French (FR)'));
-    const colDe = isJa ? 'ドイツ語 (DE)' : (curLocale === 'fr' ? 'Allemand (DE)' : (curLocale === 'de' ? 'Deutsch (DE)' : 'German (DE)'));
-    const colJa = isJa ? '日本語 / 訳語' : (curLocale === 'fr' ? 'Japonais (日本語 / JA)' : (curLocale === 'de' ? 'Japanisch (日本語 / JA)' : 'Japanese (日本語 / JA)'));
+    const BADGE_LABELS = {
+      ja: '4言語同根語マトリクス',
+      en: '4-Language Cognate Matrix',
+      fr: 'Matrice de cognats en 4 langues',
+      de: '4-Sprachen-Kognatenmatrix',
+      es: 'Matriz de cognados en 4 idiomas',
+      it: 'Matrice di cognati in 4 lingue',
+      pt: 'Matriz de cognatos em 4 idiomas',
+      nl: '4-Talen Kognatenmatrix',
+      zh: '4语言同源词矩阵',
+      ko: '4개 언어 동원어 매트릭스'
+    };
+    const ROOT_PREFIXES_MAP = {
+      ja: '語根: ',
+      en: 'Root: ',
+      fr: 'Racine : ',
+      de: 'Wurzel: ',
+      es: 'Raíz: ',
+      it: 'Radice: ',
+      pt: 'Raiz: ',
+      nl: 'Wortel: ',
+      zh: '词根: ',
+      ko: '어근: '
+    };
+    const COL_EN_MAP = { ja: '英語 (EN)', ko: '영어 (EN)', zh: '英语 (EN)', fr: 'Anglais (EN)', de: 'Englisch (EN)', es: 'Inglés (EN)', it: 'Inglese (EN)', pt: 'Inglês (EN)', nl: 'Engels (EN)', en: 'English (EN)' };
+    const COL_FR_MAP = { ja: 'フランス語 (FR)', ko: '프랑스어 (FR)', zh: '法语 (FR)', fr: 'Français (FR)', de: 'Französisch (FR)', es: 'Francés (FR)', it: 'Francese (FR)', pt: 'Francês (FR)', nl: 'Frans (FR)', en: 'French (FR)' };
+    const COL_DE_MAP = { ja: 'ドイツ語 (DE)', ko: '독일어 (DE)', zh: '德语 (DE)', fr: 'Allemand (DE)', de: 'Deutsch (DE)', es: 'Alemán (DE)', it: 'Tedesco (DE)', pt: 'Alemão (DE)', nl: 'Duits (DE)', en: 'German (DE)' };
+    const COL_JA_MAP = { ja: '日本語 / 訳語', ko: '일본어 (JA)', zh: '日语 (JA)', fr: 'Japonais (日本語 / JA)', de: 'Japanisch (日本語 / JA)', es: 'Japonés (日本語 / JA)', it: 'Giapponese (日本語 / JA)', pt: 'Japonês (日本語 / JA)', nl: 'Japans (日本語 / JA)', en: 'Japanese (日本語 / JA)' };
+
+    const badgeLabel = BADGE_LABELS[curLocale] || BADGE_LABELS.en;
+    const rootPrefix = ROOT_PREFIXES_MAP[curLocale] || ROOT_PREFIXES_MAP.en;
+    const colEn = COL_EN_MAP[curLocale] || COL_EN_MAP.en;
+    const colFr = COL_FR_MAP[curLocale] || COL_FR_MAP.en;
+    const colDe = COL_DE_MAP[curLocale] || COL_DE_MAP.en;
+    const colJa = COL_JA_MAP[curLocale] || COL_JA_MAP.en;
 
     return `
       <div class="cognate-matrix-box">

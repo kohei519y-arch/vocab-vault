@@ -710,22 +710,23 @@
       const crossPill = options.crossLang ? `<span class="lang-pill">${esc(iL.toUpperCase())}</span>` : '';
 
       const catVal = i.category || '';
-      const displayCat = (global.VocabI18n?.translateCategory && catVal) ? global.VocabI18n.translateCategory(catVal, tL) : catVal;
+      const displayCat = (global.VocabI18n?.translateCategory && catVal) ? global.VocabI18n.translateCategory(catVal, currentLocale) : catVal;
       const catHtml = catVal ? `<span class="tag" data-act="filter" data-type="cat" data-val="${esc(catVal)}">${esc(displayCat)}</span>` : '';
 
       let displayFol = i.folder || '';
-      if (tL !== 'ja' && hasJapaneseKana(displayFol)) {
-        displayFol = `${iL.toUpperCase()} Starter Pack`;
+      if (currentLocale !== 'ja' && (hasJapaneseKana(displayFol) || displayFol.includes('Starter Pack') || displayFol.includes('スターターパック'))) {
+        const spLabel = (global.VocabI18n?.t) ? global.VocabI18n.t('folder.starter_pack', 'Starter Pack', currentLocale) : 'Starter Pack';
+        displayFol = `${iL.toUpperCase()} ${spLabel}`;
       }
       const folHtml = i.folder ? `<span class="tag" style="border-style:dashed" data-act="filter" data-type="fol" data-val="${esc(i.folder)}">${esc(displayFol)}</span>` : '';
 
-      const editTitle = tL === 'ja' ? 'カードを編集' : 'Edit card';
-      const editAria = tL === 'ja' ? '編集' : 'Edit';
-      const delTitle = tL === 'ja' ? '削除' : 'Delete';
-      const delAria = tL === 'ja' ? '削除' : 'Delete';
-      const spkTitle = tL === 'ja' ? 'クリックでネイティブ発音' : 'Click to hear native pronunciation';
+      const editTitle = currentLocale === 'ja' ? 'カードを編集' : 'Edit card';
+      const editAria = currentLocale === 'ja' ? '編集' : 'Edit';
+      const delTitle = currentLocale === 'ja' ? '削除' : 'Delete';
+      const delAria = currentLocale === 'ja' ? '削除' : 'Delete';
+      const spkTitle = currentLocale === 'ja' ? 'クリックでネイティブ発音' : 'Click to hear native pronunciation';
 
-      c.innerHTML = `<div class="card-acts"><button type="button" class="act-icon-btn" data-act="edit" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="${editTitle}" aria-label="${editAria}">${editSvg}</button><button type="button" class="act-icon-btn del-btn" data-act="del" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="${delTitle}" aria-label="${delAria}">${delSvg}</button></div><div class="col-left"><div class="hw-wrap"><span class="id">#${i.num || 0}</span>${crossPill}${homoHtml}${genderHtml}<span class="hw" data-act="speak" data-text="${esc(i.word || '')}" data-lang="${esc(iL)}" title="${spkTitle}">${hlText(i.word || '', false, options.queryReg)}</span>${spkFn(i.word || '', iL)}</div>${gramHtml}<div class="tag-wrap">${catHtml}${folHtml}</div><div class="pho">${esc(fmtPho(i.phonetic))}<span class="due ${due ? 'is-due' : 'is-fut'}">${relTime(i.nextReview, tL)}</span></div></div>${buildRight(i, options)}`;
+      c.innerHTML = `<div class="card-acts"><button type="button" class="act-icon-btn" data-act="edit" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="${editTitle}" aria-label="${editAria}">${editSvg}</button><button type="button" class="act-icon-btn del-btn" data-act="del" data-id="${esc(i.id)}" data-num="${i.num || 0}" data-lang="${esc(iL)}" title="${delTitle}" aria-label="${delAria}">${delSvg}</button></div><div class="col-left"><div class="hw-wrap"><span class="id">#${i.num || 0}</span>${crossPill}${homoHtml}${genderHtml}<span class="hw" data-act="speak" data-text="${esc(i.word || '')}" data-lang="${esc(iL)}" title="${spkTitle}">${hlText(i.word || '', false, options.queryReg)}</span>${spkFn(i.word || '', iL)}</div>${gramHtml}<div class="tag-wrap">${catHtml}${folHtml}</div><div class="pho">${esc(fmtPho(i.phonetic))}<span class="due ${due ? 'is-due' : 'is-fut'}">${relTime(i.nextReview, currentLocale)}</span></div></div>${buildRight(i, options)}`;
       return c;
     } catch (err) {
       if (typeof console !== 'undefined' && typeof console.warn === 'function') {

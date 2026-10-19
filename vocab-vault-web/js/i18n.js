@@ -184,6 +184,10 @@
       'settings.quota_desc': '※無料アカウント登録で1日5語までAI新規生成可能（共有キャッシュは無制限）。複数端末間のクラウド自動同期はProプラン（月480円）でご利用いただけます。',
 
       'settings.plan_heading': 'プラン & サブスクリプション (Stripe決済)',
+      'settings.dev_badge': 'Developer Edition (全機能永久無制限)',
+      'settings.dev_notice': '開発者マスター権限により全機能が無制限解放されています（課金不要）',
+      'settings.plan_canceling': '(期間満了で終了予定)',
+      'folder.starter_pack': 'スターターパック',
       'settings.free_plan': 'Free プラン',
       'settings.pro_plan': 'Pro プラン',
       'settings.current_plan': '現在のプラン',
@@ -819,6 +823,10 @@
       'settings.quota_desc': '*Free accounts can generate up to 5 AI words per day (unlimited shared cache). Real-time cross-device cloud sync is included in the Pro plan ($3.99/mo).',
 
       'settings.plan_heading': 'Subscription & Plans (Stripe)',
+      'settings.dev_badge': 'Developer Edition (All Features Unlimited)',
+      'settings.dev_notice': 'All features permanently unlocked via Developer Master authority (No charge)',
+      'settings.plan_canceling': '(Cancels at period end)',
+      'folder.starter_pack': 'Starter Pack',
       'settings.free_plan': 'Free Tier',
       'settings.pro_plan': 'Pro Plan',
       'settings.current_plan': 'Current Plan',
@@ -1405,6 +1413,10 @@
       'settings.logout_btn': 'Déconnexion',
       'settings.quota_desc': '*Les comptes gratuits peuvent générer 5 mots IA par jour (cache partagé illimité). La synchronisation multi-appareils est incluse dans le forfait Pro (3,99 $/mois).',
       'settings.plan_heading': 'Abonnements & Forfaits (Stripe)',
+      'settings.dev_badge': 'Developer Edition (Toutes fonctionnalités illimitées)',
+      'settings.dev_notice': 'Toutes les fonctionnalités sont débloquées via l\'accès Développeur (sans frais)',
+      'settings.plan_canceling': '(Prend fin à l\'échéance)',
+      'folder.starter_pack': 'Pack de démarrage',
       'settings.free_plan': 'Forfait Gratuit',
       'settings.pro_plan': 'Forfait Pro',
       'settings.current_plan': 'Forfait actuel',
@@ -1699,6 +1711,10 @@
       'settings.logout_btn': 'Abmelden',
       'settings.quota_desc': '*Kostenlose Konten können 5 KI-Wörter pro Tag generieren (unbegrenzter Shared Cache). Multi-Device-Sync ist im Pro-Plan (3,99 $/Monat) enthalten.',
       'settings.plan_heading': 'Abonnements & Pläne (Stripe)',
+      'settings.dev_badge': 'Developer Edition (Alle Funktionen unbegrenzt)',
+      'settings.dev_notice': 'Alle Funktionen dauerhaft freigeschaltet über Entwickler-Master-Rechte (gebührenfrei)',
+      'settings.plan_canceling': '(Endet zum Periodenende)',
+      'folder.starter_pack': 'Starterpaket',
       'settings.free_plan': 'Kostenloser Plan',
       'settings.pro_plan': 'Pro-Plan',
       'settings.current_plan': 'Aktueller Plan',
@@ -1993,6 +2009,10 @@
       'settings.logout_btn': 'Cerrar sesión',
       'settings.quota_desc': '*Las cuentas gratuitas pueden generar 5 palabras IA al día (caché compartida ilimitada). La sincronización multidispositivo está incluida en el plan Pro (3,99 $/mes).',
       'settings.plan_heading': 'Suscripciones y Planes (Stripe)',
+      'settings.dev_badge': 'Developer Edition (Todas las funciones ilimitadas)',
+      'settings.dev_notice': 'Todas las funciones desbloqueadas permanentemente mediante autoridad de desarrollador (sin cargo)',
+      'settings.plan_canceling': '(Cancela al final del período)',
+      'folder.starter_pack': 'Paquete inicial',
       'settings.free_plan': 'Plan Gratuito',
       'settings.pro_plan': 'Plan Pro',
       'settings.current_plan': 'Plan actual',
@@ -2214,6 +2234,14 @@
       'settings.pwa_running': 'App autonoma in esecuzione',
       'settings.pwa_installed_btn': 'In esecuzione come app autonoma',
       'settings.close_btn': 'Chiudi impostazioni',
+      'settings.dev_badge': 'Developer Edition (Tutte le funzioni illimitate)',
+      'settings.dev_notice': 'Tutte le funzionalità sbloccate permanentemente con autorizzazione sviluppatore (gratuito)',
+      'settings.plan_canceling': '(Termina alla fine del periodo)',
+      'folder.starter_pack': 'Pacchetto iniziale',
+      'settings.free_plan': 'Piano Gratuito',
+      'settings.pro_plan': 'Piano Pro',
+      'settings.current_plan': 'Piano attuale',
+      'settings.recommended': 'Consigliato',
       'toolbar.wordbook': 'Vocabolario',
       'addbar.submit': 'Aggiungi',
       'list.all_words': 'Tutte le parole',
@@ -2323,6 +2351,14 @@
       'settings.pwa_running': 'App independente em execução',
       'settings.pwa_installed_btn': 'Executando como app independente',
       'settings.close_btn': 'Fechar configurações',
+      'settings.dev_badge': 'Developer Edition (Todos os recursos ilimitados)',
+      'settings.dev_notice': 'Todos os recursos desbloqueados permanentemente por autoridade de desenvolvedor (sem custos)',
+      'settings.plan_canceling': '(Cancela no final do período)',
+      'folder.starter_pack': 'Pacote inicial',
+      'settings.free_plan': 'Plano Gratuito',
+      'settings.pro_plan': 'Plano Pro',
+      'settings.current_plan': 'Plano atual',
+      'settings.recommended': 'Recomendado',
       'toolbar.wordbook': 'Vocabulário',
       'addbar.submit': 'Adicionar',
       'list.all_words': 'Todas as palavras',
@@ -2391,6 +2427,14 @@
       'settings.pwa_running': 'Zelfstandige app actief',
       'settings.pwa_installed_btn': 'Actief als zelfstandige app',
       'settings.close_btn': 'Instellingen sluiten',
+      'settings.dev_badge': 'Developer Edition (Alle functies onbeperkt)',
+      'settings.dev_notice': 'Alle functies permanent ontgrendeld via ontwikkelaarsbevoegdheid (kosteloos)',
+      'settings.plan_canceling': '(Eindigt aan het einde van de periode)',
+      'folder.starter_pack': 'Starterspakket',
+      'settings.free_plan': 'Gratis abonnement',
+      'settings.pro_plan': 'Pro-abonnement',
+      'settings.current_plan': 'Huidig abonnement',
+      'settings.recommended': 'Aanbevolen',
       'toolbar.wordbook': 'Woordenboek',
       'addbar.submit': 'Toevoegen',
       'list.all_words': 'Alle woorden',
@@ -2457,6 +2501,14 @@
       'settings.pwa_running': '独立应用运行中',
       'settings.pwa_installed_btn': '作为独立应用运行中',
       'settings.close_btn': '关闭设置',
+      'settings.dev_badge': 'Developer Edition (全功能永久无限制)',
+      'settings.dev_notice': '已通过开发者特权永久解锁全部功能（无需付费）',
+      'settings.plan_canceling': '(期满后自动终止)',
+      'folder.starter_pack': '新手入门包',
+      'settings.free_plan': '免费方案',
+      'settings.pro_plan': '专业版 Pro',
+      'settings.current_plan': '当前方案',
+      'settings.recommended': '推荐',
       'toolbar.wordbook': '词汇本',
       'addbar.submit': '添加',
       'list.all_words': '全部词汇',
@@ -2525,6 +2577,14 @@
       'settings.pwa_running': '단독 앱 실행 중',
       'settings.pwa_installed_btn': '단독 앱으로 실행 중',
       'settings.close_btn': '설정 닫기',
+      'settings.dev_badge': 'Developer Edition (모든 기능 영구 무제한)',
+      'settings.dev_notice': '개발자 마스터 권한으로 모든 기능이 영구 잠금 해제되었습니다 (결제 불필요)',
+      'settings.plan_canceling': '(기간 만료 시 종료 예정)',
+      'folder.starter_pack': '스타터 팩',
+      'settings.free_plan': '무료 플랜',
+      'settings.pro_plan': 'Pro 플랜',
+      'settings.current_plan': '현재 플랜',
+      'settings.recommended': '추천',
       'toolbar.wordbook': '단어장',
       'addbar.submit': '등록',
       'list.all_words': '모든 단어',
@@ -2936,11 +2996,17 @@
     const curPlanBadge = document.getElementById('curPlanBadge');
     if (curPlanBadge) {
       const cur = curPlanBadge.textContent || '';
-      if (cur.includes('Free') || cur.includes('フリー') || cur.includes('Gratuit') || cur.includes('Kostenlos') || cur.includes('Gratuito')) {
+      if (cur.includes('Developer') || cur.includes('開発者') || cur.includes('Développeur') || cur.includes('Entwickler') || cur.includes('Desarrollador') || cur.includes('Sviluppatore') || cur.includes('Desenvolvedor') || cur.includes('Ontwikkelaar')) {
+        curPlanBadge.textContent = t('settings.dev_badge');
+      } else if (cur.includes('Free') || cur.includes('フリー') || cur.includes('Gratuit') || cur.includes('Kostenlos') || cur.includes('Gratuito') || cur.includes('Gratis') || cur.includes('免费') || cur.includes('무료')) {
         curPlanBadge.textContent = t('settings.free_plan');
-      } else if (cur.includes('Pro')) {
+      } else if (cur.includes('Pro') || cur.includes('专业版')) {
         curPlanBadge.textContent = t('settings.pro_plan');
       }
+    }
+    const devEditionNotice = document.getElementById('devEditionNotice');
+    if (devEditionNotice) {
+      devEditionNotice.textContent = t('settings.dev_notice');
     }
     const isStandalone = (typeof window !== 'undefined') && (
       window.matchMedia?.('(display-mode: standalone)').matches ||

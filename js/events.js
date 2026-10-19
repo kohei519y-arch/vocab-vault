@@ -239,18 +239,22 @@
         if (!p) return;
         const isPro = (p.plan === 'pro' || p.plan === 'academic');
         if (appState) appState.isPro = isPro;
+        const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+        const tFn = (k, fb) => (global.VocabI18n?.t ? global.VocabI18n.t(k, fb) : fb);
         const planBadge = $('curPlanBadge');
         if (planBadge) {
           if (p.grace_period_until && new Date(p.grace_period_until) > new Date()) {
-            const graceStr = new Date(p.grace_period_until).toLocaleDateString();
-            planBadge.textContent = `決済更新待ち (猶予: ${graceStr}まで)`;
+            const graceStr = new Date(p.grace_period_until).toLocaleDateString(curLocale);
+            planBadge.textContent = curLocale === 'ja'
+              ? `決済更新待ち (猶予: ${graceStr}まで)`
+              : `Pending Payment (Grace: until ${graceStr})`;
             planBadge.className = 'badge warn';
           } else if (isPro && p.cancel_at_period_end) {
-            const expStr = p.current_period_end ? ` (${new Date(p.current_period_end).toLocaleDateString()}まで有効)` : '';
-            planBadge.textContent = `Pro プラン (期間満了で終了予定${expStr})`;
+            const expStr = p.current_period_end ? ` (${new Date(p.current_period_end).toLocaleDateString(curLocale)})` : '';
+            planBadge.textContent = `${tFn('settings.pro_plan', 'Pro プラン')} ${tFn('settings.plan_canceling', '(期間満了で終了予定)')}${expStr}`;
             planBadge.className = 'badge warn';
           } else {
-            planBadge.textContent = isPro ? 'Pro プラン' : 'Free プラン';
+            planBadge.textContent = isPro ? tFn('settings.pro_plan', 'Pro プラン') : tFn('settings.free_plan', 'Free プラン');
             planBadge.className = `badge ${isPro ? 'ok' : 'ng'}`;
           }
         }
@@ -262,9 +266,10 @@
     }
 
     if (appState && appState.isDev) {
+      const tFn = (k, fb) => (global.VocabI18n?.t ? global.VocabI18n.t(k, fb) : fb);
       const planBadge = $('curPlanBadge');
       if (planBadge) {
-        planBadge.textContent = 'Developer Edition (全機能永久無制限)';
+        planBadge.textContent = tFn('settings.dev_badge', 'Developer Edition (全機能永久無制限)');
         planBadge.className = 'badge ok';
       }
       $('planCardFree')?.classList.remove('current');
@@ -276,8 +281,10 @@
         devNotice = document.createElement('div');
         devNotice.id = 'devEditionNotice';
         devNotice.style.cssText = 'margin-top:8px;padding:8px 10px;background:var(--bg-hov);border-radius:6px;font-size:11.5px;color:var(--ac);font-weight:600;text-align:center';
-        devNotice.innerHTML = '開発者マスター権限により全機能が無制限解放されています（課金不要）';
+        devNotice.textContent = tFn('settings.dev_notice', '開発者マスター権限により全機能が無制限解放されています（課金不要）');
         $('planCardPro').appendChild(devNotice);
+      } else if (devNotice) {
+        devNotice.textContent = tFn('settings.dev_notice', '開発者マスター権限により全機能が無制限解放されています（課金不要）');
       }
     }
   }
