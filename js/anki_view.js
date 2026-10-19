@@ -296,10 +296,11 @@
 
       if (!reviewCandidates.length) {
         if (!allFiltered.length) {
-          ctx.showToast?.('復習対象の単語が登録されていません。', 'info', 3000);
+          ctx.showToast?.(global.VocabI18n?.t ? global.VocabI18n.t('anki.no_cards_to_review') : '復習対象の単語が登録されていません。', 'info', 3000);
           return;
         }
-        if (typeof confirm === 'function' && !confirm('現在、復習期日を迎えた単語はありません（すべて定着中）。\n登録済みの単語で事前復習・総復習セッションを開始しますか？')) {
+        const confirmMsg = global.VocabI18n?.t ? global.VocabI18n.t('anki.advance_review_confirm') : '現在、復習期日を迎えた単語はありません（すべて定着中）。\n登録済みの単語で事前復習・総復習セッションを開始しますか？';
+        if (typeof confirm === 'function' && !confirm(confirmMsg)) {
           return;
         }
         reviewCandidates = allFiltered;
@@ -354,7 +355,9 @@
 
     const showToast = ctx.showToast || (global.VocabModal ? global.VocabModal.showToast : null);
     if (showToast) {
-      showToast(safeMode === 'cloze' ? '復習モード: 産出 (Cloze穴埋め) に切り替えました' : '復習モード: 認識 (単語→意味) に切り替えました', 'info', 2500);
+      const toastKey = safeMode === 'cloze' ? 'anki.mode_cloze_toast' : 'anki.mode_recog_toast';
+      const defaultMsg = safeMode === 'cloze' ? '復習モード: 産出 (Cloze穴埋め) に切り替えました' : '復習モード: 認識 (単語→意味) に切り替えました';
+      showToast(global.VocabI18n?.t ? global.VocabI18n.t(toastKey) : defaultMsg, 'info', 2500);
     }
 
     renderAnki(ctx);
@@ -532,10 +535,12 @@
     }
     if (val === target) {
       inp.style.borderColor = 'var(--ok)';
-      global.VocabModal?.showToast?.(`正解！「${cur.word}」を正確に産出できました。`, 'ok', 2500);
+      const msg = global.VocabI18n?.t ? global.VocabI18n.t('anki.cloze_correct', { word: cur.word }) : `正解！「${cur.word}」を正確に産出できました。`;
+      global.VocabModal?.showToast?.(msg, 'ok', 2500);
     } else if (usedForm && val === usedForm) {
       inp.style.borderColor = 'var(--ok)';
-      global.VocabModal?.showToast?.(`正解！文中の活用形「${cur.example.used_form}」（原形: ${cur.word}）を正確に産出できました。`, 'ok', 3000);
+      const msg = global.VocabI18n?.t ? global.VocabI18n.t('anki.cloze_form_correct', { form: cur.example.used_form, word: cur.word }) : `正解！文中の活用形「${cur.example.used_form}」（原形: ${cur.word}）を正確に産出できました。`;
+      global.VocabModal?.showToast?.(msg, 'ok', 3000);
     } else {
       const valStems = getStemVariants(val);
       const targetStems = getStemVariants(target);
@@ -547,13 +552,16 @@
 
       if (hasStemMatch) {
         inp.style.borderColor = 'var(--ok)';
-        global.VocabModal?.showToast?.(`ほぼ正解（ステミング・語根一致）！入力: ${rawVal} / 正解: ${cur.word}`, 'ok', 3500);
+        const msg = global.VocabI18n?.t ? global.VocabI18n.t('anki.cloze_stem_ok', { input: rawVal, word: cur.word }) : `ほぼ正解（ステミング・語根一致）！入力: ${rawVal} / 正解: ${cur.word}`;
+        global.VocabModal?.showToast?.(msg, 'ok', 3500);
       } else if (minDistance === 1 && (val.length >= 3 || target.length >= 3)) {
         inp.style.borderColor = 'var(--ok)';
-        global.VocabModal?.showToast?.(`ほぼ正解（1文字タイポ）！入力: ${rawVal} → 正解: ${cur.word}`, 'ok', 3500);
+        const msg = global.VocabI18n?.t ? global.VocabI18n.t('anki.cloze_typo_ok', { input: rawVal, word: cur.word }) : `ほぼ正解（1文字タイポ）！入力: ${rawVal} → 正解: ${cur.word}`;
+        global.VocabModal?.showToast?.(msg, 'ok', 3500);
       } else {
         inp.style.borderColor = 'var(--ng)';
-        global.VocabModal?.showToast?.(`惜しい！入力: ${rawVal} → 正解: ${cur.word}`, 'warn', 3500);
+        const msg = global.VocabI18n?.t ? global.VocabI18n.t('anki.cloze_near_miss', { input: rawVal, word: cur.word }) : `惜しい！入力: ${rawVal} → 正解: ${cur.word}`;
+        global.VocabModal?.showToast?.(msg, 'warn', 3500);
       }
     }
     showAns();
@@ -1251,7 +1259,7 @@
           <div class="analytics-retrievability-wrap">
             ${gaugeHtml}
             <div style="flex:1;font-size:12px;line-height:1.6">
-              <div style="font-weight:700;color:var(--t)">現在の記憶維持率: <strong style="color:${gradeColor}">${retrievability.avgPct}</strong></div>
+              <div style="font-weight:700;color:var(--t)"><span data-i18n="analytics.retrievability">現在の記憶維持率:</span> <strong style="color:${gradeColor}">${retrievability.avgPct}</strong></div>
               <div style="color:var(--s)">• 安定定着 (R≥90%): <strong>${retrievability.stable}語</strong></div>
               <div style="color:var(--s)">• 境界領域 (70%≤R&lt;90%): <strong>${retrievability.borderline}語</strong></div>
               <div style="color:var(--s)">• 忘却危機 (R&lt;70%): <strong style="color:#ef4444">${retrievability.critical}語</strong></div>
@@ -1261,11 +1269,11 @@
 
         <div class="analytics-card">
           <div class="analytics-card-hd">
-            <span>個人適応型 FSRS 重み</span>
+            <span data-i18n="analytics.fsrs_weights">個人適応型 FSRS 重み</span>
             ${optStatusHtml}
           </div>
           <div style="font-size:12px;color:var(--s);line-height:1.6">
-            <p style="margin:0 0 8px 0">直近${reviewLogs.length}件の復習ログに基づき、あなたの忘却速度に数理最適化された間隔で出題します。</p>
+            <p style="margin:0 0 8px 0" data-i18n="analytics.fsrs_weights_desc">直近${reviewLogs.length}件の復習ログに基づき、あなたの忘却速度に数理最適化された間隔で出題します。</p>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
               <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="安定度スケーリング係数">S-Scale: ${Number(fsrsWeights?.sScale || 1.0).toFixed(2)}x</span>
               <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="忘却曲線の減衰率（負の指数）">Decay: ${Number(fsrsWeights?.decayFactor || -0.5).toFixed(2)}</span>
@@ -1274,8 +1282,8 @@
               <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="Easy評価時の次回係数">Easy: ${Number(fsrsWeights?.wEasy || 1.6).toFixed(2)}x</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()">今すぐFSRS重みを最適化</button>
-              <button type="button" class="btn-o btn-xs" onclick="VocabAnkiView.triggerResetWeights()">標準重みにリセット</button>
+              <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()" data-i18n="analytics.btn_optimize">今すぐFSRS最適化を実行</button>
+              <button type="button" class="btn-o btn-xs" onclick="VocabAnkiView.triggerResetWeights()" data-i18n="analytics.btn_reset_weights">標準重みにリセット</button>
             </div>
           </div>
         </div>
@@ -1283,7 +1291,7 @@
 
       <div class="analytics-card" style="margin-top:14px">
         <div class="analytics-card-hd">
-          <span>学習コミットヒートマップ (過去9週間)</span>
+          <span data-i18n="analytics.heatmap_title">学習コミットヒートマップ (過去9週間)</span>
           <span style="font-size:12px;color:var(--s)">累計: <strong>${heatmap.totalReviews}語</strong> | 連続: <strong>${heatmap.streak}日</strong></span>
         </div>
         <div class="heatmap-wrap">
@@ -1304,13 +1312,13 @@
 
       <div class="analytics-card" style="margin-top:14px">
         <div class="analytics-card-hd">
-          <span>向こう14日間の日別予測復習負荷 (Workload Forecast)</span>
+          <span data-i18n="analytics.workload_title">向こう14日間の日別予測復習負荷 (Workload Forecast)</span>
           <span style="font-size:12px;color:var(--s)">14日合計: <strong>${workload.totalUpcoming}語</strong></span>
         </div>
         <div class="workload-chart">
           ${chartBarsHtml}
         </div>
-        <p style="margin:6px 0 0 0;font-size:11px;color:var(--m)">※各バーは各日に復習満期を迎える予定単語数です。緑は本日分、赤は30語以上の過密日を示します。</p>
+        <p style="margin:6px 0 0 0;font-size:11px;color:var(--m)" data-i18n="analytics.workload_note">※各バーは各日に復習満期を迎える予定単語数です。緑は本日分、赤は30語以上の過密日を示します。</p>
       </div>
     `;
   }
@@ -1319,6 +1327,9 @@
     const el = document.getElementById(containerId);
     if (!el) return;
     el.innerHTML = buildAnalyticsDashboardHtml();
+    if (global.VocabI18n?.applyI18nToDOM) {
+      global.VocabI18n.applyI18nToDOM(el);
+    }
   }
 
   function openAnalyticsModal() {
@@ -1351,19 +1362,23 @@
     const res = global.VocabSRS.optimizeFSRSWeights();
     const showToast = global.VocabModal?.showToast || alert;
     if (res.success) {
-      showToast(`FSRS重みを最適化しました（学習ログ ${res.count}件、予測精度向上: ${res.improvement}）。`, 'ok', 4000);
+      const msg = global.VocabI18n?.t ? global.VocabI18n.t('analytics.optimize_ok', { count: res.count, imp: res.improvement }) : `FSRS重みを最適化しました（学習ログ ${res.count}件、予測精度向上: ${res.improvement}）。`;
+      showToast(msg, 'ok', 4000);
       renderAnalyticsDashboard();
     } else {
-      showToast(res.message || '学習ログが20件以上蓄積されると最適化可能です。', 'info', 3500);
+      const msg = global.VocabI18n?.t ? global.VocabI18n.t('analytics.optimize_need_more') : (res.message || '学習ログが20件以上蓄積されると最適化可能です。');
+      showToast(msg, 'info', 3500);
     }
   }
 
   function triggerResetWeights() {
-    if (typeof confirm === 'function' && !confirm('FSRS重み係数をデフォルトの初期値にリセットしますか？')) return;
+    const confirmMsg = global.VocabI18n?.t ? global.VocabI18n.t('analytics.reset_confirm') : 'FSRS重み係数をデフォルトの初期値にリセットしますか？';
+    if (typeof confirm === 'function' && !confirm(confirmMsg)) return;
     if (global.VocabSRS?.resetUserFSRSWeights) {
       global.VocabSRS.resetUserFSRSWeights();
       const showToast = global.VocabModal?.showToast || alert;
-      showToast('FSRS重みを初期値にリセットしました。', 'ok');
+      const okMsg = global.VocabI18n?.t ? global.VocabI18n.t('analytics.reset_ok') : 'FSRS重みを初期値にリセットしました。';
+      showToast(okMsg, 'ok');
       renderAnalyticsDashboard();
     }
   }

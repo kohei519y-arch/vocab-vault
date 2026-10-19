@@ -710,14 +710,16 @@
   async function startStripeCheckout(priceId = null, options = {}) {
     // [P0-5 解決] Google Play アプリ内直接課金規約の遵守 (リーダーアプリ要件)
     if (isAndroidPlayStoreApp()) {
-      alert('【Google Play アプリをご利用のお客様へ】\nGoogle Playの決済規約に基づき、アプリ内からの直接Web決済は制限されています。\nProプランのご契約・管理は、SafariやChrome等のWebブラウザで公式サイト（Vocab Vault Web版）にアクセスし、本アカウントでログインの上お手続きください。\n（WebでPro化すると、本アプリでも即座にPro機能が自動反映されます）');
+      const notice = global.VocabI18n?.t ? global.VocabI18n.t('sync.play_store_notice') : '【Google Play アプリをご利用のお客様へ】\nGoogle Playの決済規約に基づき、アプリ内からの直接Web決済は制限されています。\nProプランのご契約・管理は、SafariやChrome等のWebブラウザで公式サイト（Vocab Vault Web版）にアクセスし、本アカウントでログインの上お手続きください。\n（WebでPro化すると、本アプリでも即座にPro機能が自動反映されます）';
+      alert(notice);
       return;
     }
 
     const cfg = getConfig();
     const token = await ensureValidToken();
     if (!cfg.configured || !token) {
-      alert('Stripe決済をご利用いただくには、まずアカウントでログイン（または新規登録）してください。設定画面を開きます。');
+      const loginMsg = global.VocabI18n?.t ? global.VocabI18n.t('sync.login_required_stripe') : 'Stripe決済をご利用いただくには、まずアカウントでログイン（または新規登録）してください。設定画面を開きます。';
+      alert(loginMsg);
       if (typeof global.openSettings === 'function') global.openSettings();
       else if (typeof openSettings === 'function') openSettings();
       return;
@@ -729,8 +731,9 @@
 
     const btn = document.getElementById('btnUpgradePro');
     const upsellBtn = document.getElementById('btnUpsellUpgrade');
-    if (btn) { btn.disabled = true; btn.textContent = '決済ページへ移動中...'; }
-    if (upsellBtn) { upsellBtn.disabled = true; upsellBtn.textContent = '決済ページへ移動中...'; }
+    const movingMsg = global.VocabI18n?.t ? global.VocabI18n.t('sync.moving_to_checkout', '決済ページへ移動中...') : '決済ページへ移動中...';
+    if (btn) { btn.disabled = true; btn.textContent = movingMsg; }
+    if (upsellBtn) { upsellBtn.disabled = true; upsellBtn.textContent = movingMsg; }
     try {
       const r = await fetch(`${cfg.url}/functions/v1/stripe-checkout`, {
         method: 'POST',
@@ -755,15 +758,16 @@
         window.location.href = data.url;
       }
     } catch (e) {
-      alert(`決済のご案内: ${e.message}`);
+      const errMsg = global.VocabI18n?.t ? global.VocabI18n.t('sync.checkout_error', { err: e.message }) : `決済のご案内: ${e.message}`;
+      alert(errMsg);
     } finally {
       if (btn) btn.disabled = false;
       if (upsellBtn) upsellBtn.disabled = false;
       if (global.VocabI18n?.updatePricingUI) {
         global.VocabI18n.updatePricingUI();
       } else {
-        if (btn) btn.textContent = 'Proにアップグレード (¥480/月)';
-        if (upsellBtn) upsellBtn.textContent = '今すぐProにアップグレード';
+        if (btn) btn.textContent = global.VocabI18n?.t ? global.VocabI18n.t('sync.btn_upgrade_price') : 'Proにアップグレード (¥480/月)';
+        if (upsellBtn) upsellBtn.textContent = global.VocabI18n?.t ? global.VocabI18n.t('sync.btn_upgrade_now') : '今すぐProにアップグレード';
       }
     }
   }
@@ -775,17 +779,17 @@
     const origTxt = btn ? btn.textContent : '';
 
     if (!isCloudReady()) {
-      showToast?.('Stripeポータルを開くにはログインが必要です。', 'warn');
+      showToast?.(global.VocabI18n?.t ? global.VocabI18n.t('sync.portal_login_required') : 'Stripeポータルを開くにはログインが必要です。', 'warn');
       return;
     }
     const token = await ensureValidToken();
     if (!cfg.configured || !token) {
-      showToast?.('クラウド同期が設定されていません。', 'warn');
+      showToast?.(global.VocabI18n?.t ? global.VocabI18n.t('sync.not_configured') : 'クラウド同期が設定されていません。', 'warn');
       return;
     }
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'ポータルへ接続中...';
+      btn.textContent = global.VocabI18n?.t ? global.VocabI18n.t('sync.connecting_portal', 'ポータルへ接続中...') : 'ポータルへ接続中...';
     }
     try {
       const r = await fetch(`${cfg.url}/functions/v1/stripe-portal`, {

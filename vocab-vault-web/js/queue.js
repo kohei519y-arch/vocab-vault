@@ -167,12 +167,19 @@
       const match = existingMatches[0];
       const jumpKey = match.homographIndex > 1 ? `${match.word}#${match.homographIndex}` : match.word;
       if (global.jumpToWord) global.jumpToWord(jumpKey, sLang);
-      if (global.showToast) global.showToast(`「${match.word}」はすでに登録されています（カードに移動しました）`, 'info');
+      if (global.showToast) {
+        const msg = global.VocabI18n?.t ? global.VocabI18n.t('queue.already_exists', { word: match.word }) : `「${match.word}」はすでに登録されています（カードに移動しました）`;
+        global.showToast(msg, 'info');
+      }
       return;
     }
 
     if (existingMatches.length > 0 && newItems.length > 0) {
-      if (global.showToast) global.showToast(`「${existingMatches.map(x => x.word).join(', ')}」はすでに登録済みのためスキップしました`, 'info');
+      if (global.showToast) {
+        const wordsStr = existingMatches.map(x => x.word).join(', ');
+        const msg = global.VocabI18n?.t ? global.VocabI18n.t('queue.skipped_duplicates', { words: wordsStr }) : `「${wordsStr}」はすでに登録済みのためスキップしました`;
+        global.showToast(msg, 'info');
+      }
     }
 
     const bLim = useHist ? 6 : 10;
@@ -211,7 +218,8 @@
 
     // 長大文字列（誤貼付など）のDoS防護
     if (raw.length > 2000) {
-      if (global.showToast) global.showToast('入力文字数が上限(2000文字)を超えているため、先頭部分のみ処理します', 'info');
+      const charLimitMsg = global.VocabI18n?.t ? global.VocabI18n.t('queue.char_limit_exceeded') : '入力文字数が上限(2000文字)を超えているため、先頭部分のみ処理します';
+      if (global.showToast) global.showToast(charLimitMsg, 'info');
       raw = raw.slice(0, 2000).trim();
     }
     const f = $('inFol')?.value?.trim() || '';
@@ -223,7 +231,8 @@
     const reqQ = App.reqQueue || [];
     const isAlreadyQueued = reqQ.some(q => !q.isDone && !q.isCancelled && q.items.some(it => makeLkFn(it.word, App.srcLang, 1) === makeLkFn(raw, App.srcLang, 1)));
     if (isAlreadyQueued) {
-      if (global.showToast) global.showToast(`「${raw}」は現在処理中です`, 'info');
+      const procMsg = global.VocabI18n?.t ? global.VocabI18n.t('queue.already_processing', { word: raw }) : `「${raw}」は現在処理中です`;
+      if (global.showToast) global.showToast(procMsg, 'info');
       if ($('wordSuggestBox')) $('wordSuggestBox').style.display = 'none';
       return;
     }
@@ -349,7 +358,7 @@
 
     const fetchWiktFn = global.VocabDictionary?.fetchWiktOne || global.fetchWiktOne;
     if (useWikt && fetchWiktFn) {
-      if (stEl) stEl.textContent = 'Wiktionaryから対象言語セクションを取得中...';
+      if (stEl) stEl.textContent = global.VocabI18n?.t ? global.VocabI18n.t('queue.fetching_wiktionary') : 'Wiktionaryから対象言語セクションを取得中...';
       await Promise.all(items.map(async (it, idx) => {
         try {
           const res = await fetchWiktFn(it.word, sLang);
@@ -464,14 +473,14 @@ etymology:${eInst}`;
       let returnedList = [], usedModel = '';
       const customKey = getKeyFn();
       if (customKey && callGeminiFn) {
-        if (stEl) stEl.textContent = 'カスタムBYOKキーでAI生成中...';
+        if (stEl) stEl.textContent = global.VocabI18n?.t ? global.VocabI18n.t('queue.generating_byok') : 'カスタムBYOKキーでAI生成中...';
         const res = await callGeminiFn(sys, `対象語(${items.length}件):${JSON.stringify(payload)}${fName ? `\n分野:${fName}` : ''}`, customKey, stEl, schema, useHist);
         const rawArr = await parseApiJsonFn(res);
         returnedList = Array.isArray(rawArr) ? rawArr : [rawArr];
         usedModel = res.usedModel || 'gemini-custom';
       } else if (global.VocabSync?.isProxyReady?.() && (typeof navigator === 'undefined' || navigator.onLine !== false)) {
         try {
-          if (stEl) stEl.textContent = 'クラウドAI (Gemini 3.8 Flash) で生成中...';
+          if (stEl) stEl.textContent = global.VocabI18n?.t ? global.VocabI18n.t('queue.generating_cloud') : 'クラウドAI (Gemini 3.8 Flash) で生成中...';
           const proxyRes = await global.VocabSync.callVocabGenerateProxy({
             lang: sLang,
             srcLang: sLang,
@@ -492,11 +501,12 @@ etymology:${eInst}`;
           }
           // [P0-4 解決] クォータ上限時は内蔵ダミー生成へ逃げず、直ちにアップセルモーダルを提示して安全に停止
           if (proxyErr.isQuotaExceeded || proxyErr.status === 429) {
+            const quotaMsg = global.VocabI18n?.t ? global.VocabI18n.t('queue.daily_quota_reached') : '本日の無料AI新規生成枠の上限に達しました。Proプランで無制限にご利用いただけます。';
             if (typeof global.openUpsellModal === 'function') {
-              global.openUpsellModal(proxyErr.message || '本日のAI新規生成無料枠（5語/日）に達しました。Proプランにアップグレードすると無制限に生成できます。');
+              global.openUpsellModal(proxyErr.message || quotaMsg);
             }
             if (global.showToast) {
-              global.showToast('本日の無料AI新規生成枠の上限に達しました。Proプランで無制限にご利用いただけます。', 'warn', 5000);
+              global.showToast(quotaMsg, 'warn', 5000);
             }
             if (card) {
               card.className = 'card gen-err';
@@ -515,7 +525,7 @@ etymology:${eInst}`;
 
           // クラウド一時障害・オフライン時のみ内蔵エンジン (Wiktionary & 組み込み語源ナレッジ & 形態素合成) へフォールバック
           if (genInternalFn) {
-            if (stEl) stEl.textContent = '内蔵AIエンジン (完全機密保護) で生成中...';
+            if (stEl) stEl.textContent = global.VocabI18n?.t ? global.VocabI18n.t('queue.generating_local') : '内蔵AIエンジン (完全機密保護) で生成中...';
             const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
             returnedList = Array.isArray(internalRes?.items) ? internalRes.items : [];
             usedModel = internalRes?.usedModel || 'builtin-ai-internal';
@@ -645,7 +655,9 @@ etymology:${eInst}`;
         try { loadFn(App.page || 1); } catch {}
       }
       if (global.showToast && matchedIndices.size > 0) {
-        global.showToast(`単語カード生成完了: ${items.map(x=>x.word).join(', ')}（${matchedIndices.size}語）を追加しました`, 'ok', 3500);
+        const wordsStr = items.map(x=>x.word).join(', ');
+        const toastMsg = global.VocabI18n?.t ? global.VocabI18n.t('queue.generation_complete', { words: wordsStr, count: matchedIndices.size }) : `単語カード生成完了: ${wordsStr}（${matchedIndices.size}語）を追加しました`;
+        global.showToast(toastMsg, 'ok', 3500);
       }
 
       if (global.VocabStorage && matchedIndices.size > 0) {
@@ -678,7 +690,13 @@ etymology:${eInst}`;
             });
           }
           const loadEl = card.querySelector ? card.querySelector('.load') : null;
-          if (loadEl) loadEl.innerHTML = `<span style="color:var(--warn)">未取得の語があります (${missingItems.map(x => esc(x.word)).join(', ')})</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">失敗分を再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">閉じる</button>`;
+          if (loadEl) {
+            const missingWordsStr = missingItems.map(x => esc(x.word)).join(', ');
+            const missingMsg = global.VocabI18n?.t ? global.VocabI18n.t('queue.missing_items', { words: missingWordsStr }) : `未取得の語があります (${missingWordsStr})`;
+            const retryTxt = global.VocabI18n?.t ? global.VocabI18n.t('btn.retry', '失敗分を再試行') : '失敗分を再試行';
+            const closeTxt = global.VocabI18n?.t ? global.VocabI18n.t('btn.close', '閉じる') : '閉じる';
+            loadEl.innerHTML = `<span style="color:var(--warn)">${missingMsg}</span><button type="button" class="btn-ac-o btn-xs" data-act="retry-batch">${retryTxt}</button><button type="button" class="btn-o btn-xs" data-act="close-load">${closeTxt}</button>`;
+          }
         }
         if ($('anki')?.style.display !== 'block' && loadFn) loadFn(1);
         return false;

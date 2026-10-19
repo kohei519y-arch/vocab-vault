@@ -95,11 +95,11 @@
     const rating = document.querySelector('input[name="fbRating"]:checked')?.value || '5';
 
     if (!content && category !== 'interview') {
-      alert('ご意見・ご感想をご記入ください。');
+      alert(global.VocabI18n?.t ? global.VocabI18n.t('fb.alert_fill') : 'ご意見・ご感想をご記入ください。');
       return;
     }
     if (category === 'interview' && !email) {
-      alert('ヒアリングにご協力いただける場合は、連絡先メールアドレスをご記入ください。');
+      alert(global.VocabI18n?.t ? global.VocabI18n.t('fb.alert_email') : 'ヒアリングにご協力いただける場合は、連絡先メールアドレスをご記入ください。');
       return;
     }
 
@@ -116,7 +116,7 @@
     const btn = document.getElementById('btnSubmitFb');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = '送信中...';
+      btn.textContent = global.VocabI18n?.t ? global.VocabI18n.t('fb.sending') : '送信中...';
     }
 
     let sent = false;
@@ -134,10 +134,10 @@
 
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'フィードバックを送信';
+      btn.textContent = global.VocabI18n?.t ? global.VocabI18n.t('fb.submit') : 'フィードバックを送信';
     }
 
-    alert('貴重なご意見をありがとうございます！今後の機能開発およびサービス向上に活用させていただきます。');
+    alert(global.VocabI18n?.t ? global.VocabI18n.t('fb.alert_thanks') : '貴重なご意見をありがとうございます！今後の機能開発およびサービス向上に活用させていただきます。');
     closeFeedbackModal();
     const form = document.getElementById('feedbackForm');
     if (form) form.reset();

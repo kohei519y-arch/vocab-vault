@@ -590,11 +590,15 @@
       posGroups.slice(1).forEach(g => { if (matchPos(e, g.id)) pC[g.id]++; });
     });
 
+    const allFieldsLbl = global.VocabI18n?.t ? global.VocabI18n.t('side.all_fields') : 'すべてのタイトル';
+    const allCatsLbl = global.VocabI18n?.t ? global.VocabI18n.t('side.all_cats') : 'すべてのカテゴリ';
+    const translateCat = global.VocabI18n?.translateCategory || (c => c);
+
     if ($('treeStat')) $('treeStat').innerHTML = statGroups.map(g => mkTreeItem('stat', g.id, g.label, sC[g.id], App.statF)).join('');
-    if ($('treeFol')) $('treeFol').innerHTML = mkTreeItem('fol', 'all', 'すべてのタイトル', entries.length, App.fol) + [...fM.entries()].map(([f, c]) => mkTreeItem('fol', f, f, c, App.fol)).join('');
+    if ($('treeFol')) $('treeFol').innerHTML = mkTreeItem('fol', 'all', allFieldsLbl, entries.length, App.fol) + [...fM.entries()].map(([f, c]) => mkTreeItem('fol', f, f, c, App.fol)).join('');
     if ($('treePos')) $('treePos').innerHTML = posGroups.map(g => mkTreeItem('pos', g.id, g.label, pC[g.id], App.posF)).join('');
-    if ($('treeCat')) $('treeCat').innerHTML = mkTreeItem('cat', 'all', 'すべてのカテゴリ', entries.length, App.cat)
-      + [...cats].sort((a, b) => (cM.get(b) ?? 0) - (cM.get(a) ?? 0)).filter(c => (cM.get(c) ?? 0) > 0 || App.cat === c).map(c => mkTreeItem('cat', c, c, cM.get(c) ?? 0, App.cat)).join('');
+    if ($('treeCat')) $('treeCat').innerHTML = mkTreeItem('cat', 'all', allCatsLbl, entries.length, App.cat)
+      + [...cats].sort((a, b) => (cM.get(b) ?? 0) - (cM.get(a) ?? 0)).filter(c => (cM.get(c) ?? 0) > 0 || App.cat === c).map(c => mkTreeItem('cat', c, translateCat(c), cM.get(c) ?? 0, App.cat)).join('');
     if (global.enhanceA11y) global.enhanceA11y($('secLang')?.parentElement || document);
   }
 

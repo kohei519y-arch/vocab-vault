@@ -672,8 +672,10 @@
         const meaning = curItem.meanings?.[0]?.text || '';
         const curNum = playlistState.currentIndex + 1;
         const totalNum = playlistState.items.length;
-        const stateTxt = playlistState.isPaused ? '（一時停止中）' : '';
-        apMeta.textContent = `${curNum}/${totalNum}語 ${meaning ? '・' + meaning : ''} ${stateTxt}`;
+        const isJa = global.VocabI18n ? global.VocabI18n.getLocale() === 'ja' : true;
+        const stateTxt = playlistState.isPaused ? (isJa ? '（一時停止中）' : ' (Paused)') : '';
+        const unit = isJa ? '語' : '';
+        apMeta.textContent = `${curNum}/${totalNum}${unit} ${meaning ? '・' + meaning : ''}${stateTxt}`;
       }
       if (apProgFill) {
         const pct = Math.round(((playlistState.currentIndex + 1) / Math.max(1, playlistState.items.length)) * 100);
@@ -720,7 +722,8 @@
         // 全単語再生完了
         stopAudioPlaylist();
         if (global.VocabModal?.showToast) {
-          global.VocabModal.showToast('耳学プレイリストの再生が完了しました。', 'ok', 4000);
+          const msg = global.VocabI18n?.t ? global.VocabI18n.t('speech.playback_done') : '耳学プレイリストの再生が完了しました。';
+          global.VocabModal.showToast(msg, 'ok', 4000);
         }
         break;
       }
@@ -817,7 +820,8 @@
 
     if (!playList || !playList.length) {
       if (global.VocabModal?.showToast) {
-        global.VocabModal.showToast('再生可能な単語が見つかりません。単語を登録またはフィルタを解除してください。', 'warn', 3500);
+        const msg = global.VocabI18n?.t ? global.VocabI18n.t('speech.no_words') : '再生可能な単語が見つかりません。単語を登録またはフィルタを解除してください。';
+        global.VocabModal.showToast(msg, 'warn', 3500);
       }
       return;
     }
@@ -831,7 +835,8 @@
     updatePlaylistUI();
 
     if (global.VocabModal?.showToast) {
-      global.VocabModal.showToast(`耳学・連続リスニングを開始しました（全${playList.length}語）。`, 'ok', 3000);
+      const msg = global.VocabI18n?.t ? global.VocabI18n.t('speech.started', { count: playList.length }) : `耳学・連続リスニングを開始しました（全${playList.length}語）。`;
+      global.VocabModal.showToast(msg, 'ok', 3000);
     }
 
     runPlaylistLoop(playlistState.sessionToken);

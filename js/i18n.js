@@ -318,6 +318,8 @@
       'side.xlang_btn': '全言語横断',
       'side.xlang_title': '全言語ペアを横断検索',
       'side.reset_btn': '解除',
+      'side.all_fields': 'すべてのタイトル',
+      'side.all_cats': 'すべてのカテゴリ',
 
       // カテゴリ
       'cat.philosophy': '哲学・思想',
@@ -347,7 +349,278 @@
       'toast.saved': '保存しました',
       'toast.sync_success': 'クラウドとの差分同期が完了しました',
       'toast.unlocked': 'スキルを習得して単語帳に追加しました',
-      'toast.eiken_all_unlocked': '語根の語彙スキルを一括習得しました'
+      'toast.eiken_all_unlocked': '語根の語彙スキルを一括習得しました',
+
+      // Anki 復習 UI 補完
+      'anki.exit': '終了してリストに戻る',
+      'anki.again_btn': 'もう一度',
+      'anki.good_btn': '覚えた',
+      'anki.prog_complete': '本日の復習セッション完了',
+      'anki.no_due_title': '現在、復習期日を迎えた単語はありません',
+      'anki.advance_review_confirm': '現在、復習期日を迎えた単語はありません（すべて定着中）。\n登録済みの単語で事前復習・総復習セッションを開始しますか？',
+      'anki.no_cards_to_review': '復習対象の単語が登録されていません。',
+      'anki.cap_toast': '学習継続のため、本日の出題上限は {cap} 語に設定されています。',
+      'anki.mode_recog_toast': '復習モード: 認識 (単語→意味) に切り替えました',
+      'anki.mode_cloze_toast': '復習モード: 産出 (Cloze穴埋め) に切り替えました',
+      'anki.cloze_correct': '正解！「{word}」を正確に産出できました。',
+      'anki.cloze_form_correct': '正解！文中の活用形「{form}」（原形: {word}）を正確に産出できました。',
+      'anki.cloze_stem_ok': 'ほぼ正解（ステミング・語根一致）！入力: {input} / 正解: {word}',
+      'anki.cloze_typo_ok': 'ほぼ正解（1文字タイポ）！入力: {input} → 正解: {word}',
+      'anki.cloze_near_miss': '惜しい！入力: {input} → 正解: {word}',
+
+      // アナリティクス・ダッシュボード
+      'analytics.title': '忘却予測カレンダー ＆ アナリティクス・ダッシュボード',
+      'analytics.retrievability': '現在の記憶維持率:',
+      'analytics.fsrs_weights': '個人適応型 FSRS 重み',
+      'analytics.fsrs_weights_desc': '直近の学習ログに基づき、あなたの忘却速度に数理最適化された間隔で出題します。',
+      'analytics.btn_optimize': '今すぐFSRS最適化を実行',
+      'analytics.btn_reset_weights': '標準重みにリセット',
+      'analytics.heatmap_title': '学習コミットヒートマップ (過去9週間)',
+      'analytics.workload_title': '向こう14日間の日別予測復習負荷 (Workload Forecast)',
+      'analytics.workload_note': '※各バーは各日に復習満期を迎える予定単語数です。緑は本日分、赤は30語以上の過密日を示します。',
+      'analytics.reset_confirm': 'FSRS重み係数をデフォルトの初期値にリセットしますか？',
+      'analytics.reset_ok': 'FSRS重みを初期値にリセットしました。',
+      'analytics.optimize_ok': 'FSRS重みを最適化しました（学習ログ {count}件、予測精度向上: {imp}）。',
+      'analytics.optimize_need_more': '学習ログが20件以上蓄積されると最適化可能です。',
+
+      // フィードバックモーダル
+      'fb.title': 'ご意見・フィードバック ＆ ユーザーヒアリング',
+      'fb.type_lbl': '投稿種別',
+      'fb.opt_opinion': '機能・使い勝手のご意見',
+      'fb.opt_interview': '30分オンラインヒアリングに参加希望（謝礼あり）',
+      'fb.opt_feature': '欲しい機能・言語の要望',
+      'fb.opt_bug': '不具合・表示崩れの報告',
+      'fb.sat_lbl': '本アプリの満足度',
+      'fb.sat_very': '大変満足',
+      'fb.sat_sat': '満足',
+      'fb.sat_neutral': '普通',
+      'fb.sat_unsat': '不満',
+      'fb.content_lbl': 'ご意見・詳細内容',
+      'fb.content_ph': '「語源解説が分かりやすかった」「フランス語の活用形をこう表示してほしい」「月額480円なら課金したい」など、率直なご意見をお願いします...',
+      'fb.wtp_lbl': '適正と感じる月額料金（任意）',
+      'fb.wtp_none': '未選択',
+      'fb.wtp_free': '無料のみ（課金はしない）',
+      'fb.wtp_480': '〜480円 / 月（Proプラン適正価格）',
+      'fb.wtp_980': '〜980円 / 月',
+      'fb.wtp_1500': '〜1,500円 / 月',
+      'fb.wtp_lifetime': '買い切り型なら払いたい',
+      'fb.email_lbl': 'メールアドレス（ヒアリング希望者または返信希望時）',
+      'fb.cancel': 'キャンセル',
+      'fb.submit': 'フィードバックを送信',
+      'fb.sending': '送信中...',
+      'fb.alert_fill': 'ご意見・ご感想をご記入ください。',
+      'fb.alert_email': 'ヒアリングにご協力いただける場合は、連絡先メールアドレスをご記入ください。',
+      'fb.alert_thanks': '貴重なご意見をありがとうございます！今後の機能開発およびサービス向上に活用させていただきます。',
+
+      // 単語編集モーダル
+      'edit.title': '単語カードの完全編集（復習履歴は維持されます）',
+      'edit.word_lbl': '見出し語',
+      'edit.homo_lbl': '同形#',
+      'edit.homo_title': '同形異義語の識別番号（通常は1）',
+      'edit.pho_lbl': '発音記号 (IPA)',
+      'edit.gram_lbl': '屈折・変化形 (複数形/三基本形)',
+      'edit.gram_ph': '例: l\'arbre, pl. -s',
+      'edit.cat_lbl': 'カテゴリ',
+      'edit.fol_lbl': 'タイトル・分野',
+      'edit.conf_lbl': '語源の確実性',
+      'edit.conf_none': '未設定 (変更しない)',
+      'edit.conf_certain': '確実 (certain)',
+      'edit.conf_probable': '有力 (probable)',
+      'edit.conf_disputed': '諸説 (disputed)',
+      'edit.conf_unknown': '不明 (unknown)',
+      'edit.meanings_lbl': '意味（1行に1つ「品詞 | 意味」形式。例: N[m] | 木、樹木）',
+      'edit.hist_lbl': '歴史・専門補足（赤字括弧内に表示）',
+      'edit.core_lbl': 'コアイメージ',
+      'edit.ety_lbl': '語源・概念史解説',
+      'edit.tags_lbl': '語源タグ（カンマ区切り。例: ラテン語: arbor (木)）',
+      'edit.ex_foreign_lbl': '例文 (外国語)',
+      'edit.ex_used_lbl': '文中活用形',
+      'edit.ex_used_title': '例文中で使われている活用形',
+      'edit.ex_trans_lbl': '例文和訳（強調は <b>語</b>）',
+      'edit.phrases_lbl': '重要表現（1行1件: 外国語表現 | 和訳）',
+      'edit.deriv_lbl': '派生語（1行1件: 単語 | IPA | 品詞 | 意味 | 用例 | 用例訳）',
+      'edit.save': '変更を保存',
+      'edit.cancel': 'キャンセル',
+      'edit.conflict_confirm': '既に同じ見出し語・同形番号のカード「{word} (#{homo})」が存在します。\n別カードとして残す場合は「キャンセル」、既存カードを上書き統合する場合は「OK」を押してください。',
+      'edit.word_required': '見出し語を入力してください。',
+      'edit.updated': '「{word}」を更新しました',
+
+      // 長文・画像抽出モーダル
+      'ext.title': '長文・画像からレベル別単語ピックアップ',
+      'ext.level_lbl': '対象者のレベル',
+      'ext.max_lbl': '最大抽出数',
+      'ext.fol_lbl': '保存先タイトル（任意）',
+      'ext.text_lbl': '解析する長文テキスト',
+      'ext.text_ph': '英語・仏語・独語などの記事、論文、書籍の文章を貼り付けてください（8文字以上）...',
+      'ext.camera_btn': 'カメラで撮影 / 画像読込 (OCR)',
+      'ext.select_btn': '選択',
+      'ext.extract_btn': '単語を自動抽出',
+      'ext.ocr_loading': 'ブラウザ内蔵OCRエンジンで文字起こし中...',
+      'ext.need_text': '解析する文章を入力してください（8文字以上）。',
+      'ext.limit_confirm': '文字数が {len} 字あります。先頭 12,000 字のみを解析対象としますがよろしいですか？',
+      'ext.quota_reach': '本日の画像OCR・長文抽出無料枠（5回/日）に達しました。Proで無制限。',
+      'ext.no_words_found': '対象の文章から抽出可能な単語が見つかりませんでした。別の文章をお試しください。',
+      'ext.ocr_dropzone_title': '画像・写真から文字起こし（OCR）',
+      'ext.ocr_dropzone_sub': '画像選択 / ドロップ / スクショ貼り付け (Cmd+V)',
+      'ext.select_unregistered': '未登録のみ選択',
+      'ext.select_all': 'すべて選択',
+      'ext.deselect_all': '全解除',
+      'ext.commit_btn': '選択した単語を単語帳に登録',
+      'ext.commit_batch': '選択した {n} 語を一括登録',
+
+      // リスニング・耳学プレイヤー
+      'speech.idle': '再生待機中',
+      'speech.prev_title': '前の単語 (J)',
+      'speech.play_title': '再生 / 一時停止 (K / Space)',
+      'speech.next_title': '次の単語 (L)',
+      'speech.close_title': '耳学モードを終了 (Esc)',
+      'speech.playback_done': '耳学プレイリストの再生が完了しました。',
+      'speech.no_words': '再生可能な単語が見つかりません。単語を登録またはフィルタを解除してください。',
+      'speech.started': '耳学・連続リスニングを開始しました（全{count}語）。',
+
+      // キュー・生成ステータス
+      'queue.fetching_wiktionary': 'Wiktionaryから対象言語セクションを取得中...',
+      'queue.generating_cloud': 'クラウドAI (Gemini 3.8 Flash) で生成中...',
+      'queue.generating_local': '内蔵AIエンジン (完全機密保護) で生成中...',
+      'queue.generating_byok': 'カスタムBYOKキーでAI生成中...',
+      'queue.already_exists': '「{word}」はすでに登録されています（カードに移動しました）',
+      'queue.daily_quota_reached': '本日の無料AI新規生成枠の上限に達しました。Proプランで無制限にご利用いただけます。',
+      'queue.batch_complete': '単語カード生成完了: {count} 語を追加しました',
+
+      // ナビゲーション・キーボード
+      'nav.search_kbd': '/ または Alt+F',
+      'shortcuts.title': 'キーボードショートカット',
+      'shortcuts.close': '閉じる',
+      // ショートカット一覧詳細
+      'shortcuts.th_key': 'キー',
+      'shortcuts.th_normal': '機能（通常一覧モード）',
+      'shortcuts.next_card': '次の単語カードへ移動・フォーカス',
+      'shortcuts.prev_card': '前の単語カードへ移動・フォーカス',
+      'shortcuts.prev_page': '前のページへ切り替え',
+      'shortcuts.next_page': '次のページへ切り替え',
+      'shortcuts.first_page': '最初のページ（Page 1）へジャンプ',
+      'shortcuts.last_page': '最後のページへジャンプ',
+      'shortcuts.pronounce': 'フォーカス中の単語を発音・音声再生',
+      'shortcuts.edit': 'フォーカス中の単語を編集モーダルで開く',
+      'shortcuts.delete': 'フォーカス中の単語を削除',
+      'shortcuts.search': '検索バーに即座にフォーカス',
+      'shortcuts.add': '新規単語入力欄へフォーカス',
+      'shortcuts.review': '暗記復習 (Anki) モードを開始',
+      'shortcuts.audio': '耳学モード（Audio Playlist 連続自動リスニング）を開始 / 停止',
+      'shortcuts.analytics': '忘却予測 ＆ 学習アナリティクスを開く',
+      'shortcuts.graph': '語根ネットワーク (Graph View) を表示',
+      'shortcuts.help': 'このショートカット一覧を開く',
+      'shortcuts.esc': 'モーダルを閉じる / フォーカス解除',
+      'shortcuts.th_anki': '機能（Anki復習モード）',
+      'shortcuts.anki_mode': '復習モード切替（認識 ⇄ 産出 Cloze穴埋め）',
+      'shortcuts.anki_show': '解答・裏面を表示',
+      'shortcuts.anki_rate': '復習評価（1:もう一度 / 2:難しい / 3:普通 / 4:簡単）',
+      'shortcuts.anki_replay': '音声を再発音',
+      'shortcuts.anki_undo': '直前の回答を取り消し (Undo)',
+      'shortcuts.anki_exit': '復習モードを終了して一覧へ戻る',
+      'shortcuts.th_graph': '機能（語根ネットワーク Graph View）',
+      'shortcuts.graph_view': 'ビュー切替（1:ネットワーク / 2:系統樹ツリー / 3:マインドマップ / 4:接頭辞マトリクス）',
+      'shortcuts.graph_water': '枯れ枝の一括水やり復習（赤・黄色の要復習単語を即時Anki復習）',
+      'shortcuts.graph_mask': '赤シート穴埋め暗記テスト（意味を伏せて想起テスト）',
+      'shortcuts.graph_zoom': 'グラフの拡大 / 縮小',
+      'shortcuts.graph_reset': '等倍(100%)表示・中央配置',
+      'shortcuts.graph_fit': '全ノードが画面に収まるよう自動調整 (Fit)',
+      'shortcuts.graph_pan': 'キャンバスのパン移動 / ノードの牽引移動',
+      'shortcuts.tour_btn': 'ガイドツアーを見る',
+
+      // 法務・ポリシーモーダル
+      'legal.title': '法務・ポリシー情報',
+      'legal.tab_terms': '利用規約',
+      'legal.tab_privacy': 'プライバシーポリシー',
+      'legal.tab_tokusho': '特定商取引法に基づく表記',
+      'legal.link_privacy': 'プライバシー(独立URL)',
+      'legal.link_terms': '利用規約(独立URL)',
+      'legal.link_tokusho': '特商法(独立URL)',
+      'legal.close': '閉じる',
+
+      // Ankiインポートモーダル
+      'anki_import.title': 'Ankiデッキ (.apkg / TSV / CSV) インポート (FSRSマッピング)',
+      'anki_import.file_lbl': 'APKG / TSV / CSV ファイルを選択:',
+      'anki_import.paste_lbl': 'またはテキストを貼り付け:',
+      'anki_import.preview_lbl': 'インポートプレビュー:',
+      'anki_import.preview_empty': 'APKGファイルまたはTSV/CSVテキストを選択してください',
+      'anki_import.btn_run': 'インポート実行',
+
+      // 共有デッキモーダル
+      'share_deck.title': '共有デッキのインポート',
+      'share_deck.btn_add': 'マイライブラリに追加',
+
+      // PWA / SW更新バナー
+      'sw.update_available': '最新バージョンが利用可能です',
+      'sw.update_later': 'あとで',
+      'sw.update_now': '今すぐ更新して再読込',
+
+      // オンボーディングツアー
+      'tour.title': 'Vocab Vault ガイドツアー',
+      'tour.btn_skip': 'スキップ',
+      'tour.btn_prev': '前へ',
+      'tour.btn_next': '次へ',
+      'tour.btn_finish': '学習を開始する',
+      'tour.mode_simple': 'シンプルモード',
+      'tour.mode_academic': '学術・詳細モード',
+
+      // OCR・長文抽出補完
+      'ext.screenshot': 'スクリーンショット',
+      'ext.ocr_again': '文字起こし',
+      'ext.ocr_ai_title': '高精度 AI 文字起こし (Gemini Vision OCR)',
+      'ext.ocr_btn_setup': '設定して文字起こし',
+      'ext.ocr_get_key': '無料キー取得',
+      'ext.ocr_privacy_note': '※入力された本文や画像は解析のため AI エンドポイントへ送信されます。機密情報は入力しないでください。',
+      'ext.extracted_words': '抽出された単語',
+      'ext.ocr_done_suffix': '（文字起こし完了）',
+      'ext.ocr_success': '文字起こしが完了しました（{count}字抽出）',
+      'ext.ocr_error': 'OCRエラー: {err}',
+      'ext.extract_error': '抽出エラー: {err}',
+      'ext.ocr_loading_gemini': 'Gemini Vision で文字起こし中...',
+      'ext.ocr_loading_cloud': 'クラウドAI (Gemini Vision) で高精度文字起こし中...',
+      'ext.fallback_local_toast': 'AI通信が一時的に混雑しているため、内蔵エンジンで単語を抽出しました。',
+
+      // アップセルモーダル補完
+      'upsell.modal_title': 'Vocab Vault Pro で無制限解放',
+      'upsell.annual_badge': '(2ヶ月無料)',
+      'upsell.monthly_badge': '月払い',
+      'upsell.annual_btn': '年払い',
+      'upsell.cancel_anytime': 'いつでもワンクリックで解約可能（縛りなし）',
+      'upsell.stripe_secure': '※安全なStripe SSL暗号化決済ページへ移動します',
+      'upsell.legal_title': '【定期課金・ご契約条件に関する表記】',
+
+      // キュー・メッセージ補完
+      'queue.skipped_duplicates': '「{words}」はすでに登録済みのためスキップしました',
+      'queue.char_limit_exceeded': '入力文字数が上限(2000文字)を超えているため、先頭部分のみ処理します',
+      'queue.already_processing': '「{word}」は現在処理中です',
+      'queue.generation_complete': '単語カード生成完了: {words}（{count}語）を追加しました',
+      'queue.missing_items': '未取得の語があります ({words})。再試行してください。',
+
+      // 設定・BYOK補完
+      'settings.byok_cleared': 'ローカルAPIキーを消去しました。',
+      'settings.byok_connected': '接続確認完了 ({count}モデル)',
+      'settings.byok_error': '接続エラー: {err}',
+      'edit.manual_or_legacy': '手動または旧版データ',
+
+      // Stripe決済・同期補完
+      'sync.play_store_notice': '【Google Play アプリをご利用のお客様へ】\\nGoogle Playの決済規約に基づき、アプリ内からの直接Web決済は制限されています。\\nProプランのご契約・管理は、SafariやChrome等のWebブラウザで公式サイト（Vocab Vault Web版）にアクセスし、本アカウントでログインの上お手続きください。\\n（WebでPro化すると、本アプリでも即座にPro機能が自動反映されます）',
+      'sync.login_required_stripe': 'Stripe決済をご利用いただくには、まずアカウントでログイン（または新規登録）してください。設定画面を開きます。',
+      'sync.moving_to_checkout': '決済ページへ移動中...',
+      'sync.checkout_error': '決済のご案内: {err}',
+      'sync.btn_upgrade_price': 'Proにアップグレード (¥480/月)',
+      'sync.btn_upgrade_now': '今すぐProにアップグレード',
+      'sync.connecting_portal': 'ポータルへ接続中...',
+      'sync.portal_login_required': 'Stripeポータルを開くにはログインが必要です。',
+      'sync.not_configured': 'クラウド同期が設定されていません。',
+
+
+      // 共通ボタン・ラベル
+      'btn.close': '閉じる',
+      'btn.cancel': 'キャンセル',
+      'btn.save': '保存',
+      'btn.delete': '削除',
+      'btn.confirm': '確認',
+      'btn.retry': '失敗分を再試行'
     },
 
     en: {
@@ -657,6 +930,8 @@
       'side.xlang_btn': 'Cross-Language',
       'side.xlang_title': 'Search across all language pairs',
       'side.reset_btn': 'Reset',
+      'side.all_fields': 'All Titles',
+      'side.all_cats': 'All Categories',
 
       // Categories
       'cat.philosophy': 'Philosophy & Thought',
@@ -686,7 +961,278 @@
       'toast.saved': 'Saved successfully',
       'toast.sync_success': 'Cloud differential sync completed',
       'toast.unlocked': 'Skill learned and added to vocabulary',
-      'toast.eiken_all_unlocked': 'All branch skills for this root learned'
+      'toast.eiken_all_unlocked': 'All branch skills for this root learned',
+
+      // Anki Review UI
+      'anki.exit': 'Exit to List',
+      'anki.again_btn': 'Again',
+      'anki.good_btn': 'Good',
+      'anki.prog_complete': 'Daily Review Session Complete',
+      'anki.no_due_title': 'No Cards Due for Review Right Now',
+      'anki.advance_review_confirm': 'There are no cards due for review right now (all retained).\nWould you like to start an advance review session with your existing words?',
+      'anki.no_cards_to_review': 'No vocabulary cards registered for review.',
+      'anki.cap_toast': 'Daily review limit is set to {cap} words to ensure sustainable learning.',
+      'anki.mode_recog_toast': 'Review Mode: Recognition (Word → Meaning)',
+      'anki.mode_cloze_toast': 'Review Mode: Production (Cloze Fill-in)',
+      'anki.cloze_correct': 'Correct! "{word}" produced accurately.',
+      'anki.cloze_form_correct': 'Correct! Inflected form "{form}" (base: {word}) produced accurately.',
+      'anki.cloze_stem_ok': 'Close match (stem/root match)! Input: {input} / Answer: {word}',
+      'anki.cloze_typo_ok': 'Close match (1-letter typo)! Input: {input} → Answer: {word}',
+      'anki.cloze_near_miss': 'Almost! Input: {input} → Answer: {word}',
+
+      // Analytics & Dashboard
+      'analytics.title': 'Retention Calendar & Analytics Dashboard',
+      'analytics.retrievability': 'Current Retention Rate:',
+      'analytics.fsrs_weights': 'Personalized FSRS Weights',
+      'analytics.fsrs_weights_desc': 'Reviews are scheduled based on mathematical optimization of your forgetting curve.',
+      'analytics.btn_optimize': 'Run FSRS Optimization Now',
+      'analytics.btn_reset_weights': 'Reset to Standard Weights',
+      'analytics.heatmap_title': 'Study Commit Heatmap (Past 9 Weeks)',
+      'analytics.workload_title': '14-Day Predicted Review Load (Workload Forecast)',
+      'analytics.workload_note': '* Bars indicate scheduled reviews due each day. Green indicates today; red indicates overload (30+ words).',
+      'analytics.reset_confirm': 'Reset FSRS weight parameters to default initial values?',
+      'analytics.reset_ok': 'FSRS weights reset to default values.',
+      'analytics.optimize_ok': 'FSRS weights optimized ({count} review logs, prediction accuracy gain: {imp}).',
+      'analytics.optimize_need_more': 'At least 20 review logs are required to run optimization.',
+
+      // Feedback Modal
+      'fb.title': 'Feedback & User Hearing',
+      'fb.type_lbl': 'Feedback Category',
+      'fb.opt_opinion': 'Feature / Usability Feedback',
+      'fb.opt_interview': 'Apply for 30-min Online Interview (Reward included)',
+      'fb.opt_feature': 'Feature / Language Request',
+      'fb.opt_bug': 'Bug / UI Glitch Report',
+      'fb.sat_lbl': 'App Satisfaction',
+      'fb.sat_very': 'Very Satisfied',
+      'fb.sat_sat': 'Satisfied',
+      'fb.sat_neutral': 'Neutral',
+      'fb.sat_unsat': 'Dissatisfied',
+      'fb.content_lbl': 'Feedback & Details',
+      'fb.content_ph': 'Share your candid thoughts: "The etymology explanations were helpful", "I want French verb conjugations shown this way", "I would pay $3.99/mo for this"...',
+      'fb.wtp_lbl': 'Fair Monthly Price (Optional)',
+      'fb.wtp_none': 'Not Selected',
+      'fb.wtp_free': 'Free Only (Will not pay)',
+      'fb.wtp_480': '~$3.99 / mo (Fair Pro Price)',
+      'fb.wtp_980': '~$7.99 / mo',
+      'fb.wtp_1500': '~$12.99 / mo',
+      'fb.wtp_lifetime': 'Prefer Lifetime Purchase',
+      'fb.email_lbl': 'Email Address (for interview participants or follow-up)',
+      'fb.cancel': 'Cancel',
+      'fb.submit': 'Submit Feedback',
+      'fb.sending': 'Submitting...',
+      'fb.alert_fill': 'Please enter your comments or feedback.',
+      'fb.alert_email': 'Please enter your email address if you would like to participate in an interview.',
+      'fb.alert_thanks': 'Thank you for your valuable feedback! We will use it to continuously improve Vocab Vault.',
+
+      // Word Edit Modal
+      'edit.title': 'Edit Word Card (Review history preserved)',
+      'edit.word_lbl': 'Word',
+      'edit.homo_lbl': 'Homograph #',
+      'edit.homo_title': 'Homograph index (normally 1)',
+      'edit.pho_lbl': 'Phonetic (IPA)',
+      'edit.gram_lbl': 'Inflections (Plural / Principal parts)',
+      'edit.gram_ph': 'e.g. l\'arbre, pl. -s',
+      'edit.cat_lbl': 'Category',
+      'edit.fol_lbl': 'Title / Field',
+      'edit.conf_lbl': 'Etymology Certainty',
+      'edit.conf_none': 'Unset (Do not change)',
+      'edit.conf_certain': 'Certain',
+      'edit.conf_probable': 'Probable',
+      'edit.conf_disputed': 'Disputed',
+      'edit.conf_unknown': 'Unknown',
+      'edit.meanings_lbl': 'Meanings (one per line "POS | Meaning". e.g. N[m] | tree)',
+      'edit.hist_lbl': 'Historical / Academic Note (Shown in red brackets)',
+      'edit.core_lbl': 'Core Image',
+      'edit.ety_lbl': 'Etymology & Conceptual History',
+      'edit.tags_lbl': 'Etymology Tags (comma separated, e.g. Latin: arbor)',
+      'edit.ex_foreign_lbl': 'Example Sentence (Foreign)',
+      'edit.ex_used_lbl': 'Used Inflected Form',
+      'edit.ex_used_title': 'Inflected form used in the example sentence',
+      'edit.ex_trans_lbl': 'Translation (Bold target with <b>word</b>)',
+      'edit.phrases_lbl': 'Key Expressions (One per line: Expression | Translation)',
+      'edit.deriv_lbl': 'Derivatives (One per line: Word | IPA | POS | Meaning | Example | Example Trans)',
+      'edit.save': 'Save Changes',
+      'edit.cancel': 'Cancel',
+      'edit.conflict_confirm': 'A card for "{word} (#{homo})" already exists.\nPress "Cancel" to keep as separate card, or "OK" to overwrite and merge.',
+      'edit.word_required': 'Please enter a headword.',
+      'edit.updated': 'Updated "{word}"',
+
+      // Text & OCR Extraction Modal
+      'ext.title': 'Extract Vocabulary by Level from Text or Image',
+      'ext.level_lbl': 'Target Level',
+      'ext.max_lbl': 'Max Words',
+      'ext.fol_lbl': 'Target Title / Field (Optional)',
+      'ext.text_lbl': 'Text to Analyze',
+      'ext.text_ph': 'Paste articles, research papers, or book excerpts in English, French, German, etc. (min 8 chars)...',
+      'ext.camera_btn': 'Capture',
+      'ext.select_btn': 'Select',
+      'ext.extract_btn': 'Extract Vocabulary Automatically',
+      'ext.ocr_loading': 'Transcribing with on-device OCR engine...',
+      'ext.need_text': 'Please enter text to analyze (at least 8 characters).',
+      'ext.limit_confirm': 'The text has {len} characters. Only the first 12,000 characters will be analyzed. Continue?',
+      'ext.quota_reach': 'You have reached today\'s free OCR/extraction quota (5 times/day). Unlimited with Pro.',
+      'ext.no_words_found': 'No extractable vocabulary found in the text. Please try different text.',
+      'ext.ocr_dropzone_title': 'Transcribe from image or photo (OCR)',
+      'ext.ocr_dropzone_sub': 'Select / Drop / Paste screenshot (Cmd+V)',
+      'ext.select_unregistered': 'Unregistered Only',
+      'ext.select_all': 'Select All',
+      'ext.deselect_all': 'Deselect All',
+      'ext.commit_btn': 'Add Selected Words to Wordbook',
+      'ext.commit_batch': 'Add {n} Selected Words',
+
+      // Audio Listening Mode
+      'speech.idle': 'Ready to play',
+      'speech.prev_title': 'Previous word (J)',
+      'speech.play_title': 'Play / Pause (K / Space)',
+      'speech.next_title': 'Next word (L)',
+      'speech.close_title': 'Exit audio mode (Esc)',
+      'speech.playback_done': 'Audio playlist playback completed.',
+      'speech.no_words': 'No playable words found. Please add words or clear filters.',
+      'speech.started': 'Audio playlist started ({count} words total).',
+
+      // Queue & Generation Status
+      'queue.fetching_wiktionary': 'Fetching target language section from Wiktionary...',
+      'queue.generating_cloud': 'Generating with Cloud AI (Gemini 3.8 Flash)...',
+      'queue.generating_local': 'Generating with on-device AI (Full Privacy)...',
+      'queue.generating_byok': 'Generating with custom BYOK API key...',
+      'queue.already_exists': '"{word}" is already registered (navigated to card)',
+      'queue.daily_quota_reached': 'Daily free AI word generation quota reached. Unlimited on Pro plan.',
+      'queue.batch_complete': 'Vocabulary generation complete: added {count} words',
+
+      // Navigation & Shortcuts
+      'nav.search_kbd': '/ or Alt+F',
+      'shortcuts.title': 'Keyboard Shortcuts',
+      'shortcuts.close': 'Close',
+      // Keyboard Shortcuts Detailed
+      'shortcuts.th_key': 'Key',
+      'shortcuts.th_normal': 'Action (Normal Mode)',
+      'shortcuts.next_card': 'Navigate & focus next card',
+      'shortcuts.prev_card': 'Navigate & focus previous card',
+      'shortcuts.prev_page': 'Previous page',
+      'shortcuts.next_page': 'Next page',
+      'shortcuts.first_page': 'Jump to first page (Page 1)',
+      'shortcuts.last_page': 'Jump to last page',
+      'shortcuts.pronounce': 'Play pronunciation audio',
+      'shortcuts.edit': 'Open edit modal for focused card',
+      'shortcuts.delete': 'Delete focused card',
+      'shortcuts.search': 'Focus search bar',
+      'shortcuts.add': 'Focus add word input',
+      'shortcuts.review': 'Start Anki review session',
+      'shortcuts.audio': 'Toggle Audio Playlist listening mode',
+      'shortcuts.analytics': 'Open Retention & Analytics Dashboard',
+      'shortcuts.graph': 'Open Root Network (Graph View)',
+      'shortcuts.help': 'Open keyboard shortcuts help',
+      'shortcuts.esc': 'Close modal / unfocus',
+      'shortcuts.th_anki': 'Action (Anki Review Mode)',
+      'shortcuts.anki_mode': 'Toggle review mode (Recognition / Cloze)',
+      'shortcuts.anki_show': 'Show answer / flip card',
+      'shortcuts.anki_rate': 'Rate card (1:Again / 2:Hard / 3:Good / 4:Easy)',
+      'shortcuts.anki_replay': 'Replay audio pronunciation',
+      'shortcuts.anki_undo': 'Undo last review answer',
+      'shortcuts.anki_exit': 'Exit review session',
+      'shortcuts.th_graph': 'Action (Root Network Graph View)',
+      'shortcuts.graph_view': 'Switch view (1:Network / 2:Tree / 3:Mindmap / 4:Matrix)',
+      'shortcuts.graph_water': 'Targeted review for due branches',
+      'shortcuts.graph_mask': 'Toggle red sheet recall mask',
+      'shortcuts.graph_zoom': 'Zoom in / Zoom out',
+      'shortcuts.graph_reset': 'Reset zoom to 100% and center',
+      'shortcuts.graph_fit': 'Fit all nodes to view',
+      'shortcuts.graph_pan': 'Pan canvas / Drag nodes',
+      'shortcuts.tour_btn': 'Take Guide Tour',
+
+      // Legal & Policies Modal
+      'legal.title': 'Legal & Policy Information',
+      'legal.tab_terms': 'Terms of Service',
+      'legal.tab_privacy': 'Privacy Policy',
+      'legal.tab_tokusho': 'Statutory Legal Disclosures',
+      'legal.link_privacy': 'Privacy (Direct URL)',
+      'legal.link_terms': 'Terms (Direct URL)',
+      'legal.link_tokusho': 'Legal (Direct URL)',
+      'legal.close': 'Close',
+
+      // Anki Deck Import Modal
+      'anki_import.title': 'Import Anki Deck (.apkg / TSV / CSV)',
+      'anki_import.file_lbl': 'Select APKG / TSV / CSV file:',
+      'anki_import.paste_lbl': 'Or paste text here:',
+      'anki_import.preview_lbl': 'Import Preview:',
+      'anki_import.preview_empty': 'Please select an APKG file or paste TSV/CSV text',
+      'anki_import.btn_run': 'Run Import',
+
+      // Shared Deck Modal
+      'share_deck.title': 'Import Shared Deck',
+      'share_deck.btn_add': 'Add to My Library',
+
+      // PWA / SW Update Banner
+      'sw.update_available': 'A new version of Vocab Vault is available',
+      'sw.update_later': 'Later',
+      'sw.update_now': 'Update & Reload Now',
+
+      // Onboarding Tour
+      'tour.title': 'Vocab Vault Guided Tour',
+      'tour.btn_skip': 'Skip',
+      'tour.btn_prev': 'Back',
+      'tour.btn_next': 'Next',
+      'tour.btn_finish': 'Start Learning',
+      'tour.mode_simple': 'Simple Mode',
+      'tour.mode_academic': 'Academic & Deep Mode',
+
+      // OCR & Extract
+      'ext.screenshot': 'Screenshot',
+      'ext.ocr_again': 'Transcribe',
+      'ext.ocr_ai_title': 'High-Precision AI OCR (Gemini Vision)',
+      'ext.ocr_btn_setup': 'Save Key & Transcribe',
+      'ext.ocr_get_key': 'Get Free Key',
+      'ext.ocr_privacy_note': 'Note: Text and images are sent to AI endpoint for analysis. Do not submit sensitive personal info.',
+      'ext.extracted_words': 'Extracted Words',
+      'ext.ocr_done_suffix': ' (Transcription complete)',
+      'ext.ocr_success': 'Transcription complete ({count} characters extracted)',
+      'ext.ocr_error': 'OCR error: {err}',
+      'ext.extract_error': 'Extraction error: {err}',
+      'ext.ocr_loading_gemini': 'Transcribing with Gemini Vision...',
+      'ext.ocr_loading_cloud': 'Transcribing with Cloud AI (Gemini Vision)...',
+      'ext.fallback_local_toast': 'AI endpoint is busy, extracted words using built-in local engine.',
+
+      // Upsell Modal
+      'upsell.modal_title': 'Unlock Unlimited with Vocab Vault Pro',
+      'upsell.annual_badge': '(2 Months Free)',
+      'upsell.monthly_badge': 'Monthly',
+      'upsell.annual_btn': 'Annual',
+      'upsell.cancel_anytime': 'Cancel anytime with one click (no commitment)',
+      'upsell.stripe_secure': 'Secure checkout powered by Stripe SSL encryption',
+      'upsell.legal_title': '[Subscription Terms & Statutory Disclosures]',
+
+      // Queue & Toast Notifications
+      'queue.skipped_duplicates': '"{words}" already registered and was skipped',
+      'queue.char_limit_exceeded': 'Character limit exceeded (2000 chars), processing initial portion only',
+      'queue.already_processing': '"{word}" is currently being processed',
+      'queue.generation_complete': 'Vocabulary generation complete: added {words} ({count} words)',
+      'queue.missing_items': 'Some words could not be retrieved ({words}). Please retry.',
+
+      // Settings & BYOK
+      'settings.byok_cleared': 'Local API key cleared.',
+      'settings.byok_connected': 'Connection verified ({count} models)',
+      'settings.byok_error': 'Connection error: {err}',
+      'edit.manual_or_legacy': 'Manual or legacy entry',
+
+      // Stripe Billing & Sync
+      'sync.play_store_notice': 'Notice for Google Play App users: In-app web purchases are restricted by Google Play policy. Please upgrade via web browser.',
+      'sync.login_required_stripe': 'Please sign in or create an account before proceeding to Stripe checkout. Opening settings.',
+      'sync.moving_to_checkout': 'Redirecting to secure checkout...',
+      'sync.checkout_error': 'Checkout Notice: {err}',
+      'sync.btn_upgrade_price': 'Upgrade to Pro (.99/mo)',
+      'sync.btn_upgrade_now': 'Upgrade to Pro Now',
+      'sync.connecting_portal': 'Connecting to customer portal...',
+      'sync.portal_login_required': 'Sign in required to access customer portal.',
+      'sync.not_configured': 'Cloud sync is not configured.',
+
+
+      // Common Buttons & Labels
+      'btn.close': 'Close',
+      'btn.cancel': 'Cancel',
+      'btn.save': 'Save',
+      'btn.delete': 'Delete',
+      'btn.confirm': 'Confirm',
+      'btn.retry': 'Retry failed'
     },
 
     fr: {
@@ -2000,15 +2546,25 @@
   let currentLocale = detectInitialLocale();
 
   /**
-   * 翻訳文字列の取得
+   * 翻訳文字列の取得（パラメータ展開 {key} およびフォールバック対応）
    */
-  function t(key, fallback = '', targetLocale = null) {
+  function t(key, paramsOrFallback = '', targetLocale = null) {
+    let fallback = '';
+    let params = null;
+    if (typeof paramsOrFallback === 'object' && paramsOrFallback !== null) {
+      params = paramsOrFallback;
+    } else if (typeof paramsOrFallback === 'string') {
+      fallback = paramsOrFallback;
+    }
     const loc = (targetLocale && SUPPORTED_LOCALES.includes(targetLocale)) ? targetLocale : currentLocale;
     const dict = TRANSLATIONS[loc] || TRANSLATIONS.en;
-    if (dict && dict[key]) return dict[key];
-    const fallbackDict = TRANSLATIONS.en;
-    if (fallbackDict && fallbackDict[key]) return fallbackDict[key];
-    return fallback || key;
+    let str = (dict && dict[key]) || (TRANSLATIONS.en && TRANSLATIONS.en[key]) || fallback || key;
+    if (params && typeof str === 'string') {
+      for (const [k, v] of Object.entries(params)) {
+        str = str.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+      }
+    }
+    return str;
   }
 
   /**
@@ -2467,12 +3023,60 @@
         });
       } catch (e) {}
     }
+
+    // 4. 単語編集モーダルの語源確実性セレクタ
+    const editConf = document.getElementById('editConf');
+    if (editConf && editConf.options) {
+      try {
+        Array.from(editConf.options).forEach(opt => {
+          if (!opt) return;
+          const k = 'edit.conf_' + (opt.value || 'none');
+          const trans = t(k);
+          if (trans) opt.textContent = trans;
+        });
+      } catch (e) {}
+    }
+
+    // 5. フィードバックモーダルのセレクタ
+    const fbCategory = document.getElementById('fbCategory');
+    if (fbCategory && fbCategory.options) {
+      try {
+        Array.from(fbCategory.options).forEach(opt => {
+          if (!opt) return;
+          const k = 'fb.opt_' + opt.value;
+          const trans = t(k);
+          if (trans) opt.textContent = trans;
+        });
+      } catch (e) {}
+    }
+    const fbWtp = document.getElementById('fbWtp');
+    if (fbWtp && fbWtp.options) {
+      try {
+        Array.from(fbWtp.options).forEach(opt => {
+          if (!opt) return;
+          const k = 'fb.wtp_' + (opt.value ? opt.value.replace('sub_', '') : 'none');
+          const trans = t(k);
+          if (trans) opt.textContent = trans;
+        });
+      } catch (e) {}
+    }
+
+    // 6. 長文抽出モーダルの最大抽出数セレクタ
+    const extMaxCnt = document.getElementById('extMaxCnt');
+    if (extMaxCnt && extMaxCnt.options) {
+      try {
+        Array.from(extMaxCnt.options).forEach(opt => {
+          if (!opt) return;
+          opt.textContent = isEn ? `Max ${opt.value} words` : `最大 ${opt.value} 語`;
+        });
+      } catch (e) {}
+    }
   }
 
   /**
    * DOM 一括翻訳バインディング
    */
-  function applyI18nToDOM() {
+  function applyI18nToDOM(root) {
     if (typeof document === 'undefined') return;
 
     const isEn = currentLocale !== 'ja';
@@ -2480,8 +3084,10 @@
       document.documentElement.lang = currentLocale;
     }
 
+    const scope = (root && typeof root.querySelectorAll === 'function') ? root : document;
+
     // テキスト置換 [data-i18n]
-    document.querySelectorAll('[data-i18n]').forEach(el => {
+    scope.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.getAttribute('data-i18n');
       if (key) {
         const trans = t(key);
@@ -2490,7 +3096,7 @@
     });
 
     // ツールチップ置換 [data-i18n-title]
-    document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    scope.querySelectorAll('[data-i18n-title]').forEach(el => {
       const key = el.getAttribute('data-i18n-title');
       if (key) {
         const trans = t(key);
@@ -2499,7 +3105,7 @@
     });
 
     // プレースホルダー置換 [data-i18n-ph]
-    document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    scope.querySelectorAll('[data-i18n-ph]').forEach(el => {
       const key = el.getAttribute('data-i18n-ph');
       if (key) {
         const trans = t(key);
@@ -2508,7 +3114,7 @@
     });
 
     // HTML置換 [data-i18n-html]
-    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    scope.querySelectorAll('[data-i18n-html]').forEach(el => {
       const key = el.getAttribute('data-i18n-html');
       if (key) {
         const trans = t(key);
