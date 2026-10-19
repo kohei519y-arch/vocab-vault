@@ -4301,6 +4301,2877 @@
     `;
   }
 
+  const STARTER_LOCALIZATIONS = {
+  "정책": {
+    "zh": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "政策、方针、施政方针"
+        }
+      ],
+      "core": "为正确治理社会（*政）而制定的系统性策略（策）。",
+      "etymology": "韩语汉字词“政策”。源自汉字字源 *政（正＋攴：依规范端正社会），与中文“政策”、日语“政策”在东亚汉字字源树上完全同源。",
+      "exTrans": "政府应制定切实有效的政策来解决低出生率问题。",
+      "phrases": [
+        {
+          "foreign": "정책을 추진하다",
+          "trans": "推进政策"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "정치",
+          "phonetic": "[tɕʌŋ.tɕʰi]",
+          "pos": "N",
+          "meaning": "政治"
+        },
+        {
+          "word": "행정",
+          "phonetic": "[hɛŋ.dʑʌŋ]",
+          "pos": "N",
+          "meaning": "行政"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Politik, Richtlinie, Strategie"
+        }
+      ],
+      "core": "Systematische Maßnahmen (*政) zur gerechten Ordnung und Führung der Gesellschaft.",
+      "etymology": "Koreanisches Hanja-Wort „政策“ (Politik). Geht auf das Schriftzeichen-Etymon *政 zurück und bildet eine etymologische Einheit mit chin. 政策 und jap. 政策.",
+      "exTrans": "Die Regierung muss eine wirksame Politik zur Bewältigung der niedrigen Geburtenrate erarbeiten.",
+      "phrases": [
+        {
+          "foreign": "정책을 추진하다",
+          "trans": "Politik vorantreiben"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "정치",
+          "phonetic": "[tɕʌŋ.tɕʰi]",
+          "pos": "N",
+          "meaning": "Politik"
+        },
+        {
+          "word": "행정",
+          "phonetic": "[hɛŋ.dʑʌŋ]",
+          "pos": "N",
+          "meaning": "Verwaltung"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "policy, political measure, course of action"
+        }
+      ],
+      "core": "Systematic framework (*政) for justly governing and directing society.",
+      "etymology": "Korean Hanja word '政策' (policy). Rooted in *政 (rectify society by rule), shared across East Asia with Chinese 政策 and Japanese 政策.",
+      "exTrans": "The government must formulate effective policies to address the low birth rate.",
+      "phrases": [
+        {
+          "foreign": "정책을 추진하다",
+          "trans": "promote a policy"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "정치",
+          "phonetic": "[tɕʌŋ.tɕʰi]",
+          "pos": "N",
+          "meaning": "politics"
+        },
+        {
+          "word": "행정",
+          "phonetic": "[hɛŋ.dʑʌŋ]",
+          "pos": "N",
+          "meaning": "administration"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "politique, ligne directrice, mesures"
+        }
+      ],
+      "core": "Mesures systématiques (*政) pour régir et orienter équitablement la société.",
+      "etymology": "Mot sino-coréen „政策“ (politique). Issu de la racine *政 ; apparenté au chinois 政策 et au japonais 政策.",
+      "exTrans": "Le gouvernement doit formuler des politiques efficaces pour remédier à la dénatalité.",
+      "phrases": [
+        {
+          "foreign": "정책을 추진하다",
+          "trans": "promouvoir une politique"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "정치",
+          "phonetic": "[tɕʌŋ.tɕʰi]",
+          "pos": "N",
+          "meaning": "politique"
+        },
+        {
+          "word": "행정",
+          "phonetic": "[hɛŋ.dʑʌŋ]",
+          "pos": "N",
+          "meaning": "administration"
+        }
+      ]
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "política, directriz, medida gubernamental"
+        }
+      ],
+      "core": "Medidas sistemáticas (*政) para gobernar con justicia la sociedad.",
+      "etymology": "Término sino-coreano „政策“ (política). Deriva del étimo *政; emparentado con el chino 政策 y el japonés 政策.",
+      "exTrans": "El gobierno debe elaborar políticas eficaces para abordar la baja natalidad.",
+      "phrases": [
+        {
+          "foreign": "정책을 추진하다",
+          "trans": "impulsar una política"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "정치",
+          "phonetic": "[tɕʌŋ.tɕʰi]",
+          "pos": "N",
+          "meaning": "política"
+        },
+        {
+          "word": "행정",
+          "phonetic": "[hɛŋ.dʑʌŋ]",
+          "pos": "N",
+          "meaning": "administración"
+        }
+      ]
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "politica, direttiva, strategia"
+        }
+      ],
+      "core": "Misure sistematiche (*政) per governare rettamente la società.",
+      "etymology": "Parola sino-coreana „政策“ (politica). Risale alla radice logografica *政; affine al cinese 政策 e al giapponese 政策.",
+      "exTrans": "Il governo deve elaborare politiche efficaci per affrontare il calo delle nascite.",
+      "phrases": [
+        {
+          "foreign": "정책을 추진하다",
+          "trans": "promuovere una politica"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "정치",
+          "phonetic": "[tɕʌŋ.tɕʰi]",
+          "pos": "N",
+          "meaning": "politica"
+        },
+        {
+          "word": "행정",
+          "phonetic": "[hɛŋ.dʑʌŋ]",
+          "pos": "N",
+          "meaning": "amministrazione"
+        }
+      ]
+    }
+  },
+  "경제": {
+    "zh": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "经济；经世济民"
+        }
+      ],
+      "core": "经纬天下以济苍生（*经＋济）的社会机制。",
+      "etymology": "韩语汉字词“经济”。源自汉字字源 *经（经纶、治理），与中文“经济”、日语“経済”共享同一字源核心。",
+      "exTrans": "为了实现可持续的经济增长，技术创新是不可或缺的。",
+      "phrases": [
+        {
+          "foreign": "경제 활성화",
+          "trans": "激活经济"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "경영",
+          "phonetic": "[kjʌŋ.jʌŋ]",
+          "pos": "N",
+          "meaning": "经营"
+        },
+        {
+          "word": "경험",
+          "phonetic": "[kjʌŋ.hʌm]",
+          "pos": "N",
+          "meaning": "经验"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Wirtschaft, Ökonomie"
+        }
+      ],
+      "core": "Gesellschaftliche Ordnung (*経) zum Wohlergehen und zur Versorgung der Menschen.",
+      "etymology": "Koreanisches Hanja-Wort „經濟“ (Wirtschaft). Geht auf *経 (ordnen, weben) zurück und teilt den Begriffskern mit chin. 经济 und jap. 経済.",
+      "exTrans": "Für ein nachhaltiges Wirtschaftswachstum sind technologische Innovationen unerlässlich.",
+      "phrases": [
+        {
+          "foreign": "경제 활성화",
+          "trans": "Wirtschaftsbelebung"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "경영",
+          "phonetic": "[kjʌŋ.jʌŋ]",
+          "pos": "N",
+          "meaning": "Unternehmensführung"
+        },
+        {
+          "word": "경험",
+          "phonetic": "[kjʌŋ.hʌm]",
+          "pos": "N",
+          "meaning": "Erfahrung"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "economy, economics"
+        }
+      ],
+      "core": "Orderly system (*経) to govern society and provide for the people.",
+      "etymology": "Korean Hanja '經濟'. Rooted in *経 (warp of fabric, govern), cognate with Chinese 经济 and Japanese 経済.",
+      "exTrans": "Technological innovation is essential for sustainable economic growth.",
+      "phrases": [
+        {
+          "foreign": "경제 활성화",
+          "trans": "economic revitalization"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "경영",
+          "phonetic": "[kjʌŋ.jʌŋ]",
+          "pos": "N",
+          "meaning": "management"
+        },
+        {
+          "word": "경험",
+          "phonetic": "[kjʌŋ.hʌm]",
+          "pos": "N",
+          "meaning": "experience"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "économie"
+        }
+      ],
+      "core": "Ordre social tissé (*経) pour secourir et pourvoir aux besoins du peuple.",
+      "etymology": "Mot sino-coréen „經濟“ (économie). Racine *経 ; cognat du chinois 经济 et du japonais 経済.",
+      "exTrans": "L'innovation technologique est essentielle à une croissance économique durable.",
+      "phrases": [
+        {
+          "foreign": "경제 활성화",
+          "trans": "relance économique"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "경영",
+          "phonetic": "[kjʌŋ.jʌŋ]",
+          "pos": "N",
+          "meaning": "gestion"
+        },
+        {
+          "word": "경험",
+          "phonetic": "[kjʌŋ.hʌm]",
+          "pos": "N",
+          "meaning": "expérience"
+        }
+      ]
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "economía"
+        }
+      ],
+      "core": "Estructura social orientada a ordenar (*経) y socorrer al pueblo.",
+      "etymology": "Término sino-coreano „經濟“ (economía). Del étimo *経; cognato con el chino 经济 y el japonés 経済.",
+      "exTrans": "La innovación tecnológica es indispensable para un crecimiento económico sostenible.",
+      "phrases": [
+        {
+          "foreign": "경제 활성화",
+          "trans": "reactivación económica"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "경영",
+          "phonetic": "[kjʌŋ.jʌŋ]",
+          "pos": "N",
+          "meaning": "gestión"
+        },
+        {
+          "word": "경험",
+          "phonetic": "[kjʌŋ.hʌm]",
+          "pos": "N",
+          "meaning": "experiencia"
+        }
+      ]
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "economia"
+        }
+      ],
+      "core": "Ordine sociale intessuto (*経) per provvedere al bene comune.",
+      "etymology": "Parola sino-coreana „經濟“ (economia). Radice *経; affine al cinese 经济 e al giapponese 経済.",
+      "exTrans": "L'innovazione tecnologica è indispensabile per una crescita economica sostenibile.",
+      "phrases": [
+        {
+          "foreign": "경제 활성화",
+          "trans": "rilancio economico"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "경영",
+          "phonetic": "[kjʌŋ.jʌŋ]",
+          "pos": "N",
+          "meaning": "gestione"
+        },
+        {
+          "word": "경험",
+          "phonetic": "[kjʌŋ.hʌm]",
+          "pos": "N",
+          "meaning": "esperienza"
+        }
+      ]
+    }
+  },
+  "이론": {
+    "zh": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "理论、学说"
+        }
+      ],
+      "core": "探究事物规律（*理）并系统论述的知识构造。",
+      "etymology": "韩语汉字词“理论”（受头音法则影响，词头리变为이）。源自汉字字源 *理（玉之脉理、事理），与中文“理论”、日语“理論”同根。",
+      "exTrans": "那位学者提出了超越现有理论的新假说。",
+      "phrases": [
+        {
+          "foreign": "이론적 배경",
+          "trans": "理论背景"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "이해",
+          "phonetic": "[i.hɛ]",
+          "pos": "N",
+          "meaning": "理解"
+        },
+        {
+          "word": "합리적",
+          "phonetic": "[ham.ni.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "合理（的）"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Theorie, Lehrmeinung"
+        }
+      ],
+      "core": "Systematische Darlegung der Gesetzmäßigkeiten (*理) der Dinge.",
+      "etymology": "Koreanisches Hanja-Wort „理論“ (Theorie). Geht auf *理 (Muster, Vernunft) zurück; kognat zu chin. 理论 und jap. 理論.",
+      "exTrans": "Der Wissenschaftler stellte eine neue Hypothese auf, die über bestehende Theorien hinausgeht.",
+      "phrases": [
+        {
+          "foreign": "이론적 배경",
+          "trans": "theoretischer Hintergrund"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "이해",
+          "phonetic": "[i.hɛ]",
+          "pos": "N",
+          "meaning": "Verständnis"
+        },
+        {
+          "word": "합리적",
+          "phonetic": "[ham.ni.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "rational"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "theory, doctrine"
+        }
+      ],
+      "core": "Systematic discourse (論) revealing the underlying patterns and principles (*理) of things.",
+      "etymology": "Korean Hanja '理論'. Rooted in *理 (inherent grain/principle); cognate with Chinese 理论 and Japanese 理論.",
+      "exTrans": "The scholar proposed a novel hypothesis surpassing conventional theories.",
+      "phrases": [
+        {
+          "foreign": "이론적 배경",
+          "trans": "theoretical background"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "이해",
+          "phonetic": "[i.hɛ]",
+          "pos": "N",
+          "meaning": "understanding"
+        },
+        {
+          "word": "합리적",
+          "phonetic": "[ham.ni.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "rational"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "théorie, doctrine"
+        }
+      ],
+      "core": "Structure intellectuelle explicitant les principes (*理) régissant les choses.",
+      "etymology": "Mot sino-coréen „理論“ (théorie). Racine *理 ; cognat de 理论 (chinois) et 理論 (japonais).",
+      "exTrans": "Ce chercheur a formulé une nouvelle hypothèse dépassant les théories existantes.",
+      "phrases": [
+        {
+          "foreign": "이론적 배경",
+          "trans": "cadre théorique"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "이해",
+          "phonetic": "[i.hɛ]",
+          "pos": "N",
+          "meaning": "compréhension"
+        },
+        {
+          "word": "합리적",
+          "phonetic": "[ham.ni.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "rationnel"
+        }
+      ]
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "teoría, doctrina"
+        }
+      ],
+      "core": "Estructura teórica que explicita las leyes fundamentales (*理) de las cosas.",
+      "etymology": "Término sino-coreano „理論“ (teoría). Del étimo *理; emparentado con chin. 理论 y jap. 理論.",
+      "exTrans": "El académico planteó una nueva hipótesis que supera las teorías existentes.",
+      "phrases": [
+        {
+          "foreign": "이론적 배경",
+          "trans": "fundamento teórico"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "이해",
+          "phonetic": "[i.hɛ]",
+          "pos": "N",
+          "meaning": "comprensión"
+        },
+        {
+          "word": "합리적",
+          "phonetic": "[ham.ni.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "racional"
+        }
+      ]
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "teoria, dottrina"
+        }
+      ],
+      "core": "Costruzione intellettuale che delinea le leggi intrinseche (*理) delle cose.",
+      "etymology": "Parola sino-coreana „理論“ (teoria). Dalla radice *理; affine a chin. 理论 e jap. 理論.",
+      "exTrans": "Lo studioso ha proposto una nuova ipotesi che supera le teorie esistenti.",
+      "phrases": [
+        {
+          "foreign": "이론적 배경",
+          "trans": "quadro teorico"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "이해",
+          "phonetic": "[i.hɛ]",
+          "pos": "N",
+          "meaning": "comprensione"
+        },
+        {
+          "word": "합리적",
+          "phonetic": "[ham.ni.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "razionale"
+        }
+      ]
+    }
+  },
+  "관점": {
+    "zh": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "观点、视点、见地"
+        }
+      ],
+      "core": "审视观察（*观）事物的立足点（点）。",
+      "etymology": "韩语汉字词“观点”。源自汉字字源 *观（登高远瞩、体察），与中文“观点/观念”、日语“観点”同根。",
+      "exTrans": "这一社会现象需要从多个角度进行深入分析。",
+      "phrases": [
+        {
+          "foreign": "새로운 관점",
+          "trans": "新视角"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "객관적",
+          "phonetic": "[kɛk.k͈wan.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "客观（的）"
+        },
+        {
+          "word": "관찰",
+          "phonetic": "[kwan.tɕʰal]",
+          "pos": "N",
+          "meaning": "观察"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Standpunkt, Perspektive, Blickwinkel"
+        }
+      ],
+      "core": "Standort (Punkt) zur umfassenden Betrachtung (*観) eines Gegenstands.",
+      "etymology": "Koreanisches Hanja-Wort „觀點“ (Perspektive). Geht auf *観 (beobachten, schauen) zurück; kognat zu chin. 观点 und jap. 観点.",
+      "exTrans": "Dieses gesellschaftliche Phänomen muss aus verschiedenen Perspektiven eingehend analysiert werden.",
+      "phrases": [
+        {
+          "foreign": "새로운 관점",
+          "trans": "neue Perspektive"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "객관적",
+          "phonetic": "[kɛk.k͈wan.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "objektiv"
+        },
+        {
+          "word": "관찰",
+          "phonetic": "[kwan.tɕʰal]",
+          "pos": "N",
+          "meaning": "Beobachtung"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "point of view, perspective, standpoint"
+        }
+      ],
+      "core": "The focal point (点) from which one observes (*観) phenomena.",
+      "etymology": "Korean Hanja '觀點'. Traced to root *観 (observe broadly); cognate with Chinese 观点 and Japanese 観点.",
+      "exTrans": "This social phenomenon needs to be analyzed in depth from diverse perspectives.",
+      "phrases": [
+        {
+          "foreign": "새로운 관점",
+          "trans": "new perspective"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "객관적",
+          "phonetic": "[kɛk.k͈wan.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "objective"
+        },
+        {
+          "word": "관찰",
+          "phonetic": "[kwan.tɕʰal]",
+          "pos": "N",
+          "meaning": "observation"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "perspective, point de vue"
+        }
+      ],
+      "core": "Point d'appui (point) pour observer (*観) le monde.",
+      "etymology": "Mot sino-coréen „觀點“ (perspective). Racine *観 ; cognat de 观点 (chinois) et 観点 (japonais).",
+      "exTrans": "Ce phénomène social doit être analysé en profondeur sous différents angles.",
+      "phrases": [
+        {
+          "foreign": "새로운 관점",
+          "trans": "nouvelle perspective"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "객관적",
+          "phonetic": "[kɛk.k͈wan.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "objectif"
+        },
+        {
+          "word": "관찰",
+          "phonetic": "[kwan.tɕʰal]",
+          "pos": "N",
+          "meaning": "observation"
+        }
+      ]
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "punto de vista, perspectiva"
+        }
+      ],
+      "core": "Punto de apoyo para contemplar (*観) la realidad.",
+      "etymology": "Término sino-coreano „觀點“ (perspectiva). Del étimo *観; emparentado con chin. 观点 y jap. 観点.",
+      "exTrans": "Este fenómeno social debe ser analizado en profundidad desde diversas perspectivas.",
+      "phrases": [
+        {
+          "foreign": "새로운 관점",
+          "trans": "nueva perspectiva"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "객관적",
+          "phonetic": "[kɛk.k͈wan.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "objetivo"
+        },
+        {
+          "word": "관찰",
+          "phonetic": "[kwan.tɕʰal]",
+          "pos": "N",
+          "meaning": "observación"
+        }
+      ]
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "punto di vista, prospettiva"
+        }
+      ],
+      "core": "Punto focale per osservare (*観) la realtà.",
+      "etymology": "Parola sino-coreana „觀點“ (prospettiva). Radice *観; affine a chin. 观点 e jap. 観点.",
+      "exTrans": "Questo fenomeno sociale deve essere analizzato a fondo da diverse prospettive.",
+      "phrases": [
+        {
+          "foreign": "새로운 관점",
+          "trans": "nuova prospettiva"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "객관적",
+          "phonetic": "[kɛk.k͈wan.dʑʌk]",
+          "pos": "N/Adj",
+          "meaning": "oggettivo"
+        },
+        {
+          "word": "관찰",
+          "phonetic": "[kwan.tɕʰal]",
+          "pos": "N",
+          "meaning": "osservazione"
+        }
+      ]
+    }
+  },
+  "권리": {
+    "zh": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "权利（法律所赋予之利益资格）"
+        }
+      ],
+      "core": "如天平分锤（*权）般公正称量主张的法定利益。",
+      "etymology": "韩语汉字词“权利”（受流音化规律读作[kwʌlli]）。源自汉字字源 *权（权衡公平），与中文“权利”、日语“権利”直结。",
+      "exTrans": "所有公民在法律面前一律平等，基本权利受到充分保障。",
+      "phrases": [
+        {
+          "foreign": "권리를 행사하다",
+          "trans": "行使权利"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "인권",
+          "phonetic": "[in.k͈wʌn]",
+          "pos": "N",
+          "meaning": "人权"
+        },
+        {
+          "word": "권력",
+          "phonetic": "[kwʌl.ljʌk]",
+          "pos": "N",
+          "meaning": "权力"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Recht, Berechtigung, Anspruch"
+        }
+      ],
+      "core": "Rechtmäßig zustehender Anspruch (*利), austariert wie das Gewicht einer Waage (*権).",
+      "etymology": "Koreanisches Hanja-Wort „權利“ (Recht). Geht auf *権 zurück; kognat zu chin. 权利 und jap. 権利.",
+      "exTrans": "Alle Bürger sind vor dem Gesetz gleich und genießen garantierte Grundrechte.",
+      "phrases": [
+        {
+          "foreign": "권리를 행사하다",
+          "trans": "Rechte ausüben"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "인권",
+          "phonetic": "[in.k͈wʌn]",
+          "pos": "N",
+          "meaning": "Menschenrechte"
+        },
+        {
+          "word": "권력",
+          "phonetic": "[kwʌl.ljʌk]",
+          "pos": "N",
+          "meaning": "Macht"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "right, entitlement, privilege"
+        }
+      ],
+      "core": "Just claims (*利) balanced like scale weights (*権) under the law.",
+      "etymology": "Korean Hanja '權利'. From root *権 (scale counterbalance); directly cognate with Chinese 权利 and Japanese 権利.",
+      "exTrans": "All citizens are equal before the law and guaranteed fundamental rights.",
+      "phrases": [
+        {
+          "foreign": "권리를 행사하다",
+          "trans": "exercise a right"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "인권",
+          "phonetic": "[in.k͈wʌn]",
+          "pos": "N",
+          "meaning": "human rights"
+        },
+        {
+          "word": "권력",
+          "phonetic": "[kwʌl.ljʌk]",
+          "pos": "N",
+          "meaning": "power"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "droit, prérogative"
+        }
+      ],
+      "core": "Bénéfice légitime équilibré comme le contrepoids d'une balance (*権).",
+      "etymology": "Mot sino-coréen „權利“ (droit). Racine *権 ; cognat de 权利 (chinois) et 権利 (japonais).",
+      "exTrans": "Tous les citoyens sont égaux devant la loi et bénéficient de droits fondamentaux.",
+      "phrases": [
+        {
+          "foreign": "권리를 행사하다",
+          "trans": "exercer un droit"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "인권",
+          "phonetic": "[in.k͈wʌn]",
+          "pos": "N",
+          "meaning": "droits de l'homme"
+        },
+        {
+          "word": "권력",
+          "phonetic": "[kwʌl.ljʌk]",
+          "pos": "N",
+          "meaning": "pouvoir"
+        }
+      ]
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "derecho, prerrogativa"
+        }
+      ],
+      "core": "Interés legítimo equilibrado como la pesa de una balanza (*権).",
+      "etymology": "Término sino-coreano „權利“ (derecho). Del étimo *権; emparentado con chin. 权利 y jap. 権利.",
+      "exTrans": "Todos los ciudadanos son iguales ante la ley y tienen garantizados los derechos fundamentales.",
+      "phrases": [
+        {
+          "foreign": "권리를 행사하다",
+          "trans": "ejercer un derecho"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "인권",
+          "phonetic": "[in.k͈wʌn]",
+          "pos": "N",
+          "meaning": "derechos humanos"
+        },
+        {
+          "word": "권력",
+          "phonetic": "[kwʌl.ljʌk]",
+          "pos": "N",
+          "meaning": "poder"
+        }
+      ]
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "diritto, prerogativa"
+        }
+      ],
+      "core": "Interesse legittimo bilanciato come il contrappeso di una bilancia (*権).",
+      "etymology": "Parola sino-coreana „權利“ (diritto). Radice *権; affine a chin. 权利 e jap. 権利.",
+      "exTrans": "Tutti i cittadini sono uguali davanti alla legge e godono di diritti fondamentali garantiti.",
+      "phrases": [
+        {
+          "foreign": "권리를 행사하다",
+          "trans": "esercitare un diritto"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "인권",
+          "phonetic": "[in.k͈wʌn]",
+          "pos": "N",
+          "meaning": "diritti umani"
+        },
+        {
+          "word": "권력",
+          "phonetic": "[kwʌl.ljʌk]",
+          "pos": "N",
+          "meaning": "potere"
+        }
+      ]
+    }
+  },
+  "인식": {
+    "zh": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "认识、理解、意识（인식하다: 认识、意识到）"
+        }
+      ],
+      "core": "认清事物本质并记于心中（*识）。",
+      "etymology": "韩语汉字词“认识”。源自汉字字源 *识（见识并标记），与中文“认识”、日语“認識”在字源树上完全同源。",
+      "exTrans": "全社会对环境保护重要性的认识显著提高。",
+      "phrases": [
+        {
+          "foreign": "인식의 전환",
+          "trans": "认识的转变"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "의식",
+          "phonetic": "[ɰi.ɕik]",
+          "pos": "N",
+          "meaning": "意识"
+        },
+        {
+          "word": "지식",
+          "phonetic": "[tɕi.ɕik]",
+          "pos": "N",
+          "meaning": "知识"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Erkenntnis, Bewusstsein, Wahrnehmung (인식하다: erkennen, wahrnehmen)"
+        }
+      ],
+      "core": "Das Wesen der Dinge erfassen und im Bewusstsein verankern (*識).",
+      "etymology": "Koreanisches Hanja-Wort „認識“ (Erkenntnis). Geht auf das Schriftzeichen-Etymon *識 zurück und teilt denselben etymologischen Stamm mit chin. 认识 und jap. 認識.",
+      "exTrans": "Das gesellschaftliche Bewusstsein für die Bedeutung des Umweltschutzes ist stark gestiegen.",
+      "phrases": [
+        {
+          "foreign": "인식의 전환",
+          "trans": "Bewusstseinswandel"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "의식",
+          "phonetic": "[ɰi.ɕik]",
+          "pos": "N",
+          "meaning": "Bewusstsein"
+        },
+        {
+          "word": "지식",
+          "phonetic": "[tɕi.ɕik]",
+          "pos": "N",
+          "meaning": "Wissen"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "recognition, awareness, perception (인식하다: recognize, perceive)"
+        }
+      ],
+      "core": "Discerning the essence of reality and inscribing it onto consciousness (*識).",
+      "etymology": "Korean Hanja '認識'. Rooted in *識 (discern and record); completely cognate with Chinese 认识 and Japanese 認識.",
+      "exTrans": "Public awareness of the importance of environmental protection has grown significantly.",
+      "phrases": [
+        {
+          "foreign": "인식의 전환",
+          "trans": "shift in perception"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "의식",
+          "phonetic": "[ɰi.ɕik]",
+          "pos": "N",
+          "meaning": "consciousness"
+        },
+        {
+          "word": "지식",
+          "phonetic": "[tɕi.ɕik]",
+          "pos": "N",
+          "meaning": "knowledge"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "reconnaissance, prise de conscience, perception (인식하다: reconnaître, percevoir)"
+        }
+      ],
+      "core": "Discerner l'essence des choses et l'inscrire dans l'esprit (*識).",
+      "etymology": "Mot sino-coréen „認識“ (reconnaissance). Racine *識 ; cognat de 认识 (chinois) et 認識 (japonais).",
+      "exTrans": "La prise de conscience collective quant à la protection environnementale s'est accrue.",
+      "phrases": [
+        {
+          "foreign": "인식의 전환",
+          "trans": "changement de perception"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "의식",
+          "phonetic": "[ɰi.ɕik]",
+          "pos": "N",
+          "meaning": "conscience"
+        },
+        {
+          "word": "지식",
+          "phonetic": "[tɕi.ɕik]",
+          "pos": "N",
+          "meaning": "connaissance"
+        }
+      ]
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "reconocimiento, conciencia, percepción (인식하다: reconocer, percibir)"
+        }
+      ],
+      "core": "Discernir la esencia de las cosas y fijarla en la mente (*識).",
+      "etymology": "Término sino-coreano „認識“ (reconocimiento). Del étimo *識; emparentado con chin. 认识 y jap. 認識.",
+      "exTrans": "La conciencia social sobre la importancia de proteger el medio ambiente ha aumentado notablemente.",
+      "phrases": [
+        {
+          "foreign": "인식의 전환",
+          "trans": "cambio de percepción"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "의식",
+          "phonetic": "[ɰi.ɕik]",
+          "pos": "N",
+          "meaning": "conciencia"
+        },
+        {
+          "word": "지식",
+          "phonetic": "[tɕi.ɕik]",
+          "pos": "N",
+          "meaning": "conocimiento"
+        }
+      ]
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "riconoscimento, consapevolezza, percezione (인식하다: riconoscere, percepire)"
+        }
+      ],
+      "core": "Cogliere l'essenza delle cose e fissarla nella coscienza (*識).",
+      "etymology": "Parola sino-coreana „認識“ (riconoscimento). Radice *識; affine a chin. 认识 e jap. 認識.",
+      "exTrans": "La consapevolezza sociale sull'importanza della tutela ambientale è cresciuta notevolmente.",
+      "phrases": [
+        {
+          "foreign": "인식의 전환",
+          "trans": "cambiamento di consapevolezza"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "의식",
+          "phonetic": "[ɰi.ɕik]",
+          "pos": "N",
+          "meaning": "coscienza"
+        },
+        {
+          "word": "지식",
+          "phonetic": "[tɕi.ɕik]",
+          "pos": "N",
+          "meaning": "conoscenza"
+        }
+      ]
+    }
+  },
+  "政策": {
+    "ko": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "정책, 방침, 시정 방침"
+        }
+      ],
+      "core": "죽간에 기록된 계책(策)으로 사회를 바르게 다스리는(*政) 기본 방침.",
+      "etymology": "한자 자원 *政(바르게 다스리다)과 策(방책)에서 유래. 한국어 '정책' 및 일본어 '政策'과 동일한 동아시아 공통 학술 어휘.",
+      "exTrans": "정부는 재생에너지 발전을 촉진하기 위한 새로운 정책을 수립하고 있다.",
+      "phrases": [
+        {
+          "foreign": "宏观经济政策",
+          "trans": "거시경제정책"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "行政",
+          "phonetic": "xíng zhèng",
+          "pos": "N",
+          "meaning": "행정, 거버넌스"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Politik, Richtlinie, Handlungsleitfaden"
+        }
+      ],
+      "core": "Systematische Maßnahmen (*政) zur gerechten Ordnung und Führung der Gesellschaft.",
+      "etymology": "Aus dem Schriftzeichen-Etymon *政 (gerecht ordnen) und 策 (Plan, Strategie); kognat zu jap. 政策 und kor. 정책.",
+      "exTrans": "Die Regierung erarbeitet eine neue Politik zur Förderung erneuerbarer Energien.",
+      "phrases": [
+        {
+          "foreign": "宏观经济政策",
+          "trans": "makroökonomische Politik"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "行政",
+          "phonetic": "xíng zhèng",
+          "pos": "N",
+          "meaning": "Verwaltung, Governance"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "policy, political guideline"
+        }
+      ],
+      "core": "Systematic strategy (策) for justly governing and regulating (*政) society.",
+      "etymology": "From root *政 (rectify society) + 策 (strategy); shared across East Asia with Japanese 政策 and Korean 정책.",
+      "exTrans": "The government is formulating a new policy aimed at promoting renewable energy.",
+      "phrases": [
+        {
+          "foreign": "宏观经济政策",
+          "trans": "macroeconomic policy"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "行政",
+          "phonetic": "xíng zhèng",
+          "pos": "N",
+          "meaning": "administration, governance"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "politique, ligne directrice"
+        }
+      ],
+      "core": "Mesures (*政) pour diriger la société avec justice.",
+      "exTrans": "Le gouvernement doit formuler des politiques efficaces."
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "política, directriz"
+        }
+      ],
+      "core": "Medidas (*政) para dirigir con rectitud la sociedad.",
+      "exTrans": "El gobierno debe formular políticas eficaces."
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "politica, direttiva"
+        }
+      ],
+      "core": "Misure (*政) per governare rettamente la società.",
+      "exTrans": "Il governo deve formulare politiche efficaci."
+    }
+  },
+  "经济": {
+    "ko": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "경제; 경세제민"
+        }
+      ],
+      "core": "천하를 질서 있게 다스리고(*経) 백성을 구제하는(済) 사회 메커니즘.",
+      "etymology": "한자 자원 *経(날실을 꿰다, 다스리다)에서 유래. 한국어 '경제', 일본어 '経済'와 동일 어원.",
+      "exTrans": "디지털 전환은 이미 세계 경제 성장을 이끄는 핵심 동력이 되었다.",
+      "phrases": [
+        {
+          "foreign": "市场经济",
+          "trans": "시장경제"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "经验",
+          "phonetic": "jīng yàn",
+          "pos": "N/V",
+          "meaning": "경험(하다)"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Wirtschaft, Ökonomie"
+        }
+      ],
+      "core": "Ordnung der Welt (*経) zum Wohlergehen und zur Versorgung des Volkes (済).",
+      "etymology": "Aus dem Schriftzeichen-Etymon *経 (ordnen, weben); kognat zu jap. 経済 und kor. 경제.",
+      "exTrans": "Die digitale Transformation ist zum Kernmotor des weltweiten Wirtschaftswachstums geworden.",
+      "phrases": [
+        {
+          "foreign": "市场经济",
+          "trans": "Marktwirtschaft"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "经验",
+          "phonetic": "jīng yàn",
+          "pos": "N/V",
+          "meaning": "Erfahrung"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "economy, economics"
+        }
+      ],
+      "core": "Orderly management (*経) of society to deliver welfare (済) to the people.",
+      "etymology": "Traced to *経 (govern, warp of thread); shared with Japanese 経済 and Korean 경제.",
+      "exTrans": "Digital transformation has become the core engine driving global economic growth.",
+      "phrases": [
+        {
+          "foreign": "市场经济",
+          "trans": "market economy"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "经验",
+          "phonetic": "jīng yàn",
+          "pos": "N/V",
+          "meaning": "experience"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "économie"
+        }
+      ],
+      "core": "Administrer la société et secourir le peuple (*经 + *济).",
+      "exTrans": "L'économie mondiale traverse une mutation rapide."
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "economía"
+        }
+      ],
+      "core": "Gobernar la sociedad y auxiliar al pueblo (*经 + *济).",
+      "exTrans": "La economía global atraviesa una rápida transformación."
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "economia"
+        }
+      ],
+      "core": "Governare la società e sostenere il popolo (*经 + *济).",
+      "exTrans": "L'economia globale attraversa una rapida trasformazione."
+    }
+  },
+  "理论": {
+    "ko": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "이론, 학설"
+        }
+      ],
+      "core": "사물의 이치(*理)를 체계적으로 논하는(論) 지적 구조.",
+      "etymology": "한자 자원 *理(옥의 결, 이치)에 유래. 한국어 '이론', 일본어 '理論'과 완전 동원.",
+      "exTrans": "어떠한 과학 이론도 엄밀한 실험적 검증을 거쳐야 한다.",
+      "phrases": [
+        {
+          "foreign": "理论体系",
+          "trans": "이론 체계"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "理解",
+          "phonetic": "lǐ jiě",
+          "pos": "V/N",
+          "meaning": "이해(하다)"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Theorie, Lehrmeinung"
+        }
+      ],
+      "core": "Systematische Darlegung der inneren Gesetzmäßigkeiten (*理) der Dinge.",
+      "etymology": "Aus *理 (Muster, Prinzip); kognat zu jap. 理論 und kor. 이론.",
+      "exTrans": "Jede wissenschaftliche Theorie muss einer strengen experimentellen Überprüfung unterzogen werden.",
+      "phrases": [
+        {
+          "foreign": "理论体系",
+          "trans": "Theoriesystem"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "理解",
+          "phonetic": "lǐ jiě",
+          "pos": "V/N",
+          "meaning": "Verständnis / verstehen"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "theory, doctrine"
+        }
+      ],
+      "core": "Systematic discourse (論) on the underlying principles and patterns (*理) of reality.",
+      "etymology": "From root *理 (natural pattern/order) + 論 (discourse); completely cognate with Japanese 理論 and Korean 이론.",
+      "exTrans": "Any scientific theory must undergo rigorous experimental verification.",
+      "phrases": [
+        {
+          "foreign": "理论体系",
+          "trans": "theoretical framework"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "理解",
+          "phonetic": "lǐ jiě",
+          "pos": "V/N",
+          "meaning": "understand / understanding"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "théorie, doctrine"
+        }
+      ],
+      "core": "Exposé méthodique (*论) des principes internes (*理).",
+      "exTrans": "Cette théorie a été vérifiée par application aux données réelles."
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "teoría, doctrina"
+        }
+      ],
+      "core": "Exposición metódica (*论) de los principios internos (*理).",
+      "exTrans": "Esta teoría se puso a prueba con datos reales."
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "teoria, dottrina"
+        }
+      ],
+      "core": "Trattazione sistematica (*论) dei principi intrinseci (*理).",
+      "exTrans": "Questa teoria è stata verificata con dati reali."
+    }
+  },
+  "观念": {
+    "ko": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "관념, 생각, 가치관"
+        }
+      ],
+      "core": "대상의 본질을 깊이 통찰하고(*観) 마음에 품는(念) 생각.",
+      "etymology": "한자 자원 *観(깊이 보다)에서 유래. 한국어 '관념', 일본어 '観念'과 동일 어원.",
+      "exTrans": "사회의 발전에 따라 사람들의 소비 관념에는 깊은 변화가 일어났다.",
+      "phrases": [
+        {
+          "foreign": "传统观念",
+          "trans": "전통적 가치관"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "客观",
+          "phonetic": "kè guān",
+          "pos": "Adj/N",
+          "meaning": "객관적(인)"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Vorstellung, Auffassung, Konzept, Werte"
+        }
+      ],
+      "core": "Tiefes Erfassen (*観) des Wesens und Verankern im Geiste (念).",
+      "etymology": "Aus *観 (beobachten, schauen); kognat zu jap. 観念 und kor. 관념.",
+      "exTrans": "Mit der Entwicklung der Gesellschaft hat sich das Konsumverhalten der Menschen grundlegend verändert.",
+      "phrases": [
+        {
+          "foreign": "传统观念",
+          "trans": "traditionelle Werte"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "客观",
+          "phonetic": "kè guān",
+          "pos": "Adj/N",
+          "meaning": "objektiv"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "conception, notion, mindset, values"
+        }
+      ],
+      "core": "Gazing deeply (*観) into phenomena and holding the impression (念) in the mind.",
+      "etymology": "From root *観 (observe broadly); cognate with Japanese 観念 and Korean 관념.",
+      "exTrans": "With the development of society, people's consumption mindsets have undergone profound changes.",
+      "phrases": [
+        {
+          "foreign": "传统观念",
+          "trans": "traditional values / mindsets"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "客观",
+          "phonetic": "kè guān",
+          "pos": "Adj/N",
+          "meaning": "objective"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "notion, conception, idée"
+        }
+      ],
+      "core": "Image mentale durable (*念) issue de l'observation (*观).",
+      "exTrans": "Il faut renouveler nos conceptions traditionnelles."
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "concepto, noción, idea"
+        }
+      ],
+      "core": "Imagen mental fijada (*念) tras la observación (*观).",
+      "exTrans": "Es necesario renovar nuestros conceptos tradicionales."
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "concetto, nozione, idea"
+        }
+      ],
+      "core": "Immagine mentale (*念) derivata dall'osservazione (*观).",
+      "exTrans": "È necessario rinnovare i nostri concetti tradizionali."
+    }
+  },
+  "权利": {
+    "ko": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "권리 (법률상 정당한 이익과 자격)"
+        }
+      ],
+      "core": "저울추(*権)처럼 균형 있게 보장되는 정당한 법적 이익(利).",
+      "etymology": "한자 자원 *権(저울추, 균형)에 유래. 한국어 '권리', 일본어 '権利'와 직결.",
+      "exTrans": "헌법은 모든 시민이 법에 따라 누리는 기본적 권리를 보장한다.",
+      "phrases": [
+        {
+          "foreign": "知识产权",
+          "trans": "지식재산권"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "权力",
+          "phonetic": "quán lì",
+          "pos": "N",
+          "meaning": "권력, 파워"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "Recht, Berechtigung, Anspruch"
+        }
+      ],
+      "core": "Rechtmäßig zustehender Anspruch (*利), austariert wie das Gewicht einer Waage (*権).",
+      "etymology": "Aus *権 (Waage, Gleichgewicht); kognat zu jap. 権利 und kor. 권리.",
+      "exTrans": "Die Verfassung garantiert die Grundrechte, die jedem Bürger gesetzlich zustehen.",
+      "phrases": [
+        {
+          "foreign": "知识产权",
+          "trans": "geistiges Eigentum"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "权力",
+          "phonetic": "quán lì",
+          "pos": "N",
+          "meaning": "Macht, Befugnis"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "right, legal entitlement"
+        }
+      ],
+      "core": "Legitimate interest (*利) balanced like scale weights (*権) under the law.",
+      "etymology": "From root *権 (counterbalance/scale); cognate with Japanese 権利 and Korean 권리.",
+      "exTrans": "The constitution guarantees the fundamental rights enjoyed by every citizen according to law.",
+      "phrases": [
+        {
+          "foreign": "知识产权",
+          "trans": "intellectual property rights"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "权力",
+          "phonetic": "quán lì",
+          "pos": "N",
+          "meaning": "power, authority"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "droit, prérogative"
+        }
+      ],
+      "core": "Pouvoir légitime (*权) d'exercer une prérogative (*利).",
+      "exTrans": "Les citoyens ont le droit de défendre leurs intérêts légitimes."
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "derecho, prerrogativa"
+        }
+      ],
+      "core": "Facultad legítima (*权) para gozar de prerrogativas (*利).",
+      "exTrans": "Los ciudadanos tienen el derecho de defender sus intereses legítimos."
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "diritto, prerogativa"
+        }
+      ],
+      "core": "Facoltà legittima (*权) di esercitare un potere (*利).",
+      "exTrans": "I cittadini hanno il diritto di difendere i propri interessi legittimi."
+    }
+  },
+  "认识": {
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V/N",
+          "text": "인식하다, 알다; 인식, 이해"
+        }
+      ],
+      "core": "사물의 본질을 분별하고(*識) 마음에 새기는 것.",
+      "etymology": "한자 자원 *識(분별하다, 새기다)에 유래. 한국어 '인식', 일본어 '認識'과 완전 동원.",
+      "exTrans": "이 연구는 우리가 기후변화의 복잡한 메커니즘을 더욱 깊이 인식하는 데 도움을 준다.",
+      "phrases": [
+        {
+          "foreign": "清醒的认识",
+          "trans": "냉철하고 명확한 인식"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "知识",
+          "phonetic": "zhī shi",
+          "pos": "N",
+          "meaning": "지식"
+        },
+        {
+          "word": "意识",
+          "phonetic": "yì shi",
+          "pos": "N/V",
+          "meaning": "의식(하다)"
+        }
+      ]
+    },
+    "de": {
+      "meanings": [
+        {
+          "pos": "V/N",
+          "text": "erkennen, kennen, verstehen; Erkenntnis, Wahrnehmung"
+        }
+      ],
+      "core": "Das Wesen durch Zeichen erfassen und im Bewusstsein verankern (*識).",
+      "etymology": "Aus *識 (erkennen, merken); kognat zu jap. 認識 und kor. 인식.",
+      "exTrans": "Diese Studie hilft uns, die komplexen Mechanismen des Klimawandels tiefer zu erkennen.",
+      "phrases": [
+        {
+          "foreign": "清醒的认识",
+          "trans": "klare Erkenntnis"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "知识",
+          "phonetic": "zhī shi",
+          "pos": "N",
+          "meaning": "Wissen"
+        },
+        {
+          "word": "意识",
+          "phonetic": "yì shi",
+          "pos": "N/V",
+          "meaning": "Bewusstsein"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V/N",
+          "text": "recognize, understand, know; recognition, awareness"
+        }
+      ],
+      "core": "Discerning reality through signs (*識) and engraving it into consciousness.",
+      "etymology": "From root *識 (discern, record); shared with Japanese 認識 and Korean 인식.",
+      "exTrans": "This research helps us understand more deeply the complex mechanisms of climate change.",
+      "phrases": [
+        {
+          "foreign": "清醒的认识",
+          "trans": "clear and sober understanding"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "知识",
+          "phonetic": "zhī shi",
+          "pos": "N",
+          "meaning": "knowledge"
+        },
+        {
+          "word": "意识",
+          "phonetic": "yì shi",
+          "pos": "N/V",
+          "meaning": "consciousness"
+        }
+      ]
+    },
+    "fr": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "connaissance, perception, cognition"
+        }
+      ],
+      "core": "Graver dans l'esprit (*认) et discerner (*识).",
+      "exTrans": "La prise de conscience collective de ce problème s'approfondit."
+    },
+    "es": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "conocimiento, percepción, cognición"
+        }
+      ],
+      "core": "Grabar en la mente (*认) y discernir con claridad (*识).",
+      "exTrans": "La conciencia social sobre este asunto se profundiza."
+    },
+    "it": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "conoscenza, consapevolezza, cognizione"
+        }
+      ],
+      "core": "Imprimere nella mente (*认) e discernere (*识).",
+      "exTrans": "La consapevolezza sociale su questa problematica si approfondisce."
+    }
+  },
+  "concebir": {
+    "de": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "konzipieren, begreifen, ersinnen; empfangen"
+        }
+      ],
+      "core": "Zerstreute Gedanken erfassen (*kap-) und zu einer einheitlichen Idee zusammenfügen.",
+      "etymology": "Lat. concipere (con- zusammen + capere fassen) aus idg. *kap-. Kognat zu frz. concevoir und engl. conceive.",
+      "exTrans": "Es ist unmöglich, sich die Moderne ohne die Entwicklung des kritischen Denkens vorzustellen.",
+      "phrases": [
+        {
+          "foreign": "concebir una idea",
+          "trans": "eine Idee entwickeln"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "concepción",
+          "phonetic": "/konθepˈθjon/",
+          "pos": "N[f]",
+          "meaning": "Konzeption, Begriff"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "conceive, imagine, formulate; become pregnant"
+        }
+      ],
+      "core": "Grasping disparate thoughts together (*kap-) to crystallize an idea.",
+      "etymology": "From Latin concipere (con- together + capere seize) from PIE *kap- (grasp). Cognate with English conceive.",
+      "exTrans": "It is impossible to conceive of modernity without the development of critical thinking.",
+      "phrases": [
+        {
+          "foreign": "concebir una idea",
+          "trans": "conceive an idea"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "concepción",
+          "phonetic": "/konθepˈθjon/",
+          "pos": "N[f]",
+          "meaning": "conception"
+        }
+      ]
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "착상하다, 구상하다, 이해하다; 임신하다"
+        }
+      ],
+      "core": "씨앗이나 생각을 마음속에 완전히 품다 (*kap- / cipere) -> 새로운 아이디어를 낳다.",
+      "etymology": "라틴어 concipere (con- 완전히 + capere 쥐다, 품다)에서 유래.",
+      "exTrans": "새로운 이론적 틀을 구상하기 위해 수많은 선행 연구를 검토했다.",
+      "phrases": [
+        {
+          "foreign": "concebir una idea",
+          "trans": "아이디어를 구상하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "concepto",
+          "pos": "N",
+          "meaning": "개념"
+        },
+        {
+          "word": "concepción",
+          "pos": "N",
+          "meaning": "구상, 임신"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "构思、设想、孕育、理解"
+        }
+      ],
+      "core": "将种子或思绪完整纳入心中 (*kap-) -> 孕育出全新构想。",
+      "etymology": "源自拉丁语 concipere（con- 完全 + capere 捕捉、怀抱）。",
+      "exTrans": "为了构想新的理论框架，深入研读了大量前沿文献。",
+      "phrases": [
+        {
+          "foreign": "concebir una idea",
+          "trans": "构思新想法"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "concepto",
+          "pos": "N",
+          "meaning": "概念"
+        },
+        {
+          "word": "concepción",
+          "pos": "N",
+          "meaning": "构想、受孕"
+        }
+      ]
+    }
+  },
+  "mantener": {
+    "de": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "aufrechterhalten, beibehalten, unterhalten; behaupten"
+        }
+      ],
+      "core": "Mit der Hand (mano) fest umfassen und gespannt halten (*ten-).",
+      "etymology": "Lat. manu tenere (mit der Hand halten) aus idg. *ten- (spannen, halten). Kognat zu engl. maintain.",
+      "exTrans": "Die Zentralbank beschloss, die Zinssätze beizubehalten, um die Inflation einzudämmen.",
+      "phrases": [
+        {
+          "foreign": "mantener el equilibrio",
+          "trans": "das Gleichgewicht halten"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "mantenimiento",
+          "phonetic": "/manteniˈmjento/",
+          "pos": "N[m]",
+          "meaning": "Instandhaltung, Wartung"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "maintain, uphold, sustain, preserve"
+        }
+      ],
+      "core": "Holding firmly with the hand (manus) under tension (*ten-) so it does not collapse.",
+      "etymology": "From Latin manu tenere (hold with hand) from PIE *ten- (stretch, hold). Cognate with English maintain.",
+      "exTrans": "The central bank decided to maintain interest rates to control inflation.",
+      "phrases": [
+        {
+          "foreign": "mantener el equilibrio",
+          "trans": "maintain balance"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "mantenimiento",
+          "phonetic": "/manteniˈmjento/",
+          "pos": "N[m]",
+          "meaning": "maintenance"
+        }
+      ]
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "유지하다, 부양하다, 지키다"
+        }
+      ],
+      "core": "손 안에 단단히 쥐고 있다 (*manus + *ten-) -> 상태를 계속 지속하다.",
+      "etymology": "라틴어 manu tenere (손으로 붙잡다)에서 파생.",
+      "exTrans": "어떠한 압력 속에서도 원칙과 평정을 유지해야 한다.",
+      "phrases": [
+        {
+          "foreign": "mantener el equilibrio",
+          "trans": "균형을 유지하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "mantenimiento",
+          "pos": "N",
+          "meaning": "유지, 보수"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "维持、保持、抚养、坚持"
+        }
+      ],
+      "core": "手握不放 (*manus + *ten-) -> 使状态长久持存。",
+      "etymology": "拉丁语 manu tenere（手持）。",
+      "exTrans": "在面对外部压力时必须始终保持原则与沉着。",
+      "phrases": [
+        {
+          "foreign": "mantener el equilibrio",
+          "trans": "保持平衡"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "mantenimiento",
+          "pos": "N",
+          "meaning": "维持、保养"
+        }
+      ]
+    }
+  },
+  "establecer": {
+    "de": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "festsetzen, gründen, einrichten, etablieren"
+        }
+      ],
+      "core": "Fest auf ein Fundament stellen (*sta-), sodass es unverrückbar steht.",
+      "etymology": "Lat. stabilire (festigen) zu stare (stehen), idg. *sta-. Kognat zu engl. establish.",
+      "exTrans": "Die beiden Länder vereinbarten, neue diplomatische Beziehungen aufzunehmen.",
+      "phrases": [
+        {
+          "foreign": "establecer reglas",
+          "trans": "Regeln aufstellen"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "establecimiento",
+          "phonetic": "/estableθiˈmjento/",
+          "pos": "N[m]",
+          "meaning": "Einrichtung, Niederlassung"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "establish, set up, lay down, institute"
+        }
+      ],
+      "core": "Setting firmly on a foundation (*sta-) so that it stands immovably.",
+      "etymology": "From Latin stabilire from stare (to stand), from PIE *sta-. Cognate with English establish.",
+      "exTrans": "The two countries agreed to establish new diplomatic relations.",
+      "phrases": [
+        {
+          "foreign": "establecer reglas",
+          "trans": "establish rules"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "establecimiento",
+          "phonetic": "/estableθiˈmjento/",
+          "pos": "N[m]",
+          "meaning": "establishment"
+        }
+      ]
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "설립하다, 제정하다, 확립하다"
+        }
+      ],
+      "core": "흔들리지 않는 확고한 기초 위에 세우다 (*sta- / stabilire).",
+      "etymology": "라틴어 stabilire (sta- 서다 + -bilis).",
+      "exTrans": "양국 연구진은 장기 공동 연구 프로젝트를 확립했다.",
+      "phrases": [
+        {
+          "foreign": "establecer una norma",
+          "trans": "규범을 제정하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "establecimiento",
+          "pos": "N",
+          "meaning": "확립, 시설"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "建立、确立、制定、设立"
+        }
+      ],
+      "core": "在稳固基底上牢牢站立 (*sta-) -> 确立长久制度。",
+      "etymology": "源自拉丁语 stabilire（*sta- 站立）。",
+      "exTrans": "两国学者确立了长期跨学科联合研究项目。",
+      "phrases": [
+        {
+          "foreign": "establecer una norma",
+          "trans": "确立规范"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "establecimiento",
+          "pos": "N",
+          "meaning": "建立、机构"
+        }
+      ]
+    }
+  },
+  "transferir": {
+    "de": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "übertragen, überweisen, transferieren"
+        }
+      ],
+      "core": "Über eine Grenze hinweg (trans-) tragen und übergeben (*bher-).",
+      "etymology": "Lat. transferre (trans- hinüber + ferre tragen) aus idg. *bʰer- (tragen). Kognat zu engl. transfer.",
+      "exTrans": "Der Forscher konnte die akademischen Erkenntnisse erfolgreich in die Praxis übertragen.",
+      "phrases": [
+        {
+          "foreign": "transferir fondos",
+          "trans": "Gelder überweisen"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "transferencia",
+          "phonetic": "/tɾansfeˈɾenθja/",
+          "pos": "N[f]",
+          "meaning": "Überweisung, Übertragung"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "transfer, convey, wire (funds)"
+        }
+      ],
+      "core": "Carrying across (*bher-) a boundary (trans-) to pass on.",
+      "etymology": "From Latin transferre (trans- across + ferre carry), from PIE *bʰer-. Cognate with English transfer.",
+      "exTrans": "The researcher successfully transferred the academic findings into practical application.",
+      "phrases": [
+        {
+          "foreign": "transferir fondos",
+          "trans": "transfer funds"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "transferencia",
+          "phonetic": "/tɾansfeˈɾenθja/",
+          "pos": "N[f]",
+          "meaning": "transfer"
+        }
+      ]
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "이전하다, 양도하다, 이체하다, 전근시키다"
+        }
+      ],
+      "core": "저편으로 (*trans-) 나르다 (*bher- / ferre).",
+      "etymology": "라틴어 transferre (trans- 가로질러 + ferre 운반하다).",
+      "exTrans": "첨단 기술 지식을 현장 실무 조직으로 효과적으로 이전했다.",
+      "phrases": [
+        {
+          "foreign": "transferir fondos",
+          "trans": "자금을 이체하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "transferencia",
+          "pos": "N",
+          "meaning": "이전, 이체"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "转移、转让、转账、调动"
+        }
+      ],
+      "core": "越过界面 (*trans-) 运送运载 (*bher-)。",
+      "etymology": "拉丁语 transferre（trans- 越过 + ferre 携带）。",
+      "exTrans": "将尖端技术理论成功转移应用至产业实践一线。",
+      "phrases": [
+        {
+          "foreign": "transferir fondos",
+          "trans": "转移资金"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "transferencia",
+          "pos": "N",
+          "meaning": "转移、转账"
+        }
+      ]
+    }
+  },
+  "perspectiva": {
+    "de": {
+      "meanings": [
+        {
+          "pos": "N[f]",
+          "text": "Perspektive, Ausblick, Blickwinkel"
+        }
+      ],
+      "core": "Klar hindurchschauen (*speḱ-), um das Gesamte in richtiger Raumtiefe zu erfassen.",
+      "etymology": "Lat. perspectiva (per- hindurch + specere schauen) aus idg. *speḱ-. Kognat zu engl. perspective.",
+      "exTrans": "Aus historischer Perspektive stellt diese Reform einen Wendepunkt dar.",
+      "phrases": [
+        {
+          "foreign": "abrir nuevas perspectivas",
+          "trans": "neue Perspektiven eröffnen"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "perspicaz",
+          "phonetic": "/peɾspiˈkaθ/",
+          "pos": "Adj",
+          "meaning": "scharfsinnig"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "N[f]",
+          "text": "perspective, viewpoint, outlook"
+        }
+      ],
+      "core": "Looking clearly through (*speḱ-) to discern full spatial and conceptual depth.",
+      "etymology": "From Latin perspectiva (per- through + specere look), from PIE *speḱ-. Cognate with English perspective.",
+      "exTrans": "From a historical perspective, this reform represents a crucial turning point.",
+      "phrases": [
+        {
+          "foreign": "abrir nuevas perspectivas",
+          "trans": "open new perspectives"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "perspicaz",
+          "phonetic": "/peɾspiˈkaθ/",
+          "pos": "Adj",
+          "meaning": "perspicacious, shrewd"
+        }
+      ]
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "원근법, 관점, 시각, 전망"
+        }
+      ],
+      "core": "통하여 철저히 들여다보다 (*spec- / specere) -> 전체 구조를 꿰뚫어 보는 시야.",
+      "etymology": "라틴어 perspectivus (per- 꿰뚫어 + specere 보다).",
+      "exTrans": "거시적이고 종합적인 관점에서 사건의 본질을 파악하다.",
+      "phrases": [
+        {
+          "foreign": "desde una perspectiva crítica",
+          "trans": "비판적 관점에서"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "perspicaz",
+          "pos": "Adj",
+          "meaning": "통찰력 있는"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "N",
+          "text": "视角、透视、观点、前瞻"
+        }
+      ],
+      "core": "穿透事物全局深入观察 (*spec-) -> 宏观清晰的视野。",
+      "etymology": "拉丁语 perspicere（per- 穿透 + specere 凝视）。",
+      "exTrans": "应当站在更开阔宏观的视角来审视历史变迁。",
+      "phrases": [
+        {
+          "foreign": "desde una perspectiva crítica",
+          "trans": "从批判性视角"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "perspicaz",
+          "pos": "Adj",
+          "meaning": "敏锐洞察的"
+        }
+      ]
+    }
+  },
+  "contradecir": {
+    "de": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "widersprechen, bestreiten"
+        }
+      ],
+      "core": "Dagegen (contra) sprechen (*deyk-), um eine Behauptung zurückzuweisen.",
+      "etymology": "Lat. contradicere (contra- gegen + dicere sagen) aus idg. *deyḱ-. Kognat zu engl. contradict.",
+      "exTrans": "Die experimentellen Daten widersprechen der ursprünglichen Annahme direkt.",
+      "phrases": [
+        {
+          "foreign": "contradecirse a sí mismo",
+          "trans": "sich selbst widersprechen"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "contradicción",
+          "phonetic": "/kontɾaðiɣˈθjon/",
+          "pos": "N[f]",
+          "meaning": "Widerspruch"
+        }
+      ]
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "contradict, gainsay, dispute"
+        }
+      ],
+      "core": "Speaking (*deyk-) against (contra-) to refute a claim.",
+      "etymology": "From Latin contradicere (contra- against + dicere speak), from PIE *deyḱ-. Cognate with English contradict.",
+      "exTrans": "The experimental data directly contradict the initial hypothesis.",
+      "phrases": [
+        {
+          "foreign": "contradecirse a sí mismo",
+          "trans": "contradict oneself"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "contradicción",
+          "phonetic": "/kontɾaðiɣˈθjon/",
+          "pos": "N[f]",
+          "meaning": "contradiction"
+        }
+      ]
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "모순되다, 반박하다, 반대되는 말을 하다"
+        }
+      ],
+      "core": "정반대 방향으로 (*contra-) 말하다 (*deik- / dicere).",
+      "etymology": "라틴어 contradicere (contra- 반대하여 + dicere 말하다).",
+      "exTrans": "새로운 실험 데이터는 기존의 가설을 정면으로 반박하고 있다.",
+      "phrases": [
+        {
+          "foreign": "contradecirse a sí mismo",
+          "trans": "자신과 모순되다 (자가당착)"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "contradicción",
+          "pos": "N",
+          "meaning": "모순, 반박"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "反驳、同……矛盾、抵触"
+        }
+      ],
+      "core": "迎面背道言说 (*contra- + *deik- / dicere)。",
+      "etymology": "拉丁语 contradicere（contra- 反向 + dicere 讲述）。",
+      "exTrans": "这一最新实验结果与最初提出的预设立场完全相抵触。",
+      "phrases": [
+        {
+          "foreign": "contradecirse a sí mismo",
+          "trans": "自相矛盾"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "contradicción",
+          "pos": "N",
+          "meaning": "矛盾、抵触"
+        }
+      ]
+    }
+  },
+  "bestehen": {
+    "fr": {
+      "meanings": [
+        {
+          "pos": "V[I/T]",
+          "text": "exister, consister en ; réussir (un examen)"
+        }
+      ],
+      "core": "Rester debout solidement (*sta-) face aux épreuves ou perdurer dans l'être.",
+      "etymology": "Vieux haut-allemand bistantan (be- + stehen), racine indo-européenne *sta- (être debout).",
+      "exTrans": "Il n'y a aucun doute sur l'existence de cette corrélation."
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[I/T]",
+          "text": "exist, consist of; pass (an exam)"
+        }
+      ],
+      "core": "Standing firmly (*sta-) enduring tests or remaining in existence.",
+      "etymology": "From Old High German bistantan, PIE *sta- (stand). Cognate with English be + stand.",
+      "exTrans": "There is no doubt about the existence of this correlation."
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[I/T]",
+          "text": "존재하다, 존속하다; (시험에) 합격하다; (~으로) 구성되다 (aus)"
+        }
+      ],
+      "core": "확고하게 서 있다 (*sta- / stehen) -> 변함없이 자리를 지키거나 관문을 통과하다.",
+      "etymology": "게르만 조어 *sta- (서다)에 강조/완료 접두사 be-가 결합된 형태. 라틴어 constare, 영어 stand와 동원어.",
+      "exTrans": "이 오래된 전통은 수세기 동안 변함없이 존속해 왔다.",
+      "phrases": [
+        {
+          "foreign": "die Prüfung bestehen",
+          "trans": "시험에 합격하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Bestand",
+          "pos": "N",
+          "meaning": "존속, 재고, 잔고"
+        },
+        {
+          "word": "Beständigkeit",
+          "pos": "N",
+          "meaning": "불변성, 지속성"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[I/T]",
+          "text": "存在、保持；通过（考试）；由……组成 (aus)"
+        }
+      ],
+      "core": "稳固站立 (*sta- / stehen) -> 屹立不倒或顺利越过难关。",
+      "etymology": "源自日耳曼原始词根 *sta-（站立），结合完成前缀 be-。与拉丁语 constare、英语 stand 完全同源。",
+      "exTrans": "这一古老传统已经延续存在了数个世纪。",
+      "phrases": [
+        {
+          "foreign": "die Prüfung bestehen",
+          "trans": "通过考试"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Bestand",
+          "pos": "N",
+          "meaning": "存续、库存、藏量"
+        }
+      ]
+    }
+  },
+  "entstehen": {
+    "fr": {
+      "meanings": [
+        {
+          "pos": "V[I]",
+          "text": "naître, surgir, résulter de, se former"
+        }
+      ],
+      "core": "S'élever et prendre naissance à partir d'une origine (*sta-).",
+      "etymology": "Préfixe ent- (séparation/émergence) + stehen (se tenir), racine *sta-.",
+      "exTrans": "De nouvelles opportunités émergent grâce aux avancées technologiques."
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[I]",
+          "text": "originate, arise, emerge, come into being"
+        }
+      ],
+      "core": "Rising and taking stand (*sta-) from an origin point (ent-).",
+      "etymology": "Prefix ent- (away/forth) + stehen (stand), PIE *sta-.",
+      "exTrans": "New opportunities arise through technological advances."
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[I]",
+          "text": "생겨나다, 발생하다, 비롯되다"
+        }
+      ],
+      "core": "기존의 상태에서 일어나 서다 (*sta- / stehen) -> 새로운 것이 출현하다.",
+      "etymology": "게르만 조어 *sta- (서다)에 이탈/분리 접두사 ent-가 결합하여 '솟아나다'를 의미.",
+      "exTrans": "이러한 계기로 두 연구 기관 사이에 긴밀한 협력 관계가 생겨났다.",
+      "phrases": [
+        {
+          "foreign": "ein Konflikt entsteht",
+          "trans": "갈등이 발생하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Entstehung",
+          "pos": "N",
+          "meaning": "발생, 기원, 형성"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[I]",
+          "text": "产生、发生、形成、萌生"
+        }
+      ],
+      "core": "从基底立起 (*sta-) -> 新生事物萌芽崛起。",
+      "etymology": "词根 *sta- 加上起始/分离前缀 ent-，表示脱胎独立站立。",
+      "exTrans": "以此为契机，两个研究机构之间建立了紧密的合作关系。",
+      "phrases": [
+        {
+          "foreign": "ein Konflikt entsteht",
+          "trans": "产生冲突"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Entstehung",
+          "pos": "N",
+          "meaning": "产生、起源、成因"
+        }
+      ]
+    }
+  },
+  "einbeziehen": {
+    "fr": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "inclure, intégrer, prendre en considération"
+        }
+      ],
+      "core": "Tirer vers l'intérieur d'un cercle (*dewk- / ziehen) pour englober.",
+      "exTrans": "Tous les facteurs environnementaux doivent être pris en compte."
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "include, incorporate, take into account"
+        }
+      ],
+      "core": "Drawing in (*dewk-) to encompass within the boundary.",
+      "exTrans": "All environmental factors must be taken into account."
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "포함하다, 고려에 넣다, 산입하다"
+        }
+      ],
+      "core": "경계 안으로 끌어당기다 (*dewk- / ziehen) -> 논의의 범위 내에 포함시키다.",
+      "etymology": "印欧祖語 *dewk- (끌다)에 분리접두사 ein- (안으로)가 결합.",
+      "exTrans": "모든 환경적 요인을 사전에 종합적으로 고려해야 한다.",
+      "phrases": [
+        {
+          "foreign": "in die Planung einbeziehen",
+          "trans": "계획에 반영하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Einbeziehung",
+          "pos": "N",
+          "meaning": "포함, 산입, 고려"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "纳入、把……考虑在内、包含"
+        }
+      ],
+      "core": "向内拉入 (*dewk- / ziehen) 范围之中。",
+      "etymology": "印欧词根 *dewk-（拉曳）加上前缀 ein-（入内）。",
+      "exTrans": "必须预先将所有环境因素全面纳入考量。",
+      "phrases": [
+        {
+          "foreign": "in die Planung einbeziehen",
+          "trans": "纳入规划"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Einbeziehung",
+          "pos": "N",
+          "meaning": "纳入、包含"
+        }
+      ]
+    }
+  },
+  "bewältigen": {
+    "fr": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "surmonter, maîtriser, venir à bout de"
+        }
+      ],
+      "core": "Exercer sa force (*waldan) pour maîtriser une difficulté.",
+      "exTrans": "La société a su surmonter cette crise majeure avec résilience."
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "overcome, cope with, master"
+        }
+      ],
+      "core": "Exercising power (*waldan) to triumph over challenges.",
+      "exTrans": "Society managed to overcome this major crisis with resilience."
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "극복하다, 해내다, 처리하다"
+        }
+      ],
+      "core": "힘과 통제력 (*waldan)을 발휘하여 어려운 과제를 지배하고 완수하다.",
+      "etymology": "게르만 조어 *waldan (지배하다, 다스리다)에서 파생된 walten / bewältigen.",
+      "exTrans": "사회는 강인한 회복탄력성으로 이 심각한 위기를 극복해 냈다.",
+      "phrases": [
+        {
+          "foreign": "eine Krise bewältigen",
+          "trans": "위기를 극복하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Bewältigung",
+          "pos": "N",
+          "meaning": "극복, 처리, 해결"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "克服、战胜、处理、胜任"
+        }
+      ],
+      "core": "施展掌控力 (*waldan) 压倒并解决困难。",
+      "etymology": "日耳曼原始词根 *waldan（支配、治理）派生，指驾驭局势。",
+      "exTrans": "全社会凭借强大的韧性成功化解克服了这一重大危机。",
+      "phrases": [
+        {
+          "foreign": "eine Krise bewältigen",
+          "trans": "克服危机"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Bewältigung",
+          "pos": "N",
+          "meaning": "克服、化解、处理"
+        }
+      ]
+    }
+  },
+  "nachhaltig": {
+    "fr": {
+      "meanings": [
+        {
+          "pos": "Adj",
+          "text": "durable, pérenne, persistant"
+        }
+      ],
+      "core": "Maintenir une prise continue (*haldan) qui dure dans le temps.",
+      "exTrans": "Un développement durable est essentiel pour les générations futures."
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "Adj",
+          "text": "sustainable, lasting, enduring"
+        }
+      ],
+      "core": "Holding (*haldan) continuously so that value endures over time.",
+      "exTrans": "Sustainable development is essential for future generations."
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "Adj",
+          "text": "지속 가능한, 오래 지속되는"
+        }
+      ],
+      "core": "손을 놓지 않고 계속 붙잡고 있다 (*haldan / halten) -> 미래까지 효과가 지속되다.",
+      "etymology": "원래 임업에서 벌채 후 숲이 지속되도록 관리하던 개념에서 발전 (nach + halten).",
+      "exTrans": "지속 가능한 발전은 미래 세대를 위해 반드시 필요하다.",
+      "phrases": [
+        {
+          "foreign": "nachhaltige Entwicklung",
+          "trans": "지속 가능한 발전"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Nachhaltigkeit",
+          "pos": "N",
+          "meaning": "지속 가능성"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "Adj",
+          "text": "可持续的、深远的、持久的"
+        }
+      ],
+      "core": "紧握不放 (*haldan) -> 价值长久留存延续。",
+      "etymology": "源自林业永续管理概念（nach + halten：持续护持）。",
+      "exTrans": "可持续发展对子孙后代至关重要。",
+      "phrases": [
+        {
+          "foreign": "nachhaltige Entwicklung",
+          "trans": "可持续发展"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Nachhaltigkeit",
+          "pos": "N",
+          "meaning": "可持续性"
+        }
+      ]
+    }
+  },
+  "übertragen": {
+    "fr": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "transférer, transmettre, confier"
+        }
+      ],
+      "core": "Porter par-delà les frontières (*dʰregʰ- / tragen).",
+      "exTrans": "Il est difficile de transposer ces résultats directement à la pratique clinique."
+    },
+    "en": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "transfer, transmit, broadcast, delegate"
+        }
+      ],
+      "core": "Carrying (*dʰregʰ-) across (über-) boundaries.",
+      "exTrans": "It is difficult to transfer these results directly into clinical practice."
+    },
+    "ko": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "전달하다, 양도하다, 중계하다; 적용하다"
+        }
+      ],
+      "core": "경계를 넘어서 (*dʰregʰ- / tragen) 저편으로 운반하다.",
+      "etymology": "게르만 조어 *dʰregʰ- (나르다, 지탱하다)에 초과/건넘 접두사 über-가 결합.",
+      "exTrans": "이러한 연구 결과를 임상 현장에 직접 적용하기는 어렵다.",
+      "phrases": [
+        {
+          "foreign": "eine Aufgabe übertragen",
+          "trans": "과제를 위임하다"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Übertragung",
+          "pos": "N",
+          "meaning": "전달, 중계, 전이"
+        }
+      ]
+    },
+    "zh": {
+      "meanings": [
+        {
+          "pos": "V[T]",
+          "text": "转让、转播、委派、转移、套用"
+        }
+      ],
+      "core": "越过界限 (*dʰregʰ- / tragen) 运至彼方。",
+      "etymology": "日耳曼词根 *dʰregʰ-（运载）加 über-（跨越）。",
+      "exTrans": "很难直接将这些研究结论套用推广至临床实践中。",
+      "phrases": [
+        {
+          "foreign": "eine Aufgabe übertragen",
+          "trans": "委派任务"
+        }
+      ],
+      "derivatives": [
+        {
+          "word": "Übertragung",
+          "pos": "N",
+          "meaning": "转让、转播、转移"
+        }
+      ]
+    }
+  }
+};
+
+  function localizeStarterItem(item, tgtLang = 'ja', srcLang = null) {
+    if (!item || typeof item !== 'object') return item;
+    const t = String(tgtLang || 'ja').toLowerCase();
+    if (t === 'ja' || !t) return item;
+    const s = String(srcLang || item.lang || 'en').toLowerCase();
+    if (t === s) return item;
+
+    const w = String(item.word || '').trim();
+    const locDict = STARTER_LOCALIZATIONS[w] || STARTER_LOCALIZATIONS[w.toLowerCase()];
+    const loc = locDict ? (locDict[t] || locDict['en']) : null;
+
+    const cloned = JSON.parse(JSON.stringify(item));
+    cloned.tgtLang = t;
+    cloned.pair = `${s}_${t}`;
+
+    if (loc) {
+      if (loc.meanings) cloned.meanings = JSON.parse(JSON.stringify(loc.meanings));
+      if (loc.core) cloned.core = loc.core;
+      if (loc.etymology) cloned.etymology = loc.etymology;
+      if (cloned.example) {
+        if (loc.exTrans) {
+          cloned.example.trans = loc.exTrans;
+          cloned.example[t] = loc.exTrans;
+        }
+      }
+      if (Array.isArray(cloned.phrases) && Array.isArray(loc.phrases)) {
+        cloned.phrases = cloned.phrases.map((p, idx) => {
+          const lp = loc.phrases[idx];
+          return lp ? { ...p, trans: lp.trans, [t]: lp.trans } : p;
+        });
+      }
+      if (Array.isArray(cloned.derivatives) && Array.isArray(loc.derivatives)) {
+        cloned.derivatives = cloned.derivatives.map((d, idx) => {
+          const ld = loc.derivatives[idx];
+          return ld ? { ...d, meaning: ld.meaning || d.meaning } : d;
+        });
+      }
+    }
+    return cloned;
+  }
+
   const DEFAULT_PACK_BY_LANG = {
     fr: 'fr_pre1',
     de: 'de_pre1',
@@ -4353,7 +7224,7 @@
     return Object.values(PACK_METADATA);
   }
 
-  function populateStarterPack(currentEntries, lang = 'en', packType = 'academic', targetPairKey = null) {
+  function populateStarterPack(currentEntries, lang = 'en', packType = 'academic', targetPairKey = null, targetTgtLang = null) {
     let resolvedPack = packType;
     if (packType === 'academic' && DEFAULT_PACK_BY_LANG[lang]) {
       resolvedPack = DEFAULT_PACK_BY_LANG[lang];
@@ -4382,19 +7253,25 @@
       const k = makeLookupKey(item.word, itemLang, hIdx);
       if (!existingWords.has(k)) {
         maxNum++;
-        const cleanSlug = String(item.word || '').trim().toLowerCase().replace(/[^a-z0-9\u00C0-\u024F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]+/g, '_') || String(maxNum);
-        const cardId = item.id || `starter_${resolvedPack}_${cleanSlug}${hIdx > 1 ? '_' + hIdx : ''}`;
-        const cardWk = item.wordKey || makeWordKey(item.word, itemLang, item.meanings?.[0]?.pos, hIdx);
+        const activeTgtLang = targetTgtLang || (global.App?.tgtLang) || 'ja';
+        const localizedItem = (activeTgtLang && activeTgtLang !== 'ja' && typeof localizeStarterItem === 'function')
+          ? localizeStarterItem(item, activeTgtLang, itemLang)
+          : item;
+        const cleanSlug = String(localizedItem.word || '').trim().toLowerCase().replace(/[^a-z0-9\u00C0-\u024F\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]+/g, '_') || String(maxNum);
+        const cardId = localizedItem.id || `starter_${resolvedPack}_${cleanSlug}${hIdx > 1 ? '_' + hIdx : ''}`;
+        const cardWk = localizedItem.wordKey || makeWordKey(localizedItem.word, itemLang, localizedItem.meanings?.[0]?.pos, hIdx);
         const card = {
-          ...item,
+          ...localizedItem,
           id: cardId,
           wordKey: cardWk,
           homographIndex: hIdx,
-          version: Number(item.version) || 1,
+          version: Number(localizedItem.version) || 1,
           num: maxNum,
           lang: itemLang,
-          category: item.category || (resolvedPack.startsWith('eiken_') ? '英検準1級' : '一般・その他'),
-          folder: item.folder || defaultFolder,
+          tgtLang: activeTgtLang,
+          pair: `${itemLang}_${activeTgtLang}`,
+          category: localizedItem.category || (resolvedPack.startsWith('eiken_') ? '英検準1級' : '一般・その他'),
+          folder: localizedItem.folder || defaultFolder,
           interval: 0,
           repetition: 0,
           efactor: 2.5,
@@ -4458,6 +7335,8 @@
     getStarterPack,
     getStarterPacksInfo,
     populateStarterPack,
+    localizeStarterItem,
+    STARTER_LOCALIZATIONS,
     buildStarterPackGalleryHtml,
     loadStarterPackData,
     registerPackData,

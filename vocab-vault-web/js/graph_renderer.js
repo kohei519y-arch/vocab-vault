@@ -184,21 +184,6 @@
         bCtx.lineTo(cx + 1450 * Math.cos(startA), cy + 1450 * Math.sin(startA));
         bCtx.stroke();
         bCtx.setLineDash([]);
-
-        // サンバースト階層ラベル
-        const centerA = Number(sDef.center || (startA + endA) / 2);
-        bCtx.textAlign = 'center';
-        bCtx.font = '700 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        bCtx.fillStyle = isDark ? (sDef.textColorDark || '#7dd3fc') : (sDef.textColorLight || '#0369a1');
-        const t2X = cx + 220 * Math.cos(centerA);
-        const t2Y = cy + 220 * Math.sin(centerA);
-        bCtx.fillText(sDef.label || '', t2X, t2Y);
-
-        bCtx.font = '600 10.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-        bCtx.fillStyle = isDark ? (sDef.subTextColorDark || '#a5b4fc') : (sDef.subTextColorLight || '#4338ca');
-        const t3X = cx + 465 * Math.cos(centerA);
-        const t3Y = cy + 465 * Math.sin(centerA);
-        bCtx.fillText(sDef.subLabel || '', t3X, t3Y);
       });
     } else {
       // フォールバック: 標準3セクター
@@ -239,17 +224,6 @@
       });
       bCtx.stroke();
       bCtx.setLineDash([]);
-
-      bCtx.textAlign = 'center';
-      bCtx.font = '700 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-      bCtx.fillStyle = isDark ? '#bef264' : '#4d7c0f';
-      bCtx.fillText('ゲルマン語派 / Germanic', cx, cy - 260);
-
-      bCtx.fillStyle = isDark ? '#7dd3fc' : '#0369a1';
-      bCtx.fillText('イタリック語派 / Italic', cx + 260 * Math.cos(Math.PI / 6), cy + 260 * Math.sin(Math.PI / 6));
-
-      bCtx.fillStyle = isDark ? '#d8b4fe' : '#7e22ce';
-      bCtx.fillText('ギリシャ・古典諸派', cx + 260 * Math.cos(11 * Math.PI / 12), cy + 260 * Math.sin(11 * Math.PI / 12));
     }
 
     // D. 同心円ガイドライン
@@ -299,7 +273,7 @@
       global.VocabWebGLGraph.hide();
     }
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.scale(dpr, dpr);
@@ -347,6 +321,47 @@
             return;
           }
           ctx.drawImage(bgCache, cx - 1550, cy - 1550, 3100, 3100);
+
+          // セクター見出しバッジを100%ネイティブ解像度・ノード非干渉のオープンリング回廊 (r = 138) に鮮明描画
+          const sectorList = sDefs ? Object.values(sDefs) : [];
+          if (sectorList.length > 0 && zoom >= 0.20) {
+            const secBadgeR = 138;
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const secFontSize = Math.round(Math.max(10, 11.5 / Math.sqrt(Math.max(0.65, zoom))));
+            ctx.font = `bold ${secFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+
+            sectorList.forEach(s => {
+              const theta = Number(s.center || ((Number(s.start || 0) + Number(s.end || 0)) / 2));
+              const badgeX = cx + secBadgeR * Math.cos(theta);
+              const badgeY = cy + secBadgeR * Math.sin(theta);
+              const label = s.label || '';
+              if (!label) return;
+
+              const metrics = ctx.measureText(label);
+              const padX = 8, padY = 3.5;
+              const bW = metrics.width + padX * 2;
+              const bH = secFontSize + padY * 2;
+
+              ctx.fillStyle = isDark ? 'rgba(11, 15, 25, 0.90)' : 'rgba(255, 255, 255, 0.94)';
+              ctx.beginPath();
+              if (typeof ctx.roundRect === 'function') {
+                ctx.roundRect(badgeX - bW / 2, badgeY - bH / 2, bW, bH, 5);
+              } else {
+                ctx.rect(badgeX - bW / 2, badgeY - bH / 2, bW, bH);
+              }
+              ctx.fill();
+
+              ctx.strokeStyle = isDark ? (s.colorDarkBorder || 'rgba(56, 189, 248, 0.40)') : (s.colorLightBorder || 'rgba(2, 132, 199, 0.35)');
+              ctx.lineWidth = 1.0;
+              ctx.stroke();
+
+              ctx.fillStyle = isDark ? (s.textColorDark || '#7dd3fc') : (s.textColorLight || '#0369a1');
+              ctx.fillText(label, badgeX, badgeY);
+            });
+            ctx.restore();
+          }
         });
       }
     }
@@ -533,6 +548,7 @@
 
     for (let i = 0; i < graphState.nodes.length; i++) {
       const n = graphState.nodes[i];
+      ctx.globalAlpha = 1.0;
       if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
       const rBuf = (n.radius || 10) + 20;
       if (n.x + rBuf < viewLeft || n.x - rBuf > viewRight || n.y + rBuf < viewTop || n.y - rBuf > viewBottom) {
@@ -564,13 +580,13 @@
 
       let nodeAlpha = 1.0;
       if (isDimmedByEra) {
-        nodeAlpha = 0.12;
+        nodeAlpha = 0.28;
       } else if (focusNode && !isSelected && !isHover && !isConnectedToFocus) {
-        nodeAlpha = 0.12;
+        nodeAlpha = 0.38;
       } else if (isFiltered && !isMatch) {
-        nodeAlpha = 0.15;
+        nodeAlpha = 0.25;
       }
-      if (nodeAlpha !== 1.0) ctx.globalAlpha = nodeAlpha;
+      ctx.globalAlpha = nodeAlpha;
 
       // カラー算出
       let nodeColor = LANG_GRAPH_COLORS.root;
@@ -789,16 +805,31 @@
         if (zoom >= (isTree ? 0.20 : 0.40) || isSelected || isHover) {
           const bFontSize = Math.round(Math.max(9.5, 11.0 / Math.sqrt(zoom)));
           ctx.font = `700 ${bFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-          ctx.lineJoin = 'round';
-          ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.95)';
-          ctx.lineWidth = 3.0;
           ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
           const cleanBranchLabel = n.label.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric):\s*/i, '');
           const wCount = n.connectedWords?.length || 0;
           const displayBranchText = wCount > 0 ? `${cleanBranchLabel} (${wCount})` : cleanBranchLabel;
-          ctx.strokeText(displayBranchText, n.x, n.y + drawRadius + bFontSize + 2);
+
+          const bTextW = ctx.measureText(displayBranchText).width;
+          const bPadX = 6, bPadY = 3.0;
+          const bY = n.y + drawRadius + bFontSize * 0.7 + 3;
+
+          ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.90)' : 'rgba(255, 255, 255, 0.94)';
+          ctx.beginPath();
+          if (typeof ctx.roundRect === 'function') {
+            ctx.roundRect(n.x - bTextW / 2 - bPadX, bY - bFontSize / 2 - bPadY, bTextW + bPadX * 2, bFontSize + bPadY * 2, 4);
+          } else {
+            ctx.rect(n.x - bTextW / 2 - bPadX, bY - bFontSize / 2 - bPadY, bTextW + bPadX * 2, bFontSize + bPadY * 2);
+          }
+          ctx.fill();
+
+          ctx.strokeStyle = isDark ? 'rgba(251, 191, 36, 0.45)' : 'rgba(217, 119, 6, 0.35)';
+          ctx.lineWidth = 0.9;
+          ctx.stroke();
+
           ctx.fillStyle = isDark ? '#fbbf24' : '#b45309';
-          ctx.fillText(displayBranchText, n.x, n.y + drawRadius + bFontSize + 2);
+          ctx.fillText(displayBranchText, n.x, bY);
         }
 
       } else if (n.type === 'ghost_bud') {
@@ -979,22 +1010,53 @@
 
           if (shouldDrawWordLabel) {
             ctx.font = `bold ${wFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-            ctx.lineJoin = 'round';
-            ctx.strokeStyle = isDark ? 'rgba(11, 15, 25, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-            ctx.lineWidth = 3.5;
             ctx.textAlign = 'center';
-            ctx.strokeText(n.label, n.x, n.y + drawRadius + wFontSize + 3);
-            ctx.fillStyle = textColor;
-            ctx.fillText(n.label, n.x, n.y + drawRadius + wFontSize + 3);
+            ctx.textBaseline = 'middle';
+            const wordText = n.label;
+            const wWidth = ctx.measureText(wordText).width;
+            const wPadX = 5, wPadY = 2.5;
+            const wLabelY = n.y + drawRadius + wFontSize * 0.6 + 3;
+
+            ctx.fillStyle = isDark ? 'rgba(11, 17, 32, 0.88)' : 'rgba(255, 255, 255, 0.92)';
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') {
+              ctx.roundRect(n.x - wWidth / 2 - wPadX, wLabelY - wFontSize / 2 - wPadY, wWidth + wPadX * 2, wFontSize + wPadY * 2, 3);
+            } else {
+              ctx.rect(n.x - wWidth / 2 - wPadX, wLabelY - wFontSize / 2 - wPadY, wWidth + wPadX * 2, wFontSize + wPadY * 2);
+            }
+            ctx.fill();
+
+            ctx.strokeStyle = isFocusHighlight
+              ? (isDark ? '#38bdf8' : '#0284c7')
+              : (isDark ? 'rgba(148, 163, 184, 0.32)' : 'rgba(100, 116, 139, 0.26)');
+            ctx.lineWidth = isFocusHighlight ? 1.4 : 0.7;
+            ctx.stroke();
+
+            ctx.fillStyle = isFocusHighlight
+              ? (isDark ? '#38bdf8' : '#0284c7')
+              : (isDark ? '#f8fafc' : '#0f172a');
+            ctx.fillText(wordText, n.x, wLabelY);
           }
 
-          // ズームイン時 (zoom >= 1.30) は日本語訳も控えめに添える
+          // ズームイン時 (zoom >= 1.30) は訳語も控えめに添える
           if (isTree && meaningText && (zoom >= 1.30 || isFocusHighlight)) {
             const mFontSize = Math.round(wFontSize * 0.82);
             const shortMeaning = meaningText.length > 9 ? meaningText.slice(0, 8) + '…' : meaningText;
             ctx.font = `500 ${mFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-            const mY = n.y + drawRadius + wFontSize + mFontSize + 6;
-            ctx.strokeText(shortMeaning, n.x, mY);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const mY = n.y + drawRadius + wFontSize + mFontSize * 0.7 + 6;
+
+            const mW = ctx.measureText(shortMeaning).width;
+            ctx.fillStyle = isDark ? 'rgba(11, 17, 32, 0.82)' : 'rgba(255, 255, 255, 0.88)';
+            ctx.beginPath();
+            if (typeof ctx.roundRect === 'function') {
+              ctx.roundRect(n.x - mW / 2 - 4, mY - mFontSize / 2 - 2, mW + 8, mFontSize + 4, 3);
+            } else {
+              ctx.rect(n.x - mW / 2 - 4, mY - mFontSize / 2 - 2, mW + 8, mFontSize + 4);
+            }
+            ctx.fill();
+
             ctx.fillStyle = (isMask && !isHover && !isSelected) ? '#94a3b8' : (isDark ? '#94a3b8' : '#64748b');
             ctx.fillText(shortMeaning, n.x, mY);
           }

@@ -148,22 +148,33 @@
     const viewMode = options.viewMode || global.App?.viewMode || 'academic';
 
     const iL = d.lang || options.lang || global.App?.lang || 'en';
+    const tL = d.tgtLang || options.tgtLang || global.App?.tgtLang || 'ja';
     const { meanings, histDigest, compactEty, isLongEty } = formatMeaningAndEty(d);
     const mHtml = meanings.map((x, idx) => `<div class="pos-block"><span class="pos">${esc(x.pos)}</span><span class="m-red" data-act="reveal-mask">${hlText(x.text, false, qReg)}${idx === meanings.length - 1 && histDigest ? `<span class="m-hist-note">${hlText(histDigest, false, qReg)}</span>` : ''}</span></div>`).join('');
-    const coreHtml = d.core ? `<div class="core-box" data-act="reveal-mask"><span class="core-badge">コア</span><span class="core-text">${hlText(d.core, false, qReg)}</span></div>` : '';
+
+    const coreBadgeLabel = (tL === 'en' ? 'CORE' : (tL === 'de' ? 'KERN' : (tL === 'fr' ? 'CŒUR' : (tL === 'es' ? 'NÚCLEO' : (tL === 'ko' ? '핵심' : (tL === 'zh' ? '核心' : 'コア'))))));
+    const histBadgeLabel = (tL === 'en' ? 'History' : (tL === 'de' ? 'Kontext' : (tL === 'fr' ? 'Histoire' : (tL === 'es' ? 'Historia' : (tL === 'ko' ? '역사·맥락' : (tL === 'zh' ? '历史·背景' : '歴史・文脈'))))));
+
+    const coreHtml = d.core ? `<div class="core-box" data-act="reveal-mask"><span class="core-badge">${coreBadgeLabel}</span><span class="core-text">${hlText(d.core, false, qReg)}</span></div>` : '';
 
     const hn = String(d.history_note || '').trim();
-    const histHtml = hn ? `<div class="hist-box" data-act="reveal-mask"><span class="hist-badge">歴史・文脈</span><span>${hlText(hn, false, qReg)}</span></div>` : '';
+    const histHtml = hn ? `<div class="hist-box" data-act="reveal-mask"><span class="hist-badge">${histBadgeLabel}</span><span>${hlText(hn, false, qReg)}</span></div>` : '';
 
     const spkFn = (txt, l, sm) => global.VocabSpeech ? global.VocabSpeech.mkSpkBtn(txt, l, sm) : '';
 
-    const hasEx = d.example && (d.example.foreign || d.example.ja);
-    const ctxHtml = d.contextSentence ? `<div class="ctx-src"><span class="ctx-tag">文脈</span>${hlText(d.contextSentence, false, qReg)}</div>` : '';
-    const exHtml = (hasEx || ctxHtml) ? `<div class="ex-block">${hasEx ? `<div class="ex-en">${spkFn(d.example.foreign, iL, true)}<span>${hlText(d.example.foreign, false, qReg)}</span></div><div class="ex-ja" data-act="reveal-mask">${hlText(d.example.ja, true, qReg)}</div>` : ''}${ctxHtml}</div>` : '';
+    const exTrans = d.example ? (d.example.trans || (tL && d.example[tL]) || d.example.ja || '') : '';
+    const hasEx = d.example && (d.example.foreign || exTrans);
+    const ctxTagLabel = (tL === 'en' ? 'Context' : (tL === 'ko' ? '맥락' : (tL === 'zh' ? '语境' : (tL === 'de' ? 'Kontext' : (tL === 'fr' ? 'Contexte' : '文脈')))));
+    const ctxHtml = d.contextSentence ? `<div class="ctx-src"><span class="ctx-tag">${ctxTagLabel}</span>${hlText(d.contextSentence, false, qReg)}</div>` : '';
+    const exHtml = (hasEx || ctxHtml) ? `<div class="ex-block">${hasEx ? `<div class="ex-en">${spkFn(d.example.foreign, iL, true)}<span>${hlText(d.example.foreign, false, qReg)}</span></div><div class="ex-ja" data-act="reveal-mask">${hlText(exTrans, true, qReg)}</div>` : ''}${ctxHtml}</div>` : '';
 
-    const phHtml = (d.phrases || []).map(x => `<div class="ph-line">${spkFn(x.foreign, iL, true)}<strong>${hlText(x.foreign, false, qReg)}</strong> <span>${hlText(x.ja, false, qReg)}</span></div>`).join('');
+    const phHtml = (d.phrases || []).map(x => {
+      const trans = x.trans || (tL && x[tL]) || x.ja || '';
+      return `<div class="ph-line">${spkFn(x.foreign, iL, true)}<strong>${hlText(x.foreign, false, qReg)}</strong> <span>${hlText(trans, false, qReg)}</span></div>`;
+    }).join('');
     const drvHtml = (d.derivatives || []).map(x => {
-      const sub = x.sub_phrase ? `<div class="sub-p">${spkFn(x.sub_phrase, iL, true)}<span>${hlText(x.sub_phrase, false, qReg)}</span> <span>${hlText(x.sub_trans, false, qReg)}</span></div>` : '';
+      const trans = x.sub_trans || (tL && x[`sub_trans_${tL}`]) || '';
+      const sub = x.sub_phrase ? `<div class="sub-p">${spkFn(x.sub_phrase, iL, true)}<span>${hlText(x.sub_phrase, false, qReg)}</span> <span>${hlText(trans, false, qReg)}</span></div>` : '';
       return `<div><div class="sub-h">${spkFn(x.word, iL, true)}<strong>${hlText(x.word, false, qReg)}</strong> <span style="font-family:var(--mono);font-size:11px;color:var(--s)">${esc(fmtPho(x.phonetic))}</span><span class="pos-lbl">${esc(x.pos)}</span><span class="sub-m">${hlText(x.meaning, false, qReg)}</span></div>${sub}</div>`;
     }).join('');
 
@@ -192,11 +203,17 @@
 
     const fullDetailsContent = `${histHtml}${exHtml}${phHtml ? `<div class="ph-wrap">${phHtml}</div>` : ''}${drvHtml ? `<div class="d-wrap">${drvHtml}</div>` : ''}${coreHtml}${etyHtml}${matrixHtml}${netHtml}${flagHtml}`;
 
+    const etyTabLbl = (tL === 'en' ? 'Etymology' : (tL === 'ko' ? '어원·어근' : (tL === 'zh' ? '词源·词根' : (tL === 'de' ? 'Etymologie' : (tL === 'fr' ? 'Étymologie' : (tL === 'es' ? 'Etimología' : (tL === 'it' ? 'Etimologia' : '語源・語根')))))));
+    const exTabLbl = (tL === 'en' ? 'Examples' : (tL === 'ko' ? '예문·구문' : (tL === 'zh' ? '例句·成语' : (tL === 'de' ? 'Beispiele' : (tL === 'fr' ? 'Exemples' : (tL === 'es' ? 'Ejemplos' : (tL === 'it' ? 'Esempi' : '例文・成句')))))));
+    const histTabLbl = (tL === 'en' ? 'History' : (tL === 'ko' ? '역사·배경' : (tL === 'zh' ? '历史·背景' : (tL === 'de' ? 'Geschichte' : (tL === 'fr' ? 'Histoire' : (tL === 'es' ? 'Historia' : (tL === 'it' ? 'Storia' : '歴史・背景')))))));
+    const drvTabLbl = (tL === 'en' ? 'Derivatives' : (tL === 'ko' ? '파생어' : (tL === 'zh' ? '衍生词' : (tL === 'de' ? 'Ableitungen' : (tL === 'fr' ? 'Dérivés' : (tL === 'es' ? 'Derivados' : (tL === 'it' ? 'Derivati' : '派生語')))))));
+    const allTabLbl = (tL === 'en' ? 'All' : (tL === 'ko' ? '전체' : (tL === 'zh' ? '全部' : (tL === 'de' ? 'Alle' : (tL === 'fr' ? 'Tout' : (tL === 'es' ? 'Todo' : (tL === 'it' ? 'Tutto' : 'すべて')))))));
+
     const panels = [];
-    if (panelEty) panels.push({ id: 'ety', label: '語源・語根', html: panelEty });
-    if (panelEx) panels.push({ id: 'ex', label: '例文・成句', html: panelEx });
-    if (panelHist) panels.push({ id: 'hist', label: '歴史・背景', html: panelHist });
-    if (panelDrv) panels.push({ id: 'drv', label: '派生語', html: panelDrv });
+    if (panelEty) panels.push({ id: 'ety', label: etyTabLbl, html: panelEty });
+    if (panelEx) panels.push({ id: 'ex', label: exTabLbl, html: panelEx });
+    if (panelHist) panels.push({ id: 'hist', label: histTabLbl, html: panelHist });
+    if (panelDrv) panels.push({ id: 'drv', label: drvTabLbl, html: panelDrv });
 
     const hasMultiPanels = panels.length > 1;
     const defaultTab = panels[0]?.id || 'all';
@@ -204,7 +221,7 @@
     let accordionBodyContent = '';
     if (hasMultiPanels) {
       const tabBtns = panels.map(p => `<button type="button" class="detail-tab-btn ${p.id === defaultTab ? 'active' : ''}" role="tab" aria-selected="${p.id === defaultTab ? 'true' : 'false'}" data-act="switch-detail-tab" data-tab="${p.id}">${p.label}</button>`).join('') +
-        `<button type="button" class="detail-tab-btn ${defaultTab === 'all' ? 'active' : ''}" role="tab" aria-selected="${defaultTab === 'all' ? 'true' : 'false'}" data-act="switch-detail-tab" data-tab="all">すべて</button>`;
+        `<button type="button" class="detail-tab-btn ${defaultTab === 'all' ? 'active' : ''}" role="tab" aria-selected="${defaultTab === 'all' ? 'true' : 'false'}" data-act="switch-detail-tab" data-tab="all">${allTabLbl}</button>`;
       const tabsBar = `<div class="detail-tabs-bar" role="tablist">${tabBtns}</div>`;
       const panelDivs = panels.map(p => `<div class="detail-panel" role="tabpanel" data-panel="${p.id}" style="display:${p.id === defaultTab ? 'block' : 'none'}">${p.html}</div>`).join('');
       accordionBodyContent = `${tabsBar}${panelDivs}`;

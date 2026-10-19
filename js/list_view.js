@@ -396,7 +396,12 @@
     if (p) appState.page = p;
     const curPairKey = ctx.getActivePairKey ? ctx.getActivePairKey() : (global.VocabCore?.getActivePairConfig?.()?.key);
     if (typeof ctx.getJson === 'function' && curPairKey) {
-      appState.entries = ctx.getJson(curPairKey);
+      let items = ctx.getJson(curPairKey);
+      if (typeof ctx.repairEntriesLocalization === 'function') {
+        const pairCfg = ctx.getActivePairConfig ? ctx.getActivePairConfig() : null;
+        items = ctx.repairEntriesLocalization(items, pairCfg);
+      }
+      appState.entries = items;
     }
     if (typeof ctx.buildEtyIndex === 'function') ctx.buildEtyIndex();
     if (typeof ctx.renderSidebarTree === 'function') ctx.renderSidebarTree();

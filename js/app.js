@@ -475,7 +475,8 @@
     if (window.innerWidth <= 768) closeSidebar();
 
     const curPairCfg = getActivePairConfig();
-    const curItems = getJson(curPairCfg.key);
+    let curItems = getJson(curPairCfg.key);
+    curItems = repairEntriesLocalization(curItems, curPairCfg);
     const pairId = curPairCfg.pairId || `${s}_${t}`;
     const cleared = global.VocabStorage ? global.VocabStorage.getClearedAt(curPairCfg.key) : 0;
     const starterLoaded = lsGet(`vv_starter_loaded_${pairId}`) === '1';
@@ -486,6 +487,30 @@
     } else {
       load(1);
     }
+  }
+
+  function repairEntriesLocalization(entries, pairCfg) {
+    if (!Array.isArray(entries) || !pairCfg) return entries;
+    const tgt = pairCfg.tgtLang || App.tgtLang || 'ja';
+    const src = pairCfg.srcLang || App.lang || 'en';
+    if (tgt === 'ja' || !global.VocabStarterPack?.localizeStarterItem) return entries;
+
+    let changed = false;
+    const repaired = entries.map(item => {
+      if (!item || item.isDeleted) return item;
+      const w = String(item.word || '').trim();
+      const locDict = global.VocabStarterPack?.STARTER_LOCALIZATIONS?.[w] || global.VocabStarterPack?.STARTER_LOCALIZATIONS?.[w.toLowerCase()];
+      if (locDict && (item.tgtLang !== tgt || !item.example?.trans)) {
+        changed = true;
+        return global.VocabStarterPack.localizeStarterItem(item, tgt, src);
+      }
+      return item;
+    });
+    if (changed) {
+      setJson(pairCfg.key, repaired, true, false);
+      return repaired;
+    }
+    return entries;
   }
 
   function swapLanguagePair() {
@@ -646,10 +671,17 @@
     if (packType === 'academic') {
       if (App.lang === 'fr') actualPackType = 'fr_pre1';
       else if (App.lang === 'de') actualPackType = 'de_pre1';
+      else if (App.lang === 'es') actualPackType = 'es_pre1';
+      else if (App.lang === 'it') actualPackType = 'it_pre1';
+      else if (App.lang === 'pt') actualPackType = 'pt_pre1';
+      else if (App.lang === 'nl') actualPackType = 'nl_pre1';
+      else if (App.lang === 'zh') actualPackType = 'zh_pre1';
+      else if (App.lang === 'ko') actualPackType = 'ko_pre1';
     }
     const pairCfg = getActivePairConfig();
     const cur = getJson(pairCfg.key);
-    const { added, merged } = global.VocabStarterPack.populateStarterPack(cur, App.lang, actualPackType, pairCfg.key);
+    const targetTgt = pairCfg.tgtLang || App.tgtLang || 'ja';
+    const { added, merged } = global.VocabStarterPack.populateStarterPack(cur, App.lang, actualPackType, pairCfg.key, targetTgt);
     if (!added.length) {
       showToast('選択したパックの単語はすべて登録済みです。', 'info', 3000);
       return;
@@ -789,6 +821,8 @@
     posGroups: POS_GROUPS,
     statGroups: STAT_GROUPS,
     getActivePairKey: () => getActivePairConfig().key,
+    getActivePairConfig,
+    repairEntriesLocalization,
     getJson,
     buildEtyIndex,
     renderSidebarTree,

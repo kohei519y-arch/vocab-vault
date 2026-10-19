@@ -162,11 +162,13 @@
    */
   function buildAnkiBack(item, options = {}) {
     if (!item) return '';
+    const tL = item.tgtLang || options.tgtLang || global.App?.tgtLang || 'ja';
+    const coreBadgeLabel = (tL === 'en' ? 'Core Concept' : (tL === 'de' ? 'Kernkonzept' : (tL === 'fr' ? 'Concept Clé' : (tL === 'es' ? 'Concepto Clave' : (tL === 'ko' ? '코아이미지' : (tL === 'zh' ? '核心概念' : 'コアイメージ'))))));
 
     // 1. コアイメージ（一言）
     const coreHtml = item.core ? `
       <div class="anki-core-box">
-        <span class="anki-core-badge">コアイメージ</span>
+        <span class="anki-core-badge">${coreBadgeLabel}</span>
         <div class="anki-core-text">${esc(item.core)}</div>
       </div>
     ` : '';
@@ -188,13 +190,13 @@
     // 3. 例文（簡潔な1文）
     const ex = item.example;
     const exForeign = ex ? (ex.foreign || ex.en || ex.f || '') : '';
-    const exJa = ex ? (ex.ja || ex.trans || ex.j || '') : '';
+    const exTrans = ex ? (ex.trans || (tL && ex[tL]) || ex.ja || ex.j || '') : '';
     const cleanEx = exForeign ? exForeign.replace(/<[^>]+>/g, '').trim() : '';
     const spkExBtn = cleanEx && global.VocabSpeech?.mkSpkBtn ? global.VocabSpeech.mkSpkBtn(cleanEx, item.lang || options.lang || 'en', true) : '';
-    const exampleHtml = (cleanEx || exJa) ? `
+    const exampleHtml = (cleanEx || exTrans) ? `
       <div class="anki-example-box">
         ${cleanEx ? `<div class="anki-ex-foreign"><span>${esc(cleanEx)}</span>${spkExBtn}</div>` : ''}
-        ${exJa ? `<div class="anki-ex-ja">${esc(exJa.replace(/<[^>]+>/g, ''))}</div>` : ''}
+        ${exTrans ? `<div class="anki-ex-ja">${esc(exTrans.replace(/<[^>]+>/g, ''))}</div>` : ''}
       </div>
     ` : '';
 
@@ -202,10 +204,16 @@
     const matrix = global.VocabMorphology?.buildCognateMatrix ? global.VocabMorphology.buildCognateMatrix(item, options.rootIndexMap || global.App?.rootIndexMap) : null;
     const matrixHtml = matrix ? (global.VocabMorphology?.renderCognateMatrixHtml ? global.VocabMorphology.renderCognateMatrixHtml(matrix) : '') : '';
     const hasEty = Boolean(item.etymology || item.history_note || (item.derivatives && item.derivatives.length) || matrixHtml);
+
+    const etyLbl = (tL === 'en' ? 'Etymology' : (tL === 'de' ? 'Etymologie' : (tL === 'fr' ? 'Étymologie' : (tL === 'es' ? 'Etimología' : (tL === 'ko' ? '어원' : (tL === 'zh' ? '词源' : '語源'))))));
+    const histLbl = (tL === 'en' ? 'History & Context' : (tL === 'de' ? 'Geschichte & Kontext' : (tL === 'fr' ? 'Histoire & Contexte' : (tL === 'es' ? 'Historia y Contexto' : (tL === 'ko' ? '개념사·배경' : (tL === 'zh' ? '概念史·背景' : '概念史・背景'))))));
+    const drvLbl = (tL === 'en' ? 'Derivatives' : (tL === 'de' ? 'Ableitungen' : (tL === 'fr' ? 'Dérivés' : (tL === 'es' ? 'Derivados' : (tL === 'ko' ? '파생어' : (tL === 'zh' ? '衍生词' : '派生語'))))));
+    const summaryLbl = (tL === 'en' ? 'Expand Deep Etymology & Cognates' : (tL === 'de' ? 'Tiefenetymologie & Kognaten anzeigen' : (tL === 'fr' ? 'Développer étymologie & mots apparentés' : (tL === 'es' ? 'Desplegar etimología profunda y cognados' : (tL === 'ko' ? '심층 어원·개념사·동근어 펼치기' : (tL === 'zh' ? '展开深层词源·概念史·同源词' : '深層語源・概念史・4言語同根語を展開'))))));
+
     let etyHtml = '';
     if (hasEty) {
-      const etyText = item.etymology ? `<p class="anki-ety-text"><strong>語源:</strong> ${esc(item.etymology)}</p>` : '';
-      const histText = item.history_note ? `<p class="anki-hist-text"><strong>概念史・背景:</strong> ${esc(item.history_note)}</p>` : '';
+      const etyText = item.etymology ? `<p class="anki-ety-text"><strong>${etyLbl}:</strong> ${esc(item.etymology)}</p>` : '';
+      const histText = item.history_note ? `<p class="anki-hist-text"><strong>${histLbl}:</strong> ${esc(item.history_note)}</p>` : '';
       const tagsText = (Array.isArray(item.etymologyTags) && item.etymologyTags.length) ? `
         <div class="anki-ety-tags" style="margin:6px 0;">
           ${item.etymologyTags.map(t => `<span class="ety-tag">${esc(t)}</span>`).join(' ')}
@@ -213,13 +221,13 @@
       ` : '';
       const derivsText = (Array.isArray(item.derivatives) && item.derivatives.length) ? `
         <div class="anki-derivs" style="margin-top:6px;font-size:12px;color:var(--s);">
-          <strong>派生語:</strong> ${item.derivatives.slice(0, 4).map(d => `${esc(d.word)} (${esc(d.meaning || '')})`).join(', ')}
+          <strong>${drvLbl}:</strong> ${item.derivatives.slice(0, 4).map(d => `${esc(d.word)} (${esc(d.meaning || '')})`).join(', ')}
         </div>
       ` : '';
 
       etyHtml = `
         <details class="anki-ety-details" style="margin-top:12px;border:1px solid var(--border);border-radius:6px;padding:6px 10px;background:var(--bg-sub, rgba(0,0,0,0.02));">
-          <summary class="anki-ety-summary" style="cursor:pointer;font-weight:600;font-size:12px;color:var(--s);user-select:none;">深層語源・概念史・4言語同根語を展開</summary>
+          <summary class="anki-ety-summary" style="cursor:pointer;font-weight:600;font-size:12px;color:var(--s);user-select:none;">${summaryLbl}</summary>
           <div class="anki-ety-body" style="margin-top:8px;font-size:13px;line-height:1.5;">
             ${tagsText}
             ${etyText}
@@ -428,9 +436,11 @@
 
   function buildClozeHintsHtml(item) {
     if (!item) return '';
+    const tL = item.tgtLang || global.App?.tgtLang || 'ja';
+    const coreBadgePrefix = (tL === 'en' ? 'Core: ' : (tL === 'de' ? 'Kern: ' : (tL === 'fr' ? 'Cœur: ' : (tL === 'es' ? 'Núcleo: ' : (tL === 'ko' ? '코아이미지: ' : (tL === 'zh' ? '核心概念: ' : 'コアイメージ: '))))));
     const badges = [];
     if (item.core) {
-      badges.push(`<div class="cloze-hint-badge core">${CLOZE_IDEA_SVG}コアイメージ: ${esc(item.core)}</div>`);
+      badges.push(`<div class="cloze-hint-badge core">${CLOZE_IDEA_SVG}${coreBadgePrefix}${esc(item.core)}</div>`);
     }
     const pos = item.meanings?.[0]?.pos;
     const meaning = item.meanings?.[0]?.text;

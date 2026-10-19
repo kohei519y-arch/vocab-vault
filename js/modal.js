@@ -737,7 +737,8 @@
     const curPairKey = global.VocabCore?.getActivePairConfig?.()?.key || (meta?.lang ? (meta.lang === 'en' ? 'distinction_entries' : `distinction_entries_${meta.lang}`) : 'distinction_entries');
     const curEntries = (typeof global.VocabCore?.getJson === 'function' ? global.VocabCore.getJson(curPairKey) : (global.VocabStorage?.state?.mem?.[curPairKey] || []));
     const lang = App.srcLang || App.lang || packLang;
-    const { added, merged } = global.VocabStarterPack.populateStarterPack(curEntries, lang, packId, curPairKey);
+    const targetTgt = App.tgtLang || 'ja';
+    const { added, merged } = global.VocabStarterPack.populateStarterPack(curEntries, lang, packId, curPairKey, targetTgt);
 
     if (added.length === 0) {
       showToast('このスターターパックの単語はすべて既にライブラリに存在します。', 'info');
