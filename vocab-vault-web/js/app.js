@@ -910,6 +910,57 @@
 
   const toggleDarkMode = d => global.VocabModal ? global.VocabModal.toggleDarkMode(d) : undefined;
 
+  const PWA_TOAST_MESSAGES = {
+    already_native: {
+      ja: '既に専用アプリ（Vocab Vault）としてインストール・起動されています。',
+      en: 'Vocab Vault is already installed and running as a dedicated app.',
+      fr: 'Vocab Vault est déjà installé et fonctionne comme une application dédiée.',
+      de: 'Vocab Vault ist bereits als eigene App installiert und läuft.',
+      es: 'Vocab Vault ya está instalado y ejecutándose como una app dedicada.',
+      it: 'Vocab Vault è già installato e in esecuzione come app dedicata.',
+      pt: 'O Vocab Vault já está instalado e em execução como app dedicado.',
+      nl: 'Vocab Vault is al geïnstalleerd en actief als speciale app.',
+      zh: '已作为专属应用程序（Vocab Vault）安装并运行中。',
+      ko: '이미 전용 앱(Vocab Vault)으로 설치되어 실행 중입니다.'
+    },
+    installed_success: {
+      ja: 'アプリをインストールしました。Dockやホーム画面から直接開けます。',
+      en: 'App installed successfully. You can open it directly from your Dock or home screen.',
+      fr: 'Application installée avec succès. Vous pouvez l\'ouvrir directement depuis le Dock ou l\'écran d\'accueil.',
+      de: 'App erfolgreich installiert. Sie können sie direkt aus dem Dock oder vom Startbildschirm öffnen.',
+      es: 'Aplicación instalada con éxito. Puede abrirla directamente desde el Dock o la pantalla de inicio.',
+      it: 'App installata con successo. Puoi aprirla direttamente dal Dock o dalla schermata iniziale.',
+      pt: 'Aplicativo instalado com sucesso. Você pode abri-lo diretamente do Dock ou da tela inicial.',
+      nl: 'App succesvol geïnstalleerd. U kunt deze direct openen vanuit het Dock of startscherm.',
+      zh: '应用安装成功！可从 Dock 或主屏幕直接启动。',
+      ko: '앱이 성공적으로 설치되었습니다. Dock이나 홈 화면에서 직접 실행할 수 있습니다.'
+    },
+    safari_mac: {
+      ja: 'Mac Safari: 画面上のメニュー「ファイル」→「Dockに追加」を選ぶと単体Macアプリとして登録されます。',
+      en: 'Mac Safari: Select "File" → "Add to Dock" from the menu bar to register as a standalone Mac app.',
+      fr: 'Mac Safari : Choisissez "Fichier" → "Ajouter au Dock" pour enregistrer comme application Mac autonome.',
+      de: 'Mac Safari: Wählen Sie "Ablage" → "Zum Dock hinzufügen", um als eigenständige Mac-App zu registrieren.',
+      es: 'Mac Safari: Seleccione "Archivo" → "Añadir al Dock" para registrar como app independiente de Mac.',
+      it: 'Mac Safari: Seleziona "File" → "Aggiungi al Dock" per registrare come app autonoma per Mac.',
+      pt: 'Mac Safari: Selecione "Arquivo" → "Adicionar ao Dock" para registrar como app autônomo do Mac.',
+      nl: 'Mac Safari: Kies in de menubalk "Archief" → "Zet in Dock" om te registreren als zelfstandige Mac-app.',
+      zh: 'Mac Safari: 在菜单栏中选择「文件」→「添加到 Dock」，即可作为独立的 Mac 应用添加。',
+      ko: 'Mac Safari: 메뉴의 "파일" → "Dock에 추가"를 선택하면 단독 Mac 앱으로 등록됩니다.'
+    },
+    browser_menu: {
+      ja: 'ブラウザのメニューまたはアドレスバー右端のインストールアイコンから単体アプリ化できます。',
+      en: 'You can install it as a standalone app from the browser menu or the address bar install icon.',
+      fr: 'Vous pouvez installer l\'application depuis le menu du navigateur ou l\'icône de la barre d\'adresse.',
+      de: 'Sie können die App über das Browsermenü oder das Installationssymbol in der Adressleiste installieren.',
+      es: 'Puede instalarla como app independiente desde el menú del navegador o el icono de la barra de direcciones.',
+      it: 'Puoi installarla come app autonoma dal menu del browser o dall\'icona nella barra degli indirizzi.',
+      pt: 'Você pode instalá-lo como app independente pelo menu do navegador ou pelo ícone na barra de endereços.',
+      nl: 'U kunt de app installeren via het browsermenu of het installatie-icoon in de adresbalk.',
+      zh: '可通过浏览器菜单或地址栏右侧的安装图标将其保存为独立应用。',
+      ko: '브라우저 메뉴 또는 주소창 오른쪽의 설치 아이콘에서 단독 앱으로 설치할 수 있습니다.'
+    }
+  };
+
   async function promptAppInstall() {
     const isNativeApp = (typeof window !== 'undefined') && (
       window.location.protocol === 'file:' ||
@@ -917,8 +968,11 @@
       window.matchMedia?.('(display-mode: standalone)').matches ||
       window.navigator?.standalone === true
     );
+    const loc = global.VocabI18n?.getLocale?.() || 'ja';
+    const getPwaMsg = key => PWA_TOAST_MESSAGES[key]?.[loc] || PWA_TOAST_MESSAGES[key]?.en || PWA_TOAST_MESSAGES[key]?.ja;
+
     if (isNativeApp) {
-      showToast('既に専用アプリ（Vocab Vault）としてインストール・起動されています。', 'ok', 3500);
+      showToast(getPwaMsg('already_native'), 'ok', 3500);
       return;
     }
 
@@ -928,7 +982,7 @@
         App.deferredInstallPrompt.prompt();
         const { outcome } = await App.deferredInstallPrompt.userChoice;
         if (outcome === 'accepted') {
-          showToast('アプリをインストールしました。Dockやホーム画面から直接開けます。', 'ok', 4500);
+          showToast(getPwaMsg('installed_success'), 'ok', 4500);
           App.deferredInstallPrompt = null;
           if ($('ribInstallBtn')) $('ribInstallBtn').style.display = 'none';
         }
@@ -942,9 +996,9 @@
     const isMac = navigator.platform?.toUpperCase().indexOf('MAC') >= 0 || navigator.userAgent?.includes('Mac');
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     if (isMac && isSafari) {
-      showToast('Mac Safari: 画面上のメニュー「ファイル」→「Dockに追加」を選ぶと単体Macアプリとして登録されます。', 'ok', 5500);
+      showToast(getPwaMsg('safari_mac'), 'ok', 5500);
     } else {
-      showToast('ブラウザのメニューまたはアドレスバー右端のインストールアイコンから単体アプリ化できます。', 'info', 4500);
+      showToast(getPwaMsg('browser_menu'), 'info', 4500);
     }
     toggleModal('installGuideModal', true);
   }

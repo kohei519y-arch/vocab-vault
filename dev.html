@@ -973,64 +973,64 @@
 <div id="installGuideModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="installGuideModalTitle" onclick="if(event.target===this) toggleModal('installGuideModal',false)">
   <div class="modal" style="max-width:620px;max-height:85vh;display:flex;flex-direction:column">
     <div class="modal-hd flx-sb">
-      <span class="modal-title" id="installGuideModalTitle">単体アプリケーションとして起動（ブラウザ枠なし）</span>
+      <span class="modal-title" id="installGuideModalTitle" data-i18n="guide.modal_title">単体アプリケーションとして起動（ブラウザ枠なし）</span>
       <button type="button" class="modal-close" onclick="toggleModal('installGuideModal',false)" aria-label="閉じる">&times;</button>
     </div>
     <div style="flex:1;overflow-y:auto;font-size:13px;line-height:1.7;color:var(--s);padding-right:4px">
-      <p style="margin-top:0">Vocab Vault は <strong>macOS専用スタンドアロンアプリ</strong>、<strong>PWA（Progressive Web App）</strong>、および完全オフラインパッケージに対応しており、Chromeなどのブラウザ枠を通さず独立した専用アプリとして起動できます。</p>
+      <p style="margin-top:0" data-i18n-html="guide.intro">Vocab Vault は <strong>macOS専用スタンドアロンアプリ</strong>、<strong>PWA（Progressive Web App）</strong>、および完全オフラインパッケージに対応しており、Chromeなどのブラウザ枠を通さず独立した専用アプリとして起動できます。</p>
 
       <!-- macOS 専用アプリ ダウンロードカード -->
       <div style="background:rgba(124,58,237,0.12);border:1px solid rgba(139,92,246,0.3);padding:14px;border-radius:10px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
         <div>
           <div style="font-weight:700;color:var(--t);font-size:14px;display:flex;align-items:center;gap:6px">
-            <span>macOS専用スタンドアロンアプリ (v2.0)</span>
+            <span data-i18n="guide.mac_app_title">macOS専用スタンドアロンアプリ (v2.0)</span>
           </div>
-          <div style="font-size:12px;color:var(--m);margin-top:2px">新公式アイコン付属・URLバーなし独立ウィンドウ・完全オフライン</div>
+          <div style="font-size:12px;color:var(--m);margin-top:2px" data-i18n="guide.mac_app_desc">新公式アイコン付属・URLバーなし独立ウィンドウ・完全オフライン</div>
         </div>
         <a href="VocabVault-Mac.zip" download="VocabVault-Mac.zip" class="btn-p" style="padding:8px 16px;text-decoration:none;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:6px;border-radius:6px;color:#fff;background:#7c3aed">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Mac版をダウンロード (.zip)
+          <span data-i18n="guide.mac_download_btn">Mac版をダウンロード (.zip)</span>
         </a>
       </div>
 
       <div style="background:var(--bg-hov);padding:10px 14px;border-radius:8px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <div style="font-size:12px;color:var(--s)">全OS・完全オフラインWebパッケージ</div>
-        <a href="vocab-vault-web.zip" download="vocab-vault-web.zip" class="btn-o btn-xs" style="text-decoration:none">ZIPダウンロード</a>
+        <div style="font-size:12px;color:var(--s)" data-i18n="guide.web_zip_title">全OS・完全オフラインWebパッケージ</div>
+        <a href="vocab-vault-web.zip" download="vocab-vault-web.zip" class="btn-o btn-xs" style="text-decoration:none" data-i18n="guide.web_zip_btn">ZIPダウンロード</a>
       </div>
 
       <div style="background:var(--bg-hov);padding:12px;border-radius:8px;margin-bottom:12px">
-        <h4 style="margin:0 0 6px;color:var(--t)">macOS (Mac) で単体起動する</h4>
+        <h4 style="margin:0 0 6px;color:var(--t)" data-i18n="guide.macos_title">macOS (Mac) で単体起動する</h4>
         <ul style="margin:0;padding-left:20px;font-size:12px">
-          <li><strong>方法1（Mac版アプリ）:</strong> 上記の「Mac版をダウンロード」から <code>Vocab Vault.app</code> を入手し、アプリケーションフォルダに入れるだけで即座に起動できます。</li>
-          <li><strong>方法2（Chrome / Edge PWA）:</strong> アドレスバー右端の「インストール」アイコンをクリックすると、MacのDockやLaunchpadに登録されます。</li>
-          <li><strong>方法3（SafariのDock追加）:</strong> Safariのメニュー「ファイル」→「Dockに追加」を選ぶと、専用のWebアプリが作成されます。</li>
+          <li data-i18n-html="guide.macos_method1"><strong>方法1（Mac版アプリ）:</strong> 上記の「Mac版をダウンロード」から <code>Vocab Vault.app</code> を入手し、アプリケーションフォルダに入れるだけで即座に起動できます。</li>
+          <li data-i18n-html="guide.macos_method2"><strong>方法2（Chrome / Edge PWA）:</strong> アドレスバー右端の「インストール」アイコンをクリックすると、MacのDockやLaunchpadに登録されます。</li>
+          <li data-i18n-html="guide.macos_method3"><strong>方法3（SafariのDock追加）:</strong> Safariのメニュー「ファイル」→「Dockに追加」を選ぶと、専用のWebアプリが作成されます。</li>
         </ul>
       </div>
 
       <div style="background:var(--bg-hov);padding:12px;border-radius:8px;margin-bottom:12px">
-        <h4 style="margin:0 0 6px;color:var(--t)">iOS (iPhone / iPad Safari)</h4>
+        <h4 style="margin:0 0 6px;color:var(--t)" data-i18n="guide.ios_title">iOS (iPhone / iPad Safari)</h4>
         <ol style="margin:0;padding-left:20px;font-size:12px">
-          <li>Safariで本ページを開き、画面下部（または上部）の <strong>共有ボタン</strong> をタップします。</li>
-          <li>メニュー内の <strong>「ホーム画面に追加」</strong> を選択します。</li>
-          <li>ホーム画面にアプリアイコンが追加され、次回から全画面のネイティブアプリとして起動します。</li>
+          <li data-i18n-html="guide.ios_step1">Safariで本ページを開き、画面下部（または上部）の <strong>共有ボタン</strong> をタップします。</li>
+          <li data-i18n-html="guide.ios_step2">メニュー内の <strong>「ホーム画面に追加」</strong> を選択します。</li>
+          <li data-i18n-html="guide.ios_step3">ホーム画面にアプリアイコンが追加され、次回から全画面のネイティブアプリとして起動します。</li>
         </ol>
       </div>
 
       <div style="background:var(--bg-hov);padding:12px;border-radius:8px;margin-bottom:12px">
-        <h4 style="margin:0 0 6px;color:var(--t)">Android (Chrome)</h4>
+        <h4 style="margin:0 0 6px;color:var(--t)" data-i18n="guide.android_title">Android (Chrome)</h4>
         <ol style="margin:0;padding-left:20px;font-size:12px">
-          <li>画面上の「アプリをインストール」ボタンをタップするか、右上のメニューから「アプリをインストール」をタップします。</li>
-          <li>ホーム画面やアプリ一覧から直接独立して起動します。</li>
+          <li data-i18n-html="guide.android_step1">画面上の「アプリをインストール」ボタンをタップするか、右上のメニューから「アプリをインストール」をタップします。</li>
+          <li data-i18n-html="guide.android_step2">ホーム画面やアプリ一覧から直接独立して起動します。</li>
         </ol>
       </div>
 
       <div style="background:var(--bg-hov);padding:12px;border-radius:8px">
-        <h4 style="margin:0 0 6px;color:var(--t)">Windows (Chrome / Edge)</h4>
-        <p style="margin:0;font-size:12px">「アプリをインストール」を押すと、デスクトップおよびスタートメニューにショートカットが作成され、独立した専用ウィンドウで起動します。</p>
+        <h4 style="margin:0 0 6px;color:var(--t)" data-i18n="guide.windows_title">Windows (Chrome / Edge)</h4>
+        <p style="margin:0;font-size:12px" data-i18n="guide.windows_desc">「アプリをインストール」を押すと、デスクトップおよびスタートメニューにショートカットが作成され、独立した専用ウィンドウで起動します。</p>
       </div>
     </div>
     <div style="display:flex;justify-content:flex-end;margin-top:10px;padding-top:8px;border-top:1px solid var(--b)">
-      <button type="button" class="btn-o btn-xs" onclick="toggleModal('installGuideModal',false)">閉じる</button>
+      <button type="button" class="btn-o btn-xs" onclick="toggleModal('installGuideModal',false)" data-i18n="guide.close_btn">閉じる</button>
     </div>
   </div>
 </div>

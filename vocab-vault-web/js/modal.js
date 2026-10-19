@@ -128,7 +128,11 @@
       try { localStorage.setItem('vv_theme_dark', isDark ? '1' : '0'); } catch {}
     }
     const themeBtn = $('btnTheme');
-    if (themeBtn) themeBtn.textContent = isDark ? 'ライト' : 'ダーク';
+    if (themeBtn) {
+      const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+      const isJa = curLocale === 'ja';
+      themeBtn.textContent = isDark ? (isJa ? 'ライト' : 'Light') : (isJa ? 'ダーク' : 'Dark');
+    }
     if ($('chkDark')) $('chkDark').checked = isDark;
     if (global.VocabGraph?.invalidateTreeBgCache) {
       global.VocabGraph.invalidateTreeBgCache();
@@ -296,16 +300,23 @@
       window.matchMedia?.('(display-mode: standalone)').matches ||
       window.navigator?.standalone === true
     );
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = curLocale === 'ja';
+
     if ($('pwaStatusBadge')) {
-      $('pwaStatusBadge').textContent = isStandalone ? '単体アプリ起動中' : '単体起動対応 (PWA)';
+      const runningLabel = global.VocabI18n?.t ? global.VocabI18n.t('settings.pwa_running') : (isJa ? '単体アプリ起動中' : 'Standalone App Running');
+      const readyLabel = global.VocabI18n?.t ? global.VocabI18n.t('settings.pwa_badge') : (isJa ? '単体起動対応' : 'Standalone Ready');
+      $('pwaStatusBadge').textContent = isStandalone ? runningLabel : readyLabel;
       $('pwaStatusBadge').className = 'badge ok';
     }
     if ($('btnPwaInstall')) {
       if (isStandalone) {
-        $('btnPwaInstall').textContent = '単体アプリとして実行中';
+        const runningBtnLabel = global.VocabI18n?.t ? global.VocabI18n.t('settings.pwa_installed_btn') : (isJa ? '単体アプリとして実行中' : 'Running as Standalone App');
+        $('btnPwaInstall').textContent = runningBtnLabel;
         $('btnPwaInstall').disabled = true;
       } else {
-        $('btnPwaInstall').innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>アプリをインストール（単独起動）';
+        const installBtnLabel = global.VocabI18n?.t ? global.VocabI18n.t('settings.pwa_install_btn') : (isJa ? 'アプリをインストール（単独起動）' : 'Install App (Standalone)');
+        $('btnPwaInstall').innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-i18n="settings.pwa_install_btn">${esc(installBtnLabel)}</span>`;
         $('btnPwaInstall').disabled = false;
       }
     }
@@ -358,18 +369,20 @@
     const fsrsWeights = global.VocabSRS?.getUserFSRSWeights ? global.VocabSRS.getUserFSRSWeights() : null;
     const historyLogs = global.VocabSRS?.getReviewHistoryLog ? global.VocabSRS.getReviewHistoryLog() : [];
     const count = historyLogs.length;
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = curLocale === 'ja';
 
     const badge = $('fsrsOptBadge');
     const desc = $('fsrsOptDesc');
     if (badge) {
       if (fsrsWeights) {
-        badge.textContent = `最適化稼働中 (+${fsrsWeights.improvement || '0'}%)`;
+        badge.textContent = isJa ? `最適化稼働中 (+${fsrsWeights.improvement || '0'}%)` : `Optimized (+${fsrsWeights.improvement || '0'}%)`;
         badge.className = 'badge ok';
       } else if (count >= 20) {
-        badge.textContent = `最適化可能 (${count}件ログ)`;
+        badge.textContent = isJa ? `最適化可能 (${count}件ログ)` : `Ready to Optimize (${count} logs)`;
         badge.className = 'badge ok';
       } else {
-        badge.textContent = `初期係数 (${count}/20件)`;
+        badge.textContent = isJa ? `初期係数 (${count}/20件)` : `Default Parameters (${count}/20)`;
         badge.className = 'badge';
         badge.style.background = 'var(--b)';
         badge.style.color = 'var(--s)';
@@ -377,9 +390,13 @@
     }
     if (desc) {
       if (fsrsWeights) {
-        desc.textContent = `FSRSパーソナライズ学習: 有効（学習ログ ${fsrsWeights.logCount || count}件に基づき最適化中・精度改善 +${fsrsWeights.improvement || '0'}%）`;
+        desc.textContent = isJa
+          ? `FSRSパーソナライズ学習: 有効（学習ログ ${fsrsWeights.logCount || count}件に基づき最適化中・精度改善 +${fsrsWeights.improvement || '0'}%）`
+          : `FSRS Personalized Learning: Active (optimized on ${fsrsWeights.logCount || count} logs, +${fsrsWeights.improvement || '0'}% retention improvement)`;
       } else {
-        desc.textContent = `FSRSパーソナライズ学習: 初期係数稼働中（学習ログ ${count}/20件。20件蓄積で自動最適化されます）`;
+        desc.textContent = isJa
+          ? `FSRSパーソナライズ学習: 初期係数稼働中（学習ログ ${count}/20件。20件蓄積で自動最適化されます）`
+          : `FSRS Personalized Learning: Running default parameters (${count}/20 logs. Automatically optimizes after 20 reviews)`;
       }
     }
   }
@@ -391,34 +408,39 @@
     const badge = $('smartNotifyBadge');
     const desc = $('smartNotifyPermDesc');
     const btn = $('btnReqNotify');
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = curLocale === 'ja';
 
     const perm = (typeof window !== 'undefined' && 'Notification' in window) ? Notification.permission : 'unsupported';
     if (badge) {
       if (!isEnabled) {
-        badge.textContent = '通知無効';
+        badge.textContent = isJa ? '通知無効' : 'Disabled';
         badge.className = 'badge';
         badge.style.background = 'var(--b)';
         badge.style.color = 'var(--s)';
       } else if (perm === 'granted') {
-        badge.textContent = '通知稼働中';
+        badge.textContent = isJa ? '通知稼働中' : 'Active';
         badge.className = 'badge ok';
       } else if (perm === 'denied') {
-        badge.textContent = '通知ブロック中';
+        badge.textContent = isJa ? '通知ブロック中' : 'Blocked';
         badge.className = 'badge ng';
       } else {
-        badge.textContent = '通知未許可';
+        badge.textContent = isJa ? '通知未許可' : 'Not Granted';
         badge.className = 'badge';
         badge.style.background = 'var(--b)';
         badge.style.color = 'var(--s)';
       }
     }
     if (desc) {
-      if (perm === 'granted') desc.textContent = 'ブラウザ通知許可済み（記憶定着率90%直前で自動アラート）';
-      else if (perm === 'denied') desc.textContent = 'ブラウザ設定で通知がブロックされています。設定から許可してください。';
-      else desc.textContent = '通知ボタンを押してブラウザ通知を許可してください。';
+      if (perm === 'granted') desc.textContent = isJa ? 'ブラウザ通知許可済み（記憶定着率90%直前で自動アラート）' : 'Notifications granted (alerts right before memory retention drops to 90%).';
+      else if (perm === 'denied') desc.textContent = isJa ? 'ブラウザ設定で通知がブロックされています。設定から許可してください。' : 'Notifications are blocked in browser settings. Please enable them.';
+      else desc.textContent = isJa ? '通知ボタンを押してブラウザ通知を許可してください。' : 'Click the button below to enable browser study reminder alerts.';
     }
     if (btn) {
       btn.style.display = perm === 'granted' ? 'none' : 'inline-block';
+      if (!isJa) {
+        btn.textContent = 'Enable Notifications';
+      }
     }
   }
 

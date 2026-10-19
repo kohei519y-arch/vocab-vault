@@ -116,6 +116,30 @@
       'settings.pwa_install_btn': 'アプリをインストール（単独起動）',
       'settings.pwa_guide_btn': 'OS別セットアップ手順',
       'settings.pwa_mac_note': '※Macの方は、本フォルダ内の「Vocab Vault.app」または「Vocab Vault.command」をダブルクリックするだけで、ブラウザ枠なしの単体アプリとして直接起動できます。',
+      'settings.pwa_running': '単体アプリ起動中',
+      'settings.pwa_installed_btn': '単体アプリとして実行中',
+
+      'guide.modal_title': '単体アプリケーションとして起動（ブラウザ枠なし）',
+      'guide.intro': 'Vocab Vault は <strong>macOS専用スタンドアロンアプリ</strong>、<strong>PWA（Progressive Web App）</strong>、および完全オフラインパッケージに対応しており、Chromeなどのブラウザ枠を通さず独立した専用アプリとして起動できます。',
+      'guide.mac_app_title': 'macOS専用スタンドアロンアプリ (v2.0)',
+      'guide.mac_app_desc': '新公式アイコン付属・URLバーなし独立ウィンドウ・完全オフライン',
+      'guide.mac_download_btn': 'Mac版をダウンロード (.zip)',
+      'guide.web_zip_title': '全OS・完全オフラインWebパッケージ',
+      'guide.web_zip_btn': 'ZIPダウンロード',
+      'guide.macos_title': 'macOS (Mac) で単体起動する',
+      'guide.macos_method1': '<strong>方法1（Mac版アプリ）:</strong> 上記の「Mac版をダウンロード」から <code>Vocab Vault.app</code> を入手し、アプリケーションフォルダに入れるだけで即座に起動できます。',
+      'guide.macos_method2': '<strong>方法2（Chrome / Edge PWA）:</strong> アドレスバー右端の「インストール」アイコンをクリックすると、MacのDockやLaunchpadに登録されます。',
+      'guide.macos_method3': '<strong>方法3（SafariのDock追加）:</strong> Safariのメニュー「ファイル」→「Dockに追加」を選ぶと、専用のWebアプリが作成されます。',
+      'guide.ios_title': 'iOS (iPhone / iPad Safari)',
+      'guide.ios_step1': 'Safariで本ページを開き、画面下部（または上部）の <strong>共有ボタン</strong> をタップします。',
+      'guide.ios_step2': 'メニュー内の <strong>「ホーム画面に追加」</strong> を選択します。',
+      'guide.ios_step3': 'ホーム画面にアプリアイコンが追加され、次回から全画面のネイティブアプリとして起動します。',
+      'guide.android_title': 'Android (Chrome)',
+      'guide.android_step1': '画面上の「アプリをインストール」ボタンをタップするか、右上のメニューから「アプリをインストール」をタップします。',
+      'guide.android_step2': 'ホーム画面やアプリ一覧から直接独立して起動します。',
+      'guide.windows_title': 'Windows (Chrome / Edge)',
+      'guide.windows_desc': '「アプリをインストール」を押すと、デスクトップおよびスタートメニューにショートカットが作成され、独立した専用ウィンドウで起動します。',
+      'guide.close_btn': '閉じる',
 
       'settings.account_title': 'アカウント管理 ＆ クラウド同期',
       'settings.not_logged_in': '未ログイン',
@@ -431,6 +455,30 @@
       'settings.pwa_install_btn': 'Install App (Standalone)',
       'settings.pwa_guide_btn': 'OS Setup Guide',
       'settings.pwa_mac_note': '*Mac users can launch directly as a borderless standalone app by double-clicking "Vocab Vault.app" or "Vocab Vault.command" in this folder.',
+      'settings.pwa_running': 'Standalone App Running',
+      'settings.pwa_installed_btn': 'Running as Standalone App',
+
+      'guide.modal_title': 'Launch as Standalone App (Borderless Window)',
+      'guide.intro': 'Vocab Vault supports a <strong>dedicated macOS standalone app</strong>, <strong>PWA (Progressive Web App)</strong>, and offline web packages, enabling seamless operation as an independent window without browser URL bars or tabs.',
+      'guide.mac_app_title': 'macOS Standalone App (v2.0)',
+      'guide.mac_app_desc': 'Official app icon, borderless window, fully offline native WebKit container',
+      'guide.mac_download_btn': 'Download for Mac (.zip)',
+      'guide.web_zip_title': 'All OS · Complete Offline Web Package',
+      'guide.web_zip_btn': 'Download ZIP',
+      'guide.macos_title': 'Launch on macOS (Mac)',
+      'guide.macos_method1': '<strong>Method 1 (Native Mac App):</strong> Download <code>Vocab Vault.app</code> above and place it into your Applications folder for instant launch.',
+      'guide.macos_method2': '<strong>Method 2 (Chrome / Edge PWA):</strong> Click the install icon at the right edge of the address bar to add Vocab Vault to your Dock and Launchpad.',
+      'guide.macos_method3': '<strong>Method 3 (Safari Add to Dock):</strong> In Safari, select "File" → "Add to Dock" to create a dedicated web app window.',
+      'guide.ios_title': 'iOS (iPhone / iPad Safari)',
+      'guide.ios_step1': 'Open this page in Safari and tap the <strong>Share</strong> button at the bottom (or top) of the screen.',
+      'guide.ios_step2': 'Select <strong>"Add to Home Screen"</strong> from the share menu.',
+      'guide.ios_step3': 'The app icon will be added to your home screen, launching full-screen like a native app.',
+      'guide.android_title': 'Android (Chrome)',
+      'guide.android_step1': 'Tap the "Install App" button on screen or select "Install app" from Chrome\'s menu.',
+      'guide.android_step2': 'Launch directly from your home screen or app drawer as a standalone window.',
+      'guide.windows_title': 'Windows (Chrome / Edge)',
+      'guide.windows_desc': 'Click "Install App" to create desktop and Start Menu shortcuts, launching in a dedicated borderless window.',
+      'guide.close_btn': 'Close',
 
       'settings.account_title': 'Account Management & Cloud Sync',
       'settings.not_logged_in': 'Not Signed In',
@@ -744,6 +792,8 @@
       'settings.pwa_install_btn': 'Installer l\'application (Autonome)',
       'settings.pwa_guide_btn': 'Guide d\'installation par OS',
       'settings.pwa_mac_note': '*Sur Mac, lancez directement l\'application sans navigateur en double-cliquant sur "Vocab Vault.app" dans ce dossier.',
+      'settings.pwa_running': 'Application autonome active',
+      'settings.pwa_installed_btn': 'Exécuté en tant qu\'application autonome',
       'settings.account_title': 'Gestion du compte & Synchronisation Cloud',
       'settings.not_logged_in': 'Non connecté',
       'settings.logged_in': 'Connecté',
@@ -1036,6 +1086,8 @@
       'settings.pwa_install_btn': 'App installieren (Eigenständig)',
       'settings.pwa_guide_btn': 'Installationsanleitung je Betriebssystem',
       'settings.pwa_mac_note': '*Auf dem Mac können Sie die App direkt per Doppelklick auf "Vocab Vault.app" in diesem Ordner starten.',
+      'settings.pwa_running': 'Eigenständige App läuft',
+      'settings.pwa_installed_btn': 'Als eigenständige App ausgeführt',
       'settings.account_title': 'Kontoverwaltung & Cloud-Synchronisierung',
       'settings.not_logged_in': 'Nicht angemeldet',
       'settings.logged_in': 'Angemeldet',
@@ -1328,6 +1380,8 @@
       'settings.pwa_install_btn': 'Instalar aplicación (Independiente)',
       'settings.pwa_guide_btn': 'Guía de instalación por SO',
       'settings.pwa_mac_note': '*En Mac, puede iniciar la app directamente haciendo doble clic en "Vocab Vault.app" en esta carpeta.',
+      'settings.pwa_running': 'Aplicación independiente activa',
+      'settings.pwa_installed_btn': 'Ejecutando como aplicación independiente',
       'settings.account_title': 'Gestión de cuenta y sincronización en la nube',
       'settings.not_logged_in': 'No identificado',
       'settings.logged_in': 'Identificado',
@@ -1559,6 +1613,14 @@
       'settings.theme_heading': 'Aspetto e Voce',
       'settings.theme_dark': 'Modalità scura',
       'settings.auto_speak': 'Pronuncia automatica nel ripasso',
+      'settings.pwa_title': 'Avvia come app autonoma (Senza cornice del browser)',
+      'settings.pwa_badge': 'Pronto per l\'avvio autonomo',
+      'settings.pwa_desc': 'Utilizzabile come finestra indipendente su Mac, Windows e dispositivi mobili senza barra URL o schede del browser.',
+      'settings.pwa_install_btn': 'Installa applicazione (Autonoma)',
+      'settings.pwa_guide_btn': 'Guida all\'installazione per OS',
+      'settings.pwa_mac_note': '*Su Mac, è possibile avviare direttamente l\'app facendo doppio clic su "Vocab Vault.app" in questa cartella.',
+      'settings.pwa_running': 'App autonoma in esecuzione',
+      'settings.pwa_installed_btn': 'In esecuzione come app autonoma',
       'settings.close_btn': 'Chiudi impostazioni',
       'toolbar.wordbook': 'Vocabolario',
       'addbar.submit': 'Aggiungi',
@@ -1619,6 +1681,14 @@
       'settings.theme_heading': 'Aparência e Voz',
       'settings.theme_dark': 'Modo escuro',
       'settings.auto_speak': 'Pronúncia automática na revisão',
+      'settings.pwa_title': 'Iniciar como app independente (Sem borda de navegador)',
+      'settings.pwa_badge': 'Pronto para app independente',
+      'settings.pwa_desc': 'Use como uma janela de aplicativo independente no Mac, Windows e celular sem barra de URL ou abas.',
+      'settings.pwa_install_btn': 'Instalar aplicativo (Independente)',
+      'settings.pwa_guide_btn': 'Guia de instalação por SO',
+      'settings.pwa_mac_note': '*No Mac, abra diretamente o aplicativo clicando duas vezes em "Vocab Vault.app" nesta pasta.',
+      'settings.pwa_running': 'App independente em execução',
+      'settings.pwa_installed_btn': 'Executando como app independente',
       'settings.close_btn': 'Fechar configurações',
       'toolbar.wordbook': 'Vocabulário',
       'addbar.submit': 'Adicionar',
@@ -1679,6 +1749,14 @@
       'settings.theme_heading': 'Weergave & Spraak',
       'settings.theme_dark': 'Donkere modus',
       'settings.auto_speak': 'Automatisch uitspreken bij herhaling',
+      'settings.pwa_title': 'Openen als zelfstandige app (Zonder browserkader)',
+      'settings.pwa_badge': 'Zelfstandige app gereed',
+      'settings.pwa_desc': 'Gebruik als een zelfstandig app-venster op Mac, Windows en mobiel zonder de URL-balk of tabbladen van Chrome.',
+      'settings.pwa_install_btn': 'App installeren (Zelfstandig)',
+      'settings.pwa_guide_btn': 'Installatiegids per besturingssysteem',
+      'settings.pwa_mac_note': '*Op de Mac start u de app direct door te dubbelklikken op "Vocab Vault.app" in deze map.',
+      'settings.pwa_running': 'Zelfstandige app actief',
+      'settings.pwa_installed_btn': 'Actief als zelfstandige app',
       'settings.close_btn': 'Instellingen sluiten',
       'toolbar.wordbook': 'Woordenboek',
       'addbar.submit': 'Toevoegen',
@@ -1737,6 +1815,14 @@
       'settings.theme_heading': '外观与语音设置',
       'settings.theme_dark': '深色模式',
       'settings.auto_speak': '复习时自动发音',
+      'settings.pwa_title': '独立应用窗口启动 (无浏览器外框)',
+      'settings.pwa_badge': '支持独立启动',
+      'settings.pwa_desc': '无需通过浏览器的网址栏与标签页，可在 Mac、Windows、手机上作为独立的专属应用窗口流畅使用。',
+      'settings.pwa_install_btn': '安装应用（独立启动）',
+      'settings.pwa_guide_btn': '各系统安装指南',
+      'settings.pwa_mac_note': '※Mac 用户可直接双击本目录中的 "Vocab Vault.app"，即可作为无浏览器外框的独立应用直接启动。',
+      'settings.pwa_running': '独立应用运行中',
+      'settings.pwa_installed_btn': '作为独立应用运行中',
       'settings.close_btn': '关闭设置',
       'toolbar.wordbook': '词汇本',
       'addbar.submit': '添加',
@@ -1797,6 +1883,14 @@
       'settings.theme_heading': '화면 및 음성 설정',
       'settings.theme_dark': '다크 모드',
       'settings.auto_speak': '복습 시 자동 발음',
+      'settings.pwa_title': '단독 앱으로 열기 (브라우저 창 틀 없이 실행)',
+      'settings.pwa_badge': '단독 실행 지원',
+      'settings.pwa_desc': '브라우저의 URL 주소창이나 탭 없이 Mac, Windows, 스마트폰에서 독립된 전용 앱 창으로 쾌적하게 사용할 수 있습니다.',
+      'settings.pwa_install_btn': '앱 설치 (단독 실행)',
+      'settings.pwa_guide_btn': 'OS별 설치 안내',
+      'settings.pwa_mac_note': '※Mac 사용자는 이 폴더의 "Vocab Vault.app"을 더블클릭하는 것만으로 브라우저 창 없이 단독 앱으로 즉시 실행할 수 있습니다.',
+      'settings.pwa_running': '단독 앱 실행 중',
+      'settings.pwa_installed_btn': '단독 앱으로 실행 중',
       'settings.close_btn': '설정 닫기',
       'toolbar.wordbook': '단어장',
       'addbar.submit': '등록',
@@ -2205,8 +2299,24 @@
         curPlanBadge.textContent = t('settings.pro_plan');
       }
     }
+    const isStandalone = (typeof window !== 'undefined') && (
+      window.matchMedia?.('(display-mode: standalone)').matches ||
+      window.navigator?.standalone === true
+    );
     const pwaStatusBadge = document.getElementById('pwaStatusBadge');
-    if (pwaStatusBadge) pwaStatusBadge.textContent = t('settings.pwa_badge');
+    if (pwaStatusBadge) {
+      pwaStatusBadge.textContent = isStandalone ? t('settings.pwa_running') : t('settings.pwa_badge');
+    }
+    const btnPwaInstall = document.getElementById('btnPwaInstall');
+    if (btnPwaInstall) {
+      if (isStandalone) {
+        btnPwaInstall.textContent = t('settings.pwa_installed_btn');
+        btnPwaInstall.disabled = true;
+      } else {
+        btnPwaInstall.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span data-i18n="settings.pwa_install_btn">${t('settings.pwa_install_btn')}</span>`;
+        btnPwaInstall.disabled = false;
+      }
+    }
     const metricsEfficiencyBadge = document.getElementById('metricsEfficiencyBadge');
     if (metricsEfficiencyBadge) metricsEfficiencyBadge.textContent = t('settings.metrics_badge_cache');
     const apiBadge = document.getElementById('apiBadge');
