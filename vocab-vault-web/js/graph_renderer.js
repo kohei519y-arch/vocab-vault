@@ -617,8 +617,8 @@
         nodeColor = isDark ? '#475569' : '#94a3b8'; // 派生小枝
       }
 
-      const minScreenR = n.type === 'root' ? 12.0 : (n.type === 'branch' ? 8.5 : (n.type === 'word' ? 7.5 : (n.type === 'ghost_bud' ? 6.5 : 4.0)));
-      const baseR = Math.max(n.radius || 7.5, minScreenR / Math.max(0.35, zoom));
+      const minScreenR = n.type === 'root' ? 12.0 : (n.type === 'branch' ? 8.5 : (n.type === 'word' ? 6.5 : (n.type === 'ghost_bud' ? 5.5 : 3.8)));
+      const baseR = Math.max(n.radius || 7.0, minScreenR / Math.max(0.35, zoom));
       const drawRadius = baseR * (isSelected ? 1.45 : (isHover ? 1.30 : 1.0));
 
       // --- Semantic Zoom (LOD): 3段階の表示表現 ---
@@ -869,21 +869,13 @@
         // Level 3: 未開拓スキルノード (Ghost Bud / RPG Skill Node)
         ctx.save();
 
-        // 鮮やかな真鍮・シアンのオーラ（発見しやすいクリアな微光）
-        const budAuraR = drawRadius * (isSelected ? 2.2 : (isHover ? 1.9 : 1.7));
+        // 語根・周辺と調和する微光オーラ（中間輝度）
+        const budAuraR = drawRadius * (isSelected ? 2.0 : (isHover ? 1.75 : 1.55));
         ctx.beginPath();
         ctx.arc(n.x, n.y, budAuraR, 0, Math.PI * 2);
         ctx.fillStyle = isSelected
-          ? 'rgba(56, 189, 248, 0.42)'
-          : (isHover ? 'rgba(245, 158, 11, 0.38)' : (isDark ? 'rgba(148, 163, 184, 0.32)' : 'rgba(100, 116, 139, 0.24)'));
-        ctx.fill();
-
-        // 内側コロナ
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, drawRadius * 1.35, 0, Math.PI * 2);
-        ctx.fillStyle = isSelected
-          ? 'rgba(56, 189, 248, 0.28)'
-          : (isHover ? 'rgba(245, 158, 11, 0.24)' : (isDark ? 'rgba(148, 163, 184, 0.20)' : 'rgba(100, 116, 139, 0.15)'));
+          ? 'rgba(56, 189, 248, 0.32)'
+          : (isHover ? 'rgba(245, 158, 11, 0.28)' : (isDark ? 'rgba(148, 163, 184, 0.22)' : 'rgba(100, 116, 139, 0.16)'));
         ctx.fill();
 
         // ノード本体背景（くすんだ鉄色・スレート調）
@@ -897,7 +889,7 @@
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
         ctx.strokeStyle = isSelected ? '#38bdf8' : (isHover ? '#fbbf24' : (isDark ? '#94a3b8' : '#64748b'));
-        ctx.lineWidth = isSelected ? 2.4 : 1.6;
+        ctx.lineWidth = isSelected ? 2.2 : 1.4;
         ctx.stroke();
         ctx.setLineDash([]);
 
@@ -969,48 +961,55 @@
         const meaningText = (isMask && !isHover && !isSelected) ? '[ ????? ]' : (n.meaning || '');
         const isFocusHighlight = isSelected || isHover;
 
-        // --- 美麗な天体球体ノード（Celestial Sphere Node: 明るく鮮やかに発光）---
-        // 1. 周囲の広域ソフトオーラ（Ambient Celestial Halo / 鮮やかな淡光の広がり）
-        const outerAuraR = drawRadius * (isSelected ? 3.0 : (isHover ? 2.6 : 2.25));
+        // --- 美麗な天体球体ノード（語根の温もりと調和する上品な中間輝度）---
+        // 1. 周囲の広域ソフトオーラ（Ambient Celestial Halo / 語根と調和する淡い微光）
+        const outerAuraR = drawRadius * (isSelected ? 2.5 : (isHover ? 2.2 : 1.95));
         ctx.beginPath();
         ctx.arc(n.x, n.y, outerAuraR, 0, Math.PI * 2);
         ctx.fillStyle = isSelected
-          ? 'rgba(56, 189, 248, 0.45)'
-          : (isHover ? 'rgba(167, 139, 250, 0.40)' : colorToRgba(nodeColor, isDark ? 0.30 : 0.20));
+          ? 'rgba(56, 189, 248, 0.35)'
+          : (isHover ? 'rgba(167, 139, 250, 0.30)' : colorToRgba(nodeColor, isDark ? 0.22 : 0.14));
         ctx.fill();
 
-        // 2. 内側コロナ光輪（Inner Corona Ring / 高輝度な光の衣）
-        const innerCoronaR = drawRadius * (isSelected ? 1.95 : (isHover ? 1.75 : 1.55));
+        // 2. 内側コロナ光輪（Inner Corona Ring / 優しい光の衣）
+        const innerCoronaR = drawRadius * (isSelected ? 1.70 : (isHover ? 1.55 : 1.45));
         ctx.beginPath();
         ctx.arc(n.x, n.y, innerCoronaR, 0, Math.PI * 2);
         ctx.fillStyle = isSelected
-          ? 'rgba(56, 189, 248, 0.65)'
-          : (isHover ? 'rgba(167, 139, 250, 0.55)' : colorToRgba(nodeColor, isDark ? 0.52 : 0.38));
+          ? 'rgba(56, 189, 248, 0.48)'
+          : (isHover ? 'rgba(167, 139, 250, 0.42)' : colorToRgba(nodeColor, isDark ? 0.36 : 0.24));
         ctx.fill();
 
-        // 3. コア本体（発光ブルームを纏った鮮明ジュエルトーン球体）
-        ctx.save();
-        ctx.shadowColor = nodeColor;
-        ctx.shadowBlur = isDark ? 12 : 7;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
-        ctx.fillStyle = nodeColor;
-        ctx.fill();
-        ctx.restore();
+        // 3. コア本体（控えめな微光ブルームを纏った鮮明球体）
+        if (isDark && isFocusHighlight) {
+          ctx.save();
+          ctx.shadowColor = nodeColor;
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
+          ctx.fillStyle = nodeColor;
+          ctx.fill();
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
+          ctx.fillStyle = nodeColor;
+          ctx.fill();
+        }
 
         // 4. 繊細でクリアな外周リムリング
         ctx.beginPath();
         ctx.arc(n.x, n.y, drawRadius, 0, Math.PI * 2);
         ctx.strokeStyle = isSelected
           ? '#bae6fd'
-          : (isHover ? '#f3e8ff' : (isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.95)'));
-        ctx.lineWidth = isFocusHighlight ? 2.2 : 1.2;
+          : (isHover ? '#f3e8ff' : (isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(255, 255, 255, 0.85)'));
+        ctx.lineWidth = isFocusHighlight ? 1.8 : 0.95;
         ctx.stroke();
 
-        // 5. 中心自己発光コア（白熱する恒星の核）
+        // 5. 中心自己発光コア（語根の0.42と以前の0.92のちょうど中間: 0.58）
         ctx.beginPath();
-        ctx.arc(n.x, n.y, drawRadius * 0.48, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.arc(n.x, n.y, drawRadius * 0.42, 0, Math.PI * 2);
+        ctx.fillStyle = isFocusHighlight ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.58)';
         ctx.fill();
         if (isFocusHighlight) ctx.shadowBlur = 0;
 
@@ -1118,42 +1117,38 @@
             ctx.fillText(shortMeaning, n.x, mY);
           }
         } else {
-          // --- 俯瞰・星辰モード: 軽快かつ鮮やかに輝く星屑レンダリング ---
-          const dotR = Math.max(3.8, drawRadius * 0.92);
+          // --- 俯瞰・星辰モード: 語根部と自然に調和する星屑レンダリング ---
+          const dotR = Math.max(3.0, drawRadius * 0.85);
 
-          // 1. 周囲の広域微光オーラ（Ambient Glow / 鮮やかな淡光）
+          // 1. 周囲の広域微光オーラ（Ambient Glow / 淡い微光）
           ctx.beginPath();
-          ctx.arc(n.x, n.y, dotR * 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = colorToRgba(nodeColor, isDark ? 0.35 : 0.24);
+          ctx.arc(n.x, n.y, dotR * 2.1, 0, Math.PI * 2);
+          ctx.fillStyle = colorToRgba(nodeColor, isDark ? 0.22 : 0.14);
           ctx.fill();
 
-          // 2. 内側コロナ光輪 (高輝度)
+          // 2. 内側コロナ光輪
           ctx.beginPath();
-          ctx.arc(n.x, n.y, dotR * 1.65, 0, Math.PI * 2);
-          ctx.fillStyle = colorToRgba(nodeColor, isDark ? 0.58 : 0.40);
+          ctx.arc(n.x, n.y, dotR * 1.5, 0, Math.PI * 2);
+          ctx.fillStyle = colorToRgba(nodeColor, isDark ? 0.36 : 0.24);
           ctx.fill();
 
-          // 3. コアセル (ネオングロー付与)
-          ctx.save();
-          ctx.shadowColor = nodeColor;
-          ctx.shadowBlur = isDark ? 10 : 5;
+          // 3. コアセル
           ctx.beginPath();
           ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
           ctx.fillStyle = nodeColor;
           ctx.fill();
-          ctx.restore();
 
           // 4. 外周リム
           ctx.beginPath();
           ctx.arc(n.x, n.y, dotR, 0, Math.PI * 2);
-          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.80)' : 'rgba(255, 255, 255, 0.95)';
-          ctx.lineWidth = 1.0;
+          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(255, 255, 255, 0.85)';
+          ctx.lineWidth = 0.8;
           ctx.stroke();
 
-          // 5. 中心白熱核
+          // 5. 中心自己発光核（中間輝度: 0.58）
           ctx.beginPath();
-          ctx.arc(n.x, n.y, dotR * 0.48, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+          ctx.arc(n.x, n.y, dotR * 0.42, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.58)';
           ctx.fill();
         }
       }
