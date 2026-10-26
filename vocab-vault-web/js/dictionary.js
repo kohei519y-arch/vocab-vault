@@ -313,7 +313,7 @@
     const toWikiSlug = s => encodeURIComponent(String(s).trim().replace(/\s+/g, '_'));
     const tryFetch = async (host, title) => {
       const url = `https://${host}.wiktionary.org/w/api.php?action=query&prop=extracts&explaintext=1&redirects=1&titles=${encodeURIComponent(title)}&format=json&origin=*`;
-      const r = await fetchWithTimeout(url, {}, 3500);
+      const r = await fetchWithTimeout(url, {}, 2500);
       if (!r.ok) return null;
       const pages = (await r.json())?.query?.pages;
       const page = pages ? Object.values(pages)[0] : null;
@@ -601,16 +601,25 @@
           }
         }
         if (!defText) {
-          defText = isPhrase ? '成句・熟語' : (pos.startsWith('N') ? '名詞（学術・文脈語義）' : (pos === 'Adj' ? '形容詞（状態・性質）' : '動詞・文脈語義'));
+          if (tLang === 'ja') {
+            defText = isPhrase ? '成句・熟語' : (pos.startsWith('N') ? '名詞（学術・文脈語義）' : (pos === 'Adj' ? '形容詞（状態・性質）' : '動詞・文脈語義'));
+          } else {
+            defText = isPhrase ? 'Phrase / Idiom' : (pos.startsWith('N') ? 'Noun (Contextual definition)' : (pos === 'Adj' ? 'Adjective' : 'Verb / Contextual'));
+          }
         }
         meanings = [{ pos, text: defText }];
       }
 
       let example = histData?.example;
       if (!example) {
+        const jaTrans = tLang === 'ja'
+          ? `文脈における<b>${rawW}</b>の学術的用法。`
+          : `Academic usage of <b>${rawW}</b> in context.`;
         example = {
           foreign: `This context illustrates the academic usage of ${rawW}.`,
-          ja: `文脈における<b>${rawW}</b>の学術的用法。`,
+          trans: jaTrans,
+          [tLang]: jaTrans,
+          ja: jaTrans,
           used_form: rawW
         };
       }
@@ -724,7 +733,10 @@
     };
 
     const req = (m, think) => {
-      const cfg = schema ? { temperature: 0.1, maxOutputTokens: 8192, responseMimeType: "application/json", responseSchema: schema } : { temperature: 0.1, maxOutputTokens: 4096 };
+      const userTxt = usrParts[0]?.text || '';
+      const wCount = (userTxt.match(/"reqWord"|"word"/g) || []).length || 1;
+      const dynamicTokens = wCount === 1 ? (deep ? 3000 : 2500) : (wCount <= 3 ? 4500 : (wCount <= 6 ? 6000 : 8192));
+      const cfg = schema ? { temperature: 0.1, maxOutputTokens: dynamicTokens, responseMimeType: "application/json", responseSchema: schema } : { temperature: 0.1, maxOutputTokens: Math.max(dynamicTokens, 8192) };
       if (think && schema && (m.includes('gemini-2.5') || m.includes('gemini-3')) && !m.includes('pro')) {
         cfg.thinkingConfig = { thinkingBudget: deep ? 512 : 0 };
       }

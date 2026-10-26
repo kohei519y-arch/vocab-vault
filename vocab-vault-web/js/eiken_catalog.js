@@ -116,8 +116,8 @@
       desc: 'ラテン語 vertere（回す・向ける）に由来。convert, divert, invert, revert, subvert, avert, adverse, controversy など、方向転換や論争・逆境を示す抽象語。'
     },
     {
-      rootKey: '*grebh-',
-      label: '*grebh-',
+      rootKey: '*skreybʰ-',
+      label: '*skreybʰ-',
       meaning: '引っ掻く、書く、刻む',
       rank: 16,
       desc: 'ラテン語 scribere（書く）に由来。prescribe, proscribe, ascribe, inscribe, subscribe, transcribe, circumscribe など、規定や帰属・限定を表す接頭辞対比の代表格。'
@@ -1183,15 +1183,15 @@
     },
 
     // ------------------------------------------------------------------------
-    // Root 16: *grebh- / *scrip- (引っ掻く、書く、刻む)
+    // Root 16: *skreybʰ- (引っ掻く、書く、刻む)
     // ------------------------------------------------------------------------
     {
       word: 'prescribe',
       phonetic: '/prɪˈskraɪb/',
       meanings: [{ pos: 'V[T]', text: '（薬・治療法を）処方する；（規則・法令を）規定する、指示する' }],
       core: '事前に書面で「前もって決めて書き記す（pre- 前もって + scribe 書く）」こと。',
-      etymology: 'ラテン語 praescribere（前に書く、規定する；prae-「前に」＋ scribere「書く」）に由来し、印欧祖語 *grebh-（引っ掻く・彫る）に遡る。',
-      etymologyTags: ['*grebh-'],
+      etymology: 'ラテン語 praescribere（前に書く、規定する；prae-「前に」＋ scribere「書く」）に由来し、印欧祖語 *skreybʰ-（引っ掻く・刻みつける）に遡る。',
+      etymologyTags: ['*skreybʰ-'],
       example: {
         foreign: 'Physicians should only <b>prescribe</b> antibiotics when a bacterial infection is confirmed.',
         ja: '医師は細菌感染が確認された場合にのみ、抗生物質を<b>処方すべき</b>である。',
@@ -1204,8 +1204,8 @@
       phonetic: '/prəˈskraɪb/',
       meanings: [{ pos: 'V[T]', text: '（危険な行為・組織などを法で）禁止する、排斥する' }],
       core: '公の掲示板の前に「禁止対象者の氏名を書いて張り出す（pro- 前に + scribe 書く）」こと。',
-      etymology: 'ラテン語 proscribere（公開処刑や追放のリストを公示する；pro-「前に」＋ scribere「書く」）に由来し、印欧祖語 *grebh- に遡る。',
-      etymologyTags: ['*grebh-'],
+      etymology: 'ラテン語 proscribere（公開処刑や追放のリストを公示する；pro-「前に」＋ scribere「書く」）に由来し、印欧祖語 *skreybʰ-（引っ掻く・刻みつける）に遡る。',
+      etymologyTags: ['*skreybʰ-'],
       example: {
         foreign: 'The international treaty explicitly aims to <b>proscribe</b> biological weapon testing.',
         ja: 'その国際条約は、生物兵器の実験を明確に<b>禁止する</b>ことを目的としている。',
@@ -1218,8 +1218,8 @@
       phonetic: '/əˈskraɪb/',
       meanings: [{ pos: 'V[T]', text: '（原因・結果・作品などを〜に）帰する、〜のせいにする（ascribe A to B）' }],
       core: '〜の元へと「原因の帰属先を書き添える（ad- 〜へ + scribe 書く）」こと。',
-      etymology: 'ラテン語 ascribere（書き加える、割り当てる；ad-「〜へ」＋ scribere「書く」）に由来し、印欧祖語 *grebh- に遡る。',
-      etymologyTags: ['*grebh-'],
+      etymology: 'ラテン語 ascribere（書き加える、割り当てる；ad-「〜へ」＋ scribere「書く」）に由来し、印欧祖語 *skreybʰ-（引っ掻く・刻みつける）に遡る。',
+      etymologyTags: ['*skreybʰ-'],
       example: {
         foreign: 'Biologists <b>ascribe</b> the population resurgence to strict habitat preservation.',
         ja: '生物学者たちは、個体数の回復を厳格な生息環境保全の<b>成果であると帰している</b>。',
@@ -1231,8 +1231,8 @@
       phonetic: '/ɪnˈskraɪb/',
       meanings: [{ pos: 'V[T]', text: '（石・金属・心などに文字や名前を）刻む、記す、銘記する' }],
       core: '表面の内側へ「深く彫り込んで書き刻む（in- 中に + scribe 書く）」こと。',
-      etymology: 'ラテン語 inscribere（銘を刻む；in-「中に」＋ scribere「書く」）に由来し、印欧祖語 *grebh- に遡る。',
-      etymologyTags: ['*grebh-'],
+      etymology: 'ラテン語 inscribere（銘を刻む；in-「中に」＋ scribere「書く」）に由来し、印欧祖語 *skreybʰ-（引っ掻く・刻みつける）に遡る。',
+      etymologyTags: ['*skreybʰ-'],
       example: {
         foreign: 'The artisan was commissioned to <b>inscribe</b> the heroes\' names upon the memorial.',
         ja: 'その職人は、記念碑に英雄たちの名前を<b>刻み込む</b>ことを依頼された。',
@@ -1245,8 +1245,8 @@
       phonetic: '/ˈsɜːkəmskraɪb/',
       meanings: [{ pos: 'V[T]', text: '（権限・自由・範囲などを）制限する、周囲に境界線を引く' }],
       core: '外に出て行けないように「周囲にぐるりと境界線を引く（circum- 周囲に + scribe 書く）」こと。',
-      etymology: 'ラテン語 circumscribere（周囲を囲む、制限する；circum-「周りに」＋ scribere「書く」）に由来し、印欧祖語 *grebh- に遡る。',
-      etymologyTags: ['*grebh-'],
+      etymology: 'ラテン語 circumscribere（周囲を囲む、制限する；circum-「周りに」＋ scribere「書く」）に由来し、印欧祖語 *skreybʰ-（引っ掻く・刻みつける）に遡る。',
+      etymologyTags: ['*skreybʰ-'],
       example: {
         foreign: 'The new executive charter is strictly intended to <b>circumscribe</b> presidential decree power.',
         ja: '新たな基本定款は、大統領令の権限を厳格に<b>制限する</b>ことを意図している。',
@@ -1326,7 +1326,17 @@
         '*gn-': '*gno-',
         '*gn': '*gno-',
         '*graph-': '*grebh-',
-        '*graph': '*grebh-'
+        '*graph': '*grebh-',
+        '*scrip-': '*skreybʰ-',
+        '*scrip': '*skreybʰ-',
+        '*scribe-': '*skreybʰ-',
+        '*scribe': '*skreybʰ-',
+        '*skreibh-': '*skreybʰ-',
+        '*skreibh': '*skreybʰ-',
+        '*skreybh-': '*skreybʰ-',
+        '*skreybh': '*skreybʰ-',
+        '*grebh-': '*skreybʰ-',
+        '*grebh': '*skreybʰ-'
       };
       const normRoot = s => String(s || '').trim().toLowerCase()
         .replace(/h[1-3₁-₃]/g, '')

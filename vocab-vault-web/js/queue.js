@@ -258,13 +258,15 @@
     if (!App.reqQueue) App.reqQueue = [];
 
     const $ = global.$ || (id => typeof document !== 'undefined' ? document.getElementById(id) : null);
-    const c = typeof document !== 'undefined' ? document.createElement('div') : { classList: { add(){}, remove(){} } };
+    const reqId = task.requestId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('req_' + Date.now() + '_' + Math.random().toString(36).slice(2)));
+    const c = typeof document !== 'undefined' ? document.createElement('div') : { classList: { add(){}, remove(){} }, dataset: {} };
     c.className = 'card loading-card';
+    if (c.dataset) c.dataset.requestId = reqId;
     c.innerHTML = `<div class="card-acts" style="opacity:1"><button type="button" class="act-icon-btn del-btn" data-act="close-load" aria-label="キャンセル">×</button></div><div class="col-left"><span class="hw">${esc((task.items || []).map(x => x.word).join(', '))}</span></div><div class="right"><div class="load"><div class="spin"></div><span class="st-text">待機中 (${(task.items || []).length}語)...</span></div></div>`;
 
     const list = $('list');
     if (list) list.prepend(c);
-    App.reqQueue.push({ ...task, card: c, isCancelled: false, isDone: false });
+    App.reqQueue.push({ ...task, requestId: reqId, card: c, isCancelled: false, isDone: false });
     syncPersistedQueue();
     processQueue();
   }
@@ -327,7 +329,7 @@
         syncPersistedQueue();
 
         if (App.reqQueue.some(q => !q.isCancelled && !q.isDone && !q.isFailed)) {
-          await new Promise(r => setTimeout(r, 600));
+          await new Promise(r => setTimeout(r, 50));
         }
       }
       if (!App.reqQueue.some(q => !q.isDone) && $('list')) {
@@ -345,6 +347,9 @@
    */
   async function executeBatch(task) {
     const { items, fName, card, useHist, useWikt, targetLang, srcLang, tgtLang, pairKey } = task;
+    const reqId = task.requestId || card?.dataset?.requestId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('req_' + Date.now() + '_' + Math.random().toString(36).slice(2)));
+    task.requestId = reqId;
+    if (card && card.dataset) card.dataset.requestId = reqId;
     const App = global.App || {};
     const LANGS = global.LANGS || {};
     const sLang = srcLang || targetLang || App.srcLang || 'en';
@@ -359,9 +364,14 @@
     const fetchWiktFn = global.VocabDictionary?.fetchWiktOne || global.fetchWiktOne;
     if (useWikt && fetchWiktFn) {
       if (stEl) stEl.textContent = global.VocabI18n?.t ? global.VocabI18n.t('queue.fetching_wiktionary') : 'Wiktionaryから対象言語セクションを取得中...';
+      // [接地品質向上] モバイル・低速ネットワークでのWiktionary語源・IPA欠落（Grounding喪失）を防ぐため待機枠を2500msへ拡張
+      const timedFetch = (word, lang) => Promise.race([
+        fetchWiktFn(word, lang),
+        new Promise(resolve => setTimeout(() => resolve(null), 2500))
+      ]);
       await Promise.all(items.map(async (it, idx) => {
         try {
-          const res = await fetchWiktFn(it.word, sLang);
+          const res = await timedFetch(it.word, sLang);
           if (res) wiktByIdx.set(idx, res);
         } catch {}
       }));
@@ -487,10 +497,11 @@ etymology:${eInst}`;
             tgtLang: tLang,
             useHist,
             fName,
-            items: payload
+            items: payload,
+            requestId: reqId
           });
           returnedList = Array.isArray(proxyRes.items) ? proxyRes.items : [];
-          usedModel = proxyRes.usedModel || 'gemini-3.8-flash-proxy';
+          usedModel = proxyRes.usedModel || 'gemini-2.0-flash-proxy';
           if (proxyRes.quotaRemaining !== undefined && proxyRes.quotaRemaining !== null) {
             App.quotaRemaining = proxyRes.quotaRemaining;
             if (global.updCloudUI) global.updCloudUI();
@@ -517,6 +528,7 @@ etymology:${eInst}`;
               card.dataset.srcLang = sLang;
               card.dataset.tgtLang = tLang;
               card.dataset.pairKey = saveKey;
+              card.dataset.requestId = reqId;
               card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成枠上限（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">本日の無料枠(5語/日)に達しました。Proプランで無制限に生成できます。</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="open-upsell" data-reason="無料枠到達">アップグレード</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
             }
             syncPersistedQueue();
@@ -543,6 +555,7 @@ etymology:${eInst}`;
               card.dataset.srcLang = sLang;
               card.dataset.tgtLang = tLang;
               card.dataset.pairKey = saveKey;
+              card.dataset.requestId = reqId;
               card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(proxyErr.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
             }
             syncPersistedQueue();
@@ -567,6 +580,7 @@ etymology:${eInst}`;
           card.dataset.srcLang = sLang;
           card.dataset.tgtLang = tLang;
           card.dataset.pairKey = saveKey;
+          card.dataset.requestId = reqId;
           card.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">エントリの取得に失敗しました</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`;
         }
         syncPersistedQueue();
@@ -663,7 +677,7 @@ etymology:${eInst}`;
       if (global.VocabStorage && matchedIndices.size > 0) {
         if (usedModel === 'shared-cache') {
           global.VocabStorage.recordMetricsEvent('cache_hit', matchedIndices.size);
-        } else if (usedModel.includes('builtin') || usedModel.includes('on-device')) {
+        } else if (usedModel.includes('builtin') || usedModel.includes('on-device') || usedModel.includes('ondevice')) {
           global.VocabStorage.recordMetricsEvent('on_device', matchedIndices.size);
           global.VocabStorage.recordAiGenerationUsage(matchedIndices.size);
         } else {

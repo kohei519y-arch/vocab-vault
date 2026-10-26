@@ -381,6 +381,14 @@
               return true;
             }
           }
+        } else {
+          // [P2-⑦ 解決] フォーカス可能要素がない空/ローディングモーダル時、背後要素への漏洩を遮断
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          if (typeof openModal.focus === 'function') {
+            if (!openModal.hasAttribute('tabindex')) openModal.setAttribute('tabindex', '-1');
+            openModal.focus();
+          }
+          return true;
         }
       }
     }
@@ -455,7 +463,8 @@
         const appState = ctx.appState || global.VocabCore?.App;
         if (appState && typeof global.VocabCore?.setPage === 'function') {
           const per = appState.per || 30;
-          const tot = Math.max(1, Math.ceil((appState.entries?.length || 1) / per));
+          const filtered = global.VocabCore?.getFiltered?.() || appState.entries || [];
+          const tot = Math.max(1, Math.ceil(filtered.length / per));
           global.VocabCore.setPage(tot);
         }
         return true;

@@ -32,10 +32,21 @@ def generate_dev_html():
     with open(index_path, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # 1. window.__VV_DEV_MASTER = true; を注入
+    # 1. window.__VV_DEV_MASTER = true; および本番ホスト遮断ガードを注入
+    dev_guard = """<script>
+    (function() {
+      const host = String(window.location?.hostname || '');
+      const isLocal = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local') || host === '';
+      if (!isLocal) {
+        document.documentElement.innerHTML = '<body style="padding:40px;font-family:sans-serif;background:#111;color:#eee"><h1>403 Forbidden</h1><p>Developer master mode is strictly disabled on non-local hosts.</p></body>';
+        throw new Error('dev.html is blocked on non-local hosts');
+      }
+    })();
+    window.__VV_DEV_MASTER = true;
+    // [ゼロ障害保証]"""
     dev_content = content.replace(
         "<script>\n    // [ゼロ障害保証]",
-        "<script>\n    window.__VV_DEV_MASTER = true;\n    // [ゼロ障害保証]"
+        dev_guard
     )
 
     # 2. DEV MASTER バッジとクォータ無制限表示を注入
@@ -55,11 +66,11 @@ def generate_dev_html():
     with open(dev_path, "w", encoding="utf-8") as f:
         f.write(dev_content)
 
-    log("dev.html generated deterministically from index.html (Single Source of Truth)")
+    log("dev.html generated deterministically with production host protection")
     return True
 
 def sync_web_package():
-    """ルート資産を vocab-vault-web/ に完全同期"""
+    """ルート資産を vocab-vault-web/ に完全同期（dev.html は本番パッケージから除外）"""
     web_dir = os.path.join(BASE_DIR, "vocab-vault-web")
     os.makedirs(web_dir, exist_ok=True)
 
@@ -73,10 +84,9 @@ def sync_web_package():
                 shutil.rmtree(dst)
             shutil.copytree(src, dst)
 
-    # 同期対象ファイル
+    # 同期対象ファイル（dev.html は意図的に除外して本番流出を防止）
     files_to_sync = [
         "index.html",
-        "dev.html",
         "sw.js",
         "manifest.json"
     ]
@@ -86,7 +96,12 @@ def sync_web_package():
         if os.path.exists(src):
             shutil.copy2(src, dst)
 
-    log("vocab-vault-web/ assets synchronized completely")
+    # 過去の dev.html が残っていれば確実に削除
+    old_dev = os.path.join(web_dir, "dev.html")
+    if os.path.exists(old_dev):
+        os.remove(old_dev)
+
+    log("vocab-vault-web/ assets synchronized completely (dev.html excluded)")
     return True
 
 def package_distributions():
@@ -115,6 +130,15 @@ def package_distributions():
     log("Distribution packages updated")
     return True
 
+def update_mac_bundle():
+    """Vocab Vault.app および VocabVault-Mac.zip を最新コードでリビルド"""
+    update_mac_script = os.path.join(BASE_DIR, "scripts", "update_mac_app.py")
+    if os.path.exists(update_mac_script):
+        log("Rebuilding Vocab Vault.app & VocabVault-Mac.zip...")
+        res = subprocess.run([sys.executable, update_mac_script], cwd=BASE_DIR)
+        return res.returncode == 0
+    return True
+
 def run_tests():
     """全テストスイートの実行"""
     test_script = os.path.join(BASE_DIR, "scripts", "run_all_tests.py")
@@ -140,7 +164,12 @@ def main():
         log_fail("Build halted due to test failures.")
         sys.exit(1)
 
-    # 4. 配布パッケージ作成
+    # 4. Macネイティブアプリのリビルド・再署名・アーカイブ
+    if not update_mac_bundle():
+        log_fail("Failed to rebuild Mac bundle.")
+        sys.exit(1)
+
+    # 5. 配布パッケージ作成
     if not package_distributions():
         sys.exit(1)
 

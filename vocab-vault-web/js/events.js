@@ -87,6 +87,9 @@
           totalPulled += res.pulled;
           totalPushed += res.pushed;
         }
+        if (typeof global.VocabSync?.syncAppSettingsWithSupabase === 'function') {
+          await global.VocabSync.syncAppSettingsWithSupabase().catch(() => null);
+        }
         if ($('anki')?.style.display !== 'block' && typeof ctx.load === 'function' && appState) {
           ctx.load(appState.page);
         } else if (typeof ctx.renderSidebarTree === 'function') {
@@ -344,17 +347,28 @@
       return;
     }
     const sess = global.VocabSync.getSession();
-    const email = sess?.user?.email || 'あなたのアカウント';
-    const firstConfirm = confirm(`【重要・警告】\n${email} の全データ（クラウド単語帳、学習履歴、アカウント情報）を完全に抹消します。\n※Proプラン契約中の方はStripeサブスクリプションも即時自動解約されます。\nこの操作は取り消せません。本当に退会しますか？`);
-    if (!firstConfirm) return;
+    const email = sess?.user?.email || '';
+    const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
+    const DELETE_KEYWORDS = {
+      ja: '退会', en: 'DELETE', fr: 'SUPPRIMER', de: 'LÖSCHEN',
+      es: 'ELIMINAR', it: 'ELIMINA', pt: 'EXCLUIR', nl: 'VERWIJDEREN',
+      zh: '注销', ko: '탈퇴'
+    };
+    const keyword = DELETE_KEYWORDS[curLocale] || 'DELETE';
+    const t = (k, params, fb) => (global.VocabI18n?.t ? global.VocabI18n.t(k, params, curLocale) : fb);
 
-    if (confirm('退会する前に、登録した単語帳データをJSONファイルとしてダウンロード（保存）しますか？')) {
+    const firstMsg = t('settings.delete_first_confirm', { email }, `【重要・警告】\n${email} の全データ（クラウド単語帳、学習履歴、アカウント情報）を完全に抹消します。\n※Proプラン契約中の方はStripeサブスクリプションも即時自動解約されます。\nこの操作は取り消せません。本当に退会しますか？`);
+    if (!confirm(firstMsg)) return;
+
+    const backupMsg = t('settings.delete_backup_confirm', {}, '退会する前に、登録した単語帳データをJSONファイルとしてダウンロード（保存）しますか？');
+    if (confirm(backupMsg)) {
       await global.VocabSync?.exportAllUserDataJson?.();
     }
 
-    const userInput = prompt('最終確認です。退会してデータを完全に消去する場合は「退会」と入力してください。');
-    if (userInput !== '退会') {
-      alert('入力内容が一致しなかったため、退会処理を中止しました。');
+    const finalMsg = t('settings.delete_final_confirm', { keyword }, `最終確認: データを完全に消去する場合は「${keyword}」と入力してください。`);
+    const userInput = prompt(finalMsg);
+    if (!userInput || userInput.trim() !== keyword) {
+      alert(t('settings.delete_cancelled', {}, '入力内容が一致しなかったため、退会処理を中止しました。'));
       return;
     }
 
@@ -386,9 +400,9 @@
       if (global.VocabModal && typeof global.VocabModal.toggleModal === 'function') {
         global.VocabModal.toggleModal('settingsModal', false);
       }
-      showToast('アカウントおよび全てのクラウドデータが完全に抹消されました。ご利用ありがとうございました。', 'ok', 6000);
+      showToast(t('settings.delete_completed', {}, 'アカウントおよび全てのクラウドデータが完全に抹消されました。ご利用ありがとうございました。'), 'ok', 6000);
     } catch (e) {
-      alert(`退会処理エラー: ${e.message}`);
+      alert(t('settings.delete_failed', { error: e.message }, `退会処理エラー: ${e.message}`));
     }
   }
 
@@ -726,7 +740,7 @@
         if (!card) return;
         try {
           const retryItems = JSON.parse(card.dataset.retryItems || '[]');
-          const { fName = '', useHist, useWikt, srcLang, tgtLang, pairKey } = card.dataset;
+          const { fName = '', useHist, useWikt, srcLang, tgtLang, pairKey, requestId } = card.dataset;
           const reqQueue = appState?.reqQueue || [];
           const qIdx = reqQueue.findIndex(q => q.card === card);
           if (qIdx !== -1) reqQueue.splice(qIdx, 1);
@@ -740,7 +754,8 @@
               targetLang: srcLang || appState?.srcLang,
               srcLang: srcLang || appState?.srcLang,
               tgtLang: tgtLang || appState?.tgtLang,
-              pairKey: pairKey || (ctx.getActivePairConfig ? ctx.getActivePairConfig().key : '')
+              pairKey: pairKey || (ctx.getActivePairConfig ? ctx.getActivePairConfig().key : ''),
+              requestId: requestId || undefined
             });
           }
         } catch {}
@@ -808,9 +823,11 @@
         if (!appState?.isComposing) {
           clearTimeout(appState?.searchDebounceTimer);
           if (appState) {
+            const v = e.target.value || '';
+            const delay = /^[a-zA-Z0-9\s*_-]*$/.test(v) ? 70 : 120;
             appState.searchDebounceTimer = setTimeout(() => {
               if (typeof ctx.setSearch === 'function') ctx.setSearch(e.target.value);
-            }, 160);
+            }, delay);
           }
         }
       });

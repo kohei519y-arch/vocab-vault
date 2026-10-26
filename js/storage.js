@@ -40,14 +40,13 @@
       let text = String(m.text || m.t || '');
       // 壊れたカード（意味テキストが === Etymology === 等のWiktionary生見出しやダミープレースホルダー）の自己修復
       if (text.includes('===') || text.includes('主要な意味・文脈的語義')) {
-        if (mIdx === 0 && normW === 'implement') {
-          pos = 'V[T]';
-          text = '（計画・政策・方針を）実行する、実施する、導入する';
-        } else if (mIdx === 0 && (normW === 'objective' || normW === 'objectives')) {
-          pos = 'N[C]';
-          text = '目標、目的、方針';
+        const cleaned = text.replace(/={2,}[^=]+={2,}/g, '').replace(/主要な意味・文脈的語義/g, '').trim();
+        if (cleaned) {
+          text = cleaned;
         } else {
-          text = text.replace(/===+[^=]+===+/g, '').trim() || '学術・文脈上の重要語義';
+          const cfg = resolveConfig(l);
+          const isJa = (cfg.tgtLang || 'ja') === 'ja';
+          text = isJa ? '重要語義' : 'Primary definition';
         }
       }
       return { pos, text };
@@ -84,17 +83,22 @@
       etymologyTags: (Array.isArray(rawTags) ? rawTags : [])
         .map(normRootKey)
         .filter(r => r && isValidRoot(r, { word: w, etymology: raw.etymology || raw.e, example: ex })),
+      notes: typeof raw.notes === 'string' ? raw.notes : undefined,
+      mnemonic: typeof raw.mnemonic === 'string' ? raw.mnemonic : undefined,
+      etymologyDetails: typeof raw.etymologyDetails === 'string' ? raw.etymologyDetails : undefined,
       history_note: (raw.history_note || raw.hn) ? String(raw.history_note || raw.hn).trim() : undefined,
       core: String(raw.core || raw.co || ''),
       meanings,
       example: ex ? {
         foreign: String(ex.foreign || ex.en || ex.f || ''),
-        ja: String(ex.ja || ex.j || ''),
+        ja: String(ex.ja || ex.j || ex.trans || ''),
+        trans: String(ex.trans || ex.ja || ex.j || ''),
         used_form: (ex.used_form || ex.uf) ? String(ex.used_form || ex.uf).trim() : undefined
       } : null,
       phrases: (Array.isArray(rawPhrases) ? rawPhrases : []).filter(Boolean).map(x => ({
         foreign: String(x.foreign || x.en || x.f || ''),
-        ja: String(x.ja || x.j || '')
+        ja: String(x.ja || x.j || x.trans || ''),
+        trans: String(x.trans || x.ja || x.j || '')
       })),
       derivatives: (Array.isArray(rawDerivs) ? rawDerivs : []).filter(Boolean).map(x => ({
         word: String(x.word || x.w || ''),
@@ -108,6 +112,7 @@
       interval: Number.isFinite(Number(raw.interval)) ? Number(raw.interval) : 0,
       repetition: Number.isFinite(Number(raw.repetition)) ? Number(raw.repetition) : 0,
       efactor: Number.isFinite(Number(raw.efactor)) ? Number(raw.efactor) : 2.5,
+      lapses: Number.isFinite(Number(raw.lapses)) ? Number(raw.lapses) : 0,
       stability: (Number.isFinite(Number(raw.stability)) && Number(raw.stability) > 0) ? Number(raw.stability) : undefined,
       difficulty: (Number.isFinite(Number(raw.difficulty)) && Number(raw.difficulty) >= 1 && Number(raw.difficulty) <= 10) ? Number(raw.difficulty) : undefined,
       retrievability: (Number.isFinite(Number(raw.retrievability)) && Number(raw.retrievability) >= 0 && Number(raw.retrievability) <= 1) ? Number(raw.retrievability) : undefined,
@@ -148,13 +153,25 @@
       } else {
         const ex = byId.get(existingId);
         // 項目23: 論理クロック（Lamport Version）優先、同値時は updatedAt によるハイブリッド調停 (HLC)
-        const itVer = Number(it.version) || 1;
-        const exVer = Number(ex.version) || 1;
+        // [防御] 異常値・上限超え(100万)・不正跳躍の検証を行い、version だけで無条件に勝たせない
+        const itVer = Math.min(Math.max(Number(it.version) || 1, 1), 1000000);
+        const exVer = Math.min(Math.max(Number(ex.version) || 1, 1), 1000000);
+        const itTime = Number(it.updatedAt) || 0;
+        const exTime = Number(ex.updatedAt) || 0;
+
         let itWins;
-        if (itVer !== exVer) {
-          itWins = itVer > exVer;
+        if (itTime !== exTime) {
+          // タイムスタンプが異なる場合、基本は新しい方を優先しつつ、直近7日以内の妥当な version 増分(+50以内)は許容
+          if (itTime > exTime) {
+            itWins = true;
+          } else if (itVer > exVer && itVer <= exVer + 50 && itTime >= (exTime - 604800000)) {
+            itWins = true;
+          } else {
+            itWins = false;
+          }
         } else {
-          itWins = (it.updatedAt || 0) >= (ex.updatedAt || 0);
+          // 同一ミリ秒タイブレーク
+          itWins = itVer >= exVer;
         }
         const win = itWins ? it : ex, lose = itWins ? ex : it;
 
@@ -165,24 +182,32 @@
         const revWin = revWins ? it : ex, revLose = revWins ? ex : it;
 
         // フィールド単位の無損失マージ (Field-level CRDT Lossless Merge)
-        const mergedNotes = (win.notes && String(win.notes).trim())
-          ? win.notes
-          : (lose.notes || '');
-        const mergedMnemonic = (win.mnemonic && String(win.mnemonic).trim())
-          ? win.mnemonic
-          : (lose.mnemonic || '');
-        const mergedContextSentence = (win.contextSentence && String(win.contextSentence).trim())
-          ? win.contextSentence
-          : (lose.contextSentence || '');
-        const mergedEtymologyDetails = (win.etymologyDetails && String(win.etymologyDetails).trim())
-          ? win.etymologyDetails
-          : (lose.etymologyDetails || '');
+        // win が明確な勝者の場合、ユーザーが明示的に空文字や空配列へクリアした操作（Zombie Field 防止）を反映
+        const winIsNewer = (win.updatedAt || 0) > (lose.updatedAt || 0) || itVer > exVer;
 
-        // 語根タグ（Set によるユニオン統合）
-        const mergedTagsSet = new Set();
-        (Array.isArray(win.etymologyTags) ? win.etymologyTags : []).forEach(t => { if (t) mergedTagsSet.add(String(t).trim()); });
-        (Array.isArray(lose.etymologyTags) ? lose.etymologyTags : []).forEach(t => { if (t) mergedTagsSet.add(String(t).trim()); });
-        const mergedTags = mergedTagsSet.size ? Array.from(mergedTagsSet) : (win.etymologyTags || lose.etymologyTags || []);
+        const mergedNotes = winIsNewer
+          ? (win.notes !== undefined ? win.notes : (lose.notes || ''))
+          : ((win.notes && String(win.notes).trim()) ? win.notes : (lose.notes || ''));
+        const mergedMnemonic = winIsNewer
+          ? (win.mnemonic !== undefined ? win.mnemonic : (lose.mnemonic || ''))
+          : ((win.mnemonic && String(win.mnemonic).trim()) ? win.mnemonic : (lose.mnemonic || ''));
+        const mergedContextSentence = winIsNewer
+          ? (win.contextSentence !== undefined ? win.contextSentence : (lose.contextSentence || ''))
+          : ((win.contextSentence && String(win.contextSentence).trim()) ? win.contextSentence : (lose.contextSentence || ''));
+        const mergedEtymologyDetails = winIsNewer
+          ? (win.etymologyDetails !== undefined ? win.etymologyDetails : (lose.etymologyDetails || ''))
+          : ((win.etymologyDetails && String(win.etymologyDetails).trim()) ? win.etymologyDetails : (lose.etymologyDetails || ''));
+
+        // 語根タグ: winIsNewer かつ win.etymologyTags が配列として明示的に指定されている場合は win を正とする（削除のゾンビ復活防止）
+        let mergedTags;
+        if (winIsNewer && Array.isArray(win.etymologyTags)) {
+          mergedTags = [...win.etymologyTags];
+        } else {
+          const mergedTagsSet = new Set();
+          (Array.isArray(win.etymologyTags) ? win.etymologyTags : []).forEach(t => { if (t) mergedTagsSet.add(String(t).trim()); });
+          (Array.isArray(lose.etymologyTags) ? lose.etymologyTags : []).forEach(t => { if (t) mergedTagsSet.add(String(t).trim()); });
+          mergedTags = mergedTagsSet.size ? Array.from(mergedTagsSet) : (win.etymologyTags || lose.etymologyTags || []);
+        }
 
         const merged = {
           ...lose, ...win,
@@ -305,7 +330,10 @@
 
     Storage.dbReadyPromise = new Promise(resolve => {
       try {
-        const req = indexedDB.open('VocabVaultDB', 2);
+        const req = indexedDB.open('vocab_vault_db', 1);
+        req.onblocked = () => {
+          _warn('[Storage] IndexedDB open blocked by another open tab holding an older schema version.');
+        };
         req.onupgradeneeded = e => {
           const db = e.target.result;
           if (!db.objectStoreNames.contains('vaults')) {
@@ -313,7 +341,14 @@
           }
         };
         req.onsuccess = async e => {
-          Storage.dbInst = e.target.result;
+          const db = e.target.result;
+          Storage.dbInst = db;
+          db.onversionchange = () => {
+            _warn('[Storage] Database version changed in another tab; closing connection to unblock upgrade.');
+            try { db.close(); } catch {}
+            Storage.dbInst = null;
+            Storage.dbReadyPromise = null;
+          };
           // iOS Safari等のパージ対策: 永続化ストレージ要求
           if (typeof navigator !== 'undefined' && navigator.storage?.persist) {
             navigator.storage.persist().catch(() => {});
@@ -335,10 +370,13 @@
     return Storage.dbReadyPromise;
   }
 
-  // --- LocalStorage と IndexedDB の双方向安全同期 & データ完全復旧 ---
   async function migrateFromLocalStorageIfNeeded() {
     if (!Storage.dbInst || Storage.migratedFromLs) return;
     try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('vv_migrated_idb') === '1') {
+        Storage.migratedFromLs = true;
+        return;
+      }
       const keysToMigrate = new Set(LANG_KEYS.map(l => LANGS[l].key));
       try {
         if (typeof localStorage !== 'undefined' && localStorage.length) {
@@ -383,6 +421,7 @@
         }
       }
       Storage.migratedFromLs = true;
+      try { localStorage.setItem('vv_migrated_idb', '1'); } catch {}
     } catch (e) {
       _warn('[Storage Migration Error]', e);
     }
@@ -593,11 +632,15 @@
   function saveTombstones(l = 'en', map = getTombstones(l)) {
     const cfg = resolveConfig(l), id = cfg.pairId || cfg.key;
     const cutoff = Date.now() - TOMBSTONE_TTL_MS;
-    const sorted = [...map.entries()].filter(([k, ts]) => !k.startsWith('fold:') && ts >= cutoff).sort((a, b) => b[1] - a[1]).slice(0, 2000);
-    Storage.tombstones[id] = new Map(sorted);
-    const arr = sorted.map(([key, deletedAt]) => ({ key, deletedAt }));
-    lsSet(cfg.tomb, JSON.stringify(arr));
-    idbPut(cfg.tomb, arr);
+    const sorted = [...map.entries()].filter(([k, ts]) => !k.startsWith('fold:') && ts >= cutoff).sort((a, b) => b[1] - a[1]);
+    const fullTombs = sorted.slice(0, 50000);
+    Storage.tombstones[id] = new Map(fullTombs);
+    const fullArr = fullTombs.map(([key, deletedAt]) => ({ key, deletedAt }));
+    idbPut(cfg.tomb, fullArr);
+
+    const lsTombs = sorted.slice(0, 10000);
+    const lsArr = lsTombs.map(([key, deletedAt]) => ({ key, deletedAt }));
+    lsSet(cfg.tomb, JSON.stringify(lsArr));
   }
 
   function recordTombstone(item, l = 'en', deletedAt = Date.now()) {
@@ -859,7 +902,7 @@
       try {
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
-          if (!k || !(k.includes('distinction_entries') || k.includes('vocab_snapshot') || k.startsWith('vv_'))) continue;
+          if (!k || !(k.includes('distinction_entries') || k.includes('vocab_snapshot'))) continue;
           if (k.startsWith('distinction_entries')) {
             saveClearedAt(k, 0);
             saveTombstones(k, new Map());
@@ -895,10 +938,10 @@
     };
     syncActiveLang();
 
-    // IndexedDB の初期化完了を待機して全ペアデータを完全同期・復元
+    // IndexedDB の初期化完了を待機してデータを完全同期・復元
     return initDatabase().then(async () => {
       try {
-        // デフォルト4キーに加え、IndexedDBおよびlocalStorageに存在するすべてのペアキー（en_en, ja_en等）を完全走査
+        const activeKey = ctx.getActivePairKey ? ctx.getActivePairKey() : LANGS.en.key;
         const idbKeys = await idbGetAllVaultKeys();
         const allKeySet = new Set(LANG_KEYS.map(l => LANGS[l].key));
         idbKeys.forEach(k => {
@@ -911,7 +954,7 @@
           }
         } catch {}
 
-        await Promise.all(Array.from(allKeySet).map(async k => {
+        const syncSingleKey = async k => {
           const cfg = resolveConfig(k);
           const srcL = cfg.srcLang || keyToLang(k);
           const pairId = cfg.pairId || cfg.key;
@@ -932,17 +975,55 @@
           if (merged.length > 0 || manualSalvage) {
             Storage.mem[k] = merged;
             if (k === LANGS.en.key) Storage.mem.en = merged;
-            try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
+            if (merged.length <= 500) {
+              try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
+            } else {
+              try { localStorage.removeItem(k); } catch {}
+            }
             await idbPut(k, merged);
           }
-        }));
+        };
 
-        syncActiveLang();
-        if (ctx.flushOffline) ctx.flushOffline();
-        if (ctx.syncCloud) ctx.syncCloud();
         if (manualSalvage) {
+          // 手動サルベージ時は全言語を待機して集計
+          await Promise.all(Array.from(allKeySet).map(syncSingleKey));
+          syncActiveLang();
+          if (ctx.flushOffline) ctx.flushOffline();
+          if (ctx.syncCloud) ctx.syncCloud();
           const tot = Array.from(allKeySet).reduce((s, k) => s + ctx.getJson(k).length, 0);
           notifyFn(tot ? `合計 ${tot} 語を検出・復元しました。` : '復元可能なデータは見つかりませんでした。');
+        } else {
+          // 通常起動時: 現在のアクティブ言語のみを最優先で即時同期し、メインスレッドを直ちに解放
+          await syncSingleKey(activeKey);
+          syncActiveLang();
+          if (ctx.flushOffline) ctx.flushOffline();
+          if (ctx.syncCloud) ctx.syncCloud();
+
+          // [P2-1 解決] 残りの非アクティブ言語キーは直列かつアイドルフレームごとに分割同期（メインスレッド非ブロッキング）
+          const remainingKeys = Array.from(allKeySet).filter(k => k !== activeKey);
+          if (remainingKeys.length > 0) {
+            const runBackgroundSync = async () => {
+              for (const k of remainingKeys) {
+                try {
+                  await syncSingleKey(k);
+                } catch (e) {
+                  _warn('[Background Lang Sync Error]', k, e);
+                }
+                await new Promise(res => {
+                  if (typeof requestIdleCallback === 'function') {
+                    requestIdleCallback(res, { timeout: 1000 });
+                  } else {
+                    setTimeout(res, 50);
+                  }
+                });
+              }
+            };
+            if (typeof requestIdleCallback === 'function') {
+              requestIdleCallback(() => { runBackgroundSync(); }, { timeout: 2000 });
+            } else {
+              setTimeout(() => { runBackgroundSync(); }, 200);
+            }
+          }
         }
       } catch (err) {
         _warn('[Sync Init Error]', err);
@@ -964,8 +1045,14 @@
     const merged = mergeWords(ctx.getJson(k), b.words, k, false);
     if (k === LANGS.en.key) Storage.mem.en = merged;
     Storage.mem[k] = merged;
-    try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
+    if (merged.length <= 500) {
+      try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
+    } else {
+      try { localStorage.removeItem(k); } catch {}
+    }
     ctx.applyMerged(k, merged);
+    // [P1-⑫ 解決] 他タブブロードキャスト受信によるマージ結果を直ちにIDBへ永続化（タブ閉鎖時のデータ消失防止）
+    await idbPut(k, merged).catch(() => {});
   }
 
   // --- 【項目6・9解決】日次AIクォータ管理 & トークン削減メトリクス ---
@@ -1141,8 +1228,45 @@
     cleanPho,
     fmtPho,
     WIKT_URL_RE,
-    sanitizeWiktUrl
+    sanitizeWiktUrl,
+    clearAllClientStorageData
   };
+
+  async function clearAllClientStorageData() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.clear();
+      }
+    } catch {}
+    try {
+      if (typeof sessionStorage !== 'undefined') {
+        sessionStorage.clear();
+      }
+    } catch {}
+    try {
+      const db = await initDatabase();
+      if (db) {
+        await new Promise(res => {
+          try {
+            const tx = db.transaction('vaults', 'readwrite');
+            tx.objectStore('vaults').clear();
+            tx.oncomplete = () => res(true);
+            tx.onerror = () => res(false);
+          } catch {
+            res(false);
+          }
+        });
+      }
+    } catch {}
+    Storage.mem = {};
+    Storage.tombstones = {};
+    Storage.clearedAt = {};
+    Storage.loadFailed = {};
+    if ('tombs' in Storage) delete Storage.tombs;
+    if ('baseSnap' in Storage) delete Storage.baseSnap;
+    try { if (Storage.bc) Storage.bc.postMessage({ type: 'vault-updated', key: '__all__' }); } catch {}
+    return true;
+  }
 
   // 即時初期化開始
   if (typeof window !== 'undefined') {

@@ -41,6 +41,108 @@
     }
   });
 
+  /**
+   * 10言語対応 大語族・語源系統分類タクソノミー (Language Families & Etymological Traditions)
+   */
+  const ETYMOLOGY_FAMILIES = {
+    all: {
+      id: 'all',
+      label: '全語源系統 (All Families)',
+      shortLabel: '全語源',
+      desc: '全10言語の言語系統と語源ネットワークを網羅',
+      coreRoot: '大語源ネットワーク (Global Lineage)',
+      coreMeaning: 'Indo-European, Sinospheric, Koreanic & Japonic',
+      langs: ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko', 'ja'],
+      color: '#38bdf8'
+    },
+    germanic: {
+      id: 'germanic',
+      label: 'ゲルマン語派 (Germanic)',
+      shortLabel: 'ゲルマン',
+      desc: '英語 (en)・ドイツ語 (de)・オランダ語 (nl) の西ゲルマン固有語幹とグリムの法則',
+      coreRoot: 'ゲルマン祖語 (Proto-Germanic / PGmc)',
+      coreMeaning: 'Germanic Roots & Grimm\'s Law',
+      langs: ['en', 'de', 'nl'],
+      color: '#84cc16'
+    },
+    romance: {
+      id: 'romance',
+      label: 'ロマンス語派 (Romance)',
+      shortLabel: 'ロマンス',
+      desc: 'フランス語 (fr)・スペイン語 (es)・イタリア語 (it)・ポルトガル語 (pt) の通俗ラテン語根幹',
+      coreRoot: 'ラテン・ロマンス祖語 (Proto-Romance)',
+      coreMeaning: 'Vulgar Latin & Romance Roots',
+      langs: ['fr', 'es', 'it', 'pt'],
+      color: '#06b6d4'
+    },
+    hellenic: {
+      id: 'hellenic',
+      label: 'ヘレニック古典派 (Hellenic & Classical)',
+      shortLabel: '古典ギリシャ',
+      desc: '古典ギリシャ語に由来する国際学術・科学技術接頭辞体系 (tele-, bio-, auto- 等)',
+      coreRoot: '古典ギリシャ語幹 (Ancient Greek)',
+      coreMeaning: 'Classical Academic & Scientific Prefixes',
+      langs: ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl'],
+      color: '#c084fc'
+    },
+    sinospheric: {
+      id: 'sinospheric',
+      label: 'シノ・チベット語族 / 漢語字源 (Sino-Tibetan)',
+      shortLabel: '漢語・字源',
+      desc: '中国語 (zh) および東アジア共有語幹。六書（象形・会意・形声）に基づく漢字字源体系',
+      coreRoot: '古代漢語字源 (Proto-Sinitic / CJK)',
+      coreMeaning: 'Six Writings & Character Origins (六書・字源)',
+      langs: ['zh'],
+      color: '#f43f5e'
+    },
+    koreanic: {
+      id: 'koreanic',
+      label: '朝鮮語族 (Koreanic: 固有語・漢字語)',
+      shortLabel: '朝鮮語族',
+      desc: '韓国語 (ko) の独自語幹（固有語）および東アジア漢字語音韻体系',
+      coreRoot: '朝鮮祖語・漢字音韻 (Proto-Koreanic)',
+      coreMeaning: 'Native Korean & Sino-Korean (固有語・漢字語)',
+      langs: ['ko'],
+      color: '#fb923c'
+    },
+    japonic: {
+      id: 'japonic',
+      label: '日本語族 (Japonic: 和語・漢語)',
+      shortLabel: '日本語族',
+      desc: '日本語 (ja) の大和言葉（和語固有語幹）および和製漢語・音読み体系',
+      coreRoot: '日本語祖語・和語漢語体系 (Proto-Japonic)',
+      coreMeaning: 'Yamato & Sino-Japanese (和語・和製漢語)',
+      langs: ['ja'],
+      color: '#eab308'
+    }
+  };
+
+  /**
+   * 単語・言語から大語族・語源系統を判定
+   */
+  function detectWordFamily(item, itemLang = '') {
+    const lang = String(itemLang || item?.lang || 'en').toLowerCase();
+    const word = String(item?.word || '');
+    const ety = String(item?.etymology || '').toLowerCase();
+    const roots = Array.isArray(item?.etymologyTags) ? item.etymologyTags : [];
+
+    if (lang === 'zh') return 'sinospheric';
+    if (lang === 'ko') return 'koreanic';
+    if (lang === 'ja') return 'japonic';
+    if (['fr', 'es', 'it', 'pt'].includes(lang)) return 'romance';
+    if (['de', 'nl'].includes(lang)) return 'germanic';
+
+    if (roots.some(r => /^(?:tele|bio|photo|auto|micro|macro|poly|hyper|hypo|syn|sym|dia)-/i.test(r)) ||
+        ['tele-', 'bio-', 'photo-', 'auto-', 'micro-'].some(p => word.toLowerCase().startsWith(p))) {
+      return 'hellenic';
+    }
+    if (ety.includes('french') || ety.includes('latin') || ety.includes('romance') ||
+        ['con', 'com', 'sub', 'per', 'trans', 'dis', 'pro', 'pre'].some(p => word.toLowerCase().startsWith(p))) {
+      return 'romance';
+    }
+    return 'germanic';
+  }
+
   const getEnglishPairKeyAndEntries = () => {
     if (global.VocabGraph?.getEnglishPairKeyAndEntries) {
       return global.VocabGraph.getEnglishPairKeyAndEntries();
@@ -172,13 +274,15 @@
     if (!cleanK) return '';
     const rawK = cleanK.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
 
+    const sanitizeMeaning = s => String(s || '').replace(/[<>"'`\\]/g, '').trim();
+
     // 1. BUILTIN_ETYMOLOGY_KNOWLEDGE の照合
     const builtinRoots = (global.VocabDictionary?.BUILTIN_ETYMOLOGY_KNOWLEDGE || global.BUILTIN_ETYMOLOGY_KNOWLEDGE)?.roots || {};
     for (const [k, info] of Object.entries(builtinRoots)) {
       const bRaw = k.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
       if (bRaw === rawK || bRaw.replace(/h[1-4]/g, '') === rawK.replace(/h[1-4]/g, '')) {
         if (info.meaning) {
-          return info.meaning.split(/[,、/／]/).slice(0, 2).join('・').trim();
+          return sanitizeMeaning(info.meaning.split(/[,、/／]/).slice(0, 2).join('・'));
         }
       }
     }
@@ -190,7 +294,7 @@
         : (rk => (global.VocabEikenCatalog.ROOTS || []).find(r => r && (r.rootKey === rk || (r.rootKey && r.rootKey.replace(/^\*/, '').replace(/-$/, '') === (rk || '').replace(/^\*/, '').replace(/-$/, '')))));
       const eikenRoot = getRootFn(cleanK) || getRootFn(`*${rawK}-`) || getRootFn(`*${rawK}`);
       if (eikenRoot?.meaning) {
-        return eikenRoot.meaning.split(/[,、/／]/).slice(0, 2).join('・').trim();
+        return sanitizeMeaning(eikenRoot.meaning.split(/[,、/／]/).slice(0, 2).join('・'));
       }
     }
 
@@ -201,13 +305,14 @@
         const escRaw = rawK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const match = ety.match(new RegExp(`\\*${escRaw}[^\\(（]*[\\(（]([^\\)）]{1,12})[\\)）]`, 'i'));
         if (match && match[1]) {
-          const m = match[1].split(/[,、/／]/).slice(0, 2).join('・').trim();
+          const m = sanitizeMeaning(match[1].split(/[,、/／]/).slice(0, 2).join('・'));
           if (m && !m.includes('http') && m.length <= 10) return m;
         }
       }
       for (const w of connectedWords) {
-        if (w.item?.core && typeof w.item.core === 'string' && w.item.core.length <= 10) {
-          return w.item.core.split(/[,、/／]/)[0].trim();
+        if (w.item?.core && typeof w.item.core === 'string') {
+          const m = sanitizeMeaning(w.item.core.split(/[,、/／]/)[0]);
+          if (m && m.length <= 10) return m;
         }
       }
     }
@@ -237,8 +342,8 @@
   function normalizeBranch(bLabel) {
     if (!bLabel) return 'Germanic: 西ゲルマン語群根幹 (Old English)';
     let clean = String(bLabel).trim();
-    if (clean.startsWith('Sinospheric:')) return clean;
-    clean = clean.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric):\s*/i, '');
+    if (clean.startsWith('Sinospheric:') || clean.startsWith('Koreanic:') || clean.startsWith('Japonic:')) return clean;
+    clean = clean.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric|Koreanic|Japonic):\s*/i, '');
 
     if (clean.startsWith('con-') || clean.startsWith('com-')) return 'Italic: con- / com- (共に)';
     if (clean.startsWith('in-') || clean.startsWith('im-') || clean.startsWith('il-') || clean.startsWith('ir-')) return 'Italic: in- / im- (中に/否定)';
@@ -273,21 +378,47 @@
     const lang = String(itemLang || item?.lang || 'en').toLowerCase();
     const isCjkRoot = Boolean(rootKey && /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(String(rootKey).trim()));
 
-    // 0. 東アジア漢字文化圏（中国語・韓国語・日本語の漢字語・字源系統）
-    if (isCjkRoot || lang === 'zh' || lang === 'ko' || (lang === 'ja' && /[\u4E00-\u9FFF]/.test(rawWord))) {
+    // 0a. シノ・チベット語族（中国語・漢語字源本源構文）
+    if (lang === 'zh' || (isCjkRoot && !['ja', 'ko'].includes(lang))) {
       const cjkText = `${rawWord} ${gram} ${item?.etymology || ''}`;
-      if (/^[不非無未反否]|(?:불|비|무|미|반)/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
+      if (/^[不非無未反否]/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
         return 'Sinospheric: 不-/非-/無- (否定・対抗接頭系)';
       }
-      if (/[化性的度力権観論法制権]$|(?:화|성|적|도|력|권|관|론|법|제)$/.test(rawWord) || /[化性的度力権観論法制]$/.test(gram)) {
+      if (/[化性的度力権観論法制権]$/.test(rawWord) || /[化性的度力権観論法制]$/.test(gram)) {
         return 'Sinospheric: -化/-性/-論/-制 (抽象・制度派生系)';
       }
-      if (/^[超全多総高大新再共国際]|(?:초|전|다|총|고|대|신|재|공)/.test(rawWord)) {
+      if (/^[超全多総高大新再共国際]/.test(rawWord)) {
         return 'Sinospheric: 超-/全-/共- (程度・統合接頭系)';
       }
-      if (lang === 'zh') return 'Sinospheric: 中国語・漢語本源構文 (Chinese)';
-      if (lang === 'ko') return 'Sinospheric: 韓国漢字語・東アジア共有語幹 (Korean Hanja)';
-      return 'Sinospheric: 和製漢語・東アジア漢字複合語 (Japanese Kanji)';
+      return 'Sinospheric: 中国語・漢語本源構文 (Chinese)';
+    }
+
+    // 0b. 朝鮮語族（韓国語: 固有語 および 漢字語）
+    if (lang === 'ko') {
+      if (/^[불비무미반]/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
+        return 'Koreanic: 不-/非-/無- 漢字接頭系 (Sino-Korean Prefix)';
+      }
+      if (/(?:화|성|적|도|력|권|관|론|법|제)$/.test(rawWord)) {
+        return 'Koreanic: -化/-性/-論 制度派生系 (Sino-Korean Derivation)';
+      }
+      if (isCjkRoot || /[\u4E00-\u9FFF]/.test(rawWord)) {
+        return 'Koreanic: 韓国漢字語・東アジア共有語幹 (Korean Hanja)';
+      }
+      return 'Koreanic: 固有語・韓半島独自語幹 (Native Korean)';
+    }
+
+    // 0c. 日本語族（日本語: 和語・大和言葉 および 漢語・和製漢語）
+    if (lang === 'ja') {
+      if (/^[不非無未反否]/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
+        return 'Japonic: 不-/非-/無- 漢語接頭系 (Sino-Japanese Prefix)';
+      }
+      if (/[化性的度力権観論法制権]$/.test(rawWord)) {
+        return 'Japonic: -化/-性/-論 漢語派生系 (Sino-Japanese Derivation)';
+      }
+      if (isCjkRoot || /[\u4E00-\u9FFF]/.test(rawWord)) {
+        return 'Japonic: 和製漢語・東アジア漢字複合語 (Japanese Kanji)';
+      }
+      return 'Japonic: 和語・大和言葉固有語幹 (Yamato Roots)';
     }
 
     // 1. 古典ラテン語系の主要接頭辞（同義異形を統合し、過密と衝突を根絶）
@@ -532,14 +663,30 @@
 
     const targetLang = (langFilter && langFilter !== 'all') ? langFilter.toLowerCase() : '';
     const targetRoot = filterRootKey ? cleanRootKey(filterRootKey) : '';
+    const familyFilter = (graphState?.familyFilter && graphState.familyFilter !== 'all') ? graphState.familyFilter.toLowerCase() : '';
 
     langKeys.forEach(({ key, lang }) => {
       const srcL = lang || 'en';
       if (targetLang && srcL !== targetLang) return;
+      if (familyFilter) {
+        const famMeta = ETYMOLOGY_FAMILIES[familyFilter];
+        if (famMeta && Array.isArray(famMeta.langs) && !famMeta.langs.includes(srcL)) {
+          return;
+        }
+      }
 
       const list = getJsonFn(key);
       (Array.isArray(list) ? list : []).forEach(item => {
         if (!item || !item.word) return;
+
+        if (familyFilter) {
+          const itemFam = detectWordFamily(item, srcL);
+          if (familyFilter === 'indo_european') {
+            if (!['germanic', 'romance', 'hellenic', 'indo_european'].includes(itemFam)) return;
+          } else if (itemFam !== familyFilter) {
+            return;
+          }
+        }
 
         // 1. 語根タグの取得（未設定の場合は解説文から正規表現フォールバック抽出・結果をメモ化）
         let itemRoots = item._cachedRoots;
@@ -749,42 +896,141 @@
       const ghostBuds = [];
       const twigs = [];
 
-      function createUnifiedPieRoot() {
-        const uRoot = {
-          id: 'root:pie:unified',
-          label: '印欧祖語 (PIE)',
-          meaning: 'Proto-Indo-European',
-          type: 'root',
-          level: 1,
-          radius: 26.0,
-          childCount: 0,
-          connectedWords: [],
-          x: 0,
-          y: 0,
-          targetX: 0,
-          targetY: 0,
-          vx: 0,
-          vy: 0
+      function getPhylumForWord(w) {
+        const l = (w.lang || 'en').toLowerCase();
+        if (l === 'zh') return 'sinospheric';
+        if (l === 'ko') return 'koreanic';
+        if (l === 'ja') return 'japonic';
+        return 'indo_european';
+      }
+
+      function buildPhylumRoots() {
+        const famKey = (graphState.familyFilter || 'all').toLowerCase();
+
+        const PHYLA_METAS = {
+          indo_european: {
+            id: 'root:pie:unified',
+            label: '印欧語族 / PIE (Proto-Indo-European)',
+            meaning: 'Germanic, Romance & Classical Hellenic',
+            phylum: 'indo_european',
+            targetX: 0,
+            targetY: 0
+          },
+          sinospheric: {
+            id: 'root:sinospheric:unified',
+            label: 'シノ・チベット語族 / Sino-Tibetan',
+            meaning: 'Proto-Sinitic & Six Writings (古代漢語字源・六書)',
+            phylum: 'sinospheric',
+            isCjkRoot: true,
+            targetX: 2400,
+            targetY: -400
+          },
+          koreanic: {
+            id: 'root:koreanic:unified',
+            label: '朝鮮語族 / Koreanic',
+            meaning: 'Native Korean & Sino-Korean (固有語・漢字音韻体系)',
+            phylum: 'koreanic',
+            targetX: 2400,
+            targetY: 1400
+          },
+          japonic: {
+            id: 'root:japonic:unified',
+            label: '日本語族 / Japonic',
+            meaning: 'Yamato & Sino-Japanese (和語大和言葉・和製漢語)',
+            phylum: 'japonic',
+            targetX: 2400,
+            targetY: 3200
+          }
         };
-        const allConnectedWordsSet = new Set();
+
+        function makeRoot(meta, words) {
+          return {
+            id: meta.id,
+            label: meta.label,
+            meaning: meta.meaning,
+            phylum: meta.phylum,
+            isCjkRoot: Boolean(meta.isCjkRoot),
+            type: 'root',
+            level: 1,
+            radius: 26.0,
+            childCount: words.length,
+            connectedWords: words,
+            x: meta.targetX || 0,
+            y: meta.targetY || 0,
+            targetX: meta.targetX || 0,
+            targetY: meta.targetY || 0,
+            vx: 0,
+            vy: 0
+          };
+        }
+
+        const phylaWordMap = {
+          indo_european: [],
+          sinospheric: [],
+          koreanic: [],
+          japonic: []
+        };
+        const allWordsSeen = new Set();
         finalRoots.forEach(r => {
           (r.connectedWords || []).forEach(w => {
-            if (!allConnectedWordsSet.has(w.id)) {
-              allConnectedWordsSet.add(w.id);
-              uRoot.connectedWords.push(w);
+            if (!allWordsSeen.has(w.id)) {
+              allWordsSeen.add(w.id);
+              const pKey = getPhylumForWord(w);
+              if (phylaWordMap[pKey]) phylaWordMap[pKey].push(w);
             }
           });
         });
-        uRoot.childCount = uRoot.connectedWords.length;
-        return uRoot;
+
+        if (famKey === 'sinospheric') {
+          return [makeRoot({ ...PHYLA_METAS.sinospheric, targetX: 0, targetY: 0 }, phylaWordMap.sinospheric)];
+        }
+        if (famKey === 'koreanic') {
+          return [makeRoot({ ...PHYLA_METAS.koreanic, targetX: 0, targetY: 0 }, phylaWordMap.koreanic)];
+        }
+        if (famKey === 'japonic') {
+          return [makeRoot({ ...PHYLA_METAS.japonic, targetX: 0, targetY: 0 }, phylaWordMap.japonic)];
+        }
+        if (famKey === 'germanic' || famKey === 'romance' || famKey === 'hellenic') {
+          const famMeta = ETYMOLOGY_FAMILIES[famKey];
+          const langs = new Set(famMeta?.langs || []);
+          const words = phylaWordMap.indo_european.filter(w => langs.has(w.lang));
+          const ieMeta = { ...PHYLA_METAS.indo_european, targetX: 0, targetY: 0 };
+          if (famKey === 'germanic') {
+            ieMeta.label = 'ゲルマン祖語 (Proto-Germanic / PGmc)';
+            ieMeta.meaning = "Germanic Roots & Grimm's Law";
+          } else if (famKey === 'romance') {
+            ieMeta.label = 'ラテン・ロマンス祖語 (Proto-Romance)';
+            ieMeta.meaning = 'Vulgar Latin & Romance Roots';
+          } else if (famKey === 'hellenic') {
+            ieMeta.label = '古典ギリシャ語幹 (Classical Greek)';
+            ieMeta.meaning = 'Classical Academic & Scientific Prefixes';
+          }
+          return [makeRoot(ieMeta, words)];
+        }
+
+        const activePhyla = [];
+        if (phylaWordMap.indo_european.length > 0 || allWordsSeen.size === 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.indo_european, phylaWordMap.indo_european));
+        }
+        if (phylaWordMap.sinospheric.length > 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.sinospheric, phylaWordMap.sinospheric));
+        }
+        if (phylaWordMap.koreanic.length > 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.koreanic, phylaWordMap.koreanic));
+        }
+        if (phylaWordMap.japonic.length > 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.japonic, phylaWordMap.japonic));
+        }
+
+        return activePhyla.length > 0 ? activePhyla : [makeRoot(PHYLA_METAS.indo_european, [])];
       }
 
       let isUnifiedPIE = !graphState.focusedRootKey;
       let activeRoots = [];
 
       if (isUnifiedPIE) {
-        // 全語根を1つの「印欧祖語 / PIE」コアに大統合
-        activeRoots = [createUnifiedPieRoot()];
+        // 多核大語族体系 (Multi-Centroid Galactic Architecture): 4大語族独立コア配置
+        activeRoots = buildPhylumRoots();
       } else {
         const fKey = cleanRootKey(graphState.focusedRootKey);
         const fKeyFlat = fKey.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
@@ -837,7 +1083,7 @@
           // 同一語幹の単語を連続配置するためにソート
           wordsInBranch.sort((a, b) => (a.stem || '').localeCompare(b.stem || '') || (a.label || '').localeCompare(b.label || ''));
 
-          const bId = isUnifiedPIE ? `branch:pie:${bLabel}` : `branch:${rNode.label}:${bLabel}`;
+          const bId = isUnifiedPIE ? `branch:${rNode.id}:${bLabel}` : `branch:${rNode.label}:${bLabel}`;
           let bNode = branchMap.get(bId);
           if (!bNode) {
             bNode = {
@@ -846,6 +1092,7 @@
               type: 'branch',
               level: 2,
               rootLabel: rNode.label,
+              rootId: rNode.id,
               realm: realmInfo,
               radius: 9.5,
               x: 0,
@@ -912,7 +1159,7 @@
             bLabel = normalizeBranch(bLabel);
           }
 
-          const bId = isUnifiedPIE ? `branch:pie:${bLabel}` : `branch:${rNode.label}:${bLabel}`;
+          const bId = isUnifiedPIE ? `branch:${rNode.id}:${bLabel}` : `branch:${rNode.label}:${bLabel}`;
           let bNode = branchMap.get(bId);
           if (!bNode) {
             bNode = {
@@ -1060,8 +1307,8 @@
         },
         sinospheric: {
           key: 'sinospheric',
-          label: '東アジア・漢字諸語 / Sinospheric',
-          subLabel: '中・韓・日 漢字語幹体系',
+          label: 'シノ・チベット語族 / Sino-Tibetan',
+          subLabel: '古代漢語字源・漢語構文体系',
           colorDark: 'rgba(244, 63, 94, 0.05)',
           colorDarkBorder: 'rgba(244, 63, 94, 0.15)',
           colorLight: 'rgba(225, 29, 72, 0.04)',
@@ -1109,6 +1356,32 @@
           textColorLight: '#be123c',
           subTextColorDark: '#fda4af',
           subTextColorLight: '#9d174d'
+        },
+        koreanic: {
+          key: 'koreanic',
+          label: '朝鮮語族 / Koreanic',
+          subLabel: '韓国固有語・漢字語体系',
+          colorDark: 'rgba(251, 146, 60, 0.05)',
+          colorDarkBorder: 'rgba(251, 146, 60, 0.18)',
+          colorLight: 'rgba(234, 88, 12, 0.04)',
+          colorLightBorder: 'rgba(234, 88, 12, 0.14)',
+          textColorDark: '#fdba74',
+          textColorLight: '#c2410c',
+          subTextColorDark: '#fed7aa',
+          subTextColorLight: '#9a3412'
+        },
+        japonic: {
+          key: 'japonic',
+          label: '日本語族 / Japonic',
+          subLabel: '和語大和言葉・和製漢語体系',
+          colorDark: 'rgba(234, 179, 8, 0.05)',
+          colorDarkBorder: 'rgba(234, 179, 8, 0.18)',
+          colorLight: 'rgba(202, 138, 4, 0.04)',
+          colorLightBorder: 'rgba(202, 138, 4, 0.14)',
+          textColorDark: '#fde047',
+          textColorLight: '#a16207',
+          subTextColorDark: '#fef08a',
+          subTextColorLight: '#854d0e'
         }
       };
 
@@ -1124,13 +1397,19 @@
           return 'cjk_core';
         }
 
+        if (bl.startsWith('koreanic') || bl.includes('korean') || bl.includes('韓国') || bl.includes('朝鮮') || bl.includes('hanja')) {
+          return 'koreanic';
+        }
+        if (bl.startsWith('japonic') || bl.includes('japanese') || bl.includes('和語') || bl.includes('大和') || bl.includes('和製')) {
+          return 'japonic';
+        }
         if (bl.startsWith('germanic') || bl.includes('german') || bl.includes('old english') || bl.includes('deutsch') || bl.includes('dutch') || bl.includes('nederlands')) {
           return 'germanic';
         }
         if (bl.startsWith('italic') || bl.startsWith('latin') || bl.startsWith('romance') || bl.includes('french') || bl.includes('spanish') || bl.includes('italian') || bl.includes('portuguese') || bl.includes('français') || bl.includes('español') || bl.includes('italiano') || bl.includes('português')) {
           return 'italic_romance';
         }
-        if (bl.startsWith('sinospheric') || bl.includes('chinese') || bl.includes('korean') || bl.includes('hanja') || bl.includes('kanji') || bl.includes('漢字') || bl.includes('漢語')) {
+        if (bl.startsWith('sinospheric') || bl.includes('chinese') || bl.includes('kanji') || bl.includes('漢字') || bl.includes('漢語')) {
           return 'sinospheric';
         }
         return 'hellenic';
@@ -1144,7 +1423,7 @@
         if (isSingleRoot) {
           rNode.targetX = 0;
           rNode.targetY = 0;
-        } else {
+        } else if (typeof rNode.targetX !== 'number' || (rNode.targetX === 0 && rNode.targetY === 0 && rIdx > 0)) {
           const row = Math.floor(rIdx / cols);
           const col = rIdx % cols;
           rNode.targetX = (col - (cols - 1) / 2) * rootSpacing;
@@ -1154,9 +1433,9 @@
         const isCjk = Boolean(rNode.label && /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(String(rNode.label).trim())) || Boolean(rNode.isCjkRoot);
         const sectorKeys = isCjk
           ? ['cjk_core', 'cjk_system', 'cjk_prefix']
-          : ['germanic', 'italic_romance', 'hellenic', 'sinospheric'];
+          : ['germanic', 'italic_romance', 'sinospheric', 'koreanic', 'japonic', 'hellenic'];
 
-        const rBranches = Array.from(branchMap.values()).filter(b => b.rootLabel === rNode.label);
+        const rBranches = Array.from(branchMap.values()).filter(b => b.rootId ? (b.rootId === rNode.id) : (b.rootLabel === rNode.label));
         const sectorBranches = {};
         sectorKeys.forEach(k => { sectorBranches[k] = []; });
 
@@ -1392,8 +1671,10 @@
         rNode.dynamicSectorDefs = dynamicSectorDefs;
         rNode.isCjkTree = isCjk;
         if (graphState) {
-          graphState.dynamicSectorDefs = dynamicSectorDefs;
-          graphState.isCjkTree = isCjk;
+          if (!graphState.dynamicSectorDefs || rNode.phylum === "indo_european" || rIdx === 0) {
+            graphState.dynamicSectorDefs = dynamicSectorDefs;
+            graphState.isCjkTree = isCjk;
+          }
         }
       });
 
@@ -1430,9 +1711,49 @@
       nodes.length = 0;
       nodes.push(...validNodes);
 
+      // 言語横断・同根語共鳴エッジ (Cross-Language Cognate Resonance Links)
+      // 異なる言語に属し同一の語根を共有する単語間に高精度な調和リンクを形成
+      const activeRootsForCognates = (activeRoots.length === 1 && activeRoots[0].id.includes(':unified'))
+        ? finalRoots
+        : activeRoots;
+
+      activeRootsForCognates.forEach(r => {
+        const words = (r.connectedWords || []).filter(w => validNodeSet.has(w));
+        if (words.length >= 2) {
+          const byLang = new Map();
+          words.forEach(w => {
+            const l = (w.lang || 'en').toLowerCase();
+            if (!byLang.has(l)) byLang.set(l, []);
+            byLang.get(l).push(w);
+          });
+          const langEntries = Array.from(byLang.entries());
+          for (let i = 0; i < langEntries.length; i++) {
+            for (let j = i + 1; j < langEntries.length; j++) {
+              const [l1, list1] = langEntries[i];
+              const [l2, list2] = langEntries[j];
+              const w1 = list1[0];
+              const w2 = list2[0];
+              if (w1 && w2 && w1 !== w2) {
+                finalEdges.push({
+                  source: w1,
+                  target: w2,
+                  kind: 'cognate_cross',
+                  rootKey: r.label,
+                  langs: [l1, l2]
+                });
+              }
+            }
+          }
+        }
+      });
+
       const validEdges = finalEdges.filter(e => validNodeSet.has(e.source) && validNodeSet.has(e.target));
       finalEdges.length = 0;
       finalEdges.push(...validEdges);
+    }
+
+    if (graphState) {
+      graphState.allRoots = finalRoots;
     }
 
     // クイックジャンプ用セレクター (#graphRootJumpSel) & パンくずバーの動的更新
@@ -1532,6 +1853,8 @@
 
 
   global.VocabGraphLayout = {
+    ETYMOLOGY_FAMILIES,
+    detectWordFamily,
     CANONICAL_ROOT_ALIASES,
     cleanRootKey,
     getRootMeaning,

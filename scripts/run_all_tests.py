@@ -845,7 +845,7 @@ def test_e2e_full_stack_jsc():
         log_fail("scripts/test_jsc_suite.js does not exist")
         return
 
-    res = subprocess.run([JSC_PATH, jsc_test_path], capture_output=True, text=True)
+    res = subprocess.run([JSC_PATH, jsc_test_path], cwd=BASE_DIR, capture_output=True, text=True)
     if res.returncode != 0:
         log_fail(f"JSC test execution failed with exit code {res.returncode}: {res.stderr or res.stdout}")
         return
@@ -1578,7 +1578,7 @@ def test_graph_practical_tools():
 
     required_dom_ids = [
         "graphTabNetwork", "graphTabTree", "graphTabMindmap", "graphTabMatrix",
-        "graphWateringBtn", "graphTreeMaskBtn", "graphTreeBreadcrumbBar",
+        "graphWateringBtn", "graphTreeMaskBtn", "graphMicroTreeBtn", "graphTreeBreadcrumbBar",
         "graphTimelineBar", "graphMindmapWrap", "graphMatrixWrap"
     ]
 
@@ -1594,7 +1594,8 @@ def test_graph_practical_tools():
             log_fail(f"dev.html: #{rid} missing")
 
     required_methods = [
-        "switchViewMode", "startWateringReview", "toggleTreeMask",
+        "switchViewMode", "startWateringReview", "toggleTreeMask", "revealRecallAnswer",
+        "toggleMicroTreeFocus", "rateNodeWord", "nextRoot", "prevRoot",
         "onTimelineChange", "renderMindmap", "renderMorphologyMatrix",
         "startTreeEasingAnimation", "focusRoot", "clearRootFocus"
     ]
@@ -1697,12 +1698,12 @@ def test_global_i18n_and_multi_currency():
             log_fail(f"dev.html: #{rid} missing")
 
     # 15-2. Script loading checks
-    if '<script src="js/i18n.js"></script>' in idx_html:
+    if '<script src="js/i18n.js"></script>' in idx_html or '<script src="js/i18n.js" defer></script>' in idx_html:
         log_pass("index.html: includes js/i18n.js before core scripts")
     else:
         log_fail("index.html: missing js/i18n.js script tag")
 
-    if '<script src="js/i18n.js"></script>' in dev_html:
+    if '<script src="js/i18n.js"></script>' in dev_html or '<script src="js/i18n.js" defer></script>' in dev_html:
         log_pass("dev.html: includes js/i18n.js before core scripts")
     else:
         log_fail("dev.html: missing js/i18n.js script tag")
@@ -2569,6 +2570,319 @@ def test_10_language_pie_and_cjk_lineage_tree():
     else:
         log_fail(f"Item 24-4..7 failed: {res.stderr or res.stdout}")
 
+def test_p0_p1_remediation():
+    print("\n--- 25. P0/P1 Remediations: Cursor Sync, WebLocks, Idempotent Quota, IDB Isolation & Account Erasure ---")
+    schema_path = os.path.join(BASE_DIR, "supabase", "schema.sql")
+    sync_path = os.path.join(BASE_DIR, "js", "sync.js")
+    storage_path = os.path.join(BASE_DIR, "js", "storage.js")
+    anki_path = os.path.join(BASE_DIR, "js", "anki.js")
+
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
+    with open(sync_path, "r", encoding="utf-8") as f:
+        sync_code = f.read()
+    with open(storage_path, "r", encoding="utf-8") as f:
+        storage_code = f.read()
+    with open(anki_path, "r", encoding="utf-8") as f:
+        anki_code = f.read()
+
+    # 1. Quota idempotent ledger
+    if "CREATE TABLE IF NOT EXISTS public.quota_reservations" in schema_sql and "request_id TEXT PRIMARY KEY" in schema_sql:
+        log_pass("Item 25-1: supabase/schema.sql provides quota_reservations idempotent table")
+    else:
+        log_fail("Item 25-1: missing quota_reservations in schema.sql")
+
+    if "p_request_id TEXT DEFAULT NULL" in schema_sql and "SELECT * INTO v_res_rec FROM public.quota_reservations WHERE request_id = p_request_id" in schema_sql:
+        log_pass("Item 25-2: reserve_or_refund_quota enforces strict request_id idempotency")
+    else:
+        log_fail("Item 25-2: missing request_id logic in reserve_or_refund_quota")
+
+    # 2. Feedback RLS impersonation prevention
+    if 'FOR INSERT WITH CHECK (user_id IS NULL OR user_id = auth.uid())' in schema_sql and 'Cannot submit feedback on behalf of another user' in schema_sql:
+        log_pass("Item 25-3: user_feedbacks RLS policy and trigger prevent user_id impersonation")
+    else:
+        log_fail("Item 25-3: user_feedbacks RLS lacks strict user_id checking")
+
+    # 3. sync_vocab_entries_batch column limits
+    if "length(elem->>'id') <= 128" in schema_sql and "length(COALESCE(elem->>'folder', '')) <= 100" in schema_sql and "length(COALESCE(elem->>'category', '')) <= 100" in schema_sql:
+        log_pass("Item 25-4: sync_vocab_entries_batch validates id, word_key, folder, and category lengths and formats")
+    else:
+        log_fail("Item 25-4: missing column length checks in sync_vocab_entries_batch")
+
+    # 4. Web Locks cross-tab exclusive locking
+    if "navigator.locks.request" in sync_code and "acquireSyncLock" in sync_code:
+        log_pass("Item 25-5: js/sync.js acquireSyncLock integrates Web Locks API for cross-tab mutual exclusion")
+    else:
+        log_fail("Item 25-5: missing Web Locks API integration in acquireSyncLock")
+
+    # 5. Keyset cursor pagination
+    if "cursorFilter = `&or=(server_updated_at.gt.${cursorTs}" in sync_code and "server_updated_at=lte.${serverNow}" in sync_code:
+        log_pass("Item 25-6: js/sync.js fetchAllPaginated uses keyset cursor pagination bounded by serverNow")
+    else:
+        log_fail("Item 25-6: fetchAllPaginated is not using keyset cursor pagination")
+
+    # 6. deleteUserAccount Edge Function requirement and local data cleanup
+    if "/functions/v1/delete-account" in sync_code and "rpc/delete_user_account" not in sync_code and "clearAllClientStorageData" in sync_code:
+        log_pass("Item 25-7: js/sync.js deleteUserAccount enforces Edge Function and triggers client data erasure")
+    else:
+        log_fail("Item 25-7: deleteUserAccount contains insecure direct RPC fallback or lacks local erasure")
+
+    # 7. IndexedDB version change & lockup protection
+    if "req.onblocked" in storage_code and "db.onversionchange" in storage_code and "clearAllClientStorageData" in storage_code:
+        log_pass("Item 25-8: js/storage.js handles req.onblocked / onversionchange and exports clearAllClientStorageData")
+    else:
+        log_fail("Item 25-8: storage.js missing onblocked/onversionchange or clearAllClientStorageData")
+
+    # 8. Independent storage persistence and recovery
+    if "LocalStorage saveReviewHistoryLog failed, relying on IndexedDB" in anki_code and "recoverReviewHistoryFromIdb" in anki_code and "LocalStorage saveOfflineQueue failed, relying on IndexedDB" in anki_code:
+        log_pass("Item 25-9: js/anki.js independently saves review history and offline queue with IDB recovery")
+    else:
+        log_fail("Item 25-9: anki.js lacks independent persistence or IDB recovery")
+
+def test_audit_round2_remediation():
+    print("\n--- 26. External AI Review & Red Team Remediation (XSS, Zombie Field, Multilingual SRS) ---")
+    def _read(rel):
+        with open(os.path.join(BASE_DIR, rel), "r", encoding="utf-8") as f:
+            return f.read()
+
+    storage_code = _read("js/storage.js")
+    views_code = _read("js/graph_views.js")
+    graph_code = _read("js/graph.js")
+    layout_code = _read("js/graph_layout.js")
+    bundle_script = _read("scripts/make_audit_bundle.py")
+
+    # 1. Stored XSS defense in populateRootJumpSelect & renderEikenExplorer
+    if "escFn(r.label)" in views_code and "escFn(mStr)" in views_code and "escFn(s.label)" in views_code and "escFn(s.meaning)" in views_code and "escFn(s.desc)" in views_code:
+        log_pass("Item 26-1: js/graph_views.js strictly escapes populateRootJumpSelect & renderEikenExplorer against DOM-XSS")
+    else:
+        log_fail("Item 26-1: Missing XSS escaping in populateRootJumpSelect or renderEikenExplorer")
+
+    # 2. getRootMeaning sanitizes HTML brackets and quotes
+    if "sanitizeMeaning" in layout_code and "replace(/[<" in layout_code:
+        log_pass("Item 26-2: js/graph_layout.js getRootMeaning rigorously sanitizes extraction against payload injection")
+    else:
+        log_fail("Item 26-2: getRootMeaning lacks injection sanitization")
+
+    # 3. Zombie Field Resurrection Prevention in mergeWords
+    if "winIsNewer" in storage_code and "win.notes !== undefined ? win.notes : (lose.notes || '')" in storage_code:
+        log_pass("Item 26-3: js/storage.js mergeWords supports field clearing and prevents zombie resurrection")
+    else:
+        log_fail("Item 26-3: mergeWords lacks field clearing / zombie resurrection defense")
+
+    # 4. phrases structure preserves .trans property
+    if "trans: String(x.trans || x.ja || x.j || '')" in storage_code:
+        log_pass("Item 26-4: js/storage.js sanitizeItem preserves phrases .trans property for 10-language parity")
+    else:
+        log_fail("Item 26-4: sanitizeItem phrases structure missing .trans property")
+
+    # 5. rateNodeWord pairKey resolution and version increment
+    if "getPairConfig(lang, tgtLang)" in graph_code and "item.version = (Number(item.version) || 1) + 1" in graph_code:
+        log_pass("Item 26-5: js/graph.js rateNodeWord accurately resolves pairKey and advances item.version/updatedAt")
+    else:
+        log_fail("Item 26-5: rateNodeWord lacks getPairConfig or version increment")
+
+    # 6. Dynamic CJK prefixes in morphology matrix
+    if "isCjk" in views_code and "不- (否定・反対)" in views_code and "prefixCandidateMap" in views_code:
+        log_pass("Item 26-6: js/graph_views.js renderMorphologyMatrix provides dynamic CJK prefixes for zh/ko/ja")
+    else:
+        log_fail("Item 26-6: renderMorphologyMatrix lacks dynamic CJK prefix support")
+
+    # 7. Dynamic SRS next review interval prediction in Mindmap & Detail Drawer
+    if "srsIv[0].replace('後','')" in views_code.replace(" ", "") or "srsIv[0].replace('後', '')" in views_code:
+        log_pass("Item 26-7: js/graph_views.js binds dynamic SRS interval predictions to recall buttons")
+    else:
+        log_fail("Item 26-7: js/graph_views.js missing dynamic SRS interval predictions")
+
+    # 8. CANONICAL_ROOT_ALIASES deduplication to SSOT
+    if "VocabGraphLayout?.CANONICAL_ROOT_ALIASES" in graph_code or "Layout().CANONICAL_ROOT_ALIASES" in graph_code:
+        log_pass("Item 26-8: js/graph.js establishes VocabGraphLayout as SSOT for CANONICAL_ROOT_ALIASES")
+    else:
+        log_fail("Item 26-8: CANONICAL_ROOT_ALIASES not linked to SSOT")
+
+    # 9. Audit bundle script includes native_app/main.m
+    if "scripts/native_app/main.m" in bundle_script:
+        log_pass("Item 26-9: scripts/make_audit_bundle.py includes native macOS Cocoa wrapper")
+    else:
+        log_fail("Item 26-9: make_audit_bundle.py missing scripts/native_app/main.m")
+
+    # 10. JSC engine verification of mergeWords zombie field clearance and phrases .trans
+    jsc_code = """
+    load('js/morphology.js');
+    load('js/storage.js');
+
+    var winner = {
+        id: 'w1',
+        word: 'ephemeral',
+        lang: 'en',
+        version: 5,
+        updatedAt: 2000,
+        notes: '', // User intentionally erased notes
+        mnemonic: '', // User intentionally erased mnemonic
+        etymologyTags: ['*sta-'], // User removed other tags
+        phrases: [{ foreign: 'in ephemeral state', trans: '儚い状態で' }]
+    };
+
+    var loser = {
+        id: 'w1',
+        word: 'ephemeral',
+        lang: 'en',
+        version: 4,
+        updatedAt: 1000,
+        notes: 'Old notes should not resurrect',
+        mnemonic: 'Old mnemonic should not resurrect',
+        etymologyTags: ['*sta-', '*bher-'],
+        phrases: [{ foreign: 'in ephemeral state', ja: '儚い状態で' }]
+    };
+
+    var merged = VocabStorage.mergeWords([winner], [loser], 'en');
+    if (merged.length !== 1) throw new Error("Expected 1 merged entry, got " + merged.length);
+    var item = merged[0];
+
+    // Verify notes are cleared, not resurrected
+    if (item.notes !== '') throw new Error("Zombie notes resurrected: " + item.notes);
+    if (item.mnemonic !== '') throw new Error("Zombie mnemonic resurrected: " + item.mnemonic);
+    if (item.etymologyTags.length !== 1 || !item.etymologyTags[0].includes('sta')) {
+        throw new Error("Tags failed to respect winner deletion: " + JSON.stringify(item.etymologyTags));
+    }
+    // Verify phrases trans
+    if (!item.phrases || item.phrases[0].trans !== '儚い状態で') {
+        throw new Error("phrases trans was lost: " + JSON.stringify(item.phrases));
+    }
+
+    print("OK");
+    """
+    res = run_jsc(jsc_code)
+    if res.returncode == 0 and "OK" in res.stdout:
+        log_pass("Item 26-10: JSC verified mergeWords prevents zombie field resurrection and preserves phrases.trans")
+    else:
+        log_fail(f"Item 26-10: JSC mergeWords test failed: {res.stderr or res.stdout}")
+
+    # 11. VocabGraph exports promptMatrixGen & getEnglishPairKeyAndEntries
+    if "promptMatrixGen," in graph_code and "getEnglishPairKeyAndEntries" in graph_code.split("global.VocabGraph = {")[1]:
+        log_pass("Item 26-11: js/graph.js properly exports promptMatrixGen & getEnglishPairKeyAndEntries")
+    else:
+        log_fail("Item 26-11: VocabGraph missing promptMatrixGen or getEnglishPairKeyAndEntries export")
+
+    # 12. search.js rawBlob incorporates multilingual .trans properties
+    search_code = _read("js/search.js")
+    if "p.trans" in search_code and "it.example?.trans" in search_code:
+        log_pass("Item 26-12: js/search.js rawBlob indexing incorporates phrases and example .trans properties")
+    else:
+        log_fail("Item 26-12: search.js missing .trans indexing")
+
+    # 13. Absolute Zero Emoji Policy enforcement across repository
+    emoji_count = 0
+    for root, dirs, files in os.walk(BASE_DIR):
+        if any(skip in root for skip in ['.git', 'node_modules', '.gemini', 'vocab-vault-web']):
+            continue
+        for fname in files:
+            if fname.endswith(('.js', '.ts', '.html', '.css', '.py', '.sql', '.m', '.md', '.json')):
+                fpath = os.path.join(root, fname)
+                try:
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            for ch in line:
+                                cp = ord(ch)
+                                if (0x1F300 <= cp <= 0x1F9FF) or (0x1FA00 <= cp <= 0x1FAFF) or (0x2600 <= cp <= 0x27BF):
+                                    emoji_count += 1
+                except Exception:
+                    pass
+    if emoji_count == 0:
+        log_pass("Item 26-13: Absolute Zero Emoji Policy 100% verified across all code and documentation")
+    else:
+        log_fail(f"Item 26-13: Found {emoji_count} emoji occurrences in repository")
+
+def test_workload_forecast_and_smoothing():
+    print("\n--- 27. Workload Forecast Heatmap & Load Smoothing/Fuzzing Buffer ---")
+    def _read(rel):
+        with open(os.path.join(BASE_DIR, rel), "r", encoding="utf-8") as f:
+            return f.read()
+
+    anki_code = _read("js/anki.js")
+    anki_view_code = _read("js/anki_view.js")
+    i18n_code = _read("js/i18n.js")
+    css_code = _read("css/app.css")
+
+    # 1. smoothReviewWorkload safeguard in anki.js
+    if "smoothReviewWorkload" in anki_code and "r >= 0.85" in anki_code and "shiftedCount" in anki_code:
+        log_pass("Item 27-1: js/anki.js implements smoothReviewWorkload with R >= 0.85 retrievability safeguard")
+    else:
+        log_fail("Item 27-1: js/anki.js missing smoothReviewWorkload or R >= 0.85 safeguard")
+
+    # 2. anki_view.js interactive calendar heatmap & smoothing UI
+    if "workload-calendar-grid" in anki_view_code and "showDayWorkloadDetails" in anki_view_code and "triggerWorkloadSmoothing" in anki_view_code:
+        log_pass("Item 27-2: js/anki_view.js renders interactive workload calendar heatmap and smoothing controls")
+    else:
+        log_fail("Item 27-2: js/anki_view.js missing workload calendar grid or smoothing functions")
+
+    # 3. css/app.css styling for calendar grid and range buttons
+    if ".workload-calendar-grid" in css_code and ".workload-day-cell" in css_code:
+        log_pass("Item 27-3: css/app.css provides responsive workload calendar grid and day cell styles")
+    else:
+        log_fail("Item 27-3: css/app.css missing workload calendar grid styles")
+
+    # 4. JSC validation of 10-language i18n parity and smoothReviewWorkload algorithm
+    jsc_test_code = """
+    // Test 10-language parity for the 9 keys
+    const requiredKeys = [
+      'analytics.calendar_heatmap_title',
+      'analytics.smoothing_title',
+      'analytics.smoothing_desc',
+      'analytics.target_cap_lbl',
+      'analytics.btn_smooth',
+      'analytics.peak_overload',
+      'analytics.load_balanced',
+      'analytics.smooth_workload_ok',
+      'analytics.smooth_workload_none'
+    ];
+    const langs = ['ja', 'en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'];
+    for (const l of langs) {
+      if (!VocabI18n.TRANSLATIONS[l]) throw new Error('Missing language: ' + l);
+      for (const k of requiredKeys) {
+        if (!VocabI18n.TRANSLATIONS[l][k]) throw new Error('Missing key ' + k + ' in ' + l);
+      }
+    }
+
+    // Test smoothing algorithm
+    const now = Date.now();
+    const testList = [];
+    for (let i = 0; i < 30; i++) {
+      testList.push({
+        id: 'w_' + i,
+        word: 'word_' + i,
+        nextReview: now + 2 * 86400000,
+        stability: 6.0,
+        lastReview: now - 86400000,
+        interval: 3,
+        version: 1
+      });
+    }
+    const res = VocabSRS.smoothReviewWorkload(testList, 20, 14);
+    if (!res.success || res.shiftedCount !== 10) {
+      throw new Error('Smoothing failed: shifted ' + res.shiftedCount + ' expected 10');
+    }
+    // Verify item versions and updatedAt were incremented
+    const shiftedItems = testList.filter(it => it.version > 1);
+    if (shiftedItems.length !== 10) {
+      throw new Error('Shifted items did not increment version properly');
+    }
+    print('JSC_SMOOTH_OK');
+    """
+    jsc_wrapper = f"""
+    var window = globalThis;
+    var global = globalThis;
+    {_read('js/i18n.js')}
+    {_read('js/storage.js')}
+    {_read('js/anki.js')}
+    {_read('js/anki_view.js')}
+    {jsc_test_code}
+    """
+    res = run_jsc(jsc_wrapper)
+    if res.returncode == 0 and "JSC_SMOOTH_OK" in res.stdout:
+        log_pass("Item 27-4: JSC verified 10-language i18n parity and smoothReviewWorkload algorithm execution")
+    else:
+        log_fail(f"Item 27-4: JSC test failed: {res.stderr} {res.stdout}")
+
 def main():
     print("==================================================")
     print(" Vocab Vault Automated Quality & Regression Tests")
@@ -2598,6 +2912,9 @@ def main():
     test_items_1_to_15_deep_enhancements()
     test_perfection_features()
     test_10_language_pie_and_cjk_lineage_tree()
+    test_p0_p1_remediation()
+    test_audit_round2_remediation()
+    test_workload_forecast_and_smoothing()
 
     print("\n==================================================")
     print(f" Test Results: \033[32m{PASSED} Passed\033[0m, \033[31m{FAILED} Failed\033[0m")

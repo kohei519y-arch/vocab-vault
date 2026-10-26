@@ -35,15 +35,19 @@
     selectedNode: null,
     filterQuery: '',
     langFilter: 'all',
+    familyFilter: 'all',
     colorMode: 'language', // 'language' | 'retention'
     layoutMode: 'network', // 'network' | 'tree' (4階層系統樹)
-    activeViewTab: 'network', // 'network' | 'tree' | 'mindmap' | 'matrix'
+    activeViewTab: 'mindmap', // 'mindmap' | 'matrix'
     focusedRootKey: '', // 1語根フォーカスモードで選択中の語根 (例: '*sta-')
+    microTreeFocus: false, // 1語根マイクロツリー集中モード (ワーキングメモリ認知負荷低減)
     treeMaskMode: false, // 赤シート (Mask) モード
     timelineEra: 3, // 0: 印欧祖語, 1: 古代ギリシャ・ローマ, 2: 中世古仏・ノルマン, 3: 近代・現代 (すべて)
     treeEasingFrame: 0,
     treeEasingTimer: null,
     collapsedBranches: new Set(),
+    collapsedRoots: new Set(),
+    myWordsOnly: false,
     clusterOnly: false,
     physicsPaused: false,
     animId: null,
@@ -55,7 +59,16 @@
   if (global._sharedGraphState) {
     Object.assign(graphState, global._sharedGraphState);
   }
-  global._sharedGraphState = graphState;
+  function pruneUnlockParticles() {
+    const arr = graphState.unlockParticles;
+    if (!Array.isArray(arr) || !arr.length) return;
+    const now = Date.now();
+    for (let i = arr.length - 1; i >= 0; i--) {
+      if (!arr[i].__bornAt || (now - arr[i].__bornAt) > 3000) {
+        arr.splice(i, 1);
+      }
+    }
+  }
 
   /**
    * スキル習得・覚醒時のRPGファンファーレWeb Audioシンセチャイム（ゼロ外部依存）
@@ -88,49 +101,10 @@
     } catch (e) {}
   }
 
-  // 学術語根・派生形の正規化エイリアスマップ（同根・表記ゆれを100%単一語根へ統合）
-  const CANONICAL_ROOT_ALIASES = {
-    // *sta- (立つ)
-    'sta': '*sta-', 'stā': '*sta-', 'steh': '*sta-', 'steh2': '*sta-', 'steh₂': '*sta-', 'stah': '*sta-', 'stare': '*sta-', 'stāre': '*sta-', 'stand': '*sta-',
-    // *gen- (生む)
-    'gen': '*gen-', 'genh': '*gen-', 'genh1': '*gen-', 'genh₁': '*gen-', 'genə': '*gen-', 'gna': '*gen-', 'gnā': '*gen-', 'gene': '*gen-',
-    // *bhrāthēr (兄弟)
-    'bhrather': '*bhrāthēr', 'bhrater': '*bhrāthēr', 'bhrāter': '*bhrāthēr', 'bhrātēr': '*bhrāthēr', 'bhrehter': '*bhrāthēr', 'bhrehtēr': '*bhrāthēr', 'brother': '*bhrāthēr', 'bruder': '*bhrāthēr',
-    // *mātēr (母)
-    'mater': '*mātēr', 'māter': '*mātēr', 'mehtēr': '*mātēr', 'mehter': '*mātēr',
-    // *pətēr (父)
-    'pater': '*pətēr', 'pātēr': '*pətēr', 'pehter': '*pətēr',
-    // *spec- (見る)
-    'spec': '*spec-', 'spek': '*spec-', 'speḱ': '*spec-', 'spic': '*spec-', 'spect': '*spec-',
-    // *kap- (掴む・頭)
-    'kap': '*kap-', 'cap': '*kap-', 'cept': '*kap-', 'cip': '*kap-', 'kaput': '*kap-', 'caput': '*kap-',
-    // *ten- (伸ばす)
-    'ten': '*ten-', 'tend': '*ten-', 'ton': '*ten-', 'tenh': '*ten-', 'tenh2': '*ten-', 'tenh₂': '*ten-',
-    // *dic- (言う・示す)
-    'dic': '*dic-', 'deik': '*dic-', 'deyk': '*dic-', 'dict': '*dic-',
-    // *vid- (見る・知る)
-    'vid': '*vid-', 'weid': '*vid-', 'woyd': '*vid-', 'vis': '*vid-', 'wit': '*vid-',
-    // *sed- (座る)
-    'sed': '*sed-', 'sēd': '*sed-', 'sedh': '*sed-', 'sess': '*sed-', 'sit': '*sed-',
-    // *voc- (呼ぶ・声)
-    'voc': '*voc-', 'wek': '*voc-', 'wekw': '*voc-', 'wekʷ': '*voc-', 'vox': '*voc-',
-    // *bher- (運ぶ)
-    'bher': '*bher-', 'fer': '*bher-', 'phor': '*bher-',
-    // *ped- (足)
-    'ped': '*ped-', 'pod': '*ped-', 'pēd': '*ped-', 'pes': '*ped-',
-    // *dhe- (置く・作る)
-    'dhe': '*dhe-', 'dhē': '*dhe-', 'fac': '*dhe-', 'fec': '*dhe-', 'fic': '*dhe-',
-    // *ag- (動かす・導く)
-    'ag': '*ag-', 'aǵ': '*ag-', 'act': '*ag-', 'ig': '*ag-',
-    // *mit- (送る)
-    'mit': '*mit-', 'miss': '*mit-',
-    // *ven- (来る)
-    'ven': '*ven-', 'vent': '*ven-', 'gwem': '*ven-', 'gʷem': '*ven-',
-    // *trah- (引く)
-    'trah': '*trah-', 'tract': '*trah-', 'tragh': '*trah-',
-    // *vert- (回る)
-    'vert': '*vert-', 'vers': '*vert-', 'wer': '*vert-', 'wert': '*vert-'
-  };
+  // 学術語根・派生形の正規化エイリアスマップ（VocabGraphLayout 側をSSOTとして参照）
+  const CANONICAL_ROOT_ALIASES = (function() {
+    return (typeof global !== 'undefined' && global.VocabGraphLayout?.CANONICAL_ROOT_ALIASES) || {};
+  })();
 
 
   function buildGraphData(filterRootKey = '', clusterOnly = false, langFilter = 'all') {
@@ -230,12 +204,12 @@
   // =========================================================================
   class GraphUIManager {
     constructor() {
-      // モードごとの可視コントロール定義（認知的過負荷の根絶・文脈最適化）
+      // モードごとの可視コントロール定義（マインドマップ & 接頭辞マトリクスに最適化）
       this.modeConfig = {
-        network: ['searchBox', 'langFilter', 'rootJump', 'colorModeBtn', 'clusterBtn', 'physicsBtn', 'zoomControls', 'fitBtn'],
-        tree: ['searchBox', 'rootJump', 'skillTreeBtn', 'wateringBtn', 'maskBtn', 'zoomControls', 'fitBtn'],
-        mindmap: ['searchBox', 'langFilter', 'rootJump', 'maskBtn'],
-        matrix: ['searchBox', 'langFilter']
+        network: ['searchBox', 'langFilter', 'rootJump', 'colorModeBtn', 'clusterBtn', 'physicsBtn', 'wateringBtn', 'maskBtn', 'microTreeBtn'],
+        tree: ['searchBox', 'langFilter', 'rootJump', 'skillTreeBtn', 'wateringBtn', 'maskBtn', 'microTreeBtn'],
+        mindmap: ['searchBox', 'langFilter', 'rootJump', 'wateringBtn', 'maskBtn', 'microTreeBtn'],
+        matrix: ['searchBox', 'langFilter', 'rootJump', 'wateringBtn', 'maskBtn']
       };
     }
 
@@ -252,6 +226,7 @@
         physicsBtn: document.getElementById('graphPhysicsBtn'),
         wateringBtn: document.getElementById('graphWateringBtn'),
         maskBtn: document.getElementById('graphTreeMaskBtn'),
+        microTreeBtn: document.getElementById('graphMicroTreeBtn'),
         zoomControls: document.getElementById('graphZoomWrap') || document.getElementById('graphZoomVal')?.parentElement,
         fitBtn: document.getElementById('graphFitBtn') || document.querySelector('button[onclick*="fitGraphToView"]'),
         resetZoomBtn: document.getElementById('graphResetZoomBtn') || document.querySelector('button[onclick*="resetGraphZoom"]'),
@@ -355,72 +330,45 @@
    * 4つの実用ビューモード切り替え (ネットワーク / 系統樹ツリー / マインドマップ / 接頭辞×語根)
    */
   function switchViewMode(mode) {
-    graphState.activeViewTab = mode;
+    if (mode === 'tree') {
+      graphState.layoutMode = 'tree';
+      graphState.physicsPaused = true;
+    } else if (mode === 'network') {
+      graphState.layoutMode = 'network';
+      graphState.physicsPaused = false;
+    }
+
+    // ネットワークとツリーのUIは廃止し、マインドマップと接頭辞マトリクスに特化
+    const targetTab = (mode === 'matrix') ? 'matrix' : 'mindmap';
+    graphState.activeViewTab = targetTab;
 
     if (typeof document !== 'undefined') {
-      // 1. UIの段階的開示（Progressive Disclosure）: モード別コントロールの表示・隠蔽
-      graphUIManager.applyMode(mode);
+      graphUIManager.applyMode(targetTab);
 
-      // 2. タブのアクティブクラス更新
-      const tabs = ['network', 'tree', 'mindmap', 'matrix'];
-      tabs.forEach(t => {
-        const tabBtn = document.getElementById(`graphTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
-        if (tabBtn) tabBtn.classList.toggle('active', t === mode);
-      });
+      const tabMindmap = document.getElementById('graphTabMindmap');
+      const tabMatrix = document.getElementById('graphTabMatrix');
+      if (tabMindmap) tabMindmap.classList.toggle('active', targetTab === 'mindmap');
+      if (tabMatrix) tabMatrix.classList.toggle('active', targetTab === 'matrix');
 
       const canvasWrap = document.getElementById('graphCanvasWrap');
       const mindmapWrap = document.getElementById('graphMindmapWrap');
       const matrixWrap = document.getElementById('graphMatrixWrap');
       const bcBar = document.getElementById('graphTreeBreadcrumbBar');
       const timelineBar = document.getElementById('graphTimelineBar');
-      const physicsBtn = document.getElementById('graphPhysicsBtn');
-      const treeModeBtn = document.getElementById('graphTreeModeBtn');
 
-      if (mode === 'network') {
-        graphState.layoutMode = 'network';
-        if (canvasWrap) canvasWrap.style.display = 'block';
-        if (mindmapWrap) mindmapWrap.style.display = 'none';
-        if (matrixWrap) matrixWrap.style.display = 'none';
-        if (bcBar) bcBar.style.display = 'none';
-        if (timelineBar) timelineBar.style.display = 'none';
-        if (treeModeBtn) { treeModeBtn.classList.remove('active'); treeModeBtn.textContent = '系統樹'; }
-        graphState.physicsPaused = false;
-        if (physicsBtn) { physicsBtn.classList.remove('active'); physicsBtn.textContent = '停止'; }
-        updateGraphDataAndFit();
-      } else if (mode === 'tree') {
-        graphState.layoutMode = 'tree';
-        if (canvasWrap) canvasWrap.style.display = 'block';
-        if (mindmapWrap) mindmapWrap.style.display = 'none';
-        if (matrixWrap) matrixWrap.style.display = 'none';
-        if (bcBar) bcBar.style.display = 'flex';
-        if (timelineBar) timelineBar.style.display = 'flex';
-        if (treeModeBtn) { treeModeBtn.classList.add('active'); treeModeBtn.textContent = '系統樹: ON'; }
-        graphState.physicsPaused = true;
-        if (physicsBtn) { physicsBtn.classList.add('active'); physicsBtn.textContent = '再開'; }
-        updateGraphDataAndFit();
-        startTreeEasingAnimation();
-      } else if (mode === 'mindmap') {
-        if (canvasWrap) canvasWrap.style.display = 'none';
+      if (canvasWrap) canvasWrap.style.display = 'none';
+      if (timelineBar) timelineBar.style.display = 'none';
+
+      if (targetTab === 'mindmap') {
         if (mindmapWrap) mindmapWrap.style.display = 'block';
         if (matrixWrap) matrixWrap.style.display = 'none';
         if (bcBar) bcBar.style.display = 'flex';
-        if (timelineBar) timelineBar.style.display = 'none';
         renderMindmap();
-      } else if (mode === 'matrix') {
-        if (canvasWrap) canvasWrap.style.display = 'none';
+      } else {
         if (mindmapWrap) mindmapWrap.style.display = 'none';
         if (matrixWrap) matrixWrap.style.display = 'block';
         if (bcBar) bcBar.style.display = 'none';
-        if (timelineBar) timelineBar.style.display = 'none';
         renderMorphologyMatrix();
-      }
-    } else {
-      if (mode === 'tree') {
-        graphState.layoutMode = 'tree';
-        graphState.physicsPaused = true;
-      } else if (mode === 'network') {
-        graphState.layoutMode = 'network';
-        graphState.physicsPaused = false;
       }
     }
   }
@@ -542,20 +490,288 @@
   }
 
   /**
-   * アイデア⑤: 赤シート連動「ツリー穴埋めテスト（Tree Blind Recall）」
+   * 能動的想起テスト (Active Recall Mode) のトグル
    */
   function toggleTreeMask() {
     graphState.treeMaskMode = !graphState.treeMaskMode;
     const btn = document.getElementById('graphTreeMaskBtn');
     if (btn) {
-      btn.textContent = graphState.treeMaskMode ? '赤シート:ON' : '赤シート:OFF';
+      btn.textContent = graphState.treeMaskMode ? '想起テスト:ON' : '想起テスト:OFF';
       btn.classList.toggle('active', graphState.treeMaskMode);
     }
     drawGraph();
     if (graphState.activeViewTab === 'mindmap') renderMindmap();
+    if (graphState.activeViewTab === 'matrix') renderMorphologyMatrix();
+    if (graphState.selectedNode) renderDetailDrawer(graphState.selectedNode);
     const toastFn = global.showToast || global.VocabCore?.showToast;
     if (typeof toastFn === 'function') {
-      toastFn(graphState.treeMaskMode ? '赤シート暗記モードをONにしました。意味を伏せて想起テストができます。' : '赤シート暗記モードをOFFにしました。', 'info', 2500);
+      toastFn(graphState.treeMaskMode ? '想起テストモードをONにしました。意味を伏せて想起テストができます。' : '想起テストモードをOFFにしました。', 'info', 2500);
+    }
+  }
+
+  /**
+   * 想起テスト: 伏せられた意味・語源を開示
+   */
+  function revealRecallAnswer() {
+    if (typeof document === 'undefined') return;
+    const maskBox = document.getElementById('graphRecallMaskContainer');
+    const content = document.getElementById('graphRecallContent');
+    const ratingBar = document.getElementById('graphRecallRatingBar');
+    if (maskBox) maskBox.style.display = 'none';
+    if (content) content.style.display = 'block';
+    if (ratingBar) ratingBar.style.display = 'flex';
+  }
+
+  /**
+   * 1語根マイクロツリー集中モード (ワーキングメモリ負荷低減)
+   */
+  function toggleMicroTreeFocus() {
+    graphState.microTreeFocus = !graphState.microTreeFocus;
+    const btn = document.getElementById('graphMicroTreeBtn');
+    if (btn) {
+      btn.textContent = graphState.microTreeFocus ? '1語根集中:ON' : '1語根集中:OFF';
+      btn.classList.toggle('active', graphState.microTreeFocus);
+    }
+    if (graphState.microTreeFocus) {
+      if (!graphState.focusedRootKey) {
+        const rootNodes = (graphState.allRoots && graphState.allRoots.length > 0)
+          ? graphState.allRoots
+          : (graphState.nodes || []).filter(n => n.type === 'root');
+        const sorted = [...rootNodes].sort((a, b) => (b.childCount || 0) - (a.childCount || 0));
+        const top = sorted[0];
+        if (top) {
+          focusRoot(top.label);
+        } else {
+          updateGraphDataAndFit();
+        }
+      } else {
+        updateGraphDataAndFit();
+      }
+    } else {
+      graphState.focusedRootKey = '';
+      if (typeof document !== 'undefined') {
+        const sel = document.getElementById('graphRootJumpSel');
+        if (sel) sel.value = '';
+      }
+      updateGraphDataAndFit();
+    }
+    const toastFn = global.showToast || global.VocabCore?.showToast;
+    if (typeof toastFn === 'function') {
+      toastFn(graphState.microTreeFocus
+        ? `1語根集中モードをONにしました (${graphState.focusedRootKey || '語根'}に絞り込み、認知負荷を低減)`
+        : '1語根集中モードをOFFにしました (全系統樹を表示)', 'info', 2500);
+    }
+  }
+
+  function getRootSequence() {
+    if (Array.isArray(graphState.allRoots) && graphState.allRoots.length > 0) {
+      return graphState.allRoots;
+    }
+    if (typeof document !== 'undefined') {
+      const sel = document.getElementById('graphRootJumpSel');
+      if (sel && sel.options && sel.options.length > 1) {
+        const list = [];
+        for (let i = 1; i < sel.options.length; i++) {
+          if (sel.options[i].value) {
+            list.push({ label: sel.options[i].value, childCount: 0 });
+          }
+        }
+        if (list.length > 0) return list;
+      }
+    }
+    return (graphState.nodes || []).filter(n => n.type === 'root');
+  }
+
+  /**
+   * 次の語根へ順次ナビゲーション (Wキー)
+   */
+  function nextRoot() {
+    const list = getRootSequence();
+    if (!list.length) return;
+    const curKey = graphState.focusedRootKey;
+    let idx = list.findIndex(r => r.label === curKey);
+    let nextIdx = (idx + 1) % list.length;
+    const nextR = list[nextIdx];
+    if (nextR) {
+      focusRoot(nextR.label);
+      const rootNode = (graphState.nodes || []).find(n => n.type === 'root' && n.label === nextR.label);
+      if (rootNode) {
+        selectNode(rootNode, false);
+        centerOnNode(rootNode, 1.1, true);
+      }
+      const toastFn = global.showToast || global.VocabCore?.showToast;
+      if (typeof toastFn === 'function') {
+        toastFn(`次の語根: ${nextR.label}${nextR.childCount ? ` (${nextR.childCount}語)` : ''}`, 'info', 1500);
+      }
+    }
+  }
+
+  /**
+   * 前の語根へ順次ナビゲーション (Qキー)
+   */
+  function prevRoot() {
+    const list = getRootSequence();
+    if (!list.length) return;
+    const curKey = graphState.focusedRootKey;
+    let idx = list.findIndex(r => r.label === curKey);
+    if (idx === -1) idx = 0;
+    let prevIdx = (idx - 1 + list.length) % list.length;
+    const prevR = list[prevIdx];
+    if (prevR) {
+      focusRoot(prevR.label);
+      const rootNode = (graphState.nodes || []).find(n => n.type === 'root' && n.label === prevR.label);
+      if (rootNode) {
+        selectNode(rootNode, false);
+        centerOnNode(rootNode, 1.1, true);
+      }
+      const toastFn = global.showToast || global.VocabCore?.showToast;
+      if (typeof toastFn === 'function') {
+        toastFn(`前の語根: ${prevR.label}${prevR.childCount ? ` (${prevR.childCount}語)` : ''}`, 'info', 1500);
+      }
+    }
+  }
+
+  /**
+   * 同一語根クラスタ内の次の単語へオートジャンプ
+   */
+  function jumpToNextWordInCluster(currentNode) {
+    if (!currentNode) return;
+    const rNode = (currentNode.connectedRoots && currentNode.connectedRoots[0]) ||
+                  (graphState.nodes || []).find(n => n.type === 'root' && (n.connectedWords || []).includes(currentNode));
+    let peerWords = [];
+    if (rNode && Array.isArray(rNode.connectedWords) && rNode.connectedWords.length > 0) {
+      peerWords = rNode.connectedWords.filter(w => w.type === 'word');
+    } else {
+      peerWords = (graphState.nodes || []).filter(n => n.type === 'word');
+    }
+
+    if (!peerWords.length) return;
+    const curIdx = peerWords.indexOf(currentNode);
+    const nextIdx = (curIdx + 1) % peerWords.length;
+    const nextWord = peerWords[nextIdx];
+
+    if (nextWord && nextWord !== currentNode) {
+      selectNode(nextWord, false);
+      centerOnNode(nextWord, 1.2, true);
+    }
+  }
+
+  /**
+   * 単語ノードに対する想起度(FSRS/SM-2)評価実行
+   */
+  function rateNodeWord(rating, targetNode = null) {
+    const node = targetNode || graphState.selectedNode;
+    if (!node || node.type !== 'word') return;
+
+    if (global.VocabSRS?.triggerHaptic) {
+      global.VocabSRS.triggerHaptic(rating === 0 ? 'again' : rating === 1 ? 'light' : rating === 2 ? 'good' : 'easy');
+    }
+
+    const app = global.VocabCore?.App || global.App;
+    const lang = node.lang || node.item?.lang || app?.srcLang || app?.lang || 'en';
+    const tgtLang = app?.tgtLang || 'ja';
+    const storageMod = global.VocabStorage;
+    const pairCfg = storageMod?.getPairConfig ? storageMod.getPairConfig(lang, tgtLang) : null;
+    const saveKey = pairCfg?.key || storageMod?.LANGS?.[lang]?.key || `distinction_entries${lang === 'en' ? '' : '_' + lang}`;
+    const getJsonFn = global.VocabCore?.getJson || global.getJson || storageMod?.getJson;
+    const setJsonFn = global.VocabCore?.setJson || global.setJson || storageMod?.setJson;
+
+    let entries = typeof getJsonFn === 'function' ? (getJsonFn(saveKey) || []) : (storageMod?.state?.mem?.[saveKey] || []);
+    let item = entries.find(e => (e.word || '').toLowerCase() === node.label.toLowerCase() && !e.isDeleted);
+
+    if (!item && global.VocabEikenCatalog?.getWord(node.label)) {
+      adoptGhostBud(node.label, node.parentRoot?.label);
+      entries = typeof getJsonFn === 'function' ? (getJsonFn(saveKey) || []) : (storageMod?.state?.mem?.[saveKey] || []);
+      item = entries.find(e => (e.word || '').toLowerCase() === node.label.toLowerCase() && !e.isDeleted);
+    }
+
+    const now = Date.now();
+    let rLabel = '';
+    if (item) {
+      item.version = (Number(item.version) || 1) + 1;
+      item.updatedAt = now;
+      if (global.VocabSRS?.calculateNextReview) {
+        const nextSRS = global.VocabSRS.calculateNextReview(item, rating);
+        Object.assign(item, nextSRS, { reviewUpdatedAt: now });
+      } else {
+        let iv = Number(item.interval) || 0, rep = Number(item.repetition) || 0, ef = Number(item.efactor) || 2.5;
+        if (rating === 0) {
+          rep = 0; iv = 0; item.nextReview = now + 60000;
+        } else {
+          iv = rating === 1 ? Math.max(1, iv * 1.2) : (rating === 2 ? (!rep ? 1 : iv * 2.5) : (!rep ? 4 : iv * ef));
+          ef = Math.max(1.3, ef + (rating === 1 ? -0.15 : rating === 3 ? 0.15 : 0));
+          if (rating >= 2) rep++;
+          item.nextReview = now + Math.round(iv * 86400000);
+        }
+        item.interval = Number(iv.toFixed(2));
+        item.repetition = rep;
+        item.efactor = Number(ef.toFixed(2));
+        item.reviewUpdatedAt = now;
+      }
+      if (typeof setJsonFn === 'function') {
+        setJsonFn(saveKey, entries, true, true);
+      }
+      node.item = item;
+
+      const srsPredict = global.VocabSRS?.predictIntervals ? global.VocabSRS.predictIntervals(item)[rating] : null;
+      const baseLabels = ['忘却', '困難', '良好', '簡単'];
+      rLabel = srsPredict ? `${baseLabels[rating]} (${srsPredict})` : (['忘却 (1分後)', '困難 (1日後)', '良好 (3日後)', '簡単 (7日後)'][rating] || '復習完了');
+    } else {
+      rLabel = ['忘却 (1分後)', '困難 (1日後)', '良好 (3日後)', '簡単 (7日後)'][rating] || '復習完了';
+    }
+
+    const toastFn = global.showToast || global.VocabCore?.showToast;
+    if (typeof toastFn === 'function') {
+      toastFn(`[${node.label}] ${rLabel} として記録しました`, 'ok', 1500);
+    }
+
+    drawGraph();
+    if (graphState.activeViewTab === 'mindmap') renderMindmap();
+    if (graphState.activeViewTab === 'matrix') renderMorphologyMatrix();
+
+    jumpToNextWordInCluster(node);
+  }
+
+  /**
+   * 指定単語に対する想起度評価実行 (マインドマップ等からの直通呼び出し)
+   */
+  function rateSpecificWord(word, rating, wordLang) {
+    if (!word) return;
+    const cleanWord = String(word).trim().toLowerCase();
+    const node = (graphState.nodes || []).find(n => n.type === 'word' && n.label.toLowerCase() === cleanWord);
+    if (node) {
+      rateNodeWord(rating, node);
+    } else {
+      const storageMod = global.VocabStorage;
+      const app = global.VocabCore?.App || global.App;
+      const lang = wordLang || app?.srcLang || app?.lang || 'en';
+      const tgtLang = app?.tgtLang || 'ja';
+      const pairCfg = storageMod?.getPairConfig ? storageMod.getPairConfig(lang, tgtLang) : null;
+      const saveKey = pairCfg?.key || storageMod?.LANGS?.[lang]?.key || `distinction_entries${lang === 'en' ? '' : '_' + lang}`;
+      const getJsonFn = global.VocabCore?.getJson || global.getJson || storageMod?.getJson;
+      const setJsonFn = global.VocabCore?.setJson || global.setJson || storageMod?.setJson;
+      const entries = typeof getJsonFn === 'function' ? (getJsonFn(saveKey) || []) : (storageMod?.state?.mem?.[saveKey] || []);
+      const item = entries.find(e => (e.word || '').toLowerCase() === cleanWord && !e.isDeleted);
+      if (item) {
+        const now = Date.now();
+        item.version = (Number(item.version) || 1) + 1;
+        item.updatedAt = now;
+        if (global.VocabSRS?.calculateNextReview) {
+          const nextSRS = global.VocabSRS.calculateNextReview(item, rating);
+          Object.assign(item, nextSRS, { reviewUpdatedAt: now });
+        }
+        if (typeof setJsonFn === 'function') setJsonFn(saveKey, entries, true, true);
+        const srsPredict = global.VocabSRS?.predictIntervals ? global.VocabSRS.predictIntervals(item)[rating] : null;
+        const baseLabels = ['忘却', '困難', '良好', '簡単'];
+        const rLabel = srsPredict ? `${baseLabels[rating]} (${srsPredict})` : (['忘却 (1分後)', '困難 (1日後)', '良好 (3日後)', '簡単 (7日後)'][rating] || '復習完了');
+        const toastFn = global.showToast || global.VocabCore?.showToast;
+        if (typeof toastFn === 'function') {
+          toastFn(`[${word}] ${rLabel} として記録しました`, 'ok', 1500);
+        }
+        drawGraph();
+        if (graphState.activeViewTab === 'mindmap') renderMindmap();
+        if (graphState.activeViewTab === 'matrix') renderMorphologyMatrix();
+      }
     }
   }
 
@@ -651,8 +867,14 @@
     if (countEl) {
       countEl.textContent = `${nodes.filter(n => n.type === 'root').length} 語根 / ${nodes.filter(n => n.type === 'word').length} 単語`;
     }
-    fitGraphToView();
-    wakeGraphSimulation();
+    const canvasWrap = document.getElementById('graphCanvasWrap');
+    const isCanvasVisible = canvasWrap && canvasWrap.style.display !== 'none';
+    if (isCanvasVisible) {
+      fitGraphToView();
+      wakeGraphSimulation();
+    }
+    if (typeof renderMindmap === 'function') renderMindmap();
+    if (typeof renderMorphologyMatrix === 'function') renderMorphologyMatrix();
   }
 
   function updateZoomDisplay() {
@@ -878,86 +1100,163 @@
     }
   }
 
+  /**
+   * 検索ジャンプ: 単語または語根を検索し、位置までスムーズズーム＆経路ハイライト
+   */
+  function jumpToNode(query) {
+    if (!query) return false;
+    const q = String(query).trim().toLowerCase().replace(/^\*/, '');
+    if (!q) return false;
+
+    // 1. 完全一致
+    let target = graphState.nodes.find(n => n.label.toLowerCase() === q || cleanRootKey(n.label).toLowerCase() === q);
+    // 2. 前方一致
+    if (!target) {
+      target = graphState.nodes.find(n => n.label.toLowerCase().startsWith(q));
+    }
+    // 3. 部分一致
+    if (!target) {
+      target = graphState.nodes.find(n => n.label.toLowerCase().includes(q));
+    }
+    // 4. 日本語訳・意味一致
+    if (!target) {
+      target = graphState.nodes.find(n => (n.meaning || '').toLowerCase().includes(q) || (n.rootMeaning || '').toLowerCase().includes(q));
+    }
+
+    if (target) {
+      selectNode(target, false);
+      centerOnNode(target, target.type === 'root' ? 1.05 : 1.45, true);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 「自分の単語」モードのトグル（登録・学習済み単語のみ強調、FSRS状態連動）
+   */
+  function toggleMyWordsMode() {
+    graphState.myWordsOnly = !graphState.myWordsOnly;
+    const btn = document.getElementById('graphMyWordsBtn');
+    if (btn) {
+      if (graphState.myWordsOnly) {
+        btn.classList.add('active');
+        btn.style.background = 'var(--ac)';
+        btn.style.color = '#ffffff';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.color = '';
+      }
+    }
+    drawGraph();
+  }
+
+  /**
+   * 語根ノードの展開 / 折りたたみ
+   */
+  function toggleRootCollapse(rootKey) {
+    if (!graphState.collapsedRoots) graphState.collapsedRoots = new Set();
+    const rk = cleanRootKey(rootKey);
+    if (graphState.collapsedRoots.has(rk)) {
+      graphState.collapsedRoots.delete(rk);
+    } else {
+      graphState.collapsedRoots.add(rk);
+    }
+    drawGraph();
+  }
+
+  /**
+   * 時代スライダーの自動再生アニメーション (Time-lapse Auto Play)
+   */
+  let _timelinePlayTimer = null;
+  function stopTimelineAutoPlay() {
+    if (_timelinePlayTimer) {
+      clearInterval(_timelinePlayTimer);
+      _timelinePlayTimer = null;
+      const playBtn = document.getElementById('graphTimelinePlayBtn');
+      if (playBtn) playBtn.textContent = '再生';
+    }
+  }
+
+  function toggleTimelineAutoPlay() {
+    const playBtn = document.getElementById('graphTimelinePlayBtn');
+    if (_timelinePlayTimer) {
+      stopTimelineAutoPlay();
+      return;
+    }
+    if (playBtn) playBtn.textContent = '停止';
+    _timelinePlayTimer = setInterval(() => {
+      let nextEra = ((graphState.timelineEra || 0) + 1) % 4;
+      onTimelineChange(nextEra);
+      const slider = document.getElementById('graphTimelineSlider');
+      if (slider) slider.value = nextEra;
+    }, 1300);
+  }
+
+  /**
+   * おすすめ入口: 「今日の語根」「要復習の語根」へジャンプ
+   */
+  function jumpToRecommendedRoot(type = 'today') {
+    const rootNodes = graphState.nodes.filter(n => n.type === 'root');
+    if (!rootNodes.length) return;
+    let target = null;
+    const now = Date.now();
+    if (type === 'due') {
+      // 復習期日（nextReview <= now）の単語を持つ語根を優先
+      target = rootNodes.find(r => (r.connectedWords || []).some(w => (w.item?.nextReview || 0) <= now));
+    }
+    if (!target) {
+      // 日替わり決定論的インデックス
+      const dayIdx = Math.floor(now / (1000 * 60 * 60 * 24)) % rootNodes.length;
+      target = rootNodes[dayIdx] || rootNodes[0];
+    }
+    if (target) {
+      focusRoot(target.label);
+      selectNode(target, false);
+      centerOnNode(target, 1.05, true);
+    }
+  }
+
   function openGraphModal(targetRoot = null) {
     const toggleModalFn = global.toggleModal || global.VocabCore?.toggleModal;
     if (typeof toggleModalFn === 'function') toggleModalFn('graphModal', true);
-
-    const canvas = document.getElementById('graphCanvas');
-    const wrap = document.getElementById('graphCanvasWrap');
-    if (!canvas || !wrap) return;
-
-    graphState.canvas = canvas;
-    graphState.ctx = canvas.getContext('2d');
-    invalidateTreeBgCache();
-    graphState.width = wrap.clientWidth || 800;
-    graphState.height = wrap.clientHeight || 600;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = graphState.width * dpr;
-    canvas.height = graphState.height * dpr;
-    canvas.style.width = graphState.width + 'px';
-    canvas.style.height = graphState.height + 'px';
 
     const normTarget = targetRoot ? cleanRootKey(targetRoot) : '';
     const filterInput = document.getElementById('graphFilterInput');
     if (filterInput) filterInput.value = normTarget ? normTarget : '';
     graphState.filterQuery = normTarget;
 
-    // 軽量化: 重複ビルド（buildGraphDataの多重実行）を完全撤廃しエントリー数から瞬時にclusterOnly判定
-    const currentEntryCount = (global.VocabCore?.getAppState?.()?.entries?.length) || (global.App?.entries?.length) || 0;
-    if (currentEntryCount > 120 && !targetRoot) {
-      graphState.clusterOnly = true;
-    } else if (!targetRoot) {
-      graphState.clusterOnly = false;
+    // アクティブな言語ペアに基づいて初期語源系統を自動反映
+    const curPair = (global.VocabCore?.getActivePairConfig || global.getActivePairConfig)?.() || {};
+    const curSrc = (curPair.srcLang || curPair.src || global.App?.srcLang || global.App?.lang || 'en').toLowerCase();
+    if (!graphState.familyFilter || graphState.familyFilter === 'all') {
+      if (curSrc === 'zh') graphState.familyFilter = 'sinospheric';
+      else if (curSrc === 'ko') graphState.familyFilter = 'koreanic';
+      else if (curSrc === 'ja') graphState.familyFilter = 'japonic';
+      else if (['fr', 'es', 'it', 'pt'].includes(curSrc)) graphState.familyFilter = 'romance';
+      else if (['de', 'nl'].includes(curSrc)) graphState.familyFilter = 'germanic';
+      else graphState.familyFilter = 'all';
     }
-
-    const clusterBtn = document.getElementById('graphClusterFilterBtn');
-    if (clusterBtn) clusterBtn.classList.toggle('active', graphState.clusterOnly);
+    const famSel = document.getElementById('graphFamilyFilterSel');
+    if (famSel) famSel.value = graphState.familyFilter;
+    updatePhylumPillsUI(graphState.familyFilter);
 
     // 1回のみ高速ビルド
-    const { nodes, edges } = buildGraphData(normTarget, graphState.clusterOnly, graphState.langFilter);
+    const { nodes, edges } = buildGraphData(normTarget, false, graphState.langFilter);
     graphState.nodes = nodes;
     graphState.edges = edges;
 
     const countEl = document.getElementById('graphMetaCount');
     if (countEl) countEl.textContent = `${nodes.filter(n => n.type === 'root').length} 語根 / ${nodes.filter(n => n.type === 'word').length} 単語`;
 
-    updateLegendUI();
     initGraphEvents();
 
     if (normTarget) {
-      const rNode = nodes.find(n => n.type === 'root' && (n.label === normTarget || n.id === `root:${normTarget}`));
-      if (rNode) {
-        zoomToCluster(rNode);
-        selectNode(rNode, false);
-      } else {
-        fitGraphToView();
-      }
-    } else {
-      deselectNode();
-      fitGraphToView();
+      focusRoot(normTarget);
     }
 
-    if (graphUIManager && typeof graphUIManager.applyMode === 'function') {
-      graphUIManager.applyMode(graphState.activeViewTab || 'network');
-    }
-
-    if (graphState.layoutMode === 'tree') {
-      startTreeEasingAnimation();
-    } else {
-      wakeGraphSimulation();
-    }
-
-    // モーダルCSSトランジション完了後のレイアウト寸法確定に合わせた多段自動補正
-    [50, 160, 320].forEach(delay => {
-      setTimeout(() => {
-        syncCanvasDimensions();
-        if (graphState.selectedNode) {
-          centerOnNode(graphState.selectedNode, graphState.zoom, delay > 50);
-        } else {
-          fitGraphToView();
-        }
-      }, delay);
-    });
+    // マインドマップビューで直接起動
+    switchViewMode('mindmap');
   }
 
   function resetGraphZoom() {
@@ -1174,13 +1473,15 @@
         }
         const budNode = graphState.nodes.find(n => n.type === 'ghost_bud' && n.label.toLowerCase() === budWord.toLowerCase());
         if (budNode) {
+          pruneUnlockParticles();
           graphState.unlockParticles.push({
             x: budNode.x,
             y: budNode.y,
             radius: 8,
             maxRadius: 52,
             alpha: 1.0,
-            color: '#38bdf8'
+            color: '#38bdf8',
+            __bornAt: Date.now()
           });
         }
         playSkillUnlockSound();
@@ -1188,6 +1489,7 @@
         if (typeof toastFn === 'function') {
           toastFn(`スキル習得！「${budWord}」(${rootLabel}) を覚醒させました！単語帳に追加完了。`, 'ok', 4000);
         }
+        pruneUnlockParticles();
         updateGraphDataAndFit();
         const newWordNode = graphState.nodes.find(n => n.type === 'word' && n.label.toLowerCase() === budWord.toLowerCase());
         if (newWordNode) {
@@ -1408,6 +1710,48 @@
       graphDrawScheduled = false;
       drawGraph();
     });
+  }
+
+  function updatePhylumPillsUI(famKey) {
+    if (typeof document === 'undefined') return;
+    const pills = document.querySelectorAll('.phylum-pill');
+    pills.forEach(p => {
+      const pFam = p.getAttribute('data-phylum') || p.id.replace('phylumPill', '').toLowerCase();
+      const match = (pFam === famKey) || (famKey === 'all' && (pFam === 'all' || p.id === 'phylumPillAll')) ||
+                    (famKey === 'indo_european' && (pFam === 'indo_european' || p.id === 'phylumPillIE')) ||
+                    (famKey === 'sinospheric' && (pFam === 'sinospheric' || p.id === 'phylumPillZh')) ||
+                    (famKey === 'koreanic' && (pFam === 'koreanic' || p.id === 'phylumPillKo')) ||
+                    (famKey === 'japonic' && (pFam === 'japonic' || p.id === 'phylumPillJa'));
+      if (match) p.classList.add('active');
+      else p.classList.remove('active');
+    });
+  }
+
+  function setPhylumFilter(famKey) {
+    if (!graphState) return;
+    graphState.familyFilter = famKey;
+    const famSel = document.getElementById('graphFamilyFilterSel');
+    if (famSel) {
+      if (Array.from(famSel.options).some(o => o.value === famKey)) {
+        famSel.value = famKey;
+      } else if (famKey === 'indo_european') {
+        famSel.value = 'all';
+      }
+    }
+    updatePhylumPillsUI(famKey);
+    updateGraphDataAndFit();
+    if (graphState.layoutMode === 'tree') startTreeEasingAnimation();
+    if (graphState.activeViewTab === 'mindmap') renderMindmap();
+    if (graphState.activeViewTab === 'matrix') renderMorphologyMatrix();
+
+    if (famKey !== 'all') {
+      setTimeout(() => {
+        const root = graphState.nodes.find(n => n.type === 'root' && (n.phylum === famKey || n.id.includes(famKey)));
+        if (root) {
+          centerOnNode(root);
+        }
+      }, 60);
+    }
   }
 
   function initGraphEvents() {
@@ -1689,7 +2033,7 @@
       }, { passive: true });
     }
 
-    // ノードクリック時のインスペクター展開
+    // ノードクリック時のインスペクター展開 & 語根展開トグル
     wrap.addEventListener('click', e => {
       if (shouldIgnoreCanvasEvent(e.target)) return;
       if (graphState.dragMoved) return;
@@ -1697,7 +2041,12 @@
       const { x, y } = getCanvasCoords(e.clientX, e.clientY);
       const hit = findNodeAt(x, y);
       if (hit) {
-        selectNode(hit, true);
+        if (hit.type === 'root' && graphState.selectedNode === hit) {
+          // すでに選択中の語根を再タップした場合は展開/折りたたみをトグル
+          toggleRootCollapse(hit.label);
+        } else {
+          selectNode(hit, true);
+        }
       } else {
         deselectNode();
       }
@@ -1707,12 +2056,29 @@
       fitGraphToView();
     });
 
-    // フィルタ入力
+    // フィルタ入力 & 検索ジャンプ
     const filterInput = document.getElementById('graphFilterInput');
+    let _filterJumpTimer = null;
     filterInput?.addEventListener('input', e => {
       const q = e.target.value.trim().replace(/^\*/, '');
       graphState.filterQuery = q;
       drawGraph();
+      if (graphState.activeViewTab === 'mindmap') renderMindmap();
+      if (graphState.activeViewTab === 'matrix') renderMorphologyMatrix();
+      if (_filterJumpTimer) clearTimeout(_filterJumpTimer);
+      if (q.length >= 2) {
+        _filterJumpTimer = setTimeout(() => {
+          jumpToNode(q);
+        }, 400);
+      }
+    });
+
+    filterInput?.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const q = filterInput.value.trim().replace(/^\*/, '');
+        if (q) jumpToNode(q);
+      }
     });
 
     // 言語フィルタ変更
@@ -1721,6 +2087,17 @@
       graphState.langFilter = e.target.value;
       updateGraphDataAndFit();
     });
+
+    // 語源系統・大語族分類フィルタ変更
+    const famSel = document.getElementById('graphFamilyFilterSel');
+  famSel?.addEventListener('change', e => {
+    graphState.familyFilter = e.target.value;
+    updatePhylumPillsUI(e.target.value);
+    updateGraphDataAndFit();
+    if (graphState.layoutMode === 'tree') startTreeEasingAnimation();
+    if (graphState.activeViewTab === 'mindmap') renderMindmap();
+    if (graphState.activeViewTab === 'matrix') renderMorphologyMatrix();
+  });
 
     // 主要語根ジャンプ
     const rootJumpSel = document.getElementById('graphRootJumpSel');
@@ -1754,7 +2131,12 @@
         return;
       }
 
-      if (e.key === '+' || e.key === '=') {
+      const isWordSelected = Boolean(graphState.selectedNode && graphState.selectedNode.type === 'word');
+
+      if (e.key === ' ') {
+        e.preventDefault();
+        revealRecallAnswer();
+      } else if (e.key === '+' || e.key === '=') {
         e.preventDefault();
         zoomIn();
       } else if (e.key === '-' || e.key === '_') {
@@ -1766,24 +2148,38 @@
       } else if (e.key === 'f' || e.key === 'F') {
         e.preventDefault();
         fitGraphToView();
+      } else if (e.key === 'q' || e.key === 'Q') {
+        e.preventDefault();
+        prevRoot();
       } else if (e.key === 'w' || e.key === 'W') {
         e.preventDefault();
-        startWateringReview();
+        if (graphState.microTreeFocus || graphState.focusedRootKey) {
+          nextRoot();
+        } else {
+          startWateringReview();
+        }
+      } else if (e.key === 'u' || e.key === 'U') {
+        e.preventDefault();
+        toggleMicroTreeFocus();
       } else if (e.key === 'm' || e.key === 'M') {
         e.preventDefault();
         toggleTreeMask();
       } else if (e.key === '1') {
         e.preventDefault();
-        switchViewMode('network');
+        if (isWordSelected) rateNodeWord(0);
+        else switchViewMode('mindmap');
       } else if (e.key === '2') {
         e.preventDefault();
-        switchViewMode('tree');
+        if (isWordSelected) rateNodeWord(1);
+        else switchViewMode('matrix');
       } else if (e.key === '3') {
         e.preventDefault();
-        switchViewMode('mindmap');
+        if (isWordSelected) rateNodeWord(2);
+        else switchViewMode('mindmap');
       } else if (e.key === '4') {
         e.preventDefault();
-        switchViewMode('matrix');
+        if (isWordSelected) rateNodeWord(3);
+        else switchViewMode('matrix');
       }
     });
 
@@ -1842,6 +2238,7 @@
     extractBranchInfo,
     bezierCurveTo,
     getRootMeaning,
+    ETYMOLOGY_FAMILIES: (global.VocabGraphLayout?.ETYMOLOGY_FAMILIES || {}),
     LANG_GRAPH_COLORS: (global.VocabGraphRenderer?.LANG_GRAPH_COLORS || {}),
     RETENTION_COLORS: (global.VocabGraphRenderer?.RETENTION_COLORS || {}),
     graphState,
@@ -1878,8 +2275,26 @@
     speakNodeWord,
     jumpToNodeWord,
     openWordEdit,
+    setPhylumFilter,
+    updatePhylumPillsUI,
     syncCanvasDimensions,
     invalidateTreeBgCache,
-    initGraphEvents
+    initGraphEvents,
+    jumpToNode,
+    toggleMyWordsMode,
+    toggleRootCollapse,
+    toggleTimelineAutoPlay,
+    stopTimelineAutoPlay,
+    state: graphState,
+    jumpToRecommendedRoot,
+    revealRecallAnswer,
+    rateNodeWord,
+    rateSpecificWord,
+    toggleMicroTreeFocus,
+    nextRoot,
+    prevRoot,
+    jumpToNextWordInCluster,
+    promptMatrixGen,
+    getEnglishPairKeyAndEntries
   };
 })(typeof window !== 'undefined' ? window : globalThis);

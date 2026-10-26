@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS public.user_vocab_entries (
   repetition INTEGER NOT NULL DEFAULT 0,
   efactor NUMERIC NOT NULL DEFAULT 2.5,
   next_review BIGINT NOT NULL,
-  card_data JSONB NOT NULL CHECK (length(card_data::TEXT) <= 50000),
+  card_data JSONB NOT NULL CHECK (length(card_data::TEXT) <= 100000),
   updated_at BIGINT NOT NULL,
   review_updated_at BIGINT NOT NULL DEFAULT 0,
   is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
@@ -112,11 +112,15 @@ CREATE TABLE IF NOT EXISTS public.user_tombstones (
   pair TEXT NOT NULL DEFAULT 'en_ja',
   tomb_key TEXT NOT NULL,
   deleted_at BIGINT NOT NULL,
+  server_updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::BIGINT,
   PRIMARY KEY (user_id, pair, tomb_key)
 );
 
 CREATE INDEX IF NOT EXISTS idx_ut_user_pair_del ON public.user_tombstones (user_id, pair, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_ut_user_lang_del ON public.user_tombstones (user_id, lang, deleted_at);
+-- [P0-4 解決] サーバー時刻基準でのTombstone差分Pull用インデックス
+CREATE INDEX IF NOT EXISTS idx_ut_user_pair_server_sync ON public.user_tombstones (user_id, pair, server_updated_at);
+CREATE INDEX IF NOT EXISTS idx_ut_user_lang_server_sync ON public.user_tombstones (user_id, lang, server_updated_at);
 
 -- 4. user_lang_watermarks テーブル（言語全削除ウォーターマーク）
 CREATE TABLE IF NOT EXISTS public.user_lang_watermarks (
@@ -127,8 +131,9 @@ CREATE TABLE IF NOT EXISTS public.user_lang_watermarks (
   PRIMARY KEY (user_id, pair)
 );
 
--- 既存テーブル移行マイグレーション（テーブルが既に存在する場合に pair カラムと複合主キーを追加）
+-- 既存テーブル移行マイグレーション（テーブルが既に存在する場合に pair カラムと server_updated_at を追加）
 ALTER TABLE public.user_tombstones ADD COLUMN IF NOT EXISTS pair TEXT NOT NULL DEFAULT 'en_ja';
+ALTER TABLE public.user_tombstones ADD COLUMN IF NOT EXISTS server_updated_at BIGINT NOT NULL DEFAULT (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::BIGINT;
 DO $$
 BEGIN
   IF EXISTS (
@@ -297,11 +302,11 @@ DROP POLICY IF EXISTS "Authenticated users can read wiktionary refs" ON public.w
 CREATE POLICY "Authenticated users can read wiktionary refs" ON public.wiktionary_references
   FOR SELECT TO authenticated USING (true);
 
--- user_feedbacks: インサートは誰でも可、閲覧は本人のみ
+-- user_feedbacks: インサートは誰でも可（ただし他人のuser_id偽装は不可）、閲覧は本人のみ
 DROP POLICY IF EXISTS "Anyone can insert feedback" ON public.user_feedbacks;
 DROP POLICY IF EXISTS "Users can view own feedbacks" ON public.user_feedbacks;
 CREATE POLICY "Anyone can insert feedback" ON public.user_feedbacks
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (user_id IS NULL OR user_id = auth.uid());
 CREATE POLICY "Users can view own feedbacks" ON public.user_feedbacks
   FOR SELECT USING (auth.uid() = user_id);
 
@@ -313,17 +318,36 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_recent_count INTEGER;
+  v_global_count INTEGER;
+  v_user_count INTEGER;
+  v_auth_uid UUID := auth.uid();
 BEGIN
-  -- 直近1分間に全体で30件以上、または同一ユーザーから3件以上の投稿があれば遮断
-  SELECT count(*) INTO v_recent_count
-  FROM public.user_feedbacks
-  WHERE created_at > NOW() - INTERVAL '1 minute'
-    AND (NEW.user_id IS NULL OR user_id = NEW.user_id);
-
-  IF (NEW.user_id IS NOT NULL AND v_recent_count >= 3) OR v_recent_count >= 30 THEN
-    RAISE EXCEPTION 'FEEDBACK_RATE_LIMIT_EXCEEDED: Too many feedbacks submitted recently.';
+  -- 投稿者のなりすまし完全防止
+  IF NEW.user_id IS NOT NULL AND (v_auth_uid IS NULL OR NEW.user_id <> v_auth_uid) THEN
+    RAISE EXCEPTION 'UNAUTHORIZED_FEEDBACK_USER_ID: Cannot submit feedback on behalf of another user.';
   END IF;
+
+  -- [P1-4 解決] 全体レート制限（直近1分間に全体で30件以上あればDoS防止のため遮断）
+  SELECT count(*) INTO v_global_count
+  FROM public.user_feedbacks
+  WHERE created_at > NOW() - INTERVAL '1 minute';
+
+  IF v_global_count >= 30 THEN
+    RAISE EXCEPTION 'FEEDBACK_RATE_LIMIT_EXCEEDED: System-wide rate limit reached. Please wait a minute.';
+  END IF;
+
+  -- ユーザー別レート制限（同一認証ユーザーから直近1分間に3件以上あれば遮断）
+  IF NEW.user_id IS NOT NULL THEN
+    SELECT count(*) INTO v_user_count
+    FROM public.user_feedbacks
+    WHERE created_at > NOW() - INTERVAL '1 minute'
+      AND user_id = NEW.user_id;
+
+    IF v_user_count >= 3 THEN
+      RAISE EXCEPTION 'FEEDBACK_RATE_LIMIT_EXCEEDED: Too many feedbacks submitted recently.';
+    END IF;
+  END IF;
+
   RETURN NEW;
 END;
 $$;
@@ -334,14 +358,33 @@ CREATE TRIGGER trg_check_feedback_rate_limit
   FOR EACH ROW EXECUTE FUNCTION public.check_feedback_rate_limit();
 
 
+-- ==============================================================================
+-- クォータ予約・返金の一意台帳テーブル（リクエスト単位の厳格な冪等性担保）
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.quota_reservations (
+  request_id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL,
+  item_count INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('reserved', 'refunded', 'committed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.quota_reservations ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.quota_reservations FROM PUBLIC, anon, authenticated;
+GRANT ALL ON public.quota_reservations TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_quota_reservations_created ON public.quota_reservations (created_at);
+
+
 
 -- ==============================================================================
 -- [P0-1 & P0-2 解決] 事前予約(Reserve) & 補償返還(Refund) クォータ管理関数
+-- リクエスト単位の厳格な冪等性担保（quota_reservations 台帳連携）
 -- ==============================================================================
 CREATE OR REPLACE FUNCTION public.reserve_or_refund_quota(
   p_user_id UUID,
   p_item_count INTEGER,
-  p_is_refund BOOLEAN DEFAULT FALSE
+  p_is_refund BOOLEAN DEFAULT FALSE,
+  p_request_id TEXT DEFAULT NULL
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -352,6 +395,7 @@ DECLARE
   v_profile public.profiles%ROWTYPE;
   v_now TIMESTAMPTZ := NOW();
   v_effective_limit INTEGER;
+  v_res_rec public.quota_reservations%ROWTYPE;
 BEGIN
   -- 境界値・異常値ガード（1リクエスト1〜15語に厳格制限）
   IF p_user_id IS NULL THEN
@@ -370,6 +414,34 @@ BEGIN
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'PROFILE_NOT_FOUND: user % does not exist', p_user_id;
+  END IF;
+
+  -- 冪等性チェック（同一 request_id の再送ガード）
+  IF p_request_id IS NOT NULL AND length(trim(p_request_id)) > 0 THEN
+    SELECT * INTO v_res_rec FROM public.quota_reservations WHERE request_id = p_request_id FOR UPDATE;
+    IF FOUND THEN
+      -- A. 返金モードで既に refunded 済みなら二重返金せず成功を返す
+      IF p_is_refund AND v_res_rec.status = 'refunded' THEN
+        RETURN jsonb_build_object(
+          'allowed', true,
+          'action', 'already_refunded',
+          'plan', v_profile.plan,
+          'usage_count', v_profile.usage_count,
+          'remaining', GREATEST(0, (CASE WHEN v_profile.plan IN ('pro', 'academic') THEN v_profile.pro_monthly_cap ELSE v_profile.monthly_quota END) - v_profile.usage_count)
+        );
+      END IF;
+
+      -- B. 予約モードで既に reserved/committed 済みなら二重消費せず前回の予約成功を返す
+      IF NOT p_is_refund AND v_res_rec.status IN ('reserved', 'committed') THEN
+        RETURN jsonb_build_object(
+          'allowed', true,
+          'action', 'already_reserved',
+          'plan', v_profile.plan,
+          'usage_count', v_profile.usage_count,
+          'remaining', GREATEST(0, (CASE WHEN v_profile.plan IN ('pro', 'academic') THEN v_profile.pro_monthly_cap ELSE v_profile.monthly_quota END) - v_profile.usage_count)
+        );
+      END IF;
+    END IF;
   END IF;
 
   -- クォータリセット判定 (Pro/Academic は月次3,000語リセット、Free は日次5語リセット)
@@ -413,6 +485,12 @@ BEGIN
         quota_reset_at = v_profile.quota_reset_at,
         updated_at = v_now
     WHERE id = p_user_id;
+
+    IF p_request_id IS NOT NULL AND length(trim(p_request_id)) > 0 THEN
+      INSERT INTO public.quota_reservations (request_id, user_id, item_count, status, created_at)
+      VALUES (p_request_id, p_user_id, p_item_count, 'refunded', v_now)
+      ON CONFLICT (request_id) DO UPDATE SET status = 'refunded';
+    END IF;
 
     RETURN jsonb_build_object(
       'allowed', true,
@@ -459,6 +537,12 @@ BEGIN
       updated_at = v_now
   WHERE id = p_user_id;
 
+  IF p_request_id IS NOT NULL AND length(trim(p_request_id)) > 0 THEN
+    INSERT INTO public.quota_reservations (request_id, user_id, item_count, status, created_at)
+    VALUES (p_request_id, p_user_id, p_item_count, 'reserved', v_now)
+    ON CONFLICT (request_id) DO NOTHING;
+  END IF;
+
   RETURN jsonb_build_object(
     'allowed', true,
     'action', 'reserved',
@@ -471,10 +555,11 @@ END;
 $$;
 
 -- [P0-1 解決] 一般ユーザーからの直接RPC呼び出しを完全遮断し、service_role のみに限定
-REVOKE ALL ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN) TO service_role;
+REVOKE ALL ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN, TEXT) TO service_role;
 
 -- 旧関数の安全な廃止
+DROP FUNCTION IF EXISTS public.reserve_or_refund_quota(UUID, INTEGER, BOOLEAN);
 DROP FUNCTION IF EXISTS public.check_and_consume_quota(UUID, INTEGER, BOOLEAN);
 
 
@@ -626,23 +711,12 @@ BEGIN
       RETURN jsonb_build_object('status', 'unassociated_event_skipped', 'event_id', p_event_id);
     END IF;
 
-    -- [P1-3 完全解決] checkout.session.completed 以外のイベント（subscription.updated, invoice.paid 等）で
-    -- プロフィールが見つからない場合は、退会済みアカウントの遅延イベントであるため 500 再試行させず正常終了
-    IF p_event_type <> 'checkout.session.completed' THEN
-      RETURN jsonb_build_object(
-        'status', 'user_not_found_ignored',
-        'event_id', p_event_id,
-        'event_type', p_event_type,
-        'reason', 'profile_not_found_for_non_checkout_event'
-      );
-    END IF;
-
-    -- auth.users を照合し、ユーザー自体が存在しない（退会済み）なら200で終了
+    -- [P0-5 解決] auth.users を照合し、ユーザー自体が完全に存在しない（退会済み）場合のみ無視して200終了
     IF p_user_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM auth.users WHERE id = p_user_id) THEN
       RETURN jsonb_build_object('status', 'user_not_found_ignored', 'event_id', p_event_id, 'reason', 'user_account_deleted');
     END IF;
 
-    -- 新規登録直後の checkout.session.completed レースコンディション時のみ再送させる
+    -- 非Checkoutイベント先行着信時も永久無視ロックせず、再送させてCheckout完了後に確実に適用
     RAISE EXCEPTION 'TARGET_PROFILE_NOT_FOUND: customer % / user % not ready, retry later', p_stripe_customer_id, p_user_id;
   END IF;
 
@@ -715,6 +789,8 @@ BEGIN
       END,
       grace_period_until = CASE
         WHEN p_subscription_status IN ('active', 'canceled') THEN NULL
+        -- 既に猶予期間が設定されている場合は、再試行による猶予の延長を防ぐため既存の期限を維持する
+        WHEN grace_period_until IS NOT NULL AND grace_period_until > NOW() THEN grace_period_until
         ELSE p_grace_period_until
       END,
       stripe_last_event_created = p_event_created,
@@ -749,9 +825,29 @@ DECLARE
   v_uid UUID := auth.uid();
   v_server_now BIGINT := (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::BIGINT;
   v_upserted_count INTEGER := 0;
+  v_user_plan TEXT;
+  v_sub_status TEXT;
+  v_period_end TIMESTAMPTZ;
+  v_grace_until TIMESTAMPTZ;
 BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'UNAUTHORIZED: auth.uid() is null';
+  END IF;
+
+  -- [P0-3 解決] Free ユーザーによるクラウド同期バイパスを防御（Pro / Academic 限定）
+  SELECT plan, subscription_status, current_period_end, grace_period_until
+  INTO v_user_plan, v_sub_status, v_period_end, v_grace_until
+  FROM public.profiles
+  WHERE id = v_uid;
+
+  IF v_user_plan IS NULL OR v_user_plan NOT IN ('pro', 'academic') THEN
+    RAISE EXCEPTION 'PAYWALL: Cloud sync requires Pro plan';
+  END IF;
+
+  IF v_user_plan = 'pro' AND v_period_end IS NOT NULL THEN
+    IF NOW() > v_period_end AND (v_grace_until IS NULL OR NOW() > v_grace_until) THEN
+      RAISE EXCEPTION 'SUBSCRIPTION_EXPIRED: Your Pro subscription has expired.';
+    END IF;
   END IF;
 
   IF p_entries IS NULL OR jsonb_typeof(p_entries) != 'array' THEN
@@ -806,7 +902,18 @@ BEGIN
         THEN trunc((elem->>'next_review')::NUMERIC)::BIGINT 
         ELSE v_server_now 
       END AS next_review,
-      COALESCE(elem->'card_data', '{}'::JSONB) AS card_data,
+      -- version を 1〜1,000,000 に正規化・サニタイズした card_data
+      jsonb_set(
+        COALESCE(elem->'card_data', '{}'::JSONB),
+        '{version}',
+        to_jsonb(
+          CASE 
+            WHEN (COALESCE(elem->'card_data', '{}'::JSONB)->>'version') ~ '^[0-9]+$'
+            THEN LEAST(GREATEST((COALESCE(elem->'card_data', '{}'::JSONB)->>'version')::BIGINT, 1), 1000000)
+            ELSE 1
+          END
+        )
+      ) AS card_data,
       -- クライアント時計が未来にズレていても server_now + 60秒 でクランプ（Clock Skew対策）
       LEAST(
         CASE 
@@ -827,9 +934,14 @@ BEGIN
       COALESCE((elem->>'is_deleted')::BOOLEAN, FALSE) AS is_deleted
     FROM jsonb_array_elements(p_entries) AS elem
     WHERE elem->>'id' IS NOT NULL 
+      AND length(elem->>'id') <= 128
+      AND (elem->>'id') ~ '^[a-zA-Z0-9_\-\.\:\+]+$'
       AND elem->>'lang' IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko')
       -- [P0-3 解決] ストレージ枯渇攻撃（巨大文字列・巨大JSONBペイロード注入）を遮断
       AND length(COALESCE(elem->>'word', '')) <= 255
+      AND length(COALESCE(elem->>'word_key', '')) <= 255
+      AND length(COALESCE(elem->>'folder', '')) <= 100
+      AND length(COALESCE(elem->>'category', '')) <= 100
       AND length(COALESCE(elem->'card_data', '{}'::JSONB)::TEXT) <= 50000
     ORDER BY v_uid, (elem->>'id')::TEXT, updated_at DESC, review_updated_at DESC
   ),
@@ -846,18 +958,101 @@ BEGIN
     FROM input_rows
     ON CONFLICT (user_id, id) DO UPDATE
     SET
-      pair = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.pair ELSE user_vocab_entries.pair END,
-      word_key = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word_key ELSE user_vocab_entries.word_key END,
-      word = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.word ELSE user_vocab_entries.word END,
-      folder = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.folder ELSE user_vocab_entries.folder END,
-      category = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.category ELSE user_vocab_entries.category END,
-      is_deleted = CASE WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at THEN EXCLUDED.is_deleted ELSE user_vocab_entries.is_deleted END,
-      -- カード内容・フォルダ・削除状態は updated_at が新しい方を採用しつつ、非競合JSONBキーを欠落させない双方向マージ
+      -- 健全化された競合調停: version を無条件信用せず、updated_at 優位かつ妥当な version 範囲でのみ採用
+      pair = CASE 
+        WHEN (
+          EXCLUDED.updated_at > user_vocab_entries.updated_at
+          OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+          OR (
+            EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+            AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+            AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+          )
+        ) THEN EXCLUDED.pair ELSE user_vocab_entries.pair END,
+      word_key = CASE 
+        WHEN (
+          EXCLUDED.updated_at > user_vocab_entries.updated_at
+          OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+          OR (
+            EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+            AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+            AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+          )
+        ) THEN EXCLUDED.word_key ELSE user_vocab_entries.word_key END,
+      word = CASE 
+        WHEN (
+          EXCLUDED.updated_at > user_vocab_entries.updated_at
+          OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+          OR (
+            EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+            AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+            AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+          )
+        ) THEN EXCLUDED.word ELSE user_vocab_entries.word END,
+      folder = CASE 
+        WHEN (
+          EXCLUDED.updated_at > user_vocab_entries.updated_at
+          OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+          OR (
+            EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+            AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+            AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+          )
+        ) THEN EXCLUDED.folder ELSE user_vocab_entries.folder END,
+      category = CASE 
+        WHEN (
+          EXCLUDED.updated_at > user_vocab_entries.updated_at
+          OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+          OR (
+            EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+            AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+            AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+          )
+        ) THEN EXCLUDED.category ELSE user_vocab_entries.category END,
+      is_deleted = CASE 
+        WHEN (
+          EXCLUDED.updated_at > user_vocab_entries.updated_at
+          OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+          OR (
+            EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+            AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+            AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+          )
+        ) THEN EXCLUDED.is_deleted ELSE user_vocab_entries.is_deleted END,
+      -- [P0-3 解決] カード内容・フォルダ・削除状態は updated_at または健全化された version が新しい方を採用しつつ、100,000文字CHECK制約超過を事前防御
       card_data = (
         CASE 
-          WHEN EXCLUDED.updated_at >= user_vocab_entries.updated_at 
-          THEN user_vocab_entries.card_data || EXCLUDED.card_data 
-          ELSE EXCLUDED.card_data || user_vocab_entries.card_data 
+          WHEN length((
+            CASE 
+              WHEN (
+                EXCLUDED.updated_at > user_vocab_entries.updated_at
+                OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+                OR (
+                  EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+                  AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+                  AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+                )
+              )
+              THEN user_vocab_entries.card_data || EXCLUDED.card_data 
+              ELSE EXCLUDED.card_data || user_vocab_entries.card_data 
+            END
+          )::TEXT) > 95000
+          THEN EXCLUDED.card_data
+          ELSE (
+            CASE 
+              WHEN (
+                EXCLUDED.updated_at > user_vocab_entries.updated_at
+                OR (EXCLUDED.updated_at = user_vocab_entries.updated_at AND (EXCLUDED.card_data->>'version')::BIGINT >= COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1))
+                OR (
+                  EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+                  AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+                  AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+                )
+              )
+              THEN user_vocab_entries.card_data || EXCLUDED.card_data 
+              ELSE EXCLUDED.card_data || user_vocab_entries.card_data 
+            END
+          )
         END
       ) || jsonb_strip_nulls(jsonb_build_object(
         'interval', CASE WHEN EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at THEN EXCLUDED.interval ELSE user_vocab_entries.interval END,
@@ -880,7 +1075,11 @@ BEGIN
       server_updated_at = v_server_now
     WHERE EXCLUDED.updated_at >= user_vocab_entries.updated_at
        OR EXCLUDED.review_updated_at >= user_vocab_entries.review_updated_at
-       OR COALESCE(CASE WHEN (EXCLUDED.card_data->>'version') ~ '^[0-9]+$' THEN (EXCLUDED.card_data->>'version')::BIGINT ELSE 1 END, 1) > COALESCE(CASE WHEN (user_vocab_entries.card_data->>'version') ~ '^[0-9]+$' THEN (user_vocab_entries.card_data->>'version')::BIGINT ELSE 1 END, 1)
+       OR (
+         EXCLUDED.updated_at >= (user_vocab_entries.updated_at - 604800000)
+         AND (EXCLUDED.card_data->>'version')::BIGINT > COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1)
+         AND (EXCLUDED.card_data->>'version')::BIGINT <= (COALESCE(NULLIF(user_vocab_entries.card_data->>'version', '')::BIGINT, 1) + 50)
+       )
     RETURNING 1
   )
   SELECT count(*) INTO v_upserted_count FROM upserted;
@@ -927,6 +1126,8 @@ BEGIN
   DELETE FROM public.user_tombstones WHERE user_id = v_uid;
   DELETE FROM public.user_lang_watermarks WHERE user_id = v_uid;
   DELETE FROM public.user_feedbacks WHERE user_id = v_uid;
+  -- [P1-1 解決] 退会時に FSRS重み・学習ログ同期テーブルも確実に抹消（GDPR対応）
+  DELETE FROM public.user_app_settings WHERE user_id = v_uid;
   DELETE FROM public.profiles WHERE id = v_uid;
 
   -- auth.users からの削除
@@ -993,6 +1194,7 @@ DECLARE
 BEGIN
   IF TG_TABLE_NAME = 'user_tombstones' THEN
     NEW.deleted_at := LEAST(GREATEST(0, NEW.deleted_at), v_max_allowed);
+    NEW.server_updated_at := (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::BIGINT;
   ELSIF TG_TABLE_NAME = 'user_lang_watermarks' THEN
     NEW.cleared_at := LEAST(GREATEST(0, NEW.cleared_at), v_max_allowed);
   END IF;
@@ -1072,6 +1274,10 @@ BEGIN
   DELETE FROM public.user_vocab_entries
   WHERE is_deleted = TRUE
     AND updated_at < v_cutoff_ms;
+
+  -- [P1-2 解決] 期限切れゲストレート制限ログおよび処理済みStripeイベントの定期パージ
+  DELETE FROM public.guest_rate_limits WHERE reset_at < NOW() - INTERVAL '7 days';
+  DELETE FROM public.stripe_events WHERE processed_at < NOW() - INTERVAL '90 days';
 
   RETURN v_deleted_count;
 END;

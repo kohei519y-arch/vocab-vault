@@ -23,13 +23,43 @@ serve(async (req) => {
       return new Response("Missing signature header", { status: 400 });
     }
 
-    // [DoS/OOM 防衛] メモリ枯渇攻撃を防ぐためWebhookペイロード上限（2MB）を解析前に強制
-    const contentLength = req.headers.get("content-length");
-    if (contentLength && parseInt(contentLength, 10) > 2 * 1024 * 1024) {
-      return new Response("Payload too large", { status: 413 });
+    // [DoS/OOM 防衛] Content-Length に依存せず、req.body をストリームで直接読み込み 256KB 超過で即座に中断
+    const MAX_WEBHOOK_BYTES = 256 * 1024;
+    let body = "";
+    if (req.body) {
+      const reader = req.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let totalBytes = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            totalBytes += value.byteLength;
+            if (totalBytes > MAX_WEBHOOK_BYTES) {
+              await reader.cancel("Payload too large");
+              return new Response("Payload too large", { status: 413 });
+            }
+            chunks.push(value);
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      const merged = new Uint8Array(totalBytes);
+      let offset = 0;
+      for (const chunk of chunks) {
+        merged.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      body = new TextDecoder("utf-8").decode(merged);
+    } else {
+      body = await req.text();
+      if (body.length > MAX_WEBHOOK_BYTES) {
+        return new Response("Payload too large", { status: 413 });
+      }
     }
 
-    const body = await req.text();
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: "2023-10-16",
       httpClient: Stripe.createFetchHttpClient(),
@@ -91,6 +121,7 @@ serve(async (req) => {
 
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
+        userId = (subscription.metadata?.supabase_user_id as string) || null;
         customerId = (subscription.customer as string) || null;
         subscriptionId = subscription.id;
         subStatus = subscription.status;
@@ -114,6 +145,7 @@ serve(async (req) => {
 
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
+        userId = (subscription.metadata?.supabase_user_id as string) || null;
         customerId = (subscription.customer as string) || null;
         subscriptionId = subscription.id;
         plan = "free";
@@ -125,12 +157,14 @@ serve(async (req) => {
 
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
+        userId = (invoice.subscription_details?.metadata?.supabase_user_id as string) || (invoice.metadata?.supabase_user_id as string) || null;
         customerId = (invoice.customer as string) || null;
         subscriptionId = (invoice.subscription as string) || null;
         subStatus = "past_due";
         plan = "pro";
-        // 支払い失敗時は 3 日間の猶予期間を付与
-        gracePeriodUntilIso = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+        // 支払い失敗時は請求書作成日時（初回失敗日）を基準として3日間の猶予期間を算定（再試行による延長を防止）
+        const firstFailedTs = invoice.created ? (invoice.created * 1000) : Date.now();
+        gracePeriodUntilIso = new Date(firstFailedTs + 3 * 24 * 60 * 60 * 1000).toISOString();
         if (invoice.lines?.data?.[0]?.period?.end) {
           periodEndIso = new Date(invoice.lines.data[0].period.end * 1000).toISOString();
         }
@@ -139,6 +173,7 @@ serve(async (req) => {
 
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
+        userId = (invoice.subscription_details?.metadata?.supabase_user_id as string) || (invoice.metadata?.supabase_user_id as string) || null;
         customerId = (invoice.customer as string) || null;
         subscriptionId = (invoice.subscription as string) || null;
         subStatus = "active";
@@ -153,6 +188,7 @@ serve(async (req) => {
       case "invoice.payment_action_required": {
         // 3Dセキュア等の追加カード認証が必要な場合: 猶予期間を付与して一時的にPro維持
         const invoice = event.data.object as Stripe.Invoice;
+        userId = (invoice.subscription_details?.metadata?.supabase_user_id as string) || (invoice.metadata?.supabase_user_id as string) || null;
         customerId = (invoice.customer as string) || null;
         subscriptionId = (invoice.subscription as string) || null;
         subStatus = "past_due";
@@ -164,6 +200,7 @@ serve(async (req) => {
       case "customer.subscription.trial_will_end": {
         // トライアル終了前の通知受領（状態はactiveを維持し、解約予約フラグや期間終了を正確に反映）
         const subscription = event.data.object as Stripe.Subscription;
+        userId = (subscription.metadata?.supabase_user_id as string) || null;
         customerId = (subscription.customer as string) || null;
         subscriptionId = subscription.id;
         subStatus = subscription.status || "trialing";
@@ -179,15 +216,25 @@ serve(async (req) => {
         // チャージバック発生時: 調査のため即時警告ログと無料プラン差し戻し
         const dispute = event.data.object as Stripe.Dispute;
         customerId = (dispute as any).customer || null;
-        if (!customerId && dispute.charge) {
+        if (dispute.charge) {
           try {
             const ch = await stripe.charges.retrieve(dispute.charge as string);
-            customerId = (ch.customer as string) || null;
+            if (!customerId) customerId = (ch.customer as string) || null;
+            if (!userId) userId = (ch.metadata?.supabase_user_id as string) || null;
           } catch (e: any) {
             console.warn(`[Stripe Dispute] Could not retrieve charge ${dispute.charge}:`, e.message);
           }
         }
-        console.warn(`[Stripe CRITICAL] Charge dispute created: ${dispute.id} for customer ${customerId}`);
+        if (!customerId && (dispute as any).payment_intent) {
+          try {
+            const pi = await stripe.paymentIntents.retrieve((dispute as any).payment_intent as string);
+            if (!customerId) customerId = (pi.customer as string) || null;
+            if (!userId) userId = (pi.metadata?.supabase_user_id as string) || null;
+          } catch (e: any) {
+            console.warn(`[Stripe Dispute] Could not retrieve payment_intent:`, e.message);
+          }
+        }
+        console.warn(`[Stripe CRITICAL] Charge dispute created: ${dispute.id} for customer ${customerId}, user ${userId}`);
         subStatus = "unpaid";
         plan = "free";
         break;
@@ -199,6 +246,29 @@ serve(async (req) => {
           headers: { "Content-Type": "application/json" },
           status: 200,
         });
+    }
+
+    // サブスクリプション変更系イベントで、同一秒着信や前後関係が不明瞭な場合に備えStripe最新状態を直接再照会
+    if (subscriptionId && ["customer.subscription.updated", "invoice.payment_failed"].includes(event.type)) {
+      try {
+        const liveSub = await stripe.subscriptions.retrieve(subscriptionId);
+        if (liveSub && liveSub.status) {
+          subStatus = liveSub.status;
+          cancelAtPeriodEnd = Boolean(liveSub.cancel_at_period_end);
+          if (liveSub.current_period_end) {
+            periodEndIso = new Date(liveSub.current_period_end * 1000).toISOString();
+          }
+          if (liveSub.status === "active" || liveSub.status === "trialing") {
+            plan = "pro";
+          } else if (liveSub.status === "past_due") {
+            plan = "pro";
+          } else {
+            plan = "free";
+          }
+        }
+      } catch (e: any) {
+        console.warn(`[Stripe Sync] Failed to retrieve latest subscription ${subscriptionId}:`, e.message);
+      }
     }
 
     // [P0-3 解決] 単一トランザクション内で stripe_events 記録 ＆ 順序逆転ガード ＆ profiles 更新を実行

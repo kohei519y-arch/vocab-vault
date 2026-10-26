@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/yamadashy/repomix/main/repomix.schema.json",
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "parsableStyle": true,
+    "fileSummary": true,
+    "directoryStructure": true,
+    "removeComments": false,
+    "removeEmptyLines": true,
+    "showLineNumbers": true,
+    "topFilesLength": 10
+  },
+  "include": [
+    "js/**",
+    "css/**",
+    "supabase/**",
+    "scripts/**",
+    "index.html",
+    "dev.html",
+    "sw.js",
+    "package.json"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "vocab-vault-web/**",
+      "Vocab Vault.app/**",
+      "*.zip",
+      "*.txt",
+      "*.json",
+      "ai_audit_prompts/**",
+      "gemini_audit_core_slim.md"
+    ]
+  }
+}

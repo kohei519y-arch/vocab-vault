@@ -1,4 +1,4 @@
-# VocabVault 🏛️
+# VocabVault 
 ### Interactive Proto-Indo-European (PIE) Etymology & Adaptive Spaced-Repetition Engine
 
 [![Deploy to GitHub Pages](https://github.com/kohei519y-arch/vocab-vault/actions/workflows/deploy.yml/badge.svg)](https://github.com/kohei519y-arch/vocab-vault/actions/workflows/deploy.yml)
@@ -9,34 +9,34 @@
 > **Stop atomized rote memorization.**  
 > Master English vocabulary through its deep Proto-Indo-European root lineages, visualized in real-time physics spring networks and reinforced with mathematically optimal spaced repetition.
 
-🌐 **Live Web Application**: [https://kohei519y-arch.github.io/vocab-vault/](https://kohei519y-arch.github.io/vocab-vault/)  
+ **Live Web Application**: [https://kohei519y-arch.github.io/vocab-vault/](https://kohei519y-arch.github.io/vocab-vault/)  
 *(Zero sign-up required. 100% Client-Side & Local-First)*
 
 ---
 
-## ⚡ Real-Time Etymology Spring Simulation
+##  Real-Time Etymology Spring Simulation
 
 ![VocabVault Etymology Root Graph Demo](assets/demo-root-graph.gif)
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
-- 🧬 **Interactive PIE Root Network**:
+-  **Interactive PIE Root Network**:
   Visualizes ancient Proto-Indo-European root lineages (`*bʰer-`, `*kred-dʰē-`, `*sta-`) and how modern English words branched out. Powered by a high-performance 2D Canvas spring-embedder simulation with viewport culling.
-- 🧠 **Next-Gen Adaptive Spaced Repetition (FSRS-4.5 & Cognitive PIE-Anchor Engine)**:
+-  **Next-Gen Adaptive Spaced Repetition (FSRS-4.5 & Cognitive PIE-Anchor Engine)**:
   True DSR (Difficulty, Stability, Retrievability) mathematical model mathematically integrated with Proto-Indo-European semantic graph centrality. Flattens forgetting curves through deep root lineages.
-- 📷 **Instant Camera OCR Vocabulary Capture**:
+-  **Instant Camera OCR Vocabulary Capture**:
   Point your camera or upload book snapshots. Real-time client-side OCR (Tesseract.js) extracts terms directly into your flashcards.
-- 🔁 **Bi-directional Knowledge Sync**:
+-  **Bi-directional Knowledge Sync**:
   - **Anki (.tsv)**: 1-click export formatted with cloze, root tags, and pronunciation.
   - **Obsidian (Markdown)**: Generates bidirectional `[[wikilinks]]` to map into your PKM second brain.
-- 🛡️ **Zero-Build, Pure Local-First Architecture**:
+-  **Zero-Build, Pure Local-First Architecture**:
   Written in vanilla ES6+ with IndexedDB as Single Source of Truth (SSOT). Fully operational offline via Service Worker (PWA).
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### 1. Web (No Install Needed)
 Open [https://kohei519y-arch.github.io/vocab-vault/](https://kohei519y-arch.github.io/vocab-vault/) in any modern browser (desktop or mobile).
@@ -54,7 +54,7 @@ Open `http://localhost:8000` in your browser. No `npm install`, no bundler build
 
 ---
 
-## 🛠️ Architecture
+##  Architecture
 
 ```
 vocab-vault/
@@ -80,5 +80,5 @@ vocab-vault/
 
 ---
 
-## 📄 License
+##  License
 MIT © 2026 VocabVault Contributors

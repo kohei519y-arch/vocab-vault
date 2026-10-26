@@ -63,7 +63,8 @@
     const lines = ['#separator:tab', '#html:true', '#tags column:3', '#columns:Front\tBack\tTags', ...list.map(i => {
       const { meanings, histDigest, compactEty } = formatMeaningAndEty(i);
       const m = meanings.map((x, idx) => `<b>${cl(x.pos)}</b> <span style="color:#d13438;font-weight:bold">${cl(x.text)}${idx === meanings.length - 1 && histDigest ? cl(histDigest) : ''}</span>`).join(' / ');
-      const ex = i.example ? `<br><br>${cl(i.example.foreign)}<br><small>${clAllowBold(i.example.ja)}</small>` : '';
+      const exTrans = i.example?.trans || i.example?.[lang === 'ja' ? 'en' : 'ja'] || i.example?.ja || '';
+      const ex = i.example ? `<br><br>${cl(i.example.foreign)}<br><small>${clAllowBold(exTrans)}</small>` : '';
       const gram = i.grammar_forms ? ` <small>[${cl(i.grammar_forms)}]</small>` : '';
       const tags = [i.lang || lang, i.category, i.folder].filter(Boolean).map(sanitizeTag).join(' ');
       return `<b>${cl(i.word)}</b> ${esc(fmtPho(i.phonetic))}${gram}\t${m}${ex}${compactEty ? `<br><small>${cl(compactEty)}</small>` : ''}\t${tags}`;
@@ -106,8 +107,9 @@
 
       const mLines = meanings.map(m => `- **[${m.pos}]** ${m.text}`).join('\n');
       const histLine = item.history_note ? `\n> [!NOTE] 歴史的・制度的文脈\n> ${item.history_note}\n` : '';
-      const exLine = item.example && (item.example.foreign || item.example.ja)
-        ? `\n### 例文\n> ${item.example.foreign || ''}\n> *${item.example.ja || ''}*\n`
+      const exTrans = item.example?.trans || item.example?.[lang === 'ja' ? 'en' : 'ja'] || item.example?.ja || '';
+      const exLine = item.example && (item.example.foreign || exTrans)
+        ? `\n### 例文\n> ${item.example.foreign || ''}\n> *${exTrans}*\n`
         : '';
       const coreLine = item.core ? `\n> **コア概念**: ${item.core}\n` : '';
       const etyLine = compactEty ? `\n### 語源・概念史\n${compactEty}\n` : '';
@@ -173,7 +175,8 @@
 
           if (key.startsWith('distinction_entries')) {
             storageKey = key;
-            l = global.VocabStorage ? global.VocabStorage.keyToLang(key) : 'en';
+            const pairCfg = global.VocabStorage?.keyToPair ? global.VocabStorage.keyToPair(key) : null;
+            l = pairCfg?.srcLang || (global.VocabStorage ? global.VocabStorage.keyToLang(key) : 'en');
           } else if (langs[key]) {
             storageKey = langs[key].key;
             l = key;
@@ -759,7 +762,8 @@
     const tsvLines = ['#separator:tab', '#html:true', '#tags column:3', '#columns:Front\tBack\tTags', ...list.map(i => {
       const { meanings, histDigest, compactEty } = formatMeaningAndEty(i);
       const m = meanings.map((x, idx) => `<b>${cl(x.pos)}</b> <span style="color:#d13438;font-weight:bold">${cl(x.text)}${idx === meanings.length - 1 && histDigest ? cl(histDigest) : ''}</span>`).join(' / ');
-      const ex = i.example ? `<br><br>${cl(i.example.foreign)}<br><small>${clAllowBold(i.example.ja)}</small>` : '';
+      const exTrans = i.example?.trans || i.example?.[lang === 'ja' ? 'en' : 'ja'] || i.example?.ja || '';
+      const ex = i.example ? `<br><br>${cl(i.example.foreign)}<br><small>${clAllowBold(exTrans)}</small>` : '';
       const gram = i.grammar_forms ? ` <small>[${cl(i.grammar_forms)}]</small>` : '';
       const tags = [i.lang || lang, i.category, i.folder].filter(Boolean).map(sanitizeTag).join(' ');
       return `<b>${cl(i.word)}</b> ${esc(fmtPho(i.phonetic))}${gram}\t${m}${ex}${compactEty ? `<br><small>${cl(compactEty)}</small>` : ''}\t${tags}`;
@@ -776,6 +780,62 @@
     const fileName = `anki_deck_${lang}.apkg`;
     dlBlob([zipBytes], 'application/zip', fileName);
     return fileName;
+  }
+
+  /**
+   * ZIPエントリのDeflate解凍ヘルパー（DecompressionStream活用）
+   */
+  async function decompressZipEntry(entry) {
+    if (!entry || !entry.data) return new Uint8Array(0);
+    if (entry.method === 0 || !entry.method) return entry.data;
+    if (entry.method === 8 && typeof DecompressionStream !== 'undefined') {
+      try {
+        const ds = new DecompressionStream('deflate-raw');
+        const writer = ds.writable.getWriter();
+        writer.write(entry.data);
+        writer.close();
+        const reader = ds.readable.getReader();
+        const chunks = [];
+        let total = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          total += value.length;
+        }
+        const out = new Uint8Array(total);
+        let offset = 0;
+        for (const c of chunks) {
+          out.set(c, offset);
+          offset += c.length;
+        }
+        return out;
+      } catch {
+        try {
+          const ds = new DecompressionStream('deflate');
+          const writer = ds.writable.getWriter();
+          writer.write(entry.data);
+          writer.close();
+          const reader = ds.readable.getReader();
+          const chunks = [];
+          let total = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            total += value.length;
+          }
+          const out = new Uint8Array(total);
+          let offset = 0;
+          for (const c of chunks) {
+            out.set(c, offset);
+            offset += c.length;
+          }
+          return out;
+        } catch {}
+      }
+    }
+    return entry.data;
   }
 
   /**
@@ -796,22 +856,26 @@
       // a) cards.tsv または .tsv / .txt ファイルの探索
       const textFile = extracted.find(f => f.name.endsWith('.tsv') || f.name.endsWith('.txt') || f.name === 'cards.tsv');
       if (textFile) {
-        const text = decodeUtf8(textFile.data);
+        const rawBytes = await decompressZipEntry(textFile);
+        const text = decodeUtf8(rawBytes);
         return importAnkiText(text, ctx);
       }
 
       // b) collection.anki2 (SQLite) からのノート文字列抽出
       const ankiDb = extracted.find(f => f.name === 'collection.anki2' || f.name === 'collection.anki21');
       if (ankiDb) {
-        const dbText = decodeUtf8(ankiDb.data);
+        const rawBytes = await decompressZipEntry(ankiDb);
+        const dbText = decodeUtf8(rawBytes);
         // SQLite 内の flds (0x1f 区切りのフィールド) を走査
         const rawChunks = dbText.split(/\x1f/);
         const pairs = [];
         for (let i = 0; i < rawChunks.length - 1; i += 2) {
-          const front = rawChunks[i].replace(/[\x00-\x1e]/g, '').trim();
-          const back = rawChunks[i + 1].replace(/[\x00-\x1e]/g, '').trim();
-          // 単語らしき文字列（300文字以内、英数字または日本語）を抽出
-          if (front && front.length <= 150 && back && back.length <= 2000) {
+          const front = rawChunks[i].replace(/[\x00-\x1e\x7f-\x9f]/g, '').trim();
+          const back = rawChunks[i + 1].replace(/[\x00-\x1e\x7f-\x9f]/g, '').trim();
+          // SQLスキーマ断片やバイナリヘッダの混入を除外
+          if (/^(CREATE\s+TABLE|INSERT\s+INTO|CREATE\s+INDEX|sqlite_)/i.test(front)) continue;
+          // 単語らしき文字列（1〜150文字、改行なし）を抽出
+          if (front && front.length <= 150 && !front.includes('\n') && back && back.length <= 2000) {
             pairs.push(`${front}\t${back}`);
           }
         }
@@ -854,8 +918,9 @@
 
     const mLines = meanings.map(m => `- **[${m.pos}]** ${m.text}`).join('\n');
     const histLine = item.history_note ? `\n> [!NOTE] 歴史的・制度的文脈\n> ${item.history_note}\n` : '';
-    const exLine = item.example && (item.example.foreign || item.example.ja)
-      ? `\n### 例文\n> ${item.example.foreign || ''}\n> *${item.example.ja || ''}*\n`
+    const exTrans = item.example?.trans || item.example?.[lang === 'ja' ? 'en' : 'ja'] || item.example?.ja || '';
+    const exLine = item.example && (item.example.foreign || exTrans)
+      ? `\n### 例文\n> ${item.example.foreign || ''}\n> *${exTrans}*\n`
       : '';
     const coreLine = item.core ? `\n> **コア概念**: ${item.core}\n` : '';
     const etyLine = compactEty ? `\n### 語源・概念史\n${compactEty}\n` : '';

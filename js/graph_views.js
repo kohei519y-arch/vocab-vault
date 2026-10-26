@@ -34,7 +34,22 @@
   const startBranchAnkiReview = () => global.VocabGraph?.startBranchAnkiReview?.();
   const getRootMeaning = (rk, cw) => (global.VocabGraphLayout?.getRootMeaning || global.VocabGraph?.getRootMeaning)?.(rk, cw) || '';
 
-  const esc = s => String(s ?? '').replace(/[&<>]"'/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+
+  /**
+   * HTML属性内のインラインJavaScript引数コンテキスト用エスケープ
+   * バックスラッシュ、シングルクォート、ダブルクォート、改行、HTML特殊文字を完全無害化しDOM XSSを根絶
+   */
+  const escJsAttr = s => String(s ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n');
+
+  const escFn = esc;
   /**
    * 主要語根へ直接飛べるドロップダウンを生成（概念領域オントロジーごとにグループ化）
    */
@@ -54,16 +69,16 @@
       realmGroups[realmKey].push(r);
     });
 
-    let html = '<option value="">全概念領域・全語根: 印欧祖語 (PIE) 大系統樹</option>';
+    let html = '<option value="">全言語族・全概念領域: 世界大語源体系 (Global Phyla)</option>';
     Object.entries(realms).forEach(([rk, rObj]) => {
       const rList = realmGroups[rk] || [];
       if (!rList.length) return;
       rList.sort((a, b) => b.childCount - a.childCount);
-      html += `<optgroup label="[領域] ${rObj.label}">`;
+      html += `<optgroup label="[領域] ${escFn(rObj.label)}">`;
       rList.forEach(r => {
         const m = r.rootMeaning || getRootMeaning(r.label, r.connectedWords);
         const mStr = m ? ` - ${m}` : '';
-        html += `<option value="${r.label}">${r.label}${mStr} (${r.childCount}語)</option>`;
+        html += `<option value="${escFn(r.label)}">${escFn(r.label)}${escFn(mStr)} (${Number(r.childCount) || 0}語)</option>`;
       });
       html += '</optgroup>';
     });
@@ -136,58 +151,110 @@
       const relBranches = branches.filter(b => b.rootLabel === r.label);
       const relWords = (r.connectedWords || []);
 
-      const branchHtml = relBranches.map(b => {
-        const bWords = (b.connectedWords || []);
-        const wordsRows = bWords.map(w => {
-          const item = w.item || {};
-          const meaningText = isMask ? '[ ?????????? ]' : escFn(w.meaning);
-          const maskStyle = isMask ? 'color:var(--m);font-style:italic;background:var(--bg-hov);padding:1px 6px;border-radius:3px' : '';
-          const phonetic = item.phonetic ? `<span style="font-size:10.5px;color:var(--s);font-family:var(--mono);margin-left:4px">${escFn(item.phonetic)}</span>` : '';
-          const core = item.core ? `<span style="font-size:10.5px;color:var(--m);margin-left:8px">コア: ${escFn(item.core)}</span>` : '';
+      const renderWordRow = (w) => {
+        const item = w.item || {};
+        const meaningText = isMask ? '[ 想起テスト: タップで表示 ]' : escFn(w.meaning);
+        const maskStyle = isMask ? 'color:var(--m);font-style:italic;background:var(--bg-hov);padding:1px 6px;border-radius:3px;cursor:pointer' : '';
+        const phonetic = item.phonetic ? `<span style="font-size:10.5px;color:var(--s);font-family:var(--mono);margin-left:4px">${escFn(item.phonetic)}</span>` : '';
+        const core = item.core ? `<span style="font-size:10.5px;color:var(--m);margin-left:8px">コア: ${escFn(item.core)}</span>` : '';
+        const srsIv = (global.VocabSRS?.predictIntervals && item.id)
+          ? global.VocabSRS.predictIntervals(item)
+          : ['1分後', '1日後', '3日後', '7日後'];
+
+        return `
+          <div class="mindmap-word-row">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
+              <span class="pos-lbl">${escFn((w.lang || 'en').toUpperCase())}</span>
+              <strong style="font-size:13.5px;color:var(--t)">${escFn(w.label)}</strong>
+              ${phonetic}
+              <span style="font-size:12px;color:var(--t);${maskStyle}" ${isMask ? `onclick="this.textContent='${escJsAttr(w.meaning)}';this.style.color='var(--t)';this.style.fontStyle='normal';this.style.background='transparent'"` : ''}>${meaningText}</span>
+              ${core}
+            </div>
+            <div style="display:flex;align-items:center;gap:4px">
+              ${isMask ? `
+                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateSpecificWord('${escJsAttr(w.label)}', 0)" style="color:#ef4444;border-color:rgba(239,68,68,0.3);padding:1px 5px;font-size:10px" title="忘却 (${escFn(srsIv[0])})">1:忘<span style="font-size:8.5px;opacity:0.8;margin-left:2px">(${escFn(srsIv[0].replace('後',''))})</span></button>
+                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateSpecificWord('${escJsAttr(w.label)}', 1)" style="color:#f59e0b;border-color:rgba(245,158,11,0.3);padding:1px 5px;font-size:10px" title="困難 (${escFn(srsIv[1])})">2:難<span style="font-size:8.5px;opacity:0.8;margin-left:2px">(${escFn(srsIv[1].replace('後',''))})</span></button>
+                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateSpecificWord('${escJsAttr(w.label)}', 2)" style="color:#10b981;border-color:rgba(16,185,129,0.3);padding:1px 5px;font-size:10px" title="良好 (${escFn(srsIv[2])})">3:良<span style="font-size:8.5px;opacity:0.8;margin-left:2px">(${escFn(srsIv[2].replace('後',''))})</span></button>
+                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateSpecificWord('${escJsAttr(w.label)}', 3)" style="color:#38bdf8;border-color:rgba(56,189,248,0.3);padding:1px 5px;font-size:10px" title="簡単 (${escFn(srsIv[3])})">4:易<span style="font-size:8.5px;opacity:0.8;margin-left:2px">(${escFn(srsIv[3].replace('後',''))})</span></button>
+              ` : ''}
+              <button type="button" class="spk-btn" onclick="VocabGraph.speakNodeWord('${escJsAttr(w.label)}','${escJsAttr(w.lang || 'en')}')" title="発音を聞く" aria-label="発音">
+                <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+              </button>
+              <button type="button" class="btn-o btn-xs" onclick="VocabGraph.openWordEdit('${escJsAttr(item.id || item.num || w.label)}','${escJsAttr(w.lang || 'en')}')" title="メモ・意味を直接編集">編集</button>
+              <button type="button" class="btn-o btn-xs" onclick="VocabGraph.selectNodeById('${escJsAttr(w.id)}')">詳細</button>
+            </div>
+          </div>
+        `;
+      };
+
+      let branchHtml = '';
+      if (relBranches.length > 0) {
+        branchHtml = relBranches.map(b => {
+          const bWords = (b.connectedWords || []);
+          const wordsRows = bWords.map(w => renderWordRow(w)).join('');
 
           return `
-            <div class="mindmap-word-row">
-              <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1">
-                <span class="pos-lbl">${escFn((w.lang || 'en').toUpperCase())}</span>
-                <strong style="font-size:13.5px;color:var(--t)">${escFn(w.label)}</strong>
-                ${phonetic}
-                <span style="font-size:12px;color:var(--t);${maskStyle}">${meaningText}</span>
-                ${core}
+            <div class="mindmap-branch-wrap">
+              <div class="mindmap-branch-hd">
+                <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#fbbf24"></span>
+                <span>${escFn(b.label)} (${bWords.length}語)</span>
               </div>
-              <div style="display:flex;align-items:center;gap:6px">
-                <button type="button" class="spk-btn" onclick="VocabGraph.speakNodeWord('${escFn(w.label)}','${escFn(w.lang || 'en')}')" title="発音を聞く" aria-label="発音">
-                  <svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
-                </button>
-                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.openWordEdit('${escFn(item.id || item.num || w.label)}','${escFn(w.lang || 'en')}')" title="メモ・意味を直接編集">編集</button>
-                <button type="button" class="btn-o btn-xs" onclick="VocabGraph.jumpToNodeWord('${escFn(w.label)}','${escFn(w.lang || 'en')}')">詳細</button>
-              </div>
+              <div>${wordsRows || '<div style="color:var(--m);font-size:11px">単語なし</div>'}</div>
             </div>
           `;
         }).join('');
-
-        return `
-          <div class="mindmap-branch-wrap">
-            <div class="mindmap-branch-hd">
-              <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#fbbf24"></span>
-              <span>${escFn(b.label)} (${bWords.length}語)</span>
+      } else {
+        const branchGroups = {};
+        relWords.forEach(w => {
+          const bKey = w.branchLabel || w.item?.branch || (w.item?.etymologyDetails?.prefix ? `${w.item.etymologyDetails.prefix}-` : '') || '基本派生語';
+          if (!branchGroups[bKey]) branchGroups[bKey] = [];
+          branchGroups[bKey].push(w);
+        });
+        const groupKeys = Object.keys(branchGroups);
+        if (groupKeys.length > 1) {
+          branchHtml = groupKeys.map(bk => {
+            const bWords = branchGroups[bk];
+            const wordsRows = bWords.map(w => renderWordRow(w)).join('');
+            return `
+              <div class="mindmap-branch-wrap">
+                <div class="mindmap-branch-hd">
+                  <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#fbbf24"></span>
+                  <span>${escFn(bk)} (${bWords.length}語)</span>
+                </div>
+                <div>${wordsRows}</div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          const wordsRows = relWords.map(w => renderWordRow(w)).join('');
+          branchHtml = `
+            <div class="mindmap-branch-wrap">
+              <div class="mindmap-branch-hd">
+                <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#38bdf8"></span>
+                <span>派生語一覧 (${relWords.length}語)</span>
+              </div>
+              <div>${wordsRows || '<div style="color:var(--m);font-size:11px">単語なし</div>'}</div>
             </div>
-            <div>${wordsRows || '<div style="color:var(--m);font-size:11px">単語なし</div>'}</div>
-          </div>
-        `;
-      }).join('');
+          `;
+        }
+      }
 
-      const isCjkRoot = /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(r.label);
+      const isGlobalRoot = r.id === 'root:global:phyla' || r.id === 'root:east_asian:unified';
+      const isCjkRoot = /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(String(r.label || '')) || Boolean(r.id && r.id.includes('sinospheric'));
+      const isJpRoot = /[\u3040-\u309F]/.test(String(r.label || '')) || Boolean(r.id && r.id.includes('japonic'));
+      const isKoRoot = /[\uAC00-\uD7AF]/.test(String(r.label || '')) || Boolean(r.id && r.id.includes('koreanic'));
+      const rootBadge = isGlobalRoot ? 'GLOBAL PHYLA' : (isCjkRoot ? 'SINO-TIBETAN' : isJpRoot ? 'JAPONIC' : isKoRoot ? 'KOREANIC' : 'PIE ROOT');
       return `
         <div class="mindmap-root-card">
           <div class="mindmap-root-hd">
             <div class="mindmap-root-title">
-              <span class="mindmap-badge">${isCjkRoot ? 'CJK ROOT' : 'PIE ROOT'}</span>
+              <span class="mindmap-badge">${rootBadge}</span>
               <strong style="font-size:15px;color:var(--ac);font-family:var(--mono)">${escFn(r.label)}</strong>
+              ${r.meaning ? `<span style="font-size:13px;color:var(--t);font-weight:600">(${escFn(r.meaning)})</span>` : ''}
               <span style="font-size:12px;color:var(--s)">— 全${relWords.length}語</span>
             </div>
             <div style="display:flex;align-items:center;gap:6px">
-              <button type="button" class="btn-ac btn-xs" onclick="VocabGraph.focusRoot('${escFn(r.label)}'); VocabGraph.startWateringReview()" style="font-weight:700;color:#ffffff !important">この語根を水やり復習</button>
-              <button type="button" class="btn-o btn-xs" onclick="VocabGraph.focusRoot('${escFn(r.label)}'); VocabGraph.switchViewMode('tree')">系統樹ツリーで見る</button>
+              <button type="button" class="btn-ac btn-xs" onclick="VocabGraph.focusRoot('${escJsAttr(r.label)}'); VocabGraph.startWateringReview()" style="font-weight:700;color:#ffffff !important">この語根を水やり復習</button>
             </div>
           </div>
           <div style="padding:6px 0">${branchHtml}</div>
@@ -215,7 +282,24 @@
     if (!wrap) return;
 
     const escFn = global.esc || global.VocabCore?.esc || (s => String(s ?? ''));
-    const prefixes = [
+    const isMask = graphState.treeMaskMode;
+    const curLang = (global.VocabCore?.getActivePairConfig || global.getActivePairConfig)?.()?.srcLang || global.App?.srcLang || global.App?.lang || 'en';
+    const activeLang = graphState.langFilter && graphState.langFilter !== 'all' ? graphState.langFilter : curLang;
+
+    const isCjk = ['zh', 'ko', 'ja'].includes(activeLang);
+    const prefixes = isCjk ? [
+      { key: '不', label: '不- (否定・反対)' },
+      { key: '無', label: '無- (欠如・無し)' },
+      { key: '非', label: '非- (相違・非ず)' },
+      { key: '超', label: '超- (超越・過度)' },
+      { key: '再', label: '再- (反復・再び)' },
+      { key: '総', label: '総- (全体・統括)' },
+      { key: '多', label: '多- (多数・複数)' },
+      { key: '自', label: '自- (自己・自然)' },
+      { key: '相', label: '相- (相互・相手)' },
+      { key: '反', label: '反- (対立・反抗)' },
+      { key: '国', label: '国際- (国家・国際)' }
+    ] : [
       { key: 'con', label: 'con- (共に)' },
       { key: 'sub', label: 'sub- (下に)' },
       { key: 'in', label: 'in- (中に/否定)' },
@@ -229,8 +313,14 @@
       { key: 'dis', label: 'dis- (分離)' }
     ];
 
-    const { nodes } = buildGraphData('', false, 'en');
-    const roots = nodes.filter(n => n.type === 'root').sort((a, b) => b.childCount - a.childCount).slice(0, 16);
+    const { nodes } = buildGraphData(graphState.filterQuery, false, activeLang);
+    let roots = nodes.filter(n => n.type === 'root').sort((a, b) => b.childCount - a.childCount);
+    if (graphState.focusedRootKey) {
+      const focused = roots.filter(r => r.label === graphState.focusedRootKey);
+      if (focused.length) roots = focused;
+    } else {
+      roots = roots.slice(0, 16);
+    }
     const words = nodes.filter(n => n.type === 'word');
 
     const headerThs = prefixes.map(p => `<th class="matrix-th">${escFn(p.label)}</th>`).join('');
@@ -243,6 +333,9 @@
         const matched = rootWords.find(w => {
           const lWord = w.label.toLowerCase();
           const ety = String(w.item?.etymology || '').toLowerCase();
+          if (isCjk) {
+            return lWord.startsWith(p.key) || ety.includes(p.key) || lWord.includes(p.key);
+          }
           return lWord.startsWith(p.key) || ety.includes(`${p.key}-`);
         });
 
@@ -251,18 +344,19 @@
           const rVal = global.VocabSRS?.getRetrievability ? global.VocabSRS.getRetrievability(matched.item, now) : 0.9;
           const bgPill = rVal >= 0.88 ? 'rgba(16, 185, 129, 0.15)' : (rVal >= 0.70 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(251, 113, 133, 0.15)');
           const borderPill = rVal >= 0.88 ? '#10b981' : (rVal >= 0.70 ? '#f59e0b' : '#fb7185');
+          const meaningText = isMask ? '???' : escFn(matched.meaning);
 
           return `
             <td class="matrix-td">
-              <div class="matrix-cell-pill" style="background:${bgPill};border:1px solid ${borderPill}" onclick="VocabGraph.jumpToNodeWord('${escFn(matched.label)}','en')">
+              <div class="matrix-cell-pill" style="background:${bgPill};border:1px solid ${borderPill}" onclick="VocabGraph.jumpToNodeWord('${escJsAttr(matched.label)}','${escJsAttr(matched.lang || activeLang)}')">
                 <strong style="font-size:12px;color:var(--t)">${escFn(matched.label)}</strong>
-                <span style="font-size:10px;color:var(--s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">${escFn(matched.meaning)}</span>
+                <span style="font-size:10px;color:var(--s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px" ${isMask ? `onclick="event.stopPropagation();this.textContent='${escJsAttr(matched.meaning)}'"` : ''}>${meaningText}</span>
               </div>
             </td>
           `;
         } else {
           return `
-            <td class="matrix-td empty-slot" onclick="VocabGraph.promptMatrixGen('${escFn(p.key)}','${escFn(r.label)}')" title="${escFn(p.label)} + ${escFn(r.label)} をAIで発掘">
+            <td class="matrix-td empty-slot" onclick="VocabGraph.promptMatrixGen('${escJsAttr(p.key)}','${escJsAttr(r.label)}')" title="${escFn(p.label)} + ${escFn(r.label)} をAIで発掘">
               <span style="font-size:10px;color:var(--m);font-family:var(--mono)">[+ 発掘]</span>
             </td>
           `;
@@ -319,15 +413,32 @@
       'con:*kap-': 'conceive',
       'per:*kap-': 'perceive',
       'de:*kap-': 'deceive',
-      're:*kap-': 'receive'
+      're:*kap-': 'receive',
+      '不:*安': '不安',
+      '不:*正': '不正',
+      '不:*信': '不信',
+      '無:*期': '無期',
+      '無:*力': '無力',
+      '非:*常': '非常',
+      '超:*音': '超音',
+      '再:*考': '再考',
+      '再:*生': '再生',
+      '総:*力': '総力',
+      '自:*由': '自由',
+      '相:*対': '相対',
+      '反:*対': '反対'
     };
 
-    const targetWord = prefixCandidateMap[`${prefix}:${rootKey}`];
+    let targetWord = prefixCandidateMap[`${prefix}:${rootKey}`];
+    if (!targetWord && /^[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(prefix)) {
+      const cjkRoot = rootKey.replace(/^\*/, '').replace(/-$/, '').trim();
+      if (/^[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(cjkRoot)) {
+        targetWord = `${prefix}${cjkRoot}`;
+      }
+    }
     if (targetWord && typeof regFn === 'function') {
       regFn([{ word: targetWord }], '', true, true);
       if (typeof toastFn === 'function') toastFn(`接頭辞パズルから単語「${targetWord}」をAI生成キューに追加しました！`, 'ok', 4000);
-      const toggleModalFn = global.toggleModal || global.VocabCore?.toggleModal;
-      if (typeof toggleModalFn === 'function') toggleModalFn('graphModal', false);
     } else {
       const toggleModalFn = global.toggleModal || global.VocabCore?.toggleModal;
       if (typeof toggleModalFn === 'function') toggleModalFn('graphModal', false);
@@ -342,6 +453,15 @@
 
 
   function exportGraphImage() {
+    const canvasWrap = document.getElementById('graphCanvasWrap');
+    if (canvasWrap && canvasWrap.style.display === 'none') {
+      const toastFn = global.showToast || global.VocabCore?.showToast;
+      if (typeof toastFn === 'function') {
+        toastFn('マインドマップ・表形式の出力には「A4印刷」機能をご利用いただけます。印刷ダイアログを開きます。', 'info', 3000);
+      }
+      window.print();
+      return;
+    }
     const canvas = graphState.canvas;
     if (!canvas) return;
     try {
@@ -482,6 +602,45 @@
   }
 
   /**
+   * 接頭辞・派生語の弁別対照マトリクス (干渉抑制・認知過負荷防止)
+   */
+  function renderPrefixContrastHtml(primaryRoot, currentWord) {
+    if (!primaryRoot || !graphState.nodes) return '';
+    const cleanK = cleanRootKey(primaryRoot);
+    const rootNode = graphState.nodes.find(n => n.type === 'root' && (n.label === primaryRoot || cleanRootKey(n.label) === cleanK));
+    if (!rootNode || !rootNode.connectedWords || rootNode.connectedWords.length < 2) return '';
+
+    const escFn = global.esc || global.VocabCore?.esc || (s => String(s ?? ''));
+    const words = rootNode.connectedWords.slice(0, 10);
+    const rows = words.map(w => {
+      const isCur = w.label.toLowerCase() === currentWord.label.toLowerCase();
+      const bInfo = w.branchLabel || Layout().extractBranchInfo?.(w.item, primaryRoot, w.lang) || '';
+      const cleanB = bInfo.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric|Koreanic|Japonic):\s*/i, '');
+      const m = w.meaning || w.item?.meanings?.[0]?.text || '';
+      const core = w.item?.core || '';
+
+      return `
+        <div style="display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;background:${isCur ? 'var(--ac-bg)' : 'transparent'};border:${isCur ? '1px solid var(--ac)' : '1px solid transparent'};margin-bottom:2px">
+          <span style="font-size:10px;font-family:var(--mono);color:var(--ac);padding:1px 5px;background:var(--bg-hov);border-radius:3px;min-width:65px;text-align:center">${escFn(cleanB.slice(0, 15))}</span>
+          <button type="button" class="btn-link" onclick="VocabGraph.jumpToNode('${escJsAttr(w.label)}')" style="font-size:11.5px;font-weight:${isCur ? '800' : '600'};color:${isCur ? 'var(--ac)' : 'var(--t)'};min-width:65px;background:none;border:none;padding:0;cursor:pointer;text-align:left">${escFn(w.label)}</button>
+          <span style="font-size:11px;color:var(--s);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escFn(m)}</span>
+          ${core ? `<span style="font-size:9.5px;color:var(--m);padding:1px 4px;border-radius:2px;background:var(--bg-card)">${escFn(core)}</span>` : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="margin-top:10px;padding:8px 10px;background:var(--bg-card);border-radius:6px;border:1px solid var(--b)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:10px;font-weight:700;color:var(--m)">接頭辞・派生語の弁別対照 (干渉抑制マトリクス):</span>
+          <span style="font-size:9.5px;color:var(--ac);font-family:var(--mono)">${escFn(primaryRoot)}</span>
+        </div>
+        <div style="display:flex;flex-direction:column">${rows}</div>
+      </div>
+    `;
+  }
+
+  /**
    * 語根・古典分岐・つぼみ・単語詳細インスペクター (Drawer) の描画
    */
   function renderDetailDrawer(node) {
@@ -501,14 +660,40 @@
     drawer.style.display = 'flex';
 
     if (node.type === 'root') {
-      const isCjkRoot = /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(node.label);
-      badge.textContent = isCjkRoot
-        ? '東アジア漢字字源 (CJK Root)'
-        : (node.isEikenRoot ? '印欧祖語 (PIE Root) ・ 重要語根' : '印欧祖語 (PIE Root)');
-      badge.style.background = isCjkRoot
-        ? 'rgba(244, 63, 94, 0.15)'
-        : (node.isEikenRoot ? 'rgba(234, 88, 12, 0.15)' : 'rgba(124, 58, 237, 0.15)');
-      badge.style.color = isCjkRoot ? '#fb7185' : (node.isEikenRoot ? '#ea580c' : '#a78bfa');
+      const isGlobalRoot = node.id === 'root:global:phyla' || node.id === 'root:east_asian:unified';
+      const isCjkRoot = /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(String(node.label || '')) || Boolean(node.id && node.id.includes('sinospheric'));
+      const isJpRoot = /[\u3040-\u309F]/.test(String(node.label || '')) || Boolean(node.id && node.id.includes('japonic'));
+      const isKoRoot = /[\uAC00-\uD7AF]/.test(String(node.label || '')) || Boolean(node.id && node.id.includes('koreanic'));
+
+      let badgeText = '印欧祖語 (PIE Root)';
+      let badgeBg = 'rgba(124, 58, 237, 0.15)';
+      let badgeCol = '#a78bfa';
+
+      if (isGlobalRoot) {
+        badgeText = '世界諸語・大語族体系 (Global Phyla)';
+        badgeBg = 'rgba(56, 189, 248, 0.15)';
+        badgeCol = '#38bdf8';
+      } else if (isCjkRoot) {
+        badgeText = 'シノ・チベット語族 (Sino-Tibetan / 漢語字源)';
+        badgeBg = 'rgba(244, 63, 94, 0.15)';
+        badgeCol = '#fb7185';
+      } else if (isJpRoot) {
+        badgeText = '日本語族 (Japonic / 和語・和製漢語)';
+        badgeBg = 'rgba(234, 179, 8, 0.15)';
+        badgeCol = '#facc15';
+      } else if (isKoRoot) {
+        badgeText = '朝鮮語族 (Koreanic / 固有語・漢字音)';
+        badgeBg = 'rgba(251, 146, 60, 0.15)';
+        badgeCol = '#fb923c';
+      } else if (node.isEikenRoot) {
+        badgeText = '印欧祖語 (PIE Root) ・ 重要語根';
+        badgeBg = 'rgba(234, 88, 12, 0.15)';
+        badgeCol = '#ea580c';
+      }
+
+      badge.textContent = badgeText;
+      badge.style.background = badgeBg;
+      badge.style.color = badgeCol;
       title.textContent = node.label;
 
       const eStat = node.eikenStats || (global.VocabEikenCatalog ? global.VocabEikenCatalog.calcProgress(getEnglishPairKeyAndEntries().entries).find(s => cleanRootKey(s.rootKey) === cleanRootKey(node.label)) : null);
@@ -556,7 +741,7 @@
         const statusTxt = isDue ? '復習期日' : isMastered ? '定着済' : '学習中';
 
         return `
-          <div class="graph-peer-item" onclick="VocabGraph.selectNodeById('${escFn(w.id)}')">
+          <div class="graph-peer-item" onclick="VocabGraph.selectNodeById('${escJsAttr(w.id)}')">
             <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
               <span style="font-size:9.5px;padding:1px 4px;border-radius:3px;background:var(--bg-hov);font-family:var(--mono);font-weight:700">${escFn((w.lang || 'en').toUpperCase())}</span>
               <strong style="color:var(--t)">${escFn(w.label)}</strong>
@@ -592,7 +777,9 @@
         </button>
       ` : '';
 
-      footer.innerHTML = `
+        const isRootCollapsed = graphState.collapsedRoots && graphState.collapsedRoots.has(cleanRootKey(node.label));
+        const collapseBtnText = isRootCollapsed ? '子単語を展開' : '子単語を折りたたむ';
+        footer.innerHTML = `
         ${unlockBranchBtn}
         ${node.childCount > 0 ? `
           <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.startRootAnkiReview()" style="font-weight:700;display:flex;align-items:center;justify-content:center;gap:5px">
@@ -600,7 +787,8 @@
           </button>
         ` : ''}
         <div style="display:flex;gap:6px">
-          <button type="button" class="btn-o btn-xs" onclick="VocabGraph.filterMainListByRoot('${escFn(node.label)}')" style="flex:1">リストで絞り込み</button>
+          <button type="button" class="btn-o btn-xs" onclick="VocabGraph.toggleRootCollapse('${escJsAttr(node.label)}')" style="flex:1">${collapseBtnText}</button>
+          <button type="button" class="btn-o btn-xs" onclick="VocabGraph.filterMainListByRoot('${escJsAttr(node.label)}')" style="flex:1">リストで絞り込み</button>
           <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomToCluster(VocabGraph.graphState.selectedNode)" style="flex:1">クラスタにズーム</button>
         </div>
       `;
@@ -613,7 +801,7 @@
 
       const leafWords = (node.connectedWords || []);
       const wordsListHtml = leafWords.map(w => `
-        <div class="graph-peer-item" onclick="VocabGraph.selectNodeById('${escFn(w.id)}')">
+        <div class="graph-peer-item" onclick="VocabGraph.selectNodeById('${escJsAttr(w.id)}')">
           <div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1">
             <span style="font-size:9.5px;padding:1px 4px;border-radius:3px;background:var(--bg-hov);font-family:var(--mono);font-weight:700">${escFn((w.lang || 'en').toUpperCase())}</span>
             <strong style="color:var(--t)">${escFn(w.label)}</strong>
@@ -680,13 +868,13 @@
             <div style="padding:8px 10px;background:var(--bg-card);border-radius:6px;border:1px solid var(--b)">
               <span style="font-size:10px;color:var(--m);font-weight:700">例文:</span>
               <div style="font-size:12px;color:var(--t);margin-top:2px;line-height:1.4">${escFn(eData.example.foreign)}</div>
-              <div style="font-size:11px;color:var(--s);margin-top:2px">${escFn(eData.example.ja)}</div>
+              <div style="font-size:11px;color:var(--s);margin-top:2px">${escFn(eData.example.trans || eData.example.ja || '')}</div>
             </div>
           ` : ''}
         `;
 
         footer.innerHTML = `
-          <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.adoptGhostBud('${escFn(node.label)}','${escFn(node.rootLabel)}')" style="font-weight:700;width:100%;padding:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#ea580c,#f59e0b);border:none;box-shadow:0 4px 14px rgba(234,88,12,0.35);color:#fff;border-radius:6px;cursor:pointer">
+          <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.adoptGhostBud('${escJsAttr(node.label)}','${escJsAttr(node.rootLabel)}')" style="font-weight:700;width:100%;padding:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#ea580c,#f59e0b);border:none;box-shadow:0 4px 14px rgba(234,88,12,0.35);color:#fff;border-radius:6px;cursor:pointer">
             <span>スキルを習得する (+1語・単語帳に追加)</span>
           </button>
         `;
@@ -704,7 +892,7 @@
         `;
 
         footer.innerHTML = `
-          <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.adoptGhostBud('${escFn(node.label)}','${escFn(node.rootLabel)}')" style="font-weight:700;width:100%;padding:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#7c3aed,#2563eb);border:none;color:#fff;border-radius:6px;cursor:pointer">
+          <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.adoptGhostBud('${escJsAttr(node.label)}','${escJsAttr(node.rootLabel)}')" style="font-weight:700;width:100%;padding:10px;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px;background:linear-gradient(135deg,#7c3aed,#2563eb);border:none;color:#fff;border-radius:6px;cursor:pointer">
             <span>この単語をAI生成して系統樹を育てる</span>
           </button>
         `;
@@ -724,18 +912,22 @@
       `;
 
       footer.innerHTML = `
-        <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.jumpToNodeWord('${escFn(node.parentWord)}','en')">
+        <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.jumpToNodeWord('${escJsAttr(node.parentWord)}','en')">
           親単語カードを表示
         </button>
       `;
     } else {
       // 単語ノード (Leaf)
-      badge.textContent = `${(node.lang || 'en').toUpperCase()} 単語`;
-      badge.style.background = 'rgba(37, 99, 235, 0.15)';
-      badge.style.color = '#38bdf8';
+      const item = node.item || {};
+      const nodeLang = (node.lang || item.lang || 'en').toLowerCase();
+      const wordFamily = Layout().detectWordFamily ? Layout().detectWordFamily(item, nodeLang) : 'germanic';
+      const famMeta = (Layout().ETYMOLOGY_FAMILIES && Layout().ETYMOLOGY_FAMILIES[wordFamily]) || { label: '印欧語族', shortLabel: '印欧', color: '#38bdf8' };
+
+      badge.textContent = `${nodeLang.toUpperCase()} 単語 • ${famMeta.shortLabel || famMeta.label}`;
+      badge.style.background = `${famMeta.color || '#38bdf8'}22`;
+      badge.style.color = famMeta.color || '#38bdf8';
       title.textContent = node.label;
 
-      const item = node.item || {};
       const core = item.core ? `
         <div style="margin-bottom:8px;padding:8px 10px;background:var(--bg-card);border-radius:6px;border:1px solid var(--b)">
           <span style="font-size:10px;color:var(--m);font-weight:700">コア:</span>
@@ -755,11 +947,127 @@
       ` : '';
 
       const rootsPills = (node.connectedRoots || []).map(r => `
-        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.selectNodeById('${escFn(r.id)}')" style="font-family:var(--mono);border-color:var(--ac);color:var(--ac)">${escFn(r.label)}</button>
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.selectNodeById('${escJsAttr(r.id)}')" style="font-family:var(--mono);border-color:var(--ac);color:var(--ac)">${escFn(r.label)}</button>
       `).join('');
 
       const wMatrix = global.VocabMorphology?.buildCognateMatrix ? global.VocabMorphology.buildCognateMatrix(item, global.App?.rootIndexMap) : null;
       const wMatrixHtml = wMatrix ? (global.VocabMorphology?.renderCognateMatrixHtml ? global.VocabMorphology.renderCognateMatrixHtml(wMatrix) : '') : '';
+
+      // 語源の連鎖 (Lineage Chain Flow)
+      const primaryRoot = (node.connectedRoots?.[0]?.label) || node.rootLabel || '';
+      const primaryBranch = node.branchLabel || '';
+      const lineageFlowHtml = primaryRoot ? `
+        <div style="margin-bottom:10px;padding:8px 10px;background:var(--bg-card);border-radius:6px;border:1px solid var(--b)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:10px;color:var(--m);font-weight:700">語源の系統進化 (Lineage Flow):</span>
+            <span style="font-size:9.5px;padding:1px 5px;border-radius:3px;background:${famMeta.color}18;color:${famMeta.color};font-weight:700">${escFn(famMeta.shortLabel || famMeta.label)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;flex-wrap:wrap">
+            <span style="padding:2px 7px;border-radius:4px;background:rgba(124,58,237,0.15);color:var(--ac);font-weight:700;font-family:var(--mono)">${escFn(primaryRoot)}</span>
+            <span style="color:var(--m)">&rarr;</span>
+            ${primaryBranch ? `<span style="padding:2px 7px;border-radius:4px;background:rgba(245,158,11,0.15);color:#fbbf24;font-weight:600">${escFn(primaryBranch)}</span><span style="color:var(--m)">&rarr;</span>` : ''}
+            <span style="padding:2px 7px;border-radius:4px;background:rgba(56,189,248,0.15);color:#38bdf8;font-weight:700">${escFn(node.label)}</span>
+          </div>
+        </div>
+      ` : '';
+
+      // 同根語リスト (Cognates List)
+      const rootNode = (node.connectedRoots?.[0]) || (primaryRoot ? graphState.nodes?.find(nd => nd.type === 'root' && (nd.label === primaryRoot || cleanRootKey(nd.label) === cleanRootKey(primaryRoot))) : null);
+      const cognates = (rootNode?.connectedWords || []).filter(w => w.label !== node.label);
+      const cognatesHtml = cognates.length ? `
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--b)">
+          <span style="font-size:10px;color:var(--m);font-weight:700;display:block;margin-bottom:5px">同根語 (${cognates.length}語・タップでジャンプ):</span>
+          <div style="display:flex;flex-wrap:wrap;gap:4px">
+            ${cognates.slice(0, 15).map(c => `
+              <button type="button" class="btn-o btn-xs" onclick="VocabGraph.jumpToNode('${escJsAttr(c.label)}')" style="font-size:10.5px;padding:2px 6px" title="${escFn(c.meaning || '')}">
+                <strong>${escFn(c.label)}</strong>
+                <span style="color:var(--m);font-size:9.5px;margin-left:2px">${escFn(c.meaning ? c.meaning.slice(0, 6) : '')}</span>
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      ` : '';
+
+      const isRegisteredInVocab = Boolean(
+        global.App?.vocab?.[node.label] ||
+        (Array.isArray(global.App?.entries) && global.App.entries.some(e => !e?.isDeleted && e.word === node.label))
+      );
+
+      // 10言語同根語対照マトリクス (Cross-Language Philological Alignment Matrix)
+      const cognatesByLang = new Map();
+      const allFamilyWords = [node, ...cognates];
+      allFamilyWords.forEach(w => {
+        const l = (w.lang || 'en').toLowerCase();
+        if (!cognatesByLang.has(l)) cognatesByLang.set(l, []);
+        cognatesByLang.get(l).push(w);
+      });
+
+      let multiLangMatrixHtml = '';
+      if (cognatesByLang.size >= 2) {
+        const langOrder = ['en', 'de', 'nl', 'fr', 'es', 'it', 'pt', 'zh', 'ko', 'ja'];
+        const matrixRows = langOrder
+          .filter(l => cognatesByLang.has(l))
+          .map(l => {
+            const wList = cognatesByLang.get(l) || [];
+            const lCol = global.VocabGraphRenderer?.LANG_GRAPH_COLORS?.[l] || '#38bdf8';
+            return `
+              <div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--b);font-size:11px">
+                <span style="width:24px;font-weight:700;font-size:10px;color:${lCol};text-transform:uppercase">${l}</span>
+                <div style="display:flex;flex-wrap:wrap;gap:4px;flex:1">
+                  ${wList.slice(0, 3).map(cw => `
+                    <button type="button" class="btn-link" onclick="VocabGraph.jumpToNode('${escJsAttr(cw.label)}')" style="font-weight:600;color:var(--t);background:none;border:none;padding:0;cursor:pointer;text-decoration:underline">
+                      ${escFn(cw.label)}
+                    </button>
+                    ${cw.meaning ? `<span style="color:var(--m);font-size:10px">(${escFn(cw.meaning.slice(0, 8))})</span>` : ''}
+                  `).join(' ')}
+                </div>
+              </div>
+            `;
+          }).join('');
+
+        multiLangMatrixHtml = `
+          <div style="margin-top:10px;padding:8px 10px;background:var(--bg-card);border-radius:6px;border:1px solid var(--b)">
+            <span style="font-size:10px;color:var(--m);font-weight:700;display:block;margin-bottom:4px">10言語同根語対照 (Cross-Language Cognates):</span>
+            ${matrixRows}
+          </div>
+        `;
+      }
+
+      const isMaskMode = Boolean(graphState.treeMaskMode);
+      const recallPromptHtml = isMaskMode ? `
+        <div id="graphRecallMaskContainer" style="margin:8px 0;padding:12px;background:var(--bg-card);border:1.5px dashed var(--ac);border-radius:8px;text-align:center">
+          <div style="font-size:10.5px;font-weight:700;color:var(--m);margin-bottom:4px">能動的想起テスト (Active Recall Mode)</div>
+          <div style="font-size:12px;color:var(--s);margin-bottom:8px">この単語の原義コアイメージと現代語義を脳内で想起してください</div>
+          <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.revealRecallAnswer()" style="font-weight:700;width:100%;padding:6px 12px;font-size:12px">
+            意味・語源を表示 (Spaceキー)
+          </button>
+        </div>
+      ` : '';
+
+      const contrastHtml = renderPrefixContrastHtml(primaryRoot, node);
+
+      const srsPredict = (global.VocabSRS?.predictIntervals && item.id)
+        ? global.VocabSRS.predictIntervals(item)
+        : ['1分後', '1日後', '3日後', '7日後'];
+      const lbl0 = escFn(srsPredict[0].replace('後', ''));
+      const lbl1 = escFn(srsPredict[1].replace('後', ''));
+      const lbl2 = escFn(srsPredict[2].replace('後', ''));
+      const lbl3 = escFn(srsPredict[3].replace('後', ''));
+
+      const srsRatingBarHtml = `
+        <div id="graphRecallRatingBar" style="display:${isMaskMode ? 'none' : 'flex'};flex-direction:column;gap:5px;margin-top:10px;padding:8px 10px;background:var(--bg-card);border-radius:6px;border:1px solid var(--b)">
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:10px;font-weight:700;color:var(--m)">
+            <span>想起度評価 (FSRS忘却曲線を更新):</span>
+            <span style="color:var(--ac);font-family:var(--mono)">[キー: 1, 2, 3, 4]</span>
+          </div>
+          <div style="display:flex;gap:4px;width:100%">
+            <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateNodeWord(0)" style="flex:1;background:rgba(239,68,68,0.12);color:#ef4444;border-color:rgba(239,68,68,0.4);font-weight:700;padding:4px 0;text-align:center" title="忘却 (${escFn(srsPredict[0])})">1:忘却<br><span style="font-size:9px">${lbl0}</span></button>
+            <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateNodeWord(1)" style="flex:1;background:rgba(245,158,11,0.12);color:#f59e0b;border-color:rgba(245,158,11,0.4);font-weight:700;padding:4px 0;text-align:center" title="困難 (${escFn(srsPredict[1])})">2:困難<br><span style="font-size:9px">${lbl1}</span></button>
+            <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateNodeWord(2)" style="flex:1;background:rgba(16,185,129,0.12);color:#10b981;border-color:rgba(16,185,129,0.4);font-weight:700;padding:4px 0;text-align:center" title="良好 (${escFn(srsPredict[2])})">3:良好<br><span style="font-size:9px">${lbl2}</span></button>
+            <button type="button" class="btn-o btn-xs" onclick="VocabGraph.rateNodeWord(3)" style="flex:1;background:rgba(56,189,248,0.12);color:#38bdf8;border-color:rgba(56,189,248,0.4);font-weight:700;padding:4px 0;text-align:center" title="簡単 (${escFn(srsPredict[3])})">4:簡単<br><span style="font-size:9px">${lbl3}</span></button>
+          </div>
+        </div>
+      `;
 
       body.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -767,22 +1075,37 @@
             <span style="font-size:16px;font-weight:700;color:var(--t)">${escFn(node.label)}</span>
             <span style="font-size:12px;color:var(--s);font-family:var(--mono);margin-left:6px">${escFn(item.phonetic || '')}</span>
           </div>
-          <button type="button" class="spk-btn" onclick="VocabGraph.speakNodeWord('${escFn(node.label)}','${escFn(node.lang)}')" title="発音を聞く" aria-label="発音"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>
+          <button type="button" class="spk-btn" onclick="VocabGraph.speakNodeWord('${escJsAttr(node.label)}','${escJsAttr(node.lang)}')" title="発音を聞く" aria-label="発音"><svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg></button>
         </div>
-        ${core}
-        <div style="margin-bottom:8px">${meanings}</div>
-        ${wMatrixHtml}
-        ${ety}
-        <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--b)">
-          <span style="font-size:10px;color:var(--m);font-weight:700;display:block;margin-bottom:4px">接続語根:</span>
-          <div style="display:flex;gap:4px;flex-wrap:wrap">${rootsPills || '<span style="color:var(--m)">なし</span>'}</div>
+        ${recallPromptHtml}
+        <div id="graphRecallContent" style="display:${isMaskMode ? 'none' : 'block'}">
+          ${lineageFlowHtml}
+          ${core}
+          <div style="margin-bottom:8px">${meanings}</div>
+          ${contrastHtml}
+          ${wMatrixHtml}
+          ${multiLangMatrixHtml}
+          ${ety}
+          ${cognatesHtml}
         </div>
+        ${srsRatingBarHtml}
       `;
 
       footer.innerHTML = `
-        <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.jumpToNodeWord('${escFn(node.label)}','${escFn(node.lang)}')">
-          単語カードを表示
-        </button>
+        <div style="display:flex;gap:6px;width:100%;flex-wrap:wrap">
+          <button type="button" class="btn-ac btn-sm" onclick="VocabGraph.jumpToNodeWord('${escJsAttr(node.label)}','${escJsAttr(node.lang)}')" style="flex:1">
+            単語カードを表示
+          </button>
+          ${!isRegisteredInVocab ? `
+            <button type="button" class="btn-ac-o btn-sm" onclick="VocabGraph.adoptGhostBud('${escJsAttr(node.label)}','${escJsAttr(primaryRoot)}')" style="flex:1;font-weight:700">
+              単語帳に追加
+            </button>
+          ` : `
+            <button type="button" class="btn-o btn-sm" onclick="VocabGraph.startRootAnkiReview()" style="flex:1">
+              この同根語群を復習
+            </button>
+          `}
+        </div>
       `;
     }
   }
@@ -872,6 +1195,8 @@
     }
     updateGraphDataAndFit();
     drawGraph();
+    if (typeof renderMindmap === 'function') renderMindmap();
+    if (typeof renderMorphologyMatrix === 'function') renderMorphologyMatrix();
   }
 
   /**
@@ -883,7 +1208,7 @@
     const backdrop = document.getElementById('graphEikenBackdrop');
     const btn = document.getElementById('graphEikenExplorerBtn');
 
-    // 閉じる指示（forceState === false）の場合は、ドロワーを閉じるのみでレイアウトモードの移行は行わない
+    // 閉じる指示（forceState === false）の場合は、ドロワーを閉じる
     if (forceState === false) {
       if (drawer) drawer.style.display = 'none';
       if (backdrop) backdrop.style.display = 'none';
@@ -891,40 +1216,6 @@
       return;
     }
 
-    // 系統樹ビューでない場合は、即座に系統樹 & スキルツリーモードへ移行してツリーに内包展開
-    if (graphState.layoutMode !== 'tree' || graphState.activeViewTab !== 'tree') {
-      graphState.layoutMode = 'tree';
-      graphState.activeViewTab = 'tree';
-      graphState.eikenSkillMode = true;
-
-      const treeBtn = document.getElementById('graphTreeModeBtn');
-      if (treeBtn) treeBtn.textContent = 'ネットワーク';
-      const tabTree = document.getElementById('graphTabTree');
-      const tabNet = document.getElementById('graphTabNetwork');
-      if (tabTree && tabNet) {
-        tabTree.classList.add('active');
-        tabNet.classList.remove('active');
-      }
-
-      // 未習得の準1級語根を自動フォーカス
-      if (global.VocabEikenCatalog) {
-        const stats = global.VocabEikenCatalog.calcProgress(getEnglishPairKeyAndEntries().entries);
-        const unmastered = stats.find(s => s.unlearnedCount > 0) || stats[0];
-        if (unmastered) {
-          graphState.focusedRootKey = cleanRootKey(unmastered.rootKey);
-        }
-      }
-
-      if (btn) btn.classList.add('active');
-      updateGraphDataAndFit();
-      const toastFn = global.showToast || global.VocabCore?.showToast;
-      if (typeof toastFn === 'function') {
-        toastFn('語源スキルツリーを展開しました。枝分かれしたノードから語彙スキルを習得できます。', 'ok', 3500);
-      }
-      return;
-    }
-
-    // 既に系統樹モードの場合は、目次ドロワー（全体確認）の開閉をトグル
     if (!drawer) return;
     const isOpen = drawer.style.display !== 'none';
     const next = typeof forceState === 'boolean' ? forceState : !isOpen;
@@ -946,20 +1237,20 @@
     if (!listEl) return;
     const stats = global.VocabEikenCatalog.calcProgress(getEnglishPairKeyAndEntries().entries);
     listEl.innerHTML = stats.map(s => `
-      <div class="eiken-root-card ${graphState.focusedRootKey === s.rootKey ? 'active' : ''}" onclick="VocabGraph.focusRoot('${s.rootKey}');VocabGraph.toggleEikenExplorer(false)">
+      <div class="eiken-root-card ${graphState.focusedRootKey === s.rootKey ? 'active' : ''}" onclick="VocabGraph.focusRoot('${escJsAttr(s.rootKey)}');VocabGraph.toggleEikenExplorer(false)">
         <div class="eiken-root-hd">
           <div style="display:flex;align-items:center;gap:6px">
-            <span class="eiken-root-rank">${s.rank}位</span>
-            <span class="eiken-root-key">${s.label}</span>
-            <span style="font-size:11px;color:var(--s)">（${s.meaning}）</span>
+            <span class="eiken-root-rank">${Number(s.rank) || 0}位</span>
+            <span class="eiken-root-key">${escFn(s.label)}</span>
+            <span style="font-size:11px;color:var(--s)">（${escFn(s.meaning)}）</span>
           </div>
-          <span class="eiken-root-prog-text">${s.learnedCount}/${s.total}語 (${s.percent}%)</span>
+          <span class="eiken-root-prog-text">${Number(s.learnedCount) || 0}/${Number(s.total) || 0}語 (${Number(s.percent) || 0}%)</span>
         </div>
         <div class="eiken-prog-bar">
-          <div class="eiken-prog-fill" style="width:${s.percent}%"></div>
+          <div class="eiken-prog-fill" style="width:${Number(s.percent) || 0}%"></div>
         </div>
-        <div class="eiken-root-desc">${s.desc}</div>
-        <div class="eiken-word-preview">収録: ${(global.VocabEikenCatalog.getWordsByRoot(s.rootKey) || []).map(w => w.word).join(', ')}</div>
+        <div class="eiken-root-desc">${escFn(s.desc)}</div>
+        <div class="eiken-word-preview">収録: ${(global.VocabEikenCatalog.getWordsByRoot(s.rootKey) || []).map(w => escFn(w.word)).join(', ')}</div>
       </div>
     `).join('');
   }

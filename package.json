@@ -6,7 +6,8 @@
   "scripts": {
     "test": "python3 scripts/run_all_tests.py",
     "test:e2e": "playwright test",
-    "build": "python3 scripts/build.py"
+    "build": "python3 scripts/build.py",
+    "pack": "npx repomix"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"

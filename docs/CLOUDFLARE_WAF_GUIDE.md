@@ -1,4 +1,4 @@
-# 🛡️ Vocab Vault — Cloudflare WAF & DoS 保護設定ガイド
+#  Vocab Vault — Cloudflare WAF & DoS 保護設定ガイド
 本ドキュメントは、Vocab Vault の商用運用において、AIプロキシエンドポイント（`vocab-generate`）および認証基盤を DDoS / 秒間スクリプト連打から完全防護するための Cloudflare WAF レート制限設定手順書です。
 
 Cloudflare の無料プラン（Free Tier）で利用可能な機能のみで完全防護が可能です。
@@ -68,7 +68,7 @@ Cloudflare の無料プラン（Free Tier）で利用可能な機能のみで完
 
 ### Step 3: IPヘッダー透過の確認
 Vocab Vault の Edge Functions (`vocab-generate`) は、Cloudflare の透過ヘッダー `cf-connecting-ip` を最優先で参照するように実装されています。
-プロキシ（オレンジ色の雲アイコン ☁️）を有効にするだけで、クライアントの真のIPアドレスが自動的に安全に伝達されます。
+プロキシ（オレンジ色の雲アイコン ）を有効にするだけで、クライアントの真のIPアドレスが自動的に安全に伝達されます。
 
 ---
 

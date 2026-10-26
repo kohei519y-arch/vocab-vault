@@ -61,7 +61,7 @@ serve(async (req) => {
           httpClient: Stripe.createFetchHttpClient(),
         });
 
-        // 顧客IDが存在する場合は、アクティブ・トライアル中の全サブスクリプションを走査して解約（limit 100で解約漏れ防止）
+        const failedCancellations: string[] = [];
         if (profile?.stripe_customer_id) {
           const subs = await stripe.subscriptions.list({
             customer: profile.stripe_customer_id,
@@ -70,14 +70,35 @@ serve(async (req) => {
           });
           for (const sub of subs.data) {
             if (["active", "trialing", "past_due", "unpaid"].includes(sub.status)) {
-              console.log(`[Account Deletion] Canceling active Stripe sub: ${sub.id} (status: ${sub.status})`);
-              await stripe.subscriptions.cancel(sub.id);
+              try {
+                console.log(`[Account Deletion] Canceling active Stripe sub: ${sub.id} (status: ${sub.status})`);
+                await stripe.subscriptions.cancel(sub.id);
+              } catch (oneErr: any) {
+                if (!oneErr.message?.includes("No such subscription") && !oneErr.message?.includes("resource_missing")) {
+                  failedCancellations.push(`${sub.id}: ${oneErr.message}`);
+                }
+              }
             }
           }
         } else if (profile?.stripe_subscription_id) {
-          // customer_id が未取得の場合は subscription_id を直接解約
-          console.log(`[Account Deletion] Canceling Stripe subscription directly: ${profile.stripe_subscription_id}`);
-          await stripe.subscriptions.cancel(profile.stripe_subscription_id);
+          try {
+            console.log(`[Account Deletion] Canceling Stripe subscription directly: ${profile.stripe_subscription_id}`);
+            await stripe.subscriptions.cancel(profile.stripe_subscription_id);
+          } catch (oneErr: any) {
+            if (!oneErr.message?.includes("No such subscription") && !oneErr.message?.includes("resource_missing")) {
+              failedCancellations.push(`${profile.stripe_subscription_id}: ${oneErr.message}`);
+            }
+          }
+        }
+
+        if (failedCancellations.length > 0) {
+          return new Response(
+            JSON.stringify({
+              error: `Stripe定期課金の一部解約に失敗しました（${failedCancellations.length}件）。幽霊課金防止のため退会処理を中断しました。カスタマーポータルより解約後に再度お試しください。`,
+              details: failedCancellations,
+            }),
+            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
         // [レースコンディション完全防止] Stripe解約完了をDBプロファイルに即時反映
         // これにより delete_user_account RPCの ACTIVE_SUBSCRIPTION 例外を確実に回避
@@ -125,6 +146,7 @@ serve(async (req) => {
         supabaseAdmin.from("user_tombstones").delete().eq("user_id", user.id),
         supabaseAdmin.from("user_lang_watermarks").delete().eq("user_id", user.id),
         supabaseAdmin.from("user_feedbacks").delete().eq("user_id", user.id),
+        supabaseAdmin.from("user_app_settings").delete().eq("user_id", user.id),
       ]);
       await supabaseAdmin.from("profiles").delete().eq("id", user.id);
     }

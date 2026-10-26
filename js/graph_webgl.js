@@ -158,6 +158,21 @@
     }
     if (!gl) return false;
 
+    // WebGLコンテキストロスト時の自動回復ハンドラを登録
+    if (!glCanvas._hasContextLossListeners && typeof glCanvas.addEventListener === 'function') {
+      glCanvas._hasContextLossListeners = true;
+      glCanvas.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        isInitialized = false;
+        invalidate();
+        console.warn('[WebGL Graph] Context lost, pending restore');
+      }, false);
+      glCanvas.addEventListener('webglcontextrestored', () => {
+        console.info('[WebGL Graph] Context restored, re-initializing');
+        initGL(glCanvas);
+      }, false);
+    }
+
     pointProgram = createProgram(gl, POINT_VS, POINT_FS);
     lineProgram = createProgram(gl, LINE_VS, LINE_FS);
     if (!pointProgram || !lineProgram) return false;

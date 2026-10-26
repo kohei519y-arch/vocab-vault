@@ -3,6 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <script>
+    (function() {
+      const host = String(window.location?.hostname || '');
+      const isLocal = host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local') || host === '';
+      if (!isLocal) {
+        document.documentElement.innerHTML = '<body style="padding:40px;font-family:sans-serif;background:#111;color:#eee"><h1>403 Forbidden</h1><p>Developer master mode is strictly disabled on non-local hosts.</p></body>';
+        throw new Error('dev.html is blocked on non-local hosts');
+      }
+    })();
     window.__VV_DEV_MASTER = true;
     // [ゼロ障害保証] 自己修復型ウォッチドッグ & エラーバウンダリ
     window.addEventListener('error', function(e) {
@@ -65,8 +73,8 @@
       <button class="rib-btn active" id="ribListBtn" onclick="exitAnki()" title="単語一覧" aria-label="単語一覧"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="rib-lbl" data-i18n="nav.list">一覧</span></button>
       <button class="rib-btn" id="ribExtBtn" onclick="openExtractModal()" title="長文・画像から抽出 (Alt+L)" aria-label="長文・画像から抽出"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg><span class="rib-lbl" data-i18n="nav.extract">抽出</span></button>
       <button class="rib-btn" id="ribAnkiBtn" onclick="startAnki()" title="暗記復習モード (R)" aria-label="暗記復習モード"><svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg><span class="rib-lbl" data-i18n="nav.review">復習</span></button>
-      <button class="rib-btn" id="ribAnalyticsBtn" onclick="openAnalyticsModal()" title="学習分析・忘却予測ダッシュボード" aria-label="学習分析"><svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg><span class="rib-lbl" data-i18n="nav.analytics">分析</span></button>
-      <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根ネットワーク (Graph View: G)" aria-label="語根ネットワーク"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span class="rib-lbl" data-i18n="nav.graph">語根</span></button>
+      <button class="rib-btn" id="ribAnalyticsBtn" onclick="openAnalyticsModal()" title="定着率 ＆ 忘却予測ダッシュボード" aria-label="定着率・学習分析"><svg viewBox="0 0 24 24"><path d="M18 20V10M12 20V4M6 20v-6"/></svg><span class="rib-lbl" data-i18n="nav.analytics">定着率</span></button>
+      <button class="rib-btn" id="ribGraphBtn" onclick="openGraphModal()" title="語根マインドマップ & 接頭辞体系 (G)" aria-label="語根マインドマップ"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg><span class="rib-lbl" data-i18n="nav.graph">語根</span></button>
       <button class="rib-btn" id="ribMaskBtn" onclick="toggleMask()" title="赤シート切替 (Alt+M)" aria-label="赤シート切替"><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span class="rib-lbl" data-i18n="nav.mask">赤シート</span></button>
       <button class="rib-btn" onclick="printVocabList()" title="フィルタ結果の全件をA4・2段組でPDF印刷" aria-label="PDF印刷"><svg viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
     </div>
@@ -124,6 +132,7 @@
     <div class="side-foot flx-sb">
       <span id="vaultLabel">Vocab Vault (EN)</span>
       <div style="display:flex;gap:4px">
+        <button type="button" class="side-foot-btn" onclick="openAnalyticsModal()" data-i18n="nav.analytics" title="定着率・忘却予測ダッシュボード">定着率</button>
         <button type="button" class="side-foot-btn" onclick="window.VocabFeedback.openFeedbackModal()" data-i18n="side.feedback" title="ご意見・フィードバック">ご意見</button>
         <button type="button" class="side-foot-btn" onclick="openSettings()" data-i18n="side.settings">設定</button>
       </div>
@@ -249,9 +258,12 @@
           </div>
           <div class="flx-sb" style="margin-bottom:8px">
             <span id="offlineSyncBadge" class="offline-sync-badge"><span class="badge-dot"></span><span id="offlineSyncText" data-i18n="anki.offline_badge">未同期の復習</span>: 0件</span>
-            <div class="anki-mode-toggle" id="ankiModeToggle">
-              <button type="button" id="btnAnkiRecog" class="anki-mode-btn active" data-act="set-anki-mode" data-mode="recog" data-i18n="anki.recog" data-i18n-title="anki.recog_title" title="単語から意味を想起 (M)">認識</button>
-              <button type="button" id="btnAnkiCloze" class="anki-mode-btn" data-act="set-anki-mode" data-mode="cloze" data-i18n="anki.cloze" data-i18n-title="anki.cloze_title" title="例文穴埋めから単語を想起 (M)">産出 (Cloze)</button>
+            <div style="display:flex;align-items:center;gap:8px">
+              <button type="button" class="btn-o btn-xs" onclick="openAnalyticsModal()" title="定着率・忘却予測ダッシュボード" style="display:inline-flex;align-items:center;gap:4px"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg><span data-i18n="nav.analytics">定着率</span></button>
+              <div class="anki-mode-toggle" id="ankiModeToggle">
+                <button type="button" id="btnAnkiRecog" class="anki-mode-btn active" data-act="set-anki-mode" data-mode="recog" data-i18n="anki.recog" data-i18n-title="anki.recog_title" title="単語から意味を想起 (M)">認識</button>
+                <button type="button" id="btnAnkiCloze" class="anki-mode-btn" data-act="set-anki-mode" data-mode="cloze" data-i18n="anki.cloze" data-i18n-title="anki.cloze_title" title="例文穴埋めから単語を想起 (M)">産出 (Cloze)</button>
+              </div>
             </div>
           </div>
           <div class="a-card" id="aCard">
@@ -815,7 +827,8 @@
               <div style="font-size:12px;font-weight:700" data-i18n="settings.fsrs_manual_opt">FSRS重み手動最適化</div>
               <p class="cfg-desc" style="margin:2px 0 0" data-i18n="settings.fsrs_manual_opt_desc">直近500件の復習ログから忘却速度を再計算し、係数を最新化します。</p>
             </div>
-            <div style="display:flex;gap:6px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="btn-o btn-xs" onclick="toggleModal('settingsModal',false);openAnalyticsModal()" data-i18n="settings.open_analytics_btn">定着率ダッシュボードを開く</button>
               <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()" data-i18n="settings.fsrs_opt_now">今すぐ最適化</button>
               <button type="button" class="btn-o btn-xs" onclick="VocabAnkiView.triggerResetWeights()" data-i18n="settings.fsrs_reset_weights">初期値にリセット</button>
             </div>
@@ -1140,105 +1153,149 @@
 <!-- 語根・語源ネットワーク グラフビュー モーダル (Obsidian-like Graph View) -->
 <div id="graphModal" class="modal-ov" role="dialog" aria-modal="true" aria-labelledby="graphModalTitle" onclick="if(event.target===this) toggleModal('graphModal',false)">
   <div class="modal graph-modal" style="width:96vw;max-width:1240px;height:92vh;max-height:920px;display:flex;flex-direction:column;padding:0;overflow:hidden">
-    <div class="modal-hd flx-sb" style="padding:8px 14px;border-bottom:1px solid var(--b);background:var(--bg-side);flex-wrap:wrap;gap:8px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-        <span class="modal-title" id="graphModalTitle" style="font-size:13.5px;font-weight:700" data-i18n="graph.title">語根・語源ネットワーク</span>
-        <span id="graphMetaCount" style="font-size:11px;color:var(--m);font-family:var(--mono)"></span>
-        
-        <!-- ビューモード切り替えタブ -->
+    <div class="modal-hd flx-sb" style="padding:8px 14px;border-bottom:1px solid var(--b);background:var(--bg-side);display:flex;flex-direction:column;gap:7px">
+      <!-- 上段: タイトル・語根数・実用ビュータブ・閉じるボタン -->
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <span class="modal-title" id="graphModalTitle" style="font-size:13.5px;font-weight:700" data-i18n="graph.title">語根マインドマップ & 接頭辞体系</span>
+          <span id="graphMetaCount" style="font-size:11px;color:var(--m);font-family:var(--mono)"></span>
+        </div>
+
+        <!-- 実用ビューモード切り替えタブ -->
         <div class="graph-view-tabs" role="tablist">
-          <button type="button" class="graph-view-tab active" id="graphTabNetwork" onclick="VocabGraph.switchViewMode('network')" role="tab" title="全体俯瞰・星系力学シミュレーション" data-i18n="graph.tab_network">ネットワーク</button>
-          <button type="button" class="graph-view-tab" id="graphTabTree" onclick="VocabGraph.switchViewMode('tree')" role="tab" title="1語根フォーカス・カチッと静止・段階的ズーム" data-i18n="graph.tab_tree">系統樹ツリー</button>
-          <button type="button" class="graph-view-tab" id="graphTabMindmap" onclick="VocabGraph.switchViewMode('mindmap')" role="tab" title="DOMアウトライナー・超高速スクロール・印刷対応" data-i18n="graph.tab_mindmap">マインドマップ</button>
-          <button type="button" class="graph-view-tab" id="graphTabMatrix" onclick="VocabGraph.switchViewMode('matrix')" role="tab" title="接頭辞×語根の周期表パズルグリッド" data-i18n="graph.tab_matrix">接頭辞×語根</button>
+          <button type="button" class="graph-view-tab" id="graphTabNetwork" onclick="VocabGraph.switchViewMode('network')" role="tab" style="display:none !important">ネットワーク</button>
+          <button type="button" class="graph-view-tab" id="graphTabTree" onclick="VocabGraph.switchViewMode('tree')" role="tab" style="display:none !important">系統樹ツリー</button>
+          <button type="button" class="graph-view-tab active" id="graphTabMindmap" onclick="VocabGraph.switchViewMode('mindmap')" role="tab" title="語根・接頭辞別アウトライナーマインドマップ" data-i18n="graph.tab_mindmap">マインドマップ</button>
+          <button type="button" class="graph-view-tab" id="graphTabMatrix" onclick="VocabGraph.switchViewMode('matrix')" role="tab" title="接頭辞×語根の周期表マトリクス" data-i18n="graph.tab_matrix">接頭辞×語根</button>
         </div>
+
+        <button type="button" class="modal-close" onclick="toggleModal('graphModal',false)" aria-label="閉じる" title="閉じる" style="margin-left:auto">&times;</button>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <input type="text" id="graphFilterInput" data-i18n-ph="graph.filter_ph" placeholder="語根・単語で検索..." style="font-size:11.5px;padding:3px 8px;width:120px;height:26px" autocomplete="off">
-        <select id="graphLangFilterSel" style="font-size:11px;padding:2px 6px;height:26px;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="言語でフィルタ">
-          <option value="all" data-i18n="graph.all_lang">全言語</option>
-          <option value="en" data-i18n="graph.en_only">英語のみ</option>
-          <option value="fr" data-i18n="graph.fr_only">仏語のみ</option>
-          <option value="de" data-i18n="graph.de_only">独語のみ</option>
-          <option value="es">西語のみ</option>
-          <option value="it">伊語のみ</option>
-          <option value="pt">葡語のみ</option>
-          <option value="nl">蘭語のみ</option>
-          <option value="zh">中国語のみ</option>
-          <option value="ko">韓国語のみ</option>
-          <option value="ja" data-i18n="graph.ja_only">日本語のみ</option>
-        </select>
-        <select id="graphRootJumpSel" style="font-size:11px;padding:2px 6px;height:26px;max-width:130px;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="主要語根へ直接フォーカス">
-          <option value="" data-i18n="graph.root_jump_default">主要語根へ飛ぶ...</option>
-        </select>
-        <button type="button" class="btn-o btn-xs" id="graphTreeModeBtn" onclick="VocabGraph.toggleTreeMode()" title="通常ネットワーク / 4階層系統樹 (Lineage Tree) を切替">系統樹</button>
-        <button type="button" class="btn-ac-o btn-xs" id="graphEikenExplorerBtn" onclick="VocabGraph.toggleEikenExplorer()" title="語源スキルツリー (語彙アビリティの覚醒・習得)" style="font-weight:700" data-i18n="graph.eiken_btn">スキルツリー</button>
-        <button type="button" class="btn-o btn-xs" id="graphColorModeBtn" onclick="VocabGraph.toggleColorMode()" title="言語別色分け / 記憶定着度(SRS)色分け を切替" data-i18n="graph.color_btn">言語色</button>
-        <button type="button" class="btn-o btn-xs" id="graphClusterFilterBtn" onclick="VocabGraph.toggleGraphClusterOnly()" title="2単語以上つながる重要語根クラスタのみ表示" data-i18n="graph.cluster_btn">星団のみ</button>
-        <button type="button" class="btn-o btn-xs" id="graphPhysicsBtn" onclick="VocabGraph.togglePhysics()" title="力学シミュレーションの固定/稼働を切替">停止</button>
-        <button type="button" class="btn-ac btn-xs" id="graphWateringBtn" onclick="VocabGraph.startWateringReview()" title="定着率の低い単語（赤・黄）を一括で集中復習" style="font-weight:700;color:#ffffff !important" data-i18n="graph.watering_btn">水やり復習</button>
-        <button type="button" class="btn-o btn-xs" id="graphTreeMaskBtn" onclick="VocabGraph.toggleTreeMask()" title="意味を伏せて想起テスト（赤シート）">赤シート:OFF</button>
-        <div id="graphZoomWrap" style="display:inline-flex;align-items:center;border:1px solid var(--b);border-radius:4px;overflow:hidden;background:var(--bg-card);height:26px">
-          <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomOut()" title="縮小 (または - キー)" style="border:none;border-radius:0;padding:2px 7px;font-weight:700;height:100%">－</button>
-          <span id="graphZoomVal" style="font-size:11px;padding:0 6px;color:var(--t);font-family:var(--mono);min-width:38px;text-align:center;user-select:none">100%</span>
-          <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomIn()" title="拡大 (または + キー)" style="border:none;border-radius:0;padding:2px 7px;font-weight:700;height:100%">＋</button>
+
+      <!-- 下段ツールバー: 語源系統分類・言語・語根検索・各種操作ボタン -->
+      <div style="display:flex;align-items:center;justify-content:space-between;width:100%;flex-wrap:wrap;gap:6px">
+        <!-- 分類・検索グループ -->
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <!-- 10言語対応 大語族・語源系統分類セレクタ -->
+          <select id="graphFamilyFilterSel" style="font-size:11px;padding:2px 8px;height:26px;font-weight:600;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="大語族・語源系統で分類">
+            <option value="all">全語源系統 (10言語)</option>
+            <option value="germanic">ゲルマン語派 (英・独・蘭)</option>
+            <option value="romance">ロマンス語派 (仏・西・伊・葡)</option>
+            <option value="sinospheric">シノ・チベット語族 / 漢語字源 (中)</option>
+            <option value="koreanic">朝鮮語族 (韓: 固有語・漢字語)</option>
+            <option value="japonic">日本語族 (日: 和語・漢語)</option>
+            <option value="hellenic">ヘレニック古典派 (ギリシャ学術)</option>
+          </select>
+
+          <select id="graphLangFilterSel" style="font-size:11px;padding:2px 6px;height:26px;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="言語でフィルタ">
+            <option value="all" data-i18n="graph.all_lang">全言語</option>
+            <option value="en" data-i18n="graph.en_only">英語のみ</option>
+            <option value="fr" data-i18n="graph.fr_only">仏語のみ</option>
+            <option value="de" data-i18n="graph.de_only">独語のみ</option>
+            <option value="es">西語のみ</option>
+            <option value="it">伊語のみ</option>
+            <option value="pt">葡語のみ</option>
+            <option value="nl">蘭語のみ</option>
+            <option value="zh">中国語のみ</option>
+            <option value="ko">韓国語のみ</option>
+            <option value="ja" data-i18n="graph.ja_only">日本語のみ</option>
+          </select>
+
+          <select id="graphRootJumpSel" style="font-size:11px;padding:2px 6px;height:26px;max-width:130px;background:var(--bg-card);color:var(--t);border:1px solid var(--b);border-radius:4px" title="主要語根へ直接フォーカス">
+            <option value="" data-i18n="graph.root_jump_default">主要語根へ飛ぶ...</option>
+          </select>
+
+          <input type="text" id="graphFilterInput" data-i18n-ph="graph.filter_ph" placeholder="語根・単語で検索..." style="font-size:11.5px;padding:3px 8px;width:120px;height:26px" autocomplete="off">
         </div>
-        <button type="button" class="btn-o btn-xs" id="graphFitBtn" onclick="VocabGraph.fitGraphToView()" title="画面に収まるよう自動調整 (Fキー)" data-i18n="graph.fit_btn">全体表示</button>
-        <button type="button" class="btn-o btn-xs" id="graphResetZoomBtn" onclick="VocabGraph.resetGraphZoom()" title="等倍(1.0x)・中心に戻す (0キー)">100%</button>
-        <button type="button" class="btn-o btn-xs" id="graphExportBtn" onclick="VocabGraph.exportGraphImage()" title="高解像度PNG画像として保存" data-i18n="graph.save_img">画像保存</button>
-        <button type="button" class="modal-close" onclick="toggleModal('graphModal',false)" aria-label="閉じる" title="閉じる">&times;</button>
+
+        <!-- 表示設定・操作グループ -->
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">
+          <button type="button" class="btn-o btn-xs" id="graphTreeModeBtn" onclick="VocabGraph.toggleTreeMode()" style="display:none !important">系統樹</button>
+          <button type="button" class="btn-ac-o btn-xs" id="graphEikenExplorerBtn" onclick="VocabGraph.toggleEikenExplorer()" style="display:none !important">スキルツリー</button>
+          <button type="button" class="btn-o btn-xs" id="graphMyWordsBtn" onclick="VocabGraph.toggleMyWordsMode()" style="display:none !important">自分の単語</button>
+          <button type="button" class="btn-o btn-xs" id="graphColorModeBtn" onclick="VocabGraph.toggleColorMode()" style="display:none !important">言語色</button>
+          <button type="button" class="btn-o btn-xs" id="graphClusterFilterBtn" onclick="VocabGraph.toggleGraphClusterOnly()" style="display:none !important">星団のみ</button>
+          <button type="button" class="btn-o btn-xs" id="graphPhysicsBtn" onclick="VocabGraph.togglePhysics()" style="display:none !important">停止</button>
+          <button type="button" class="btn-ac btn-xs" id="graphWateringBtn" onclick="VocabGraph.startWateringReview()" title="定着率の低い単語（赤・黄）を一括で集中復習" style="font-weight:700;color:#ffffff !important" data-i18n="graph.watering_btn">水やり復習</button>
+          <button type="button" class="btn-o btn-xs" id="graphTreeMaskBtn" onclick="VocabGraph.toggleTreeMask()" title="意味を伏せて想起テスト（Spaceで開示・1/2/3/4で評価）">想起テスト:OFF</button>
+          <button type="button" class="btn-o btn-xs" id="graphMicroTreeBtn" onclick="VocabGraph.toggleMicroTreeFocus()" title="1語根に絞り込んで認知負荷を低減し集中記憶 (UキーまたはQ/Wで切替)">1語根集中:OFF</button>
+
+          <div id="graphZoomWrap" style="display:none !important">
+            <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomOut()">－</button>
+            <span id="graphZoomVal" style="font-size:11px">100%</span>
+            <button type="button" class="btn-o btn-xs" onclick="VocabGraph.zoomIn()">＋</button>
+          </div>
+          <button type="button" class="btn-o btn-xs" id="graphFitBtn" onclick="VocabGraph.fitGraphToView()" style="display:none !important">全体表示</button>
+          <button type="button" class="btn-o btn-xs" id="graphResetZoomBtn" onclick="VocabGraph.resetGraphZoom()" style="display:none !important">100%</button>
+          <button type="button" class="btn-o btn-xs" id="graphExportBtn" onclick="VocabGraph.exportGraphImage()" style="display:none !important">画像保存</button>
+        </div>
       </div>
     </div>
 
     <!-- 語根パンくずリスト & クイックピルバー -->
     <div id="graphTreeBreadcrumbBar" class="graph-breadcrumb-bar" style="display:none">
-      <span class="graph-bc-crumb" onclick="VocabGraph.clearRootFocus()">全系統樹</span>
+      <span class="graph-bc-crumb" onclick="VocabGraph.clearRootFocus()">マインドマップ</span>
       <span class="graph-bc-sep">&gt;</span>
       <span class="graph-bc-crumb current" id="graphBcCurrentRoot">*sta-</span>
+      <button type="button" class="btn-o btn-xs" onclick="VocabGraph.prevRoot()" style="font-size:10px;padding:1px 6px;margin-left:6px" title="前の語根 (Qキー)">◀ 前の語根</button>
+      <button type="button" class="btn-o btn-xs" onclick="VocabGraph.nextRoot()" style="font-size:10px;padding:1px 6px" title="次の語根 (Wキー)">次の語根 ▶</button>
       <button type="button" class="btn-ac-o btn-xs" id="graphUnlockEikenRootBtn" onclick="VocabGraph.unlockCurrentRootEikenWords()" style="display:none;font-weight:700;margin-left:8px;padding:1px 7px" title="この系統樹の未習得語彙を一括習得" data-i18n="graph.unlock_eiken">この系統樹を一括習得</button>
-      <div style="display:inline-flex;align-items:center;gap:4px;margin-left:auto" id="graphQuickPills"></div>
+      <div style="display:inline-flex;align-items:center;gap:4px;margin-left:auto" id="graphQuickPills">
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.jumpToRecommendedRoot('today')" style="font-size:10px;padding:1px 7px" title="本日のおすすめ語根へジャンプ">今日の語根</button>
+        <button type="button" class="btn-o btn-xs" onclick="VocabGraph.jumpToRecommendedRoot('due')" style="font-size:10px;padding:1px 7px" title="復習が近い語根へジャンプ">要復習の語根</button>
+      </div>
     </div>
 
-    <!-- 1. Canvas 描画エリア (ネットワーク & 系統樹ツリー) -->
-    <div id="graphCanvasWrap" style="position:relative;flex:1;min-height:0;width:100%;height:100%;overflow:hidden;background:var(--bg-main);cursor:grab">
+    <!-- 10言語 4大語族クイックセグメントバー (Phylum Quick Navigation Bar) -->
+    <div id="graphPhylumSegmentBar" style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-side);border-bottom:1px solid var(--b);overflow-x:auto;z-index:20;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;color:var(--m);white-space:nowrap">大語族分類:</span>
+      <button type="button" class="btn-o btn-xs phylum-pill active" id="phylumPillAll" onclick="VocabGraph.setPhylumFilter('all')" style="font-weight:600;font-size:11px;padding:2px 8px;border-radius:12px">全語族 (10言語)</button>
+      <button type="button" class="btn-o btn-xs phylum-pill" id="phylumPillIE" onclick="VocabGraph.setPhylumFilter('indo_european')" style="font-weight:600;font-size:11px;padding:2px 8px;border-radius:12px">印欧語族 (英・独・仏・西・伊・葡・蘭)</button>
+      <button type="button" class="btn-o btn-xs phylum-pill" id="phylumPillZh" onclick="VocabGraph.setPhylumFilter('sinospheric')" style="font-weight:600;font-size:11px;padding:2px 8px;border-radius:12px">シノ・チベット語族 (古代漢語字源)</button>
+      <button type="button" class="btn-o btn-xs phylum-pill" id="phylumPillKo" onclick="VocabGraph.setPhylumFilter('koreanic')" style="font-weight:600;font-size:11px;padding:2px 8px;border-radius:12px">朝鮮語族 (韓国語固有語・漢字音)</button>
+      <button type="button" class="btn-o btn-xs phylum-pill" id="phylumPillJa" onclick="VocabGraph.setPhylumFilter('japonic')" style="font-weight:600;font-size:11px;padding:2px 8px;border-radius:12px">日本語族 (和語・和製漢語)</button>
+    </div>
+
+    <!-- 語源スキルツリー目次ドロワー 背景バックドロップ -->
+    <div id="graphEikenBackdrop" class="graph-drawer-backdrop" style="display:none" onclick="VocabGraph.toggleEikenExplorer(false)"></div>
+
+    <!-- 語源スキルツリー目次ドロワー (Explorer) -->
+    <aside id="graphEikenDrawer" class="graph-eiken-drawer" style="display:none" aria-label="語源スキルツリー目次">
+      <div class="graph-drawer-hd">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0">
+          <span class="graph-drawer-type-badge" style="background:rgba(234, 88, 12, 0.15);color:#ea580c">語源ツリー</span>
+          <h3 class="graph-drawer-title" style="font-size:13px;font-weight:700">重要語根スキルツリー目次 (200語)</h3>
+        </div>
+        <button type="button" class="graph-drawer-close" onclick="VocabGraph.toggleEikenExplorer(false)" aria-label="閉じる">&times;</button>
+      </div>
+      <div style="padding:8px 12px;background:var(--bg-card);border-bottom:1px solid var(--b);font-size:11px;color:var(--s)">
+        印欧祖語から古典語（ラテン・ギリシャ）を経て進化した重要語彙の系統樹。クリックで該当ブランチへジャンプし、語彙スキルを習得できます。
+      </div>
+      <div class="graph-eiken-list" id="graphEikenList"></div>
+    </aside>
+
+    <!-- 語根・単語詳細インスペクター (Drawer) -->
+    <aside id="graphDetailDrawer" class="graph-detail-drawer" style="display:none" aria-label="語根・単語詳細インスペクター">
+      <div class="graph-drawer-hd">
+        <div style="display:flex;align-items:center;gap:6px;min-width:0">
+          <span class="graph-drawer-type-badge" id="graphDrawerTypeBadge">語根</span>
+          <h3 class="graph-drawer-title" id="graphDrawerTitle"></h3>
+        </div>
+        <button type="button" class="graph-drawer-close" onclick="VocabGraph.deselectNode()" aria-label="詳細を閉じる">&times;</button>
+      </div>
+      <div class="graph-drawer-bd" id="graphDrawerBody"></div>
+      <div class="graph-drawer-ft" id="graphDrawerFooter"></div>
+    </aside>
+
+    <!-- 1. Canvas 描画エリア (非推奨・非表示) -->
+    <div id="graphCanvasWrap" style="display:none !important">
       <canvas id="graphWebGLCanvas" style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;pointer-events:none"></canvas>
       <canvas id="graphCanvas" style="display:block;width:100%;height:100%"></canvas>
       <div id="graphTooltip" class="graph-tooltip" style="display:none"></div>
 
-      <!-- 語源スキルツリー目次ドロワー 背景バックドロップ -->
-      <div id="graphEikenBackdrop" class="graph-drawer-backdrop" style="display:none" onclick="VocabGraph.toggleEikenExplorer(false)"></div>
-
-      <!-- 語源スキルツリー目次ドロワー (Explorer) -->
-      <aside id="graphEikenDrawer" class="graph-eiken-drawer" style="display:none" aria-label="語源スキルツリー目次">
-        <div class="graph-drawer-hd">
-          <div style="display:flex;align-items:center;gap:6px;min-width:0">
-            <span class="graph-drawer-type-badge" style="background:rgba(234, 88, 12, 0.15);color:#ea580c">語源ツリー</span>
-            <h3 class="graph-drawer-title" style="font-size:13px;font-weight:700">重要語根スキルツリー目次 (200語)</h3>
-          </div>
-          <button type="button" class="graph-drawer-close" onclick="VocabGraph.toggleEikenExplorer(false)" aria-label="閉じる">&times;</button>
-        </div>
-        <div style="padding:8px 12px;background:var(--bg-card);border-bottom:1px solid var(--b);font-size:11px;color:var(--s)">
-          印欧祖語から古典語（ラテン・ギリシャ）を経て進化した重要語彙の系統樹。クリックで該当ブランチへジャンプし、語彙スキルを習得できます。
-        </div>
-        <div class="graph-eiken-list" id="graphEikenList"></div>
-      </aside>
-
-      <!-- 語根・単語詳細インスペクター (Drawer) -->
-      <aside id="graphDetailDrawer" class="graph-detail-drawer" style="display:none" aria-label="語根・単語詳細インスペクター">
-        <div class="graph-drawer-hd">
-          <div style="display:flex;align-items:center;gap:6px;min-width:0">
-            <span class="graph-drawer-type-badge" id="graphDrawerTypeBadge">語根</span>
-            <h3 class="graph-drawer-title" id="graphDrawerTitle"></h3>
-          </div>
-          <button type="button" class="graph-drawer-close" onclick="VocabGraph.deselectNode()" aria-label="詳細を閉じる">&times;</button>
-        </div>
-        <div class="graph-drawer-bd" id="graphDrawerBody"></div>
-        <div class="graph-drawer-ft" id="graphDrawerFooter"></div>
-      </aside>
-
       <!-- 凡例 (Legend) -->
-      <div id="graphLegend" class="graph-legend" style="position:absolute;top:54px;left:14px;background:var(--bg-side);border:1px solid var(--b);border-radius:8px;padding:6px 12px;font-size:11px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;z-index:30;box-shadow:0 4px 14px rgba(0,0,0,0.22);max-width:520px">
+      <div id="graphLegend" class="graph-legend" style="position:absolute;top:54px;left:14px;background:var(--bg-side);border:1px solid var(--b);border-radius:8px;padding:6px 12px;font-size:11px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;z-index:30;box-shadow:0 4px 14px rgba(0,0,0,0.22);max-width:560px">
         <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:var(--ac)"></span>語根(PIE/漢字)</span>
         <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#38bdf8"></span>英</span>
         <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#818cf8"></span>仏</span>
@@ -1250,13 +1307,23 @@
         <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#f43f5e"></span>中</span>
         <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#60a5fa"></span>韓</span>
         <span style="display:inline-flex;align-items:center;gap:3px"><span style="width:7px;height:7px;border-radius:50%;background:#fb7185"></span>日</span>
+        <span style="margin-left:auto;color:var(--m);font-size:10px">大: 語数・習熟 / 小: 未習得</span>
       </div>
 
       <!-- 年代タイムトラベルスライダーバー -->
-      <div id="graphTimelineBar" class="graph-timeline-bar" style="display:none">
-        <span style="font-weight:700;color:var(--ac)">時代伝播:</span>
-        <input type="range" id="graphTimelineSlider" class="graph-timeline-slider" min="0" max="3" step="1" value="3" oninput="VocabGraph.onTimelineChange(this.value)">
-        <span id="graphTimelineLabel" style="font-family:var(--mono);font-weight:600">近代・現代 (すべて)</span>
+      <div id="graphTimelineBar" class="graph-timeline-bar" style="display:none;align-items:center;gap:8px">
+        <button type="button" class="btn-o btn-xs" id="graphTimelinePlayBtn" onclick="VocabGraph.toggleTimelineAutoPlay()" style="font-weight:700;padding:2px 8px">再生</button>
+        <span style="font-weight:700;color:var(--ac);font-size:11px">時代伝播:</span>
+        <div style="display:inline-flex;flex-direction:column;gap:2px">
+          <input type="range" id="graphTimelineSlider" class="graph-timeline-slider" min="0" max="3" step="1" value="3" oninput="VocabGraph.onTimelineChange(this.value)">
+          <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--m);width:100%">
+            <span>①PIE祖語</span>
+            <span>②古代古典</span>
+            <span>③中世</span>
+            <span>④現代(すべて)</span>
+          </div>
+        </div>
+        <span id="graphTimelineLabel" style="font-family:var(--mono);font-weight:600;font-size:11px">近代・現代 (すべて)</span>
       </div>
 
       <!-- キャンバス上フローティングズーム操作 (Floating Zoom FAB) -->
@@ -1267,8 +1334,8 @@
       </div>
     </div>
 
-    <!-- 2. DOM マインドマップ (アウトライナー) エリア -->
-    <div id="graphMindmapWrap" style="display:none"></div>
+    <!-- 2. DOM マインドマップ (アウトライナー) エリア (主画面) -->
+    <div id="graphMindmapWrap" style="display:block"></div>
 
     <!-- 3. 接頭辞×語根 パズルマトリクス エリア -->
     <div id="graphMatrixWrap" style="display:none"></div>
@@ -1302,7 +1369,7 @@
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">r</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.review">暗記復習 (Anki) モードを開始</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">l</kbd> / <kbd class="kbd-hint">p</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.audio">耳学モード（Audio Playlist 連続自動リスニング）を開始 / 停止</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">a</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.analytics">忘却予測 ＆ 学習アナリティクスを開く</td></tr>
-        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">g</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph">語根ネットワーク (Graph View) を表示</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">g</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph">マインドマップ・語根ツリー (Graph View) を表示</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">?</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.help">このショートカット一覧を開く</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Esc</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.esc">モーダルを閉じる / フォーカス解除</td></tr>
         <tr style="border-top:2px solid var(--b);border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)" data-i18n="shortcuts.th_anki">機能（Anki復習モード）</th></tr>
@@ -1312,10 +1379,12 @@
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">s</kbd> / <kbd class="kbd-hint">r</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.anki_replay">音声を再発音</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">z</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.anki_undo">直前の回答を取り消し (Undo)</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Esc</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.anki_exit">復習モードを終了して一覧へ戻る</td></tr>
-        <tr style="border-top:2px solid var(--b);border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)" data-i18n="shortcuts.th_graph">機能（語根ネットワーク Graph View）</th></tr>
-        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">1</kbd> / <kbd class="kbd-hint">2</kbd> / <kbd class="kbd-hint">3</kbd> / <kbd class="kbd-hint">4</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_view">ビュー切替（1:ネットワーク / 2:系統樹ツリー / 3:マインドマップ / 4:接頭辞マトリクス）</td></tr>
-        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">w</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_water">枯れ枝の一括水やり復習（赤・黄色の要復習単語を即時Anki復習）</td></tr>
-        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">m</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_mask">赤シート穴埋め暗記テスト（意味を伏せて想起テスト）</td></tr>
+        <tr style="border-top:2px solid var(--b);border-bottom:1.5px solid var(--b);background:var(--bg-rib)"><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)">キー</th><th style="text-align:left;padding:7px 10px;font-size:11px;color:var(--m)" data-i18n="shortcuts.th_graph">機能（マインドマップ・語根ツリー Graph View）</th></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">Space</kbd></td><td style="padding:6px 10px">想起テスト: 意味・語源を開示（単語選択時）</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">1</kbd> / <kbd class="kbd-hint">2</kbd> / <kbd class="kbd-hint">3</kbd> / <kbd class="kbd-hint">4</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_view">想起評価（単語選択時: 1:忘却 / 2:困難 / 3:良好 / 4:簡単）または ビュー切替（非選択時: 1:マインドマップ / 2:マトリクス）</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">q</kbd> / <kbd class="kbd-hint">w</kbd></td><td style="padding:6px 10px">語根の巡回ナビゲーション（◀ 前の語根 / 次の語根 ▶）</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">u</kbd></td><td style="padding:6px 10px">1語根集中モード切替（認知負荷低減）</td></tr>
+        <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">m</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_mask">能動的想起テスト切替（意味を伏せて想起テスト）</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">+</kbd> / <kbd class="kbd-hint">-</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_zoom">グラフの拡大 / 縮小</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">0</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_reset">等倍(100%)表示・中央配置</td></tr>
         <tr style="border-bottom:1px solid var(--b-s)"><td style="padding:6px 10px"><kbd class="kbd-hint">f</kbd> / <kbd class="kbd-hint">ダブルクリック</kbd></td><td style="padding:6px 10px" data-i18n="shortcuts.graph_fit">全ノードが画面に収まるよう自動調整 (Fit)</td></tr>
@@ -1534,33 +1603,33 @@
 <!-- スクリーンリーダー用不可視ライブリージョン (WCAG 2.1 AA 準拠) -->
 <div id="a11yAnnouncer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
-<!-- スクリプトの読み込み（モジュール順序） -->
-<script src="js/i18n.js"></script>
-<script src="js/storage.js"></script>
-<script src="js/anki.js"></script>
-<script src="js/sync.js"></script>
-<script src="js/ocr.js"></script>
-<script src="js/morphology.js"></script>
-<script src="js/eiken_catalog.js"></script>
-<script src="js/graph_layout.js"></script>
-<script src="js/graph_webgl.js"></script>
-<script src="js/graph_renderer.js"></script>
-<script src="js/graph_views.js"></script>
-<script src="js/graph.js"></script>
-<script src="js/feedback.js"></script>
-<script src="js/dictionary.js"></script>
-<script src="js/starter_pack.js"></script>
-<script src="js/export.js"></script>
-<script src="js/speech.js"></script>
-<script src="js/card_view.js"></script>
-<script src="js/queue.js"></script>
-<script src="js/modal.js"></script>
-<script src="js/search.js"></script>
-<script src="js/navigation.js"></script>
-<script src="js/anki_view.js"></script>
-<script src="js/list_view.js"></script>
-<script src="js/events.js"></script>
-<script src="js/app.js"></script>
+<!-- スクリプトの読み込み（モジュール順序・defer属性でTTI高速化） -->
+<script src="js/i18n.js" defer></script>
+<script src="js/storage.js" defer></script>
+<script src="js/anki.js" defer></script>
+<script src="js/sync.js" defer></script>
+<script src="js/ocr.js" defer></script>
+<script src="js/morphology.js" defer></script>
+<script src="js/eiken_catalog.js" defer></script>
+<script src="js/graph_layout.js" defer></script>
+<script src="js/graph_webgl.js" defer></script>
+<script src="js/graph_renderer.js" defer></script>
+<script src="js/graph_views.js" defer></script>
+<script src="js/graph.js" defer></script>
+<script src="js/feedback.js" defer></script>
+<script src="js/dictionary.js" defer></script>
+<script src="js/starter_pack.js" defer></script>
+<script src="js/export.js" defer></script>
+<script src="js/speech.js" defer></script>
+<script src="js/card_view.js" defer></script>
+<script src="js/queue.js" defer></script>
+<script src="js/modal.js" defer></script>
+<script src="js/search.js" defer></script>
+<script src="js/navigation.js" defer></script>
+<script src="js/anki_view.js" defer></script>
+<script src="js/list_view.js" defer></script>
+<script src="js/events.js" defer></script>
+<script src="js/app.js" defer></script>
 <script>
   // Service Worker 登録 ＆ 更新通知フローティングバナー検知
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
@@ -1592,6 +1661,7 @@
     });
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.js').then(reg => {
+        try { reg.update(); } catch (_) {}
         if (reg.waiting) promptSwUpdate(reg.waiting);
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing;

@@ -182,6 +182,7 @@ body.dark .btn-ac:hover:not(:disabled) {
 }
 .btn-xs { padding:3px 9px; font-size:11px; border-radius:5px; }
 .btn-o.btn-xs { color:var(--s); }
+.phylum-pill.active { background:var(--ac) !important; color:#ffffff !important; border-color:var(--ac) !important; font-weight:700 !important; }
 .chk-lbl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; color:var(--s); cursor:pointer; user-select:none; padding:5px 8px; background:var(--bg-main); border:1px solid var(--b); border-radius:5px; transition:all .15s var(--ease-out); }
 .chk-lbl.sm { padding:3px 8px; font-size:11px; }
 .chk-lbl:hover { border-color:var(--ac-b); color:var(--t); }
@@ -632,8 +633,8 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     color: var(--ac);
     font-weight: 700;
   }
-  /* スマホのボトムバーで主要アクション（探す・一覧・復習・語根・抽出・赤シート・設定）に厳選 */
-  .ribbon .rib-btn:not(#ribFoldBtn):not(#ribListBtn):not(#ribAnkiBtn):not(#ribGraphBtn):not(#ribExtBtn):not(#ribMaskBtn):not(#ribSettingsBtn) {
+  /* スマホのボトムバーで主要アクション（探す・一覧・復習・定着率/分析・語根・抽出・赤シート・設定）を表示 */
+  .ribbon .rib-btn:not(#ribFoldBtn):not(#ribListBtn):not(#ribAnkiBtn):not(#ribAnalyticsBtn):not(#ribGraphBtn):not(#ribExtBtn):not(#ribMaskBtn):not(#ribSettingsBtn) {
     display: none;
   }
 
@@ -1308,6 +1309,28 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
 .graph-status-pill.mastered { background: rgba(16, 185, 129, 0.15); color: #10b981; }
 
 /* 語根ネットワーク 実用タブ & マインドマップ & マトリクス */
+#graphFamilyFilterSel {
+  border-left: 3px solid var(--ac) !important;
+  font-weight: 700;
+  transition: border-color 0.15s ease;
+}
+#graphFamilyFilterSel:focus {
+  border-color: var(--ac);
+  outline: none;
+}
+@media (max-width: 768px) {
+  .graph-modal .modal-hd {
+    padding: 6px 10px;
+  }
+  .graph-view-tabs {
+    order: 3;
+    width: 100%;
+    justify-content: space-around;
+  }
+  #graphFamilyFilterSel, #graphLangFilterSel {
+    max-width: 140px;
+  }
+}
 .graph-view-tabs {
   display: inline-flex;
   align-items: center;
@@ -1411,7 +1434,7 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
   color: var(--t);
 }
 .graph-timeline-slider {
-  width: 140px;
+  width: 190px;
   accent-color: var(--ac);
   cursor: pointer;
 }
@@ -1589,6 +1612,8 @@ body.mask .m-red:not(.revealed) *, body.mask .core-box:not(.revealed) *, body.ma
     display: block !important;
     padding: 0 !important;
     background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
   }
   #graphModal .mindmap-root-card {
     border: 1px solid #ccc !important;
@@ -2163,6 +2188,61 @@ body.dark .detail-tab-btn.active {
   font-weight: 700;
   color: var(--m);
 }
+
+.workload-range-btns button.active {
+  background: var(--ac);
+  color: #fff;
+  border-color: var(--ac);
+  font-weight: 700;
+}
+.workload-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
+.workload-day-cell {
+  background: var(--bg-card);
+  border: 1px solid var(--b);
+  border-radius: 6px;
+  padding: 6px 4px;
+  text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+  user-select: none;
+}
+.workload-day-cell:hover {
+  transform: translateY(-2px);
+  border-color: var(--ac);
+}
+.workload-day-cell.today {
+  border: 1.5px solid var(--ok, #10b981);
+}
+.workload-day-cell .day-header {
+  font-size: 10px;
+  color: var(--s);
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+.workload-day-cell .day-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--t);
+  font-family: var(--mono);
+}
+.workload-day-cell .day-pill {
+  font-size: 8.5px;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 1px 4px;
+  display: inline-block;
+  margin-top: 2px;
+}
+.workload-day-cell.l-0 .day-pill { background: var(--b); color: var(--m); }
+.workload-day-cell.l-1 .day-pill { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.workload-day-cell.l-2 .day-pill { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.workload-day-cell.l-3 .day-pill { background: rgba(245, 158, 11, 0.18); color: #f59e0b; }
+.workload-day-cell.l-4 .day-pill { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
 /* ==========================================================
    P0: 学術スターターパック ギャラリー

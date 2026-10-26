@@ -60,6 +60,12 @@
               if (res.decayFactor >= 0) res.decayFactor = -0.5;
               res.version = 2;
             }
+            // [P2-⑤] 読み込み時に必ず有効範囲へクランプ（手動改ざん/破損データ防御）
+            res.decayFactor = Math.max(-0.7, Math.min(-0.3, Number(res.decayFactor) || -0.5));
+            res.sScale = Math.max(0.6, Math.min(1.8, Number(res.sScale) || 1.0));
+            res.wHard = Math.max(0.5, Math.min(1.8, Number(res.wHard) || 0.8));
+            res.wGood = Math.max(1.0, Math.min(2.5, Number(res.wGood) || 1.2));
+            res.wEasy = Math.max(1.3, Math.min(3.5, Number(res.wEasy) || 1.6));
             return res;
           }
         }
@@ -88,30 +94,68 @@
   /**
    * 復習履歴ログの取得・保存 (直近500件ローリング)
    */
+  let _cachedReviewHistory = null;
+
   function getReviewHistoryLog() {
     try {
       if (typeof localStorage !== 'undefined') {
         const raw = localStorage.getItem(REVIEW_HISTORY_KEY);
         if (raw) {
           const arr = JSON.parse(raw);
-          if (Array.isArray(arr)) return arr;
+          if (Array.isArray(arr)) {
+            _cachedReviewHistory = arr;
+            return [...arr];
+          }
         }
       }
     } catch {}
+    if (Array.isArray(_cachedReviewHistory)) {
+      return [..._cachedReviewHistory];
+    }
     return [];
   }
 
-  function saveReviewHistoryLog(logs) {
+  // iOS Safariの7日間パージ対策: IndexedDBからの復習履歴復旧
+  async function recoverReviewHistoryFromIdb() {
     try {
-      if (typeof localStorage !== 'undefined') {
-        const capped = Array.isArray(logs) ? logs.slice(-MAX_REVIEW_HISTORY) : [];
-        localStorage.setItem(REVIEW_HISTORY_KEY, JSON.stringify(capped));
-        if (global.VocabStorage?.idbPut) {
-          global.VocabStorage.idbPut(REVIEW_HISTORY_KEY, capped);
+      const cur = getReviewHistoryLog();
+      if (!cur.length && global.VocabStorage?.idbGet) {
+        const idbLogs = await global.VocabStorage.idbGet(REVIEW_HISTORY_KEY);
+        if (Array.isArray(idbLogs) && idbLogs.length > 0) {
+          _cachedReviewHistory = idbLogs;
+          try {
+            if (typeof localStorage !== 'undefined') {
+              localStorage.setItem(REVIEW_HISTORY_KEY, JSON.stringify(idbLogs));
+            }
+          } catch {}
         }
       }
     } catch {}
   }
+
+  function saveReviewHistoryLog(logs) {
+    const capped = Array.isArray(logs) ? logs.slice(-MAX_REVIEW_HISTORY) : [];
+    _cachedReviewHistory = capped;
+
+    // LocalStorage と IndexedDB を独立して保存（片方の容量超過や例外が他方をブロックしない）
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(REVIEW_HISTORY_KEY, JSON.stringify(capped));
+      }
+    } catch (e) {
+      console.warn('[SRS] LocalStorage saveReviewHistoryLog failed, relying on IndexedDB:', e);
+    }
+
+    try {
+      if (global.VocabStorage?.idbPut) {
+        global.VocabStorage.idbPut(REVIEW_HISTORY_KEY, capped);
+      }
+    } catch (e) {
+      console.warn('[SRS] IndexedDB saveReviewHistoryLog failed:', e);
+    }
+  }
+
+  let _isOptimizing = false;
 
   function recordReviewHistory(record) {
     if (!record || typeof record !== 'object') return;
@@ -132,20 +176,50 @@
     const capped = history.length > MAX_REVIEW_HISTORY ? history.slice(-MAX_REVIEW_HISTORY) : history;
     saveReviewHistoryLog(capped);
 
-    // ログが一定件数以上のとき、バックグラウンドでマイクロ最適化を自動発火
-    if (capped.length >= 20 && capped.length % 10 === 0) {
-      if (typeof queueMicrotask === 'function') {
-        queueMicrotask(() => { optimizeFSRSWeights(capped); });
-      } else if (typeof setTimeout === 'function') {
-        setTimeout(() => { optimizeFSRSWeights(capped); }, 50);
+    // ログが一定件数以上のとき、直近最適化からの増分（10件ごと）でマイクロ最適化を安全に発火（500件到達後の常時発火バグを解消）
+    try {
+      const TOTAL_REVIEWS_KEY = 'vv_total_reviews_count';
+      const LAST_OPT_COUNT_KEY = 'vv_fsrs_last_opt_count';
+      const storedTotal = typeof localStorage !== 'undefined' ? Number(localStorage.getItem(TOTAL_REVIEWS_KEY)) : 0;
+      const currentTotal = (Number.isFinite(storedTotal) && storedTotal > 0 ? storedTotal : capped.length) + 1;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(TOTAL_REVIEWS_KEY, String(currentTotal));
       }
-    }
+      const lastOptCount = typeof localStorage !== 'undefined' ? Number(localStorage.getItem(LAST_OPT_COUNT_KEY) || 0) : 0;
+
+      if (capped.length >= 20 && (currentTotal - lastOptCount) >= 10 && !_isOptimizing) {
+        _isOptimizing = true;
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(LAST_OPT_COUNT_KEY, String(currentTotal));
+        }
+        const runOpt = () => {
+          try {
+            optimizeFSRSWeights(capped);
+          } finally {
+            _isOptimizing = false;
+          }
+        };
+        if (typeof requestIdleCallback === 'function') {
+          requestIdleCallback(runOpt, { timeout: 2000 });
+        } else if (typeof setTimeout === 'function') {
+          setTimeout(runOpt, 500);
+        } else {
+          _isOptimizing = false;
+        }
+      }
+    } catch {}
   }
 
   function clearReviewHistoryLog() {
+    _cachedReviewHistory = [];
     try {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(REVIEW_HISTORY_KEY);
+      }
+    } catch {}
+    try {
+      if (global.VocabStorage?.idbPut) {
+        global.VocabStorage.idbPut(REVIEW_HISTORY_KEY, []);
       }
     } catch {}
   }
@@ -190,7 +264,8 @@
 
     const effInterval = Number(e.interval) || s;
     const rawLast = Number(e.reviewUpdatedAt || (e.nextReview ? (e.nextReview - effInterval * 86400000) : nowTs));
-    const lastReview = Number.isFinite(rawLast) ? rawLast : nowTs;
+    // 初期エントリで nextReview が小さい場合、負の lastReview になり elapsedDays が異常値になるのを防ぐ
+    const lastReview = (Number.isFinite(rawLast) && rawLast > 0) ? rawLast : nowTs;
     const elapsedDays = Math.max(0, (nowTs - lastReview) / 86400000);
 
     // 減衰指数の安全取得とクランプ (負の値: -0.7 〜 -0.3 を厳守)
@@ -207,7 +282,7 @@
    * FSRS-4.5 安定度 (Stability S) 予測算出
    * 記憶定着率 R=0.90 を維持できる日数を数理モデル化（個人適応重み対応）
    */
-  function predStability(e, rating, customWeights = null) {
+  function predStability(e, rating, customWeights = null, atTimestamp = null, priorR = null) {
     const weights = customWeights || getUserFSRSWeights() || DEFAULT_FSRS_WEIGHTS;
     const rawS = Number(e?.stability) || Number(e?.interval) || 1.0;
     const s = Number.isFinite(rawS) && rawS > 0 ? Math.max(0.1, rawS) : 1.0;
@@ -217,32 +292,45 @@
     const sScale = (Number.isFinite(Number(weights?.sScale)) && Number(weights.sScale) > 0) ? Number(weights.sScale) : 1.0;
 
     if (rating === 0) {
-      return Math.max(0.2, s * 0.3 * sScale);
+      const lapseS = Math.max(0.2, s * 0.3 * sScale);
+      const initW0 = (Number(weights?.w0) || 0.4) * sScale;
+      return Math.min(initW0, lapseS);
+    }
+
+    // 初回学習（未学習カード）判定: 各評価に応じた初期重みを適用
+    const isFirstTime = !e?.repetition && !e?.stability && !e?.interval;
+    if (isFirstTime) {
+      if (rating === 1) return (Number(weights?.w1) || 0.9) * sScale * anchorBonus;
+      if (rating === 2) return (Number(weights?.w2) || 2.5) * sScale * anchorBonus;
+      return (Number(weights?.w3) || 5.0) * sScale * anchorBonus;
+    }
+
+    // [P1-1 解決] 想起率 R に基づく変調因子の適用（復習直後 R≒1.0 の過剰連打による安定度急増を防止）
+    // 過去履歴の評価時は渡された priorR または atTimestamp を用いて過去時点の想起率を正確に再計算
+    let r;
+    if (Number.isFinite(Number(priorR))) {
+      r = Math.max(0.0, Math.min(1.0, Number(priorR)));
+    } else {
+      const evalTime = Number.isFinite(Number(atTimestamp)) ? Number(atTimestamp) : Date.now();
+      r = getRetrievability(e, evalTime, weights);
     }
 
     let nextS = s;
-    if (rating === 1) { // Hard (難しい): 最低でも前回の 1.05倍〜1.2倍は維持・微増させる
+    if (rating === 1) { // Hard (難しい): 想起率変調因子を適用しつつ微増
       const wHard = (Number.isFinite(Number(weights?.wHard)) && Number(weights.wHard) > 0) ? Number(weights.wHard) : 0.8;
-      const hardGain = Math.max(0.05, (0.25 - 0.015 * d) * wHard * anchorBonus);
+      const hardRMod = Math.max(0.1, 1 - r * 0.6);
+      const hardGain = Math.max(0.05, (0.25 - 0.015 * d) * wHard * anchorBonus * hardRMod);
       nextS = s * (1 + hardGain);
-    } else if (rating === 2) { // Good (普通): 増分項に対して wGood と anchorBonus を適用
+    } else if (rating === 2) { // Good (普通): 想起率変調因子を適用
       const wGood = (Number.isFinite(Number(weights?.wGood)) && Number(weights.wGood) > 0) ? Number(weights.wGood) : 1.2;
-      const initS = (Number(weights?.w2) || 2.5) * sScale;
-      if (!e?.repetition && !e?.stability) {
-        nextS = initS * anchorBonus;
-      } else {
-        const gain = Math.exp(1.1) * Math.pow(d, -0.4) * Math.pow(s, -0.15) * wGood * anchorBonus;
-        nextS = s * (1 + Math.max(0.2, gain));
-      }
-    } else { // Easy (簡単): 増分項に対して wEasy と anchorBonus を適用
+      const rMod = Math.max(0.15, Math.exp((1 - r) * 0.8) - 0.85);
+      const gain = Math.exp(1.1) * Math.pow(d, -0.4) * Math.pow(s, -0.15) * wGood * anchorBonus * rMod;
+      nextS = s * (1 + Math.max(0.1, gain));
+    } else { // Easy (簡単): 想起率変調因子を適用
       const wEasy = (Number.isFinite(Number(weights?.wEasy)) && Number(weights.wEasy) > 0) ? Number(weights.wEasy) : 1.6;
-      const initEasyS = (Number(weights?.w3) || 5.0) * sScale;
-      if (!e?.repetition && !e?.stability) {
-        nextS = initEasyS * anchorBonus;
-      } else {
-        const gain = Math.exp(1.4) * Math.pow(d, -0.4) * Math.pow(s, -0.15) * wEasy * anchorBonus;
-        nextS = s * (1 + Math.max(0.5, gain));
-      }
+      const rModEasy = Math.max(0.2, Math.exp((1 - r) * 1.0) - 0.75);
+      const gain = Math.exp(1.4) * Math.pow(d, -0.4) * Math.pow(s, -0.15) * wEasy * anchorBonus * rModEasy;
+      nextS = s * (1 + Math.max(0.3, gain));
     }
 
     if (!Number.isFinite(nextS) || nextS <= 0) nextS = 1.0;
@@ -313,12 +401,13 @@
     const diffDelta = rating === 0 ? 1.2 : rating === 1 ? 0.6 : rating === 2 ? -0.2 : -0.8;
     const nextDifficulty = Math.max(1.0, Math.min(10.0, Number((curDifficulty + diffDelta).toFixed(2))));
 
-    // 項目22: Leech（難語・忘却多発）の追跡
+    // 項目22: Leech（難語・忘却多発）の追跡（カードの難易度 Difficulty に応じた動的閾値）
     let curLapses = Number(e?.lapses || 0);
     if (rating === 0) {
       curLapses++;
     }
-    const isLeech = curLapses >= 5;
+    const leechThreshold = curDifficulty >= 8.0 ? 3 : (curDifficulty >= 5.0 ? 4 : 5);
+    const isLeech = curLapses >= leechThreshold;
     const flags = Array.isArray(e?.flags) ? [...e.flags] : [];
     if (isLeech && !flags.includes('leech')) {
       flags.push('leech');
@@ -372,8 +461,8 @@
       flags,
       retrievability: Number((Number.isFinite(currentR) ? currentR : 1.0).toFixed(3)),
       nextReview: nextReviewDate,
-      version: (Number(e?.version) || 1) + 1,
-      updatedAt: now,
+      version: (Number.isInteger(Number(e?.version)) && Number(e.version) > 0) ? Number(e.version) : 1,
+      updatedAt: Number(e?.updatedAt) || now,
       reviewUpdatedAt: now
     };
   }
@@ -438,15 +527,24 @@
     // 経過日数後の今回の想起率 R をシミュレートして、今回の実測 (curr.rating >= 1 ? 1 : 0) と突合
     for (let i = 0; i < transitions.length; i++) {
       const { prev, curr } = transitions[i];
+      const elapsedDays = (Number(curr.timestamp) - Number(prev.timestamp)) / 86400000;
+      // [P1-5 解決] 同日・短時間（4.8時間未満）の再学習は短期記憶ノイズと勾配消失を招くため長期忘却モデルの評価から除外
+      if (!Number.isFinite(elapsedDays) || elapsedDays < 0.2) continue;
+
+      const prevTs = Number(prev.timestamp) || Date.now();
+      const prevElapsed = Number(prev.elapsedDays || 0);
       const simulatedPrevEntry = {
         stability: Number(prev.lastStability ?? 1.0),
         difficulty: Number(prev.lastDifficulty ?? 5.0),
         interval: Number(prev.lastInterval ?? 1.0),
-        repetition: 1
+        repetition: 1,
+        reviewUpdatedAt: prevTs - Math.round(prevElapsed * 86400000),
+        nextReview: prevTs
       };
       // ラベル漏洩完全排除: next.rating ではなく前回の復習評価 prev.rating で安定度を推計
-      const nextS = predStability(simulatedPrevEntry, prev.rating, weights);
-      const elapsedDays = Math.max(0, (Number(curr.timestamp) - Number(prev.timestamp)) / 86400000);
+      // 過去復習時点の想起率 R を正確に反映するため prevTs と prev.retrievability を供給
+      const prevR = Number.isFinite(Number(prev.retrievability)) ? Number(prev.retrievability) : null;
+      const nextS = predStability(simulatedPrevEntry, prev.rating, weights, prevTs, prevR);
       const r = Math.pow(1 + dynamicFactor * (elapsedDays / (nextS > 0 ? nextS : 1.0)), decay);
       const clampedR = Number.isFinite(r) ? Math.max(0.01, Math.min(0.99, r)) : 0.9;
       const actual = curr.rating >= 1 ? 1.0 : 0.0;
@@ -459,10 +557,16 @@
     // 2. 単発ログ評価: 事前安定度 lastStability * sScale と経過日数に対する実測成否を突合
     for (let i = 0; i < singles.length; i++) {
       const l = singles[i];
-      const actual = l.rating >= 1 ? 1.0 : 0.0;
-      const rawS = ((Number(l.lastStability) > 0 ? Number(l.lastStability) : 1.0)) * sScale;
+      // [P1-1 解決] 未学習状態・初回忘却直後（lastInterval <= 0 または非有限値）を除外
+      if (!Number.isFinite(Number(l.lastInterval)) || Number(l.lastInterval) <= 0) continue;
       const rawElapsed = l.elapsedDays ?? l.lastInterval ?? 1.0;
-      const elapsedDays = Math.max(0, Number.isFinite(Number(rawElapsed)) ? Number(rawElapsed) : 1.0);
+      const elapsedDays = Number.isFinite(Number(rawElapsed)) ? Number(rawElapsed) : 1.0;
+      // [P1-5 解決] 同日短期ログのノイズ除外
+      if (elapsedDays < 0.2) continue;
+
+      const actual = l.rating >= 1 ? 1.0 : 0.0;
+      // [P2-⑧ 解決] l.lastStability は算出時点で既に sScale が適用されているため二重適用を防止
+      const rawS = Number(l.lastStability) > 0 ? Number(l.lastStability) : (1.0 * sScale);
       const r = Math.pow(1 + dynamicFactor * (elapsedDays / (rawS > 0 ? rawS : 1.0)), decay);
       const clampedR = Number.isFinite(r) ? Math.max(0.01, Math.min(0.99, r)) : 0.9;
       const err = actual - clampedR;
@@ -489,15 +593,16 @@
     const wGood = Number(weights?.wGood) || 1.2;
     const wEasy = Number(weights?.wEasy) || 1.6;
 
-    // L2正則化 (MAP: データ数 n に応じて λ/n スケーリング、中心を妥当な事前値 [1.0, -0.5, 0.8, 1.2, 1.6] に設定)
-    const lambda = 1.0 / n;
+    // L2正則化 (MAP: データ数 n < 100 の過学習を防止するため、DEFAULT_FSRS_WEIGHTS に対する正則化強度を適応的に強化)
+    const adaptiveLambda = n < 100 ? (0.2 * (1.0 - n / 100.0) + (1.0 / n)) : (1.0 / n);
+    const defW = DEFAULT_FSRS_WEIGHTS;
     const l2Penalty = (
-      Math.pow(sScale - 1.0, 2) +
-      Math.pow(decayFactor - (-0.5), 2) +
-      Math.pow(wHard - 0.8, 2) +
-      Math.pow(wGood - 1.2, 2) +
-      Math.pow(wEasy - 1.6, 2)
-    ) * lambda;
+      Math.pow(sScale - defW.sScale, 2) +
+      Math.pow(decayFactor - defW.decayFactor, 2) +
+      Math.pow(wHard - defW.wHard, 2) +
+      Math.pow(wGood - defW.wGood, 2) +
+      Math.pow(wEasy - defW.wEasy, 2)
+    ) * adaptiveLambda;
 
     // 順序制約 (Hard < Good < Easy の逆転を防止)
     let orderPenalty = 0;
@@ -798,11 +903,32 @@
     // 消化キャパシティ上限（1回あたり最大20語に制限して認知過負荷による離脱を防止）
     const maxCap = options.maxBatchCap || 20;
     const targetBatch = imminent.slice(0, maxCap);
-    const topWord = targetBatch[0]?.item?.word || '重要単語';
+    const topWord = targetBatch[0]?.item?.word || 'Word';
     const count = targetBatch.length;
     const estMinutes = Math.max(1, Math.round(count * 0.25)); // 1語あたり約15秒換算
-    const title = '【Vocab Vault】忘却防止ダイジェスト';
-    const body = `「${topWord}」など ${count} 語が復習のベストタイミングです（目安: 約${estMinutes}分）。今すぐ消化して長期記憶へ定着させましょう！`;
+    // [P3-2 解決] 全10言語対応のPush通知メッセージ生成
+    const locale = global.VocabI18n?.getLocale?.() || global.App?.tgtLang || 'ja';
+    const isJa = locale === 'ja';
+    const title = isJa ? '【Vocab Vault】忘却防止ダイジェスト' : (locale === 'de' ? '【Vocab Vault】Wiederholungs-Digest' : (locale === 'fr' ? '【Vocab Vault】Rappel de révision' : (locale === 'es' ? '【Vocab Vault】Resumen de repaso' : (locale === 'ko' ? '【Vocab Vault】망각 방지 알림' : (locale === 'zh' ? '【Vocab Vault】防遗忘复习提醒' : (locale === 'it' ? '【Vocab Vault】Promemoria ripasso' : (locale === 'pt' ? '【Vocab Vault】Lembrete de revisão' : (locale === 'nl' ? '【Vocab Vault】Herhalingsherinnering' : '【Vocab Vault】Retention Review Digest'))))))));
+    const body = isJa
+      ? `「${topWord}」など ${count} 語が復習のベストタイミングです（目安: 約${estMinutes}分）。今すぐ消化して長期記憶へ定着させましょう！`
+      : (locale === 'de'
+          ? `Guter Zeitpunkt für „${topWord}“ und ${count} weitere Wörter (ca. ${estMinutes} Min). Jetzt wiederholen!`
+          : (locale === 'fr'
+              ? `Moment idéal pour réviser « ${topWord} » et ${count} autres mots (~${estMinutes} min).`
+              : (locale === 'es'
+                  ? `Momento ideal para repasar «${topWord}» y ${count} palabras más (~${estMinutes} min).`
+                  : (locale === 'ko'
+                      ? `「${topWord}」 등 ${count}개 단어의 복습 최적 시기입니다 (약 ${estMinutes}분 소요).`
+                      : (locale === 'zh'
+                          ? `“${topWord}”等 ${count} 个单词已到最佳复习时间（约 ${estMinutes} 分钟）。`
+                          : (locale === 'it'
+                              ? `Momento ideale per ripassare "${topWord}" e altre ${count} parole (~${estMinutes} min).`
+                              : (locale === 'pt'
+                                  ? `Momento ideal para revisar "${topWord}" e mais ${count} palavras (~${estMinutes} min).`
+                                  : (locale === 'nl'
+                                      ? `Ideaal moment om "${topWord}" en ${count} andere woorden te herhalen (~${estMinutes} min).`
+                                      : `Optimal time to review "${topWord}" and ${count} more words (~${estMinutes} min).`))))))));
 
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.ready) {
@@ -840,13 +966,23 @@
   }
 
   function saveOfflineQueue(q) {
+    const list = Array.isArray(q) ? q : [];
     try {
-      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(q));
-      if (global.VocabStorage?.idbPut) {
-        global.VocabStorage.idbPut(OFFLINE_QUEUE_KEY, q);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(list));
       }
-      updateOfflineBadgeUI();
-    } catch {}
+    } catch (e) {
+      console.warn('[SRS] LocalStorage saveOfflineQueue failed, relying on IndexedDB:', e);
+    }
+
+    try {
+      if (global.VocabStorage?.idbPut) {
+        global.VocabStorage.idbPut(OFFLINE_QUEUE_KEY, list);
+      }
+    } catch (e) {
+      console.warn('[SRS] IndexedDB saveOfflineQueue failed:', e);
+    }
+    updateOfflineBadgeUI();
   }
 
   // iOS Safariの7日間パージ対策: IndexedDBからの復旧
@@ -1083,8 +1219,21 @@
     cardEl.addEventListener('touchend', onEnd, { passive: true });
     cardEl.addEventListener('touchcancel', resetCardState, { passive: true });
 
+    // [P2-⑩ 解決] window blur リスナーの蓄積・メモリリーク防止
     if (typeof window !== 'undefined') {
-      window.addEventListener('blur', resetCardState, { passive: true });
+      if (cardEl._blurHandler) {
+        window.removeEventListener('blur', cardEl._blurHandler);
+      }
+      cardEl._blurHandler = () => {
+        // カード要素がDOMから離脱した場合は自動的にリスナーを解除
+        if (typeof document !== 'undefined' && !document.contains(cardEl)) {
+          window.removeEventListener('blur', cardEl._blurHandler);
+          cardEl._blurHandler = null;
+          return;
+        }
+        resetCardState();
+      };
+      window.addEventListener('blur', cardEl._blurHandler, { passive: true });
     }
 
     // マウスドラッグ対応 (動的リスナー登録でリーク防止)
@@ -1111,6 +1260,125 @@
     });
   }
 
+  /**
+   * 復習負荷平滑化 & バッファ調整 (Workload Smoothing & Fuzzing)
+   * 特定日への復習集中（過密スパイク）を検知し、安全な記憶定着余力（R >= 0.85）のある単語を
+   * 近傍の空いている日へなだらかに再分散する。
+   */
+  function smoothReviewWorkload(listInput = null, targetCap = 25, forecastDays = 30) {
+    const list = Array.isArray(listInput) ? listInput : (global.VocabCore?.App?.entries || []);
+    if (!list.length) return { success: false, shiftedCount: 0, affectedDays: 0, message: '対象単語がありません。' };
+
+    const cap = Math.max(5, Math.min(100, Number(targetCap) || 25));
+    const days = Math.max(7, Math.min(60, Number(forecastDays) || 30));
+    const now = Date.now();
+
+    const todayYmd = (d) => {
+      const yr = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      return `${yr}-${mo}-${da}`;
+    };
+
+    const dayDiff = (d1Str, d2Str) => {
+      const p1 = d1Str.split('-').map(Number);
+      const p2 = d2Str.split('-').map(Number);
+      const dt1 = new Date(p1[0], p1[1] - 1, p1[2]);
+      const dt2 = new Date(p2[0], p2[1] - 1, p2[2]);
+      return Math.round((dt2 - dt1) / 86400000);
+    };
+
+    const baseDate = new Date();
+    const todayStr = todayYmd(baseDate);
+
+    // 1. 各日の単語リストをインデックス化
+    const dayBuckets = new Map();
+    for (let d = 0; d < days; d++) dayBuckets.set(d, []);
+
+    list.forEach(item => {
+      if (!item || !item.nextReview || item.isDeleted) return;
+      const targetYmd = todayYmd(new Date(item.nextReview));
+      const diff = dayDiff(todayStr, targetYmd);
+      if (diff >= 0 && diff < days) {
+        dayBuckets.get(diff).push(item);
+      }
+    });
+
+    let shiftedCount = 0;
+    const affectedDaysSet = new Set();
+
+    // 2. 過密日（count > cap）を検知して平滑化
+    for (let d = 0; d < days; d++) {
+      const bucket = dayBuckets.get(d) || [];
+      if (bucket.length <= cap) continue;
+
+      // 記憶定着率 R が高い（余裕がある）順に並べ替え
+      // R < 0.85 の忘却危機単語は絶対に前後にずらさず元の期日を保護
+      const candidates = bucket
+        .filter(item => {
+          const r = getRetrievability(item, now);
+          const stab = Number(item.stability) || Number(item.interval) || 0;
+          return r >= 0.85 && stab >= 2.0;
+        })
+        .sort((a, b) => {
+          const rA = getRetrievability(a, now);
+          const rB = getRetrievability(b, now);
+          return rB - rA;
+        });
+
+      const excessCount = bucket.length - cap;
+      let shiftedFromThisDay = 0;
+
+      for (let i = 0; i < candidates.length && shiftedFromThisDay < excessCount; i++) {
+        const item = candidates[i];
+
+        // 最も空いている近傍日を探す (d+1, d-1, d+2, d-2)
+        // 本日(d=0)より過去には移動させない
+        let bestTargetOffset = -1;
+        let lowestCount = cap;
+
+        const candidateOffsets = [d + 1, d - 1, d + 2, d - 2].filter(off => off >= (d === 0 ? 1 : 0) && off < days);
+        for (const targetOff of candidateOffsets) {
+          const targetBucket = dayBuckets.get(targetOff) || [];
+          if (targetBucket.length < lowestCount) {
+            lowestCount = targetBucket.length;
+            bestTargetOffset = targetOff;
+          }
+        }
+
+        if (bestTargetOffset !== -1 && lowestCount < cap) {
+          const targetBucket = dayBuckets.get(bestTargetOffset);
+          const oldIndex = bucket.indexOf(item);
+          if (oldIndex !== -1) bucket.splice(oldIndex, 1);
+          targetBucket.push(item);
+
+          // ファジング（微小なジッター: 1〜3時間）を付与して将来の期日共鳴を防止
+          const jitterMs = Math.floor((Math.random() - 0.5) * 3600000 * 4);
+          const targetDateObj = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + bestTargetOffset);
+          targetDateObj.setHours(9, 0, 0, 0);
+          item.nextReview = targetDateObj.getTime() + jitterMs;
+          item.version = (Number(item.version) || 1) + 1;
+          item.updatedAt = now;
+          item.reviewUpdatedAt = now;
+
+          shiftedCount++;
+          shiftedFromThisDay++;
+          affectedDaysSet.add(d);
+          affectedDaysSet.add(bestTargetOffset);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      shiftedCount,
+      affectedDays: affectedDaysSet.size,
+      targetCap: cap,
+      forecastDays: days,
+      list
+    };
+  }
+
   global.VocabSRS = {
     DEFAULT_FSRS_WEIGHTS,
     getUserFSRSWeights,
@@ -1134,15 +1402,20 @@
     getRetrievability,
     getEtymologyAnchorBonus,
     calculateNextReview,
+    smoothReviewWorkload,
     queueOfflineReview,
     flushOfflineReviews,
     recoverOfflineQueueFromIdb,
+    recoverReviewHistoryFromIdb,
     updateOfflineBadgeUI,
     attachSwipeGesture,
     triggerHaptic
   };
 
   if (typeof window !== 'undefined' && typeof setTimeout === 'function') {
-    setTimeout(recoverOfflineQueueFromIdb, 400);
+    setTimeout(() => {
+      recoverOfflineQueueFromIdb();
+      recoverReviewHistoryFromIdb();
+    }, 400);
   }
 })(typeof window !== 'undefined' ? window : globalThis);

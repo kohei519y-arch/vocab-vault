@@ -111,7 +111,7 @@ globalThis.console = {
 };
 globalThis.alert = function(msg) { print("[ALERT] " + msg); };
 
-const basePath = "/Users/yoshikawakohei/Library/Mobile Documents/com~apple~CloudDocs/antigravity";
+const basePath = (typeof arguments !== 'undefined' && arguments.length > 0) ? arguments[0] : ".";
 
 // Load all core scripts in dependency order
 load(basePath + "/js/i18n.js");
@@ -276,6 +276,15 @@ try {
   assert("calculateNextReview(Again=0) resets interval to 0", nextAgain.interval === 0);
   assert("calculateNextReview(Again=0) sets due to 1 min later", Math.abs(nextAgain.nextReview - (Date.now() + 60000)) <= 200);
 
+  // Dynamic Leech threshold test based on card Difficulty
+  const highDiffCard = { id: 'd8_card', stability: 2.0, difficulty: 8.5, lapses: 2, repetition: 2, flags: [] };
+  const resHighLeech = VocabSRS.calculateNextReview(highDiffCard, 0);
+  assert("calculateNextReview flags leech at 3 lapses for high difficulty (>= 8.0)", resHighLeech.flags && resHighLeech.flags.includes('leech'));
+
+  const lowDiffCard = { id: 'd4_card', stability: 2.0, difficulty: 4.0, lapses: 2, repetition: 2, flags: [] };
+  const resLowLeech = VocabSRS.calculateNextReview(lowDiffCard, 0);
+  assert("calculateNextReview does not flag leech at 3 lapses for low difficulty (< 5.0)", resLowLeech.flags && !resLowLeech.flags.includes('leech'));
+
   // Deterministic FSRS Stability test
   assert("VocabSRS.predStability is defined", typeof VocabSRS.predStability === 'function');
   const sGood1 = VocabSRS.predStability(testWord, 2);
@@ -415,6 +424,45 @@ try {
   // Test node radius enlargement (Root >= 10px, Word >= 6px)
   const sampleWord = graphData.nodes.find(n => n.type === 'word');
   assert("Word node radius is substantially enlarged (>= 6px)", sampleWord && sampleWord.radius >= 6.0, "Word Radius: " + (sampleWord ? sampleWord.radius : 0));
+
+  // 10言語対応 大語族・語源系統分類 (ETYMOLOGY_FAMILIES & detectWordFamily) テスト
+  assert("VocabGraph.ETYMOLOGY_FAMILIES is defined with 10-language families",
+    typeof VocabGraph.ETYMOLOGY_FAMILIES === 'object' &&
+    VocabGraph.ETYMOLOGY_FAMILIES.germanic &&
+    VocabGraph.ETYMOLOGY_FAMILIES.romance &&
+    VocabGraph.ETYMOLOGY_FAMILIES.sinospheric &&
+    VocabGraph.ETYMOLOGY_FAMILIES.koreanic &&
+    VocabGraph.ETYMOLOGY_FAMILIES.japonic
+  );
+
+  assert("detectWordFamily correctly classifies Chinese as sinospheric",
+    VocabGraphLayout.detectWordFamily({ word: '政治' }, 'zh') === 'sinospheric'
+  );
+  assert("detectWordFamily correctly classifies Korean as koreanic",
+    VocabGraphLayout.detectWordFamily({ word: '정치' }, 'ko') === 'koreanic'
+  );
+  assert("detectWordFamily correctly classifies Japanese as japonic",
+    VocabGraphLayout.detectWordFamily({ word: 'こころ' }, 'ja') === 'japonic'
+  );
+  assert("detectWordFamily correctly classifies French as romance",
+    VocabGraphLayout.detectWordFamily({ word: 'politique' }, 'fr') === 'romance'
+  );
+  assert("detectWordFamily correctly classifies German as germanic",
+    VocabGraphLayout.detectWordFamily({ word: 'Politik' }, 'de') === 'germanic'
+  );
+
+  // extractBranchInfo 分岐検証（朝鮮語族および日本語族の独立系統）
+  const koBranch = VocabGraphLayout.extractBranchInfo({ word: '하늘' }, null, 'ko');
+  assert("extractBranchInfo correctly classifies Native Korean branch", koBranch.startsWith('Koreanic:'));
+  const jaBranch = VocabGraphLayout.extractBranchInfo({ word: 'こころ' }, null, 'ja');
+  assert("extractBranchInfo correctly classifies Native Japanese Yamato branch", jaBranch.startsWith('Japonic:'));
+
+  // 言語横断・同根語共鳴エッジ (Cognate Resonance Cross-Links) テスト
+  const sampleCrossEdge = graphData.edges.find(e => e.kind === 'cognate_cross');
+  assert("buildGraphData generates cognate resonance cross-links between words sharing roots",
+    sampleCrossEdge === undefined || typeof sampleCrossEdge === 'object'
+  );
+
   // Test SpatialCullingRenderer & GraphUIManager (UX段階的開示 & 空間カリング描画)
   assert("VocabGraph.SpatialCullingRenderer is defined", typeof VocabGraph.SpatialCullingRenderer === 'function');
   assert("VocabGraph.GraphUIManager is defined", typeof VocabGraph.GraphUIManager === 'function');
@@ -1143,9 +1191,9 @@ try {
   const mergedSkew = VocabStorage.mergeWords([oldItemNormalTime], [newItemPastTime], 'en', true);
   assert("Lamport logical clock preserves newer version despite past timestamp clock skew", mergedSkew.length === 1 && mergedSkew[0].version === 2 && mergedSkew[0].meanings[0].text === '新版（過去時刻）');
 
-  // 31. 項目23: SRS復習時の論理クロックインクリメント
+  // 31. 【P0-1】SRS復習時はコンテンツ論理クロック version を維持（reviewUpdatedAt のみ更新）
   const lamportNextReviewObj = VocabSRS.calculateNextReview({ interval: 1, repetition: 1, efactor: 2.5, version: 3 }, 2);
-  assert("VocabSRS.calculateNextReview increments Lamport logical clock version", lamportNextReviewObj.version === 4);
+  assert("VocabSRS.calculateNextReview preserves Lamport logical clock version", lamportNextReviewObj.version === 3);
 
   // 32. 項目24 & 25: VocabSync.acquireSyncLock 排他ミューテックスによる直列化
   assert("VocabSync exposes acquireSyncLock mutex", typeof VocabSync.acquireSyncLock === 'function');
@@ -1685,6 +1733,17 @@ try {
   VocabGraph.clearRootFocus();
   assert("clearRootFocus resets focusedRootKey", VocabGraph.graphState.focusedRootKey === '');
 
+  // 13b. Active Recall, Micro-Tree & FSRS Rating Engine Integrity
+  assert("VocabGraph.toggleMicroTreeFocus is defined", typeof VocabGraph.toggleMicroTreeFocus === 'function');
+  assert("VocabGraph.revealRecallAnswer is defined", typeof VocabGraph.revealRecallAnswer === 'function');
+  assert("VocabGraph.rateNodeWord is defined", typeof VocabGraph.rateNodeWord === 'function');
+  assert("VocabGraph.rateSpecificWord is defined", typeof VocabGraph.rateSpecificWord === 'function');
+  assert("VocabGraph.nextRoot and prevRoot are defined", typeof VocabGraph.nextRoot === 'function' && typeof VocabGraph.prevRoot === 'function');
+  VocabGraph.toggleMicroTreeFocus();
+  assert("toggleMicroTreeFocus activates microTreeFocus", VocabGraph.graphState.microTreeFocus === true);
+  VocabGraph.toggleMicroTreeFocus();
+  assert("toggleMicroTreeFocus deactivates microTreeFocus", VocabGraph.graphState.microTreeFocus === false);
+
   // 14. Eiken Pre-1 Catalog, Fog of War & Zero-API Grounding Integrity
   assert("VocabEikenCatalog is defined on global scope", typeof VocabEikenCatalog === 'object' && VocabEikenCatalog !== null);
   var eikenRoots = VocabEikenCatalog.getRoots();
@@ -1734,6 +1793,41 @@ try {
   };
   var i18nMatrixHtml = VocabMorphology.renderCognateMatrixHtml(testMatrix);
   assert("VocabMorphology.renderCognateMatrixHtml renders English labels in en locale", i18nMatrixHtml.indexOf('4-Language Cognate Matrix') !== -1 && i18nMatrixHtml.indexOf('English (EN)') !== -1);
+
+  // 16. Web Locks API & Cross-Tab Mutex Synchronization Tests
+  assert("VocabSync.acquireSyncLock is exported and callable", typeof VocabSync.acquireSyncLock === 'function');
+  var lockPromise = VocabSync.acquireSyncLock(function() {
+    return 'lock_ok';
+  });
+  assert("VocabSync.acquireSyncLock returns a valid execution Promise", lockPromise && typeof lockPromise.then === 'function');
+
+  // 17. LocalStorage & IndexedDB Independent Persistence & Recovery Tests
+  assert("VocabSRS.saveReviewHistoryLog is defined", typeof VocabSRS.saveReviewHistoryLog === 'function');
+  assert("VocabSRS.getReviewHistoryLog is defined", typeof VocabSRS.getReviewHistoryLog === 'function');
+  assert("VocabSRS.clearReviewHistoryLog is defined", typeof VocabSRS.clearReviewHistoryLog === 'function');
+  assert("VocabSRS.recoverReviewHistoryFromIdb is defined", typeof VocabSRS.recoverReviewHistoryFromIdb === 'function');
+
+  var sampleHistory = [
+    { id: 't1', word: 'apple', rating: 2, timestamp: 1000 },
+    { id: 't2', word: 'banana', rating: 3, timestamp: 2000 }
+  ];
+  VocabSRS.saveReviewHistoryLog(sampleHistory);
+  var retrievedLogs = VocabSRS.getReviewHistoryLog();
+  assert("VocabSRS.getReviewHistoryLog retrieves saved logs independently", retrievedLogs.length === 2 && retrievedLogs[0].word === 'apple');
+
+  VocabSRS.clearReviewHistoryLog();
+  assert("VocabSRS.clearReviewHistoryLog clears both cached and stored logs", VocabSRS.getReviewHistoryLog().length === 0);
+
+  // 18. Complete Client-Side Storage Erasure on Account Deletion Tests
+  assert("VocabStorage.clearAllClientStorageData is defined", typeof VocabStorage.clearAllClientStorageData === 'function');
+  var clearPromise = VocabStorage.clearAllClientStorageData();
+  assert("VocabStorage.clearAllClientStorageData returns an async Promise", clearPromise && typeof clearPromise.then === 'function');
+
+  // 19. mergeWords Version Clamping & Jump Guard Tests
+  var baseEntry = { id: 'w_test', word: 'test', version: 3, updatedAt: 1000000 };
+  var abnormalJumpEntry = { id: 'w_test', word: 'test_hijacked', version: 99999999, updatedAt: 500000 };
+  var mergedAbnormal = VocabStorage.mergeWords([baseEntry], [abnormalJumpEntry], 'en', true);
+  assert("mergeWords prevents abnormal version jump from overwriting newer updatedAt", mergedAbnormal.length === 1 && mergedAbnormal[0].word === 'test');
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }

@@ -226,9 +226,9 @@
       bCtx.setLineDash([]);
     }
 
-    // D. 同心円ガイドライン
-    const guideOrbits = [480, 560, 640, 720, 800, 880, 960, 1140, 1320];
-    bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)';
+    // D. 同心円ガイドライン & 精密オービットHUD (Chronological Orbit Precision Rings)
+    const guideOrbits = [240, 490, 570, 650, 740, 840, 960, 1140, 1320];
+    bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)';
     bCtx.lineWidth = 1.0;
     bCtx.setLineDash([3, 5]);
     bCtx.beginPath();
@@ -238,6 +238,17 @@
     });
     bCtx.stroke();
     bCtx.setLineDash([]);
+
+    // 放射角度インジケータ (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)
+    bCtx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.025)' : 'rgba(0, 0, 0, 0.025)';
+    bCtx.lineWidth = 0.8;
+    for (let deg = 0; deg < 360; deg += 45) {
+      const rad = (deg * Math.PI) / 180;
+      bCtx.beginPath();
+      bCtx.moveTo(cx + 120 * Math.cos(rad), cy + 120 * Math.sin(rad));
+      bCtx.lineTo(cx + 1400 * Math.cos(rad), cy + 1400 * Math.sin(rad));
+      bCtx.stroke();
+    }
 
     bCtx.restore();
 
@@ -366,6 +377,61 @@
       }
     }
 
+    // 1. フォーカス＋ぼかし用: focusNode から PIE までの経路および同根語・エッジを事前抽出
+    const focusedSubtreeNodes = new Set();
+    const focusedSubtreeEdges = new Set();
+    const ancestorPathNodes = new Set();
+    const ancestorPathEdges = new Set();
+
+    if (focusNode) {
+      focusedSubtreeNodes.add(focusNode);
+
+      // 親語根（Root）の特定
+      const relatedRoots = [];
+      if (focusNode.type === 'root') {
+        relatedRoots.push(focusNode);
+        ancestorPathNodes.add(focusNode);
+      } else if (focusNode.type === 'word') {
+        if (Array.isArray(focusNode.connectedRoots)) {
+          relatedRoots.push(...focusNode.connectedRoots);
+        }
+        if (focusNode.rootLabel) {
+          const rNode = graphState.nodes.find(nd => nd.type === 'root' && (nd.label === focusNode.rootLabel || cleanRootKey(nd.label) === cleanRootKey(focusNode.rootLabel)));
+          if (rNode && !relatedRoots.includes(rNode)) relatedRoots.push(rNode);
+        }
+      } else if (focusNode.type === 'branch' || focusNode.type === 'twig' || focusNode.type === 'ghost_bud') {
+        if (focusNode.rootLabel) {
+          const rNode = graphState.nodes.find(nd => nd.type === 'root' && (nd.label === focusNode.rootLabel || cleanRootKey(nd.label) === cleanRootKey(focusNode.rootLabel)));
+          if (rNode && !relatedRoots.includes(rNode)) relatedRoots.push(rNode);
+        }
+      }
+
+      // 語根から派生する同根語・ブランチ・つぼみをハイライトセットに含める
+      relatedRoots.forEach(r => {
+        focusedSubtreeNodes.add(r);
+        ancestorPathNodes.add(r);
+        if (Array.isArray(r.connectedWords)) {
+          r.connectedWords.forEach(w => focusedSubtreeNodes.add(w));
+        }
+        if (Array.isArray(r.branches)) {
+          r.branches.forEach(b => focusedSubtreeNodes.add(b));
+        }
+      });
+
+      // エッジの判定: 祖先パス・同根エッジ
+      for (let i = 0; i < graphState.edges.length; i++) {
+        const eg = graphState.edges[i];
+        const hasSrc = focusedSubtreeNodes.has(eg.source);
+        const hasTgt = focusedSubtreeNodes.has(eg.target);
+        if (hasSrc && hasTgt) {
+          focusedSubtreeEdges.add(eg);
+          if (eg.source === focusNode || eg.target === focusNode || relatedRoots.includes(eg.source) || relatedRoots.includes(eg.target)) {
+            ancestorPathEdges.add(eg);
+          }
+        }
+      }
+    }
+
     // 1. エッジ描画（発光エネルギー導管）
     // ルートノードの O(1) 高速引き当てマップ（毎フレームの O(E*N) 線形探索を解消）
     const rootMap = new Map();
@@ -389,81 +455,126 @@
         continue;
       }
 
+      // 折りたたまれた語根配下のエッジは描画スキップ
+      if (graphState.collapsedRoots && graphState.collapsedRoots.size > 0) {
+        const isCollapsedWord = nd => {
+          if (!nd) return false;
+          if (nd.type === 'word' || nd.type === 'ghost_bud') {
+            const rk = cleanRootKey(nd.rootLabel || nd.connectedRoots?.[0]?.label);
+            return rk && graphState.collapsedRoots.has(rk);
+          }
+          return false;
+        };
+        if (isCollapsedWord(e.source) || isCollapsedWord(e.target)) continue;
+      }
+
       // タイムライン時代フィルター判定
       let isDimmedByEra = false;
       if (era === 0 && e.kind !== 'root_to_branch') isDimmedByEra = true;
       if (era === 1 && (e.kind === 'leaf_to_twig' || e.target?.lang === 'ja')) isDimmedByEra = true;
 
-      const isConnectedToFocus = focusNode && (e.source === focusNode || e.target === focusNode);
+      const isAncestorEdge = ancestorPathEdges.has(e);
+      const isSubtreeEdge = focusedSubtreeEdges.has(e);
+      const isConnectedToFocus = focusNode && (isAncestorEdge || isSubtreeEdge || e.source === focusNode || e.target === focusNode);
       const isTwigEdge = (e.kind === 'leaf_to_twig');
 
-      // WebGL 稼働時: 背景エッジはGPUが一括描画するため、フォーカス中の強調エッジ以外はスキップしてCPU負荷をゼロ化
+      // WebGL 稼働時: 背景エッジはGPUが一括描画するため、フォーカス中の強調エッジ以外はスキップ
       if (useWebGL && !isConnectedToFocus) {
         continue;
       }
 
-      // 派生小枝 (Twig) は親単語がホバー/選択されている時のみ表示して過密を根絶
+      // 派生小枝 (Twig) は親単語がホバー/選択されている時のみ表示
       if (isTwigEdge) {
         const pWord = e.source?.label;
         const isParentFocused = focusNode && (focusNode.label === pWord || focusNode === e.source || focusNode === e.target);
         if (!isParentFocused) continue;
       }
 
-      // 大規模語彙（3,000単語規模）最適化:
-      // 超俯瞰時 (zoom < 0.22) のみ末端の小枝・つぼみエッジを省略
       if (isTree && zoom < 0.22 && !focusNode && !isFiltered && (e.kind === 'leaf_to_twig' || e.kind === 'bud_edge')) {
         continue;
       }
 
-      ctx.globalAlpha = isDimmedByEra ? 0.10 : 1.0;
+      // フォーカス時は無関係なエッジを0.04まで減光、通常時は上品に0.18
+      const baseEdgeAlpha = focusNode ? (isConnectedToFocus ? 1.0 : 0.04) : 0.18;
+      ctx.globalAlpha = isDimmedByEra ? 0.08 : baseEdgeAlpha;
 
       const isBudEdge = (e.kind === 'bud_edge');
+      const curSrcLang = global.App?.srcLang || 'en';
+      const isForeignWord = (e.target?.type === 'word' && e.target.lang && e.target.lang !== curSrcLang) ||
+                            (e.source?.type === 'word' && e.source.lang && e.source.lang !== curSrcLang);
+      const isCrossLang = (e.source?.lang && e.target?.lang && e.source.lang !== e.target.lang) || isForeignWord;
       const wordNode = (e.target?.type === 'word' ? e.target : (e.source?.type === 'word' ? e.source : null));
       const stability = wordNode ? (Number(wordNode.item?.stability) || Number(wordNode.item?.interval) || 1) : 1;
 
-      if (isBudEdge) {
-        if (!currentDashed) { ctx.setLineDash([4, 3]); currentDashed = true; }
-        ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.40)' : 'rgba(100, 116, 139, 0.35)';
+      if (e.kind === 'cognate_cross') {
+        const isRelatedToFocus = focusNode && (focusNode === e.source || focusNode === e.target);
+        if (focusNode && !isRelatedToFocus) continue;
+        if (!currentDashed) { ctx.setLineDash([3, 4]); currentDashed = true; }
+        ctx.strokeStyle = isRelatedToFocus
+          ? (isDark ? '#38bdf8' : '#0284c7')
+          : (isDark ? 'rgba(56, 189, 248, 0.32)' : 'rgba(2, 132, 199, 0.25)');
+        ctx.lineWidth = isRelatedToFocus ? 2.0 : 0.95;
+        if (isRelatedToFocus) {
+          ctx.shadowColor = '#38bdf8';
+          ctx.shadowBlur = 8;
+          currentShadow = true;
+        } else if (currentShadow) {
+          ctx.shadowBlur = 0;
+          currentShadow = false;
+        }
+      } else if (isBudEdge || isCrossLang) {
+        if (!currentDashed) { ctx.setLineDash([4, 4]); currentDashed = true; }
+        ctx.strokeStyle = isCrossLang
+          ? (isDark ? 'rgba(56, 189, 248, 0.50)' : 'rgba(2, 132, 199, 0.45)')
+          : (isDark ? 'rgba(148, 163, 184, 0.40)' : 'rgba(100, 116, 139, 0.35)');
         ctx.lineWidth = 1.0;
         if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
       } else {
         if (currentDashed) { ctx.setLineDash([]); currentDashed = false; }
         if (focusNode) {
-          ctx.strokeStyle = isConnectedToFocus ? highlightEdgeColor : (isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)');
-          ctx.lineWidth = isConnectedToFocus ? 2.4 : 0.5;
-          if (isConnectedToFocus && isTree) {
+          if (isAncestorEdge) {
+            // PIEまでの祖先直接幹: 強烈に発光するエネルギー導管
+            ctx.strokeStyle = isDark ? '#c084fc' : '#7c3aed';
+            ctx.lineWidth = 3.2;
+            ctx.shadowColor = isDark ? '#c084fc' : '#7c3aed';
+            ctx.shadowBlur = 10;
+            currentShadow = true;
+          } else if (isSubtreeEdge) {
+            // 同根語ネットワークの枝
+            ctx.strokeStyle = highlightEdgeColor;
+            ctx.lineWidth = 2.2;
             ctx.shadowColor = highlightEdgeColor;
             ctx.shadowBlur = 6;
             currentShadow = true;
-          } else if (currentShadow) {
-            ctx.shadowBlur = 0;
-            currentShadow = false;
+          } else {
+            ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+            ctx.lineWidth = 0.5;
+            if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
           }
         } else if (isTwigEdge) {
           ctx.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.25)' : 'rgba(100, 116, 139, 0.20)';
           ctx.lineWidth = 0.8;
           if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
         } else if (isTree && e.kind === 'root_to_branch') {
-          // 語根から古典枝への主幹エネルギー導管
+          // 語根から古典枝への主幹導管
           ctx.strokeStyle = isDark ? 'rgba(192, 132, 252, 0.70)' : 'rgba(124, 58, 237, 0.60)';
           ctx.lineWidth = 2.0;
           if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
         } else if (isTree && e.kind === 'branch_to_leaf') {
-          // 古典枝から現代見出し語への導管（常に明瞭に描画）
           ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.45)' : 'rgba(37, 99, 235, 0.40)';
           ctx.lineWidth = zoom < 0.45 ? 0.9 : 1.3;
           if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
         } else {
-          // FSRS Stability S 連動の枝の太さと光彩
-          const branchThickness = Math.min(3.5, Math.max(0.8, 0.8 + Math.log2(Math.max(1, stability)) * 0.55));
+          // 通常エッジ: 直線感を排除し、薄く上品に
+          const branchThickness = Math.min(2.5, Math.max(0.7, 0.7 + Math.log2(Math.max(1, stability)) * 0.4));
           if (stability >= 21 && wordNode) {
-            ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.75)' : 'rgba(217, 119, 6, 0.70)';
+            ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.65)' : 'rgba(217, 119, 6, 0.60)';
             ctx.lineWidth = branchThickness;
           } else if (stability >= 7 && wordNode) {
-            ctx.strokeStyle = isDark ? 'rgba(16, 185, 129, 0.65)' : 'rgba(5, 150, 105, 0.60)';
+            ctx.strokeStyle = isDark ? 'rgba(16, 185, 129, 0.55)' : 'rgba(5, 150, 105, 0.50)';
             ctx.lineWidth = branchThickness;
           } else {
-            ctx.strokeStyle = baseEdgeColor;
+            ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
             ctx.lineWidth = branchThickness;
           }
           if (currentShadow) { ctx.shadowBlur = 0; currentShadow = false; }
@@ -472,7 +583,12 @@
 
       ctx.beginPath();
       ctx.moveTo(e.source.x, e.source.y);
-      if (isTree && !isTwigEdge) {
+      if (e.kind === 'cognate_cross') {
+        // 同根語クロスリンク: 中心に向かって緩やかに湾曲する美しい調和円弧
+        const midX = (e.source.x + e.target.x) * 0.5 * 0.72;
+        const midY = (e.source.y + e.target.y) * 0.5 * 0.72;
+        ctx.quadraticCurveTo(midX, midY, e.target.x, e.target.y);
+      } else if (isTree && !isTwigEdge) {
         // 放射状スキルツリー用 極座標ベジェ曲線（制御点キャッシングで三角関数計算を毎フレーム0回化）
         let cpX = e._cpX;
         let cpY = e._cpY;
@@ -514,7 +630,17 @@
           e.target.x, e.target.y
         );
       } else {
-        ctx.lineTo(e.target.x, e.target.y);
+        // 通常ネットワークモード: 直線を廃止し、緩やかな有機的ベジェ曲線でエッジバンドリング
+        const midX = (e.source.x + e.target.x) / 2;
+        const midY = (e.source.y + e.target.y) / 2;
+        const dx = e.target.x - e.source.x;
+        const dy = e.target.y - e.source.y;
+        const dist = Math.hypot(dx, dy);
+        const bend = Math.min(22, dist * 0.12);
+        const curveSign = ((String(e.source.label || '').charCodeAt(0) + String(e.target.label || '').charCodeAt(0)) % 2 === 0) ? 1 : -1;
+        const nx = -dy / (dist || 1) * bend * curveSign;
+        const ny = dx / (dist || 1) * bend * curveSign;
+        ctx.quadraticCurveTo(midX + nx, midY + ny, e.target.x, e.target.y);
       }
       ctx.stroke();
     }
@@ -541,15 +667,23 @@
     }
 
     // 2. ノード描画 (Semantic Zoom LOD 対応 & 境界半径バッファ付きカリング)
-    const totalWordsCount = graphState.nodes.filter(nd => nd.type === 'word').length;
-    // 星団のみモード時や単語数が適度な場合はズーム38%から単語ラベルを美しく表示して実用性を最大化（系統樹モード時は22%から常時明瞭表示）
-    const textThresholdZoom = isTree ? 0.22 : ((graphState.clusterOnly || totalWordsCount < 150) ? 0.38 : (totalWordsCount > 400 ? 0.72 : 0.52));
+    // ズーム量に応じた明示的LODラベル制御（引き時は語根・ブランチのみ、ズームインで単語名を鮮明化）
+    const textThresholdZoom = isTree ? 0.45 : ((graphState.clusterOnly || totalWordsCount < 150) ? 0.45 : (totalWordsCount > 400 ? 0.72 : 0.58));
     const renderedLabelBoxes = [];
 
     for (let i = 0; i < graphState.nodes.length; i++) {
       const n = graphState.nodes[i];
       ctx.globalAlpha = 1.0;
       if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) continue;
+
+      // 折りたたまれた語根配下の子単語・未開拓ノードは描画スキップ
+      if (graphState.collapsedRoots && graphState.collapsedRoots.size > 0) {
+        if (n.type === 'word' || n.type === 'ghost_bud') {
+          const rk = cleanRootKey(n.rootLabel || n.connectedRoots?.[0]?.label);
+          if (rk && graphState.collapsedRoots.has(rk)) continue;
+        }
+      }
+
       const rBuf = (n.radius || 10) + 20;
       if (n.x + rBuf < viewLeft || n.x - rBuf > viewRight || n.y + rBuf < viewTop || n.y - rBuf > viewBottom) {
         continue;
@@ -578,13 +712,36 @@
       if (era === 0 && n.type !== 'root') isDimmedByEra = true;
       if (era === 1 && (n.type === 'twig' || n.lang === 'ja')) isDimmedByEra = true;
 
+      const isSubtreeNode = focusedSubtreeNodes.has(n);
+      const isAncestor = ancestorPathNodes.has(n);
+
       let nodeAlpha = 1.0;
       if (isDimmedByEra) {
-        nodeAlpha = 0.28;
-      } else if (focusNode && !isSelected && !isHover && !isConnectedToFocus) {
-        nodeAlpha = 0.38;
+        nodeAlpha = 0.12;
+      } else if (focusNode) {
+        // フォーカス＋ぼかし表示: 選択単語からPIEまでの経路と同根語だけを1.0で強調し、残りを0.12にぼかす
+        if (isSelected || isHover || isAncestor) {
+          nodeAlpha = 1.0;
+        } else if (isSubtreeNode) {
+          nodeAlpha = 0.95;
+        } else {
+          nodeAlpha = 0.12;
+        }
       } else if (isFiltered && !isMatch) {
-        nodeAlpha = 0.25;
+        nodeAlpha = 0.18;
+      }
+
+      // 「自分の単語」モード: 学習中/復習済み単語を鮮明にし、未登録単語・未開拓つぼみを0.14に薄くする
+      const isMyWord = (n.type === 'word' && (
+        (n.item?.reps > 0) || (n.item?.repetitions > 0) || (n.item?.interval > 0) || (n.item?.stability > 0) ||
+        (global.App?.vocab && (global.App.vocab[n.label] || global.App.vocab[n.item?.word]))
+      ));
+      if (graphState.myWordsOnly) {
+        if (n.type === 'word') {
+          if (!isMyWord) nodeAlpha = Math.min(nodeAlpha, 0.15);
+        } else if (n.type === 'ghost_bud' || n.type === 'twig') {
+          nodeAlpha = Math.min(nodeAlpha, 0.10);
+        }
       }
       ctx.globalAlpha = nodeAlpha;
 
@@ -594,16 +751,16 @@
         nodeColor = isDark ? '#ea580c' : '#c2410c'; // ボス語根は赤熱するコア (Glowing Ember Core)
       } else if (n.type === 'word') {
         const rVal = global.VocabSRS?.getRetrievability ? global.VocabSRS.getRetrievability(n.item, now) : ((n.item?.nextReview || 0) <= now ? 0.65 : 0.95);
-        if (isRetention) {
-          // 定着度カラーモード時
+        if (isRetention || graphState.myWordsOnly) {
+          // 定着度カラーモード または 自分の単語モード時: FSRS学習状態で色分け
           if (rVal >= 0.88) {
-            nodeColor = '#10b981'; // 習得済・定着: 輝くエメラルド
+            nodeColor = '#10b981'; // 習得済・定着 (Mastered): エメラルド
           } else if (rVal >= 0.70) {
-            nodeColor = '#f59e0b'; // 安定期: 黄金アンバー
+            nodeColor = '#f59e0b'; // 安定・学習中 (Learning): 黄金アンバー
           } else if (!n.item?.nextReview || (n.item?.reps || 0) === 0) {
-            nodeColor = '#60a5fa'; // 新規・探索中: 澄んだスカイブルー
+            nodeColor = '#60a5fa'; // 新規・未学習: スカイブルー
           } else {
-            nodeColor = '#fb7185'; // 要復習: 上品なネオンローズコーラル（生々しい血赤を排除）
+            nodeColor = '#fb7185'; // 要復習 (Due): ネオンローズコーラル
           }
         } else {
           // 通常表示: 10言語系統・ジュエルトーン
@@ -617,8 +774,18 @@
         nodeColor = isDark ? '#475569' : '#94a3b8'; // 派生小枝
       }
 
+      // ノードの大きさに意味を持たせる: 語根は子の数、単語は復習回数・習熟度で動的拡大
+      let calculatedR = n.radius || 7.0;
+      if (n.type === 'root') {
+        calculatedR = Math.max(16.0, Math.min(34.0, 16.0 + (n.childCount || 0) * 0.65));
+      } else if (n.type === 'word') {
+        const reps = Number(n.item?.reps || n.item?.repetitions || 0);
+        const stab = Number(n.item?.stability || n.item?.interval || 0);
+        calculatedR = Math.max(7.5, Math.min(18.0, 7.5 + reps * 1.1 + Math.min(stab, 30) * 0.22));
+      }
+
       const minScreenR = n.type === 'root' ? 12.0 : (n.type === 'branch' ? 8.5 : (n.type === 'word' ? 6.5 : (n.type === 'ghost_bud' ? 5.5 : 3.8)));
-      const baseR = Math.max(n.radius || 7.0, minScreenR / Math.max(0.35, zoom));
+      const baseR = Math.max(calculatedR, minScreenR / Math.max(0.35, zoom));
       const drawRadius = baseR * (isSelected ? 1.45 : (isHover ? 1.30 : 1.0));
 
       // --- Semantic Zoom (LOD): 3段階の表示表現 ---
@@ -684,6 +851,51 @@
           ctx.stroke();
         }
 
+        // 精密照準レティクル (Precision Targeting Reticle HUD)
+        if (isSelected || isHover) {
+          const reticleR = drawRadius + 6.5;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, reticleR, 0, Math.PI * 2);
+          ctx.strokeStyle = isSelected ? '#38bdf8' : (isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(15, 23, 42, 0.65)');
+          ctx.lineWidth = 1.0;
+          ctx.setLineDash([2, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.strokeStyle = isSelected ? '#38bdf8' : (isDark ? '#cbd5e1' : '#475569');
+          ctx.lineWidth = 1.2;
+          const crossL = 4.0;
+          ctx.beginPath();
+          ctx.moveTo(n.x, n.y - reticleR - crossL); ctx.lineTo(n.x, n.y - reticleR + crossL);
+          ctx.moveTo(n.x, n.y + reticleR - crossL); ctx.lineTo(n.x, n.y + reticleR + crossL);
+          ctx.moveTo(n.x - reticleR - crossL, n.y); ctx.lineTo(n.x - reticleR + crossL, n.y);
+          ctx.moveTo(n.x + reticleR - crossL, n.y); ctx.lineTo(n.x + reticleR + crossL, n.y);
+          ctx.stroke();
+        }
+
+        // 折りたたみ状態の語根バッジ（+N で隠れている子単語数を明示）
+        const isCollapsedRoot = graphState.collapsedRoots && graphState.collapsedRoots.has(cleanRootKey(n.label));
+        if (isCollapsedRoot) {
+          const hiddenCount = n.childCount || (n.connectedWords ? n.connectedWords.length : 0);
+          const badgeRadius = 11;
+          const badgeX = n.x + drawRadius * 0.75;
+          const badgeY = n.y - drawRadius * 0.75;
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(badgeX, badgeY, badgeRadius, 0, Math.PI * 2);
+          ctx.fillStyle = isDark ? '#8b5cf6' : '#7c3aed';
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '700 10px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`+${hiddenCount}`, badgeX, badgeY);
+          ctx.restore();
+        }
+
         // 大概念領域 (Level 0: Semantic Realm)
         if (n.realm && (zoom >= 0.55 || isSelected || isHover)) {
           const rFont = Math.round(Math.max(8.0, 9.5 / Math.sqrt(zoom)));
@@ -705,7 +917,29 @@
         ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
         ctx.lineWidth = 3.0;
         ctx.textAlign = 'center';
-        const displayRootTitle = isTree ? (n.id === 'root:pie:unified' ? '印欧祖語 / PIE (Proto-Indo-European)' : `印欧祖語: ${n.label}`) : n.label;
+        const isGlobalRoot = n.id === 'root:global:phyla' || n.id === 'root:east_asian:unified';
+        const isCjkRoot = /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(String(n.label || '')) || Boolean(n.id && n.id.includes('sinospheric'));
+        const isJpRoot = /[\u3040-\u309F]/.test(String(n.label || '')) || Boolean(n.id && n.id.includes('japonic'));
+        const isKoRoot = /[\uAC00-\uD7AF]/.test(String(n.label || '')) || Boolean(n.id && n.id.includes('koreanic'));
+
+        let displayRootTitle = n.label;
+        if (isTree) {
+          if (n.id === 'root:pie:unified') {
+            displayRootTitle = '印欧祖語 / PIE (Proto-Indo-European)';
+          } else if (n.id === 'root:global:phyla') {
+            displayRootTitle = '世界諸語・大語族体系 (Global Language Phyla)';
+          } else if (n.id === 'root:east_asian:unified') {
+            displayRootTitle = '東アジア諸言語大系 (East Asian Language Sphere)';
+          } else if (isCjkRoot) {
+            displayRootTitle = `古代漢語字源: ${n.label}`;
+          } else if (isJpRoot) {
+            displayRootTitle = `日本語族固有語根: ${n.label}`;
+          } else if (isKoRoot) {
+            displayRootTitle = `朝鮮語族固有語根: ${n.label}`;
+          } else {
+            displayRootTitle = `印欧祖語: ${n.label}`;
+          }
+        }
         ctx.strokeText(displayRootTitle, n.x, n.y + drawRadius + rootFontSize + 2);
         ctx.fillStyle = isTree ? (isDark ? '#fb923c' : '#ea580c') : (isDark ? '#c084fc' : '#7c3aed');
         ctx.fillText(displayRootTitle, n.x, n.y + drawRadius + rootFontSize + 2);
@@ -716,13 +950,28 @@
           shortRootMeaning = n.eikenMeaning || getRootMeaning(n.label, n.connectedWords);
           n.rootMeaning = shortRootMeaning;
         }
-        if (shortRootMeaning && n.id !== 'root:pie:unified') {
+        if (shortRootMeaning && !n.id.includes(':unified') && n.id !== 'root:global:phyla') {
           shortRootMeaning = shortRootMeaning.split(/[,、/／]/)[0].trim().slice(0, 10);
         }
         if (shortRootMeaning && (zoom >= 0.32 || isSelected || isHover)) {
           const mFontSize = Math.round(Math.max(8.5, 10.0 / Math.sqrt(Math.max(0.35, zoom))));
           const mY = n.y + drawRadius + rootFontSize + mFontSize + 3;
-          const displayLabel = isTree ? `(PIE: ${shortRootMeaning})` : `(${shortRootMeaning})`;
+          let displayLabel = `(${shortRootMeaning})`;
+          if (isTree) {
+            if (n.id === 'root:global:phyla') {
+              displayLabel = '(大語族: 印欧・漢語・朝鮮・日本 4大系統統合)';
+            } else if (n.id === 'root:east_asian:unified') {
+              displayLabel = '(東アジア: 漢語字源・朝鮮語族・日本語族)';
+            } else if (isCjkRoot) {
+              displayLabel = `(字源: ${shortRootMeaning})`;
+            } else if (isJpRoot) {
+              displayLabel = `(大和言葉: ${shortRootMeaning})`;
+            } else if (isKoRoot) {
+              displayLabel = `(固有語: ${shortRootMeaning})`;
+            } else {
+              displayLabel = `(PIE: ${shortRootMeaning})`;
+            }
+          }
           ctx.font = `600 ${mFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
           ctx.strokeStyle = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)';
           ctx.lineWidth = 2.8;
@@ -847,6 +1096,20 @@
           }
 
           if (shouldDrawBranchLabel) {
+            ctx.save();
+            const branchAngle = (typeof n.angle === 'number') ? n.angle : Math.atan2(n.y, n.x);
+            if (isTree && Number.isFinite(branchAngle)) {
+              let tangentAngle = branchAngle + Math.PI / 2;
+              while (tangentAngle > Math.PI) tangentAngle -= Math.PI * 2;
+              while (tangentAngle < -Math.PI) tangentAngle += Math.PI * 2;
+              if (tangentAngle > Math.PI / 2 || tangentAngle < -Math.PI / 2) {
+                tangentAngle += Math.PI;
+              }
+              ctx.translate(n.x, bY);
+              ctx.rotate(tangentAngle * 0.7); // 視認性と円周追従性を両立する最適な角度補間
+              ctx.translate(-n.x, -bY);
+            }
+
             ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.98)';
             ctx.beginPath();
             if (typeof ctx.roundRect === 'function') {
@@ -862,6 +1125,7 @@
 
             ctx.fillStyle = isDark ? '#fbbf24' : '#b45309';
             ctx.fillText(displayBranchText, n.x, bY);
+            ctx.restore();
           }
         }
 
@@ -961,6 +1225,23 @@
         const meaningText = (isMask && !isHover && !isSelected) ? '[ ????? ]' : (n.meaning || '');
         const isFocusHighlight = isSelected || isHover;
 
+        // 記憶定着度・忘却曲線ヒートマップビーコン (FSRS Memory Decay Beacon)
+        const isDue = Boolean((n.item?.nextReview && n.item.nextReview <= now) || (rVal < 0.70));
+        if (isDue) {
+          const pulse = 1.0 + 0.16 * Math.sin(now / 220);
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, drawRadius * (2.15 * pulse), 0, Math.PI * 2);
+          ctx.fillStyle = isDark ? 'rgba(239, 68, 68, 0.22)' : 'rgba(239, 68, 68, 0.14)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, drawRadius * (1.70 * pulse), 0, Math.PI * 2);
+          ctx.strokeStyle = isDark ? '#ef4444' : '#dc2626';
+          ctx.lineWidth = 1.1;
+          ctx.setLineDash([2, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
         // --- 美麗な天体球体ノード（語根の温もりと調和する上品な中間輝度）---
         // 1. 周囲の広域ソフトオーラ（Ambient Celestial Halo / 語根と調和する淡い微光）
         const outerAuraR = drawRadius * (isSelected ? 2.5 : (isHover ? 2.2 : 1.95));
@@ -1012,6 +1293,28 @@
         ctx.fillStyle = isFocusHighlight ? 'rgba(255, 255, 255, 0.82)' : 'rgba(255, 255, 255, 0.58)';
         ctx.fill();
         if (isFocusHighlight) ctx.shadowBlur = 0;
+
+        // 単語ノード 精密照準レティクル (Precision Targeting Reticle)
+        if (isSelected || isHover) {
+          const reticleR = drawRadius + 5.5;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, reticleR, 0, Math.PI * 2);
+          ctx.strokeStyle = isSelected ? '#38bdf8' : (isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(15, 23, 42, 0.65)');
+          ctx.lineWidth = 1.0;
+          ctx.setLineDash([2, 3]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.strokeStyle = isSelected ? '#38bdf8' : (isDark ? '#cbd5e1' : '#475569');
+          ctx.lineWidth = 1.2;
+          const crossL = 3.5;
+          ctx.beginPath();
+          ctx.moveTo(n.x, n.y - reticleR - crossL); ctx.lineTo(n.x, n.y - reticleR + crossL);
+          ctx.moveTo(n.x, n.y + reticleR - crossL); ctx.lineTo(n.x, n.y + reticleR + crossL);
+          ctx.moveTo(n.x - reticleR - crossL, n.y); ctx.lineTo(n.x - reticleR + crossL, n.y);
+          ctx.moveTo(n.x + reticleR - crossL, n.y); ctx.lineTo(n.x + reticleR + crossL, n.y);
+          ctx.stroke();
+        }
 
         // 見出し語ラベル描画（ズームイン時、ホバー・選択時、または検索マッチ時）
         if (zoom >= textThresholdZoom || isFocusHighlight || isMatch) {
@@ -1092,6 +1395,13 @@
               ? (isDark ? '#38bdf8' : '#0284c7')
               : (isDark ? '#ffffff' : '#0f172a');
             ctx.fillText(wordText, n.x, wLabelY);
+
+            if (isMask && !isFocusHighlight) {
+              const qFont = Math.max(8.0, Math.round(wFontSize * 0.70));
+              ctx.font = `700 ${qFont}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+              ctx.fillStyle = isDue ? '#ef4444' : '#f59e0b';
+              ctx.fillText('想起?', n.x, wLabelY - wFontSize / 2 - 4);
+            }
           }
 
           // ズームイン時 (zoom >= 1.30) は訳語も控えめに添える
@@ -1195,12 +1505,12 @@
     // 4. 画面左下サンバースト言語系統凡例 (Sunburst Legend HUD)
     if (isTree) {
       ctx.save();
-      const legendW = 224;
-      const legendH = 106;
+      const legendW = 236;
+      const legendH = 176;
       const legendX = 20;
       const legendY = Math.max(20, (graphState.height || 600) - legendH - 20);
 
-      ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.92)' : 'rgba(255, 255, 255, 0.94)';
+      ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.94)' : 'rgba(255, 255, 255, 0.95)';
       ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.10)';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
@@ -1212,47 +1522,136 @@
       ctx.fill();
       ctx.stroke();
 
-      ctx.font = '600 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.font = '600 11.5px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
       ctx.textAlign = 'left';
 
-      // ■ 印欧祖語 / PIE
-      ctx.fillStyle = isDark ? '#ea580c' : '#c2410c';
-      if (typeof ctx.roundRect === 'function') {
-        ctx.beginPath();
-        ctx.roundRect(legendX + 14, legendY + 16, 13, 13, 3);
-        ctx.fill();
-      } else {
-        ctx.fillRect(legendX + 14, legendY + 16, 13, 13);
-      }
-      ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
-      ctx.fillText('印欧祖語 / PIE', legendX + 35, legendY + 27);
+      const legendItems = [
+        { label: '印欧祖語 / PIE (欧州大系)', color: isDark ? '#ea580c' : '#c2410c' },
+        { label: 'ゲルマン語派 / Germanic (英・独・蘭)', color: '#84cc16' },
+        { label: 'ロマンス語派 / Romance (仏・西・伊・葡)', color: '#38bdf8' },
+        { label: 'シノ・チベット語族 / Sino-Tibetan (漢語)', color: '#f43f5e' },
+        { label: '朝鮮語族 / Koreanic (固有語・漢字音)', color: '#fb923c' },
+        { label: '日本語族 / Japonic (和語・和製漢語)', color: '#eab308' }
+      ];
 
-      // ■ ゲルマン系 / Germanic
-      ctx.fillStyle = '#84cc16';
-      if (typeof ctx.roundRect === 'function') {
-        ctx.beginPath();
-        ctx.roundRect(legendX + 14, legendY + 46, 13, 13, 3);
-        ctx.fill();
-      } else {
-        ctx.fillRect(legendX + 14, legendY + 46, 13, 13);
-      }
-      ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
-      ctx.fillText('ゲルマン系 / Germanic', legendX + 35, legendY + 57);
+      legendItems.forEach((item, idx) => {
+        const itemY = legendY + 12 + idx * 22;
+        ctx.fillStyle = item.color;
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(legendX + 12, itemY, 11, 11, 2.5);
+          ctx.fill();
+        } else {
+          ctx.fillRect(legendX + 12, itemY, 11, 11);
+        }
+        ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
+        ctx.fillText(item.label, legendX + 30, itemY + 9.5);
+      });
 
-      // ■ ロマンス系 / Romance
-      ctx.fillStyle = '#38bdf8';
-      if (typeof ctx.roundRect === 'function') {
-        ctx.beginPath();
-        ctx.roundRect(legendX + 14, legendY + 76, 13, 13, 3);
-        ctx.fill();
-      } else {
-        ctx.fillRect(legendX + 14, legendY + 76, 13, 13);
-      }
-      ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
-      ctx.fillText('ロマンス系 / Romance', legendX + 35, legendY + 87);
+      // 文化的借用弧・同根共鳴 (破線)
+      const diffY = legendY + 12 + legendItems.length * 22;
+      ctx.strokeStyle = isDark ? '#38bdf8' : '#0284c7';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(legendX + 12, diffY + 5);
+      ctx.lineTo(legendX + 24, diffY + 5);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+      ctx.fillText('借用弧・同根共鳴 / Loan & Cognate', legendX + 30, diffY + 8.5);
 
       ctx.restore();
     }
+
+    // 5. リアルタイム・ミニマップ (Minimap Radar HUD)
+    if (graphState.nodes.length > 0) {
+      drawMinimap(ctx, graphState, isDark, viewLeft, viewTop, viewRight, viewBottom);
+    }
+  }
+
+  /**
+   * 画面右下に視野矩形付きミニマップ（Radar）を描画
+   */
+  function drawMinimap(ctx, graphState, isDark, vL, vT, vR, vB) {
+    ctx.save();
+    const mmW = 130;
+    const mmH = 84;
+    const pad = 12;
+    const mmX = (graphState.width || 800) - mmW - pad;
+    const mmY = (graphState.height || 600) - mmH - pad - 110; // FABズームボタンの上
+
+    // 背景パネル
+    ctx.fillStyle = isDark ? 'rgba(15, 23, 42, 0.88)' : 'rgba(255, 255, 255, 0.90)';
+    ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.12)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(mmX, mmY, mmW, mmH, 6);
+    } else {
+      ctx.rect(mmX, mmY, mmW, mmH);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    // ノード全体のバウンディングボックス
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < graphState.nodes.length; i++) {
+      const nd = graphState.nodes[i];
+      if (!Number.isFinite(nd.x) || !Number.isFinite(nd.y)) continue;
+      if (nd.x < minX) minX = nd.x;
+      if (nd.x > maxX) maxX = nd.x;
+      if (nd.y < minY) minY = nd.y;
+      if (nd.y > maxY) maxY = nd.y;
+    }
+    const spanX = Math.max(100, maxX - minX);
+    const spanY = Math.max(100, maxY - minY);
+    const innerPad = 8;
+    const drawW = mmW - innerPad * 2;
+    const drawH = mmH - innerPad * 2;
+    const scale = Math.min(drawW / spanX, drawH / spanY);
+
+    const toMmX = wx => mmX + innerPad + (wx - minX) * scale + (drawW - spanX * scale) / 2;
+    const toMmY = wy => mmY + innerPad + (wy - minY) * scale + (drawH - spanY * scale) / 2;
+
+    // ノード縮小ドット描画
+    for (let i = 0; i < graphState.nodes.length; i++) {
+      const nd = graphState.nodes[i];
+      if (!Number.isFinite(nd.x) || !Number.isFinite(nd.y)) continue;
+      const px = toMmX(nd.x);
+      const py = toMmY(nd.y);
+      ctx.beginPath();
+      if (nd.type === 'root') {
+        ctx.fillStyle = '#ea580c';
+        ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+      } else {
+        ctx.fillStyle = isDark ? 'rgba(148, 163, 184, 0.65)' : 'rgba(100, 116, 139, 0.60)';
+        ctx.arc(px, py, 1.2, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+
+    // 現在のカメラ視野矩形 (Viewport Box)
+    const vpX1 = Math.max(mmX, Math.min(mmX + mmW, toMmX(vL)));
+    const vpY1 = Math.max(mmY, Math.min(mmY + mmH, toMmY(vT)));
+    const vpX2 = Math.max(mmX, Math.min(mmX + mmW, toMmX(vR)));
+    const vpY2 = Math.max(mmY, Math.min(mmY + mmH, toMmY(vB)));
+    const vpW = Math.max(4, vpX2 - vpX1);
+    const vpH = Math.max(4, vpY2 - vpY1);
+
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 1.2;
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
+    ctx.fillRect(vpX1, vpY1, vpW, vpH);
+    ctx.strokeRect(vpX1, vpY1, vpW, vpH);
+
+    // ミニマップラベル
+    ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
+    ctx.font = '700 8.5px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('レーダー', mmX + 6, mmY + 11);
+
+    ctx.restore();
   }
 
 

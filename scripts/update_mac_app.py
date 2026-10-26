@@ -10,7 +10,7 @@ os.makedirs(res_dir, exist_ok=True)
 for fn in ["index.html", "dev.html", "manifest.json", "sw.js"]:
     shutil.copy(fn, res_dir)
 
-for folder in ["css", "js", "icons"]:
+for folder in ["css", "js", "icons", "legal"]:
     dest = os.path.join(res_dir, folder)
     if os.path.exists(dest):
         shutil.rmtree(dest)
@@ -21,7 +21,7 @@ web_dir = "vocab-vault-web"
 if os.path.exists(web_dir):
     for fn in ["index.html", "manifest.json", "sw.js"]:
         shutil.copy(fn, web_dir)
-    for folder in ["css", "js", "icons"]:
+    for folder in ["css", "js", "icons", "legal"]:
         dest = os.path.join(web_dir, folder)
         if os.path.exists(dest):
             shutil.rmtree(dest)

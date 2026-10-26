@@ -394,24 +394,24 @@
 
     const rawEx = rawWithTags.replace(/<[^>]+>/g, '').trim();
     const escapeRegExp = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const WORD_CHAR_CLASS = 'a-zA-Z0-9_äöüßÄÖÜéèêëàâùûüîïôœçÉÈÊËÀÂÙÛÜÎÏÔŒÇ';
-    // 語幹（先頭4文字以上）での派生・活用形マッチも候補に追加
+    // [P2-4 解決] Unicode Property Escape により西・伊・葡を含む全言語のアクセント文字境界を完全保護
+    const NOT_WORD_CHAR = '[^\\p{L}\\p{M}\\p{N}_]';
     const stem = word.length >= 5 ? word.slice(0, word.length - 2) : '';
     const targetCandidates = [usedForm, word].filter(Boolean);
     let match = null;
 
     for (const target of targetCandidates) {
       // Unicode対応の単語境界 + 活用語尾マッチ
-      const regInflected = new RegExp(`(^|[^${WORD_CHAR_CLASS}])(${escapeRegExp(target)}(?:s|es|d|ed|ing|er|est|ly|n)?)(?=[^${WORD_CHAR_CLASS}]|$)`, 'i');
+      const regInflected = new RegExp(`(^|${NOT_WORD_CHAR})(${escapeRegExp(target)}(?:s|es|d|ed|ing|er|est|ly|n)?)(?=${NOT_WORD_CHAR}|$)`, 'iu');
       const mB = regInflected.exec(rawEx);
       if (mB) {
         const prefixLen = mB[1] ? mB[1].length : 0;
         match = { start: mB.index + prefixLen, len: mB[2].length, matchedText: mB[2] };
         break;
       }
-      // 空白を含まないフレーズや日本語等の場合のみ単純一致フォールバック（英単語の短語が別単語内部を破壊するのを防止）
-      if (/[^a-zA-Z]/.test(target) || target.length >= 6) {
-        const regSimple = new RegExp(escapeRegExp(target), 'i');
+      // 空白を含まないフレーズや日本語等の場合のみ単純一致フォールバック
+      if (/[^\p{L}\p{N}]/u.test(target) || target.length >= 6) {
+        const regSimple = new RegExp(escapeRegExp(target), 'iu');
         const mS = regSimple.exec(rawEx);
         if (mS) {
           match = { start: mS.index, len: mS[0].length, matchedText: mS[0] };
@@ -422,7 +422,7 @@
 
     // 語幹によるフォールバック検索（例: conceive -> conceived, conceiving）
     if (!match && stem.length >= 4) {
-      const regStem = new RegExp(`(^|[^${WORD_CHAR_CLASS}])(${escapeRegExp(stem)}[${WORD_CHAR_CLASS}]*)(?=[^${WORD_CHAR_CLASS}]|$)`, 'i');
+      const regStem = new RegExp(`(^|${NOT_WORD_CHAR})(${escapeRegExp(stem)}[\\p{L}\\p{M}\\p{N}_]*)(?=${NOT_WORD_CHAR}|$)`, 'iu');
       const mStem = regStem.exec(rawEx);
       if (mStem) {
         const prefixLen = mStem[1] ? mStem[1].length : 0;
@@ -474,8 +474,8 @@
     const phText = isJa ? `タイピング産出 (${lenHint})` : `Type recall (${lenHint})`;
     const checkBtnLbl = isJa ? '判定' : 'Check';
     const typeBox = `<div class="cloze-type-wrap" style="margin-top:10px;display:flex;gap:6px;justify-content:center;align-items:center">
-      <input type="text" id="clozeTypeInput" class="cloze-type-input" placeholder="${phText}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;width:230px;text-align:center" onkeydown="if(event.key==='Enter' && !event.isComposing && event.keyCode !== 229){event.preventDefault();window.VocabAnkiView?.checkClozeTyping?.();}">
-      <button type="button" class="btn-xs btn-ac-o" onclick="window.VocabAnkiView?.checkClozeTyping?.()">${checkBtnLbl}</button>
+      <input type="text" id="clozeTypeInput" class="cloze-type-input" data-act="cloze-input" placeholder="${phText}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="padding:6px 10px;border-radius:6px;border:1px solid var(--b);background:var(--bg);color:var(--t);font-size:13px;width:230px;text-align:center">
+      <button type="button" class="btn-xs btn-ac-o" data-act="cloze-check">${checkBtnLbl}</button>
     </div>`;
     return badges.join('') + typeBox;
   }
@@ -554,7 +554,8 @@
         inp.style.borderColor = 'var(--ok)';
         const msg = global.VocabI18n?.t ? global.VocabI18n.t('anki.cloze_stem_ok', { input: rawVal, word: cur.word }) : `ほぼ正解（ステミング・語根一致）！入力: ${rawVal} / 正解: ${cur.word}`;
         global.VocabModal?.showToast?.(msg, 'ok', 3500);
-      } else if (minDistance === 1 && (val.length >= 3 || target.length >= 3)) {
+      // [P2-⑨ 解決] 3〜4文字の短語（cat/bat等）での1文字誤認を防止するため最低文字数5以上を要求
+      } else if (minDistance === 1 && target.length >= 5 && val.length >= 4) {
         inp.style.borderColor = 'var(--ok)';
         const msg = global.VocabI18n?.t ? global.VocabI18n.t('anki.cloze_typo_ok', { input: rawVal, word: cur.word }) : `ほぼ正解（1文字タイポ）！入力: ${rawVal} → 正解: ${cur.word}`;
         global.VocabModal?.showToast?.(msg, 'ok', 3500);
@@ -592,9 +593,23 @@
     const streakInfo = getStreakInfo(ctx);
     const progEl = $('aProg');
     if (progEl) {
-      const streakBadge = streakInfo.streak > 0 ? ` [連続: ${streakInfo.streak}日]` : '';
-      const goalBadge = ` [本日: ${goalInfo.count}/${goalInfo.goal}語]`;
-      progEl.textContent = `進捗: ${done}/${total}語 (${pct}%)${streakBadge}${goalBadge}`;
+      const t = global.VocabI18n?.t || ((k, p, d) => d || k);
+      const streakBadge = streakInfo.streak > 0
+        ? ` [${t('anki.streak_badge', { streak: streakInfo.streak }, `連続: ${streakInfo.streak}日`)}]`
+        : '';
+      const goalBadge = ` [${t('anki.goal_badge', { done: goalInfo.count, goal: goalInfo.goal }, `本日: ${goalInfo.count}/${goalInfo.goal}語`)}]`;
+      progEl.textContent = `${t('anki.progress_label', { done, total, pct }, `進捗: ${done}/${total}語 (${pct}%)`)}${streakBadge}${goalBadge}`;
+    }
+
+    // [P1-6 解決] サマリー表示ラッパーを非表示にし、通常カード要素の表示を復元
+    const summaryWrap = $('aSessionSummaryWrap');
+    if (summaryWrap) summaryWrap.style.display = 'none';
+    const aCardEl = $('aCard');
+    if (aCardEl && aCardEl.children) {
+      Array.from(aCardEl.children).forEach(child => {
+        if (!child || child.id === 'aSessionSummaryWrap' || child.classList?.contains('swipe-badge')) return;
+        if (child.style) child.style.display = '';
+      });
     }
 
     const mode = getAnkiMode();
@@ -853,7 +868,7 @@
       e.repetition = rep;
       e.efactor = Number(ef.toFixed(2));
       e.reviewUpdatedAt = now;
-      e.updatedAt = now;
+      e.updatedAt = Number(e.updatedAt) || now;
     }
 
     if (!appState._sessionReviewedItems) appState._sessionReviewedItems = [];
@@ -879,8 +894,11 @@
     } else {
       const finalGoal = getDailyGoalInfo(ctx);
       const finalStreak = getStreakInfo(ctx);
-      const streakTxt = finalStreak.streak > 0 ? ` / 連続: ${finalStreak.streak}日` : '';
-      ctx.showToast?.(`本日の復習完了。本日: ${finalGoal.count}語${streakTxt}`, 'ok', 4000);
+      const t = global.VocabI18n?.t || ((k, p, d) => d || k);
+      const streakTxt = finalStreak.streak > 0
+        ? ` / ${t('anki.streak_badge', { streak: finalStreak.streak }, `連続: ${finalStreak.streak}日`)}`
+        : '';
+      ctx.showToast?.(t('anki.session_complete_toast', { count: finalGoal.count, streak: streakTxt }, `本日の復習完了。本日: ${finalGoal.count}語${streakTxt}`), 'ok', 4000);
       showSessionSummary(ctx, appState._sessionReviewedItems || []);
     }
   }
@@ -898,7 +916,10 @@
 
     const finalGoal = getDailyGoalInfo(ctx);
     const finalStreak = getStreakInfo(ctx);
-    const streakTxt = finalStreak.streak > 0 ? `${finalStreak.streak}日連続達成` : '';
+    const t = global.VocabI18n?.t || ((k, p, d) => d || k);
+    const streakTxt = finalStreak.streak > 0
+      ? t('anki.streak_achieved', { streak: finalStreak.streak }, `${finalStreak.streak}日連続達成`)
+      : '';
 
     // 語根ごとの成長集計
     const rootGrowthMap = new Map();
@@ -923,15 +944,152 @@
 
     const tL = global.App?.tgtLang || global.VocabI18n?.getLocale?.() || 'ja';
     const isJa = tL === 'ja';
-    const emptyRootsMsg = isJa ? '語源ネットワークの記憶定着度が向上しました。' : 'Etymological root network retention reinforced.';
-    const sessCompTitle = isJa ? '本日の復習セッション完了' : (tL === 'de' ? 'Tägliche Wiederholung abgeschlossen' : (tL === 'fr' ? 'Session de révision terminée' : (tL === 'es' ? 'Sesión de repaso completada' : (tL === 'ko' ? '오늘의 복습 세션 완료' : (tL === 'zh' ? '今日复习已完成' : 'Daily Review Session Complete')))));
-    const todayReviewedLbl = isJa ? '語復習完了' : 'words reviewed';
-    const accuracyLbl = isJa ? '正答率' : 'Accuracy';
-    const rootsHeading = isJa ? '本日成長した語根ネットワーク領域' : (tL === 'de' ? 'Heute gestärkte Wortwurzeln' : (tL === 'fr' ? 'Racines renforcées aujourd’hui' : (tL === 'es' ? 'Raíces fortalecidas hoy' : (tL === 'ko' ? '오늘 성장한 어근 네트워크' : (tL === 'zh' ? '今日强化的词根网络' : 'Roots Strengthened Today')))));
-    const backBtnLbl = isJa ? '一覧に戻る' : (tL === 'de' ? 'Zurück zur Liste' : (tL === 'fr' ? 'Retour à la liste' : (tL === 'es' ? 'Volver a la lista' : (tL === 'ko' ? '목록으로 돌아가기' : (tL === 'zh' ? '返回列表' : 'Back to List')))));
-    const reinforcedLbl = isJa ? '語 定着強化' : ' words reinforced';
-    const stabilityUpLbl = isJa ? '安定度UP' : 'Stability UP';
-    const treeBtnLbl = isJa ? '系統樹' : (tL === 'de' ? 'Stammbaum' : (tL === 'fr' ? 'Arbre' : (tL === 'es' ? 'Árbol' : (tL === 'ko' ? '계통수' : (tL === 'zh' ? '谱系树' : 'Tree')))));
+
+    // [P2-2 解決] 全10言語対応のセッション完了UIテキストマッピング
+    const emptyRootsMsgMap = {
+      ja: '語源ネットワークの記憶定着度が向上しました。',
+      en: 'Etymological root network retention reinforced.',
+      fr: 'La rétention du réseau étymologique a été renforcée.',
+      de: 'Die Behaltensleistung des etymologischen Netzwerks wurde gestärkt.',
+      es: 'Se ha reforzado la retención de la red etimológica.',
+      it: 'La ritenzione della rete etimologica è stata rafforzata.',
+      pt: 'A retenção da rede etimológica foi reforçada.',
+      nl: 'De retentie van het etymologische netwerk is versterkt.',
+      zh: '词源网络的记忆牢固度已提升。',
+      ko: '어원 네트워크의 기억 정착도가 향상되었습니다.'
+    };
+    const sessCompTitleMap = {
+      ja: '本日の復習セッション完了',
+      en: 'Daily Review Session Complete',
+      fr: 'Session de révision terminée',
+      de: 'Tägliche Wiederholung abgeschlossen',
+      es: 'Sesión de repaso completada',
+      it: 'Sessione di ripasso completata',
+      pt: 'Sessão de revisão concluída',
+      nl: 'Herhalingssessie voltooid',
+      zh: '今日复习已完成',
+      ko: '오늘의 복습 세션 완료'
+    };
+    const todayReviewedLblMap = {
+      ja: '語復習完了',
+      en: 'words reviewed',
+      fr: 'mots révisés',
+      de: 'Wörter wiederholt',
+      es: 'palabras repasadas',
+      it: 'parole ripassate',
+      pt: 'palavras revisadas',
+      nl: 'woorden herhaald',
+      zh: '词已复习',
+      ko: '단어 복습 완료'
+    };
+    const accuracyLblMap = {
+      ja: '正答率',
+      en: 'Accuracy',
+      fr: 'Précision',
+      de: 'Genauigkeit',
+      es: 'Precisión',
+      it: 'Precisione',
+      pt: 'Precisão',
+      nl: 'Nauwkeurigheid',
+      zh: '正确率',
+      ko: '정답률'
+    };
+    const rootsHeadingMap = {
+      ja: '本日成長した語根ネットワーク領域',
+      en: 'Roots Strengthened Today',
+      fr: 'Racines renforcées aujourd’hui',
+      de: 'Heute gestärkte Wortwurzeln',
+      es: 'Raíces fortalecidas hoy',
+      it: 'Radici rafforzate oggi',
+      pt: 'Raízes fortalecidas hoje',
+      nl: 'Vandaag versterkte wortels',
+      zh: '今日强化的词根网络',
+      ko: '오늘 성장한 어근 네트워크'
+    };
+    const backBtnLblMap = {
+      ja: '一覧に戻る',
+      en: 'Back to List',
+      fr: 'Retour à la liste',
+      de: 'Zurück zur Liste',
+      es: 'Volver a la lista',
+      it: 'Torna all\'elenco',
+      pt: 'Voltar à lista',
+      nl: 'Terug naar de lijst',
+      zh: '返回列表',
+      ko: '목록으로 돌아가기'
+    };
+    const reinforcedLblMap = {
+      ja: '語 定着強化',
+      en: ' words reinforced',
+      fr: ' mots renforcés',
+      de: ' Wörter gestärkt',
+      es: ' palabras reforzadas',
+      it: ' parole rafforzate',
+      pt: ' palavras reforçadas',
+      nl: ' woorden versterkt',
+      zh: ' 词定着强化',
+      ko: ' 단어 정착 강화'
+    };
+    const stabilityUpLblMap = {
+      ja: '安定度UP',
+      en: 'Stability UP',
+      fr: 'Stabilité +',
+      de: 'Stabilität +',
+      es: 'Estabilidad +',
+      it: 'Stabilità +',
+      pt: 'Estabilidade +',
+      nl: 'Stabiliteit +',
+      zh: '稳定度UP',
+      ko: '안정도UP'
+    };
+    const treeBtnLblMap = {
+      ja: '系統樹',
+      en: 'Tree',
+      fr: 'Arbre',
+      de: 'Stammbaum',
+      es: 'Árbol',
+      it: 'Albero',
+      pt: 'Árvore',
+      nl: 'Boom',
+      zh: '谱系树',
+      ko: '계통수'
+    };
+    const analyticsBtnLblMap = {
+      ja: '定着率・分析を見る',
+      en: 'View Retention Analytics',
+      fr: 'Voir les analyses de rétention',
+      de: 'Behaltensanalysen anzeigen',
+      es: 'Ver análisis de retención',
+      it: 'Vedi analisi di ritenzione',
+      pt: 'Ver análises de retenção',
+      nl: 'Bekijk retentie-analyse',
+      zh: '查看记忆定着率分析',
+      ko: '기억 정착도 분석 보기'
+    };
+    const todayPrefixMap = {
+      ja: '本日',
+      en: 'Today',
+      fr: 'Aujourd\'hui',
+      de: 'Heute',
+      es: 'Hoy',
+      it: 'Oggi',
+      pt: 'Hoje',
+      nl: 'Vandaag',
+      zh: '今日',
+      ko: '오늘'
+    };
+
+    const emptyRootsMsg = emptyRootsMsgMap[tL] || emptyRootsMsgMap.en;
+    const sessCompTitle = sessCompTitleMap[tL] || sessCompTitleMap.en;
+    const todayReviewedLbl = todayReviewedLblMap[tL] || todayReviewedLblMap.en;
+    const todayPrefix = todayPrefixMap[tL] || todayPrefixMap.en;
+    const accuracyLbl = accuracyLblMap[tL] || accuracyLblMap.en;
+    const rootsHeading = rootsHeadingMap[tL] || rootsHeadingMap.en;
+    const backBtnLbl = backBtnLblMap[tL] || backBtnLblMap.en;
+    const reinforcedLbl = reinforcedLblMap[tL] || reinforcedLblMap.en;
+    const stabilityUpLbl = stabilityUpLblMap[tL] || stabilityUpLblMap.en;
+    const treeBtnLbl = treeBtnLblMap[tL] || treeBtnLblMap.en;
+    const analyticsBtnLbl = analyticsBtnLblMap[tL] || analyticsBtnLblMap.en;
 
     const rootListHtml = topRoots.length > 0 ? topRoots.map(([r, d]) => {
       const growthPct = Math.min(100, Math.round((d.growth / Math.max(1, d.count)) * 20));
@@ -950,25 +1108,45 @@
     }).join('') : `<div style="font-size:12px;color:var(--s);text-align:center;padding:12px">${emptyRootsMsg}</div>`;
 
     if (aCard) {
-      aCard.innerHTML = `
+      // [P1-6 解決] aCard の DOM 構造を破壊せず専用サマリーコンテナに描画
+      let summaryWrap = $('aSessionSummaryWrap');
+      if (!summaryWrap && typeof document !== 'undefined' && typeof document.createElement === 'function') {
+        try {
+          summaryWrap = document.createElement('div');
+          summaryWrap.id = 'aSessionSummaryWrap';
+          if (typeof aCard.appendChild === 'function') aCard.appendChild(summaryWrap);
+        } catch {}
+      }
+      if (aCard.children) {
+        try {
+          Array.from(aCard.children).forEach(child => {
+            if (child !== summaryWrap && child && child.style) child.style.display = 'none';
+          });
+        } catch {}
+      }
+      const targetEl = summaryWrap || aCard;
+      if (targetEl && targetEl.style) targetEl.style.display = 'block';
+
+      targetEl.innerHTML = `
         <div style="padding:24px 20px;text-align:center">
           <div style="display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:rgba(16,185,129,0.15);color:var(--ok);margin-bottom:12px">
             <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
           </div>
           <h2 style="font-size:18px;font-weight:750;color:var(--t);margin:0 0 6px">${sessCompTitle}</h2>
-          <p style="font-size:12.5px;color:var(--s);margin:0 0 16px">${isJa ? `本日: <strong>${finalGoal.count}</strong> ${todayReviewedLbl} ${streakTxt ? `（${streakTxt}）` : ''} / ${accuracyLbl}: <strong>${accuracy}%</strong>` : `Today: <strong>${finalGoal.count}</strong> ${todayReviewedLbl} ${streakTxt ? `(${streakTxt})` : ''} / ${accuracyLbl}: <strong>${accuracy}%</strong>`}</p>
+          <p style="font-size:12.5px;color:var(--s);margin:0 0 16px">${todayPrefix}: <strong>${finalGoal.count}</strong> ${todayReviewedLbl} ${streakTxt ? `(${streakTxt})` : ''} / ${accuracyLbl}: <strong>${accuracy}%</strong></p>
 
           <div style="text-align:left;margin-bottom:18px">
             <div style="font-size:12px;font-weight:700;color:var(--t);margin-bottom:8px">${rootsHeading}</div>
             ${rootListHtml}
           </div>
 
-          <div style="display:flex;justify-content:center;gap:10px">
+          <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap">
             <button type="button" class="btn-ac" id="btnFinishAnkiSession" style="padding:9px 24px;font-size:13px;font-weight:600">${backBtnLbl}</button>
+            <button type="button" class="btn-o" id="btnSummaryAnalytics" data-act="open-analytics" style="padding:9px 18px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:5px"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>${analyticsBtnLbl}</button>
           </div>
         </div>
       `;
-      $('btnFinishAnkiSession')?.addEventListener('click', () => exitAnki(ctx));
+      $('btnFinishAnkiSession')?.addEventListener?.('click', () => exitAnki(ctx));
     }
   }
 
@@ -1203,11 +1381,16 @@
   /**
    * アナリティクス・ダッシュボードのHTMLを生成
    */
+  let _workloadForecastDays = 14;
+  let _workloadTargetCap = 25;
+
   function buildAnalyticsDashboardHtml(options = {}) {
     const list = options.list || (global.VocabCore?.App?.entries || []);
     const retrievability = getOverallRetrievabilityStats(list);
     const heatmap = getCommitHeatmapData(63, options);
-    const workload = getFutureWorkloadData(14, list);
+    const forecastDays = options.days || _workloadForecastDays || 14;
+    _workloadForecastDays = forecastDays;
+    const workload = getFutureWorkloadData(forecastDays, list);
     const fsrsWeights = global.VocabSRS?.getUserFSRSWeights ? global.VocabSRS.getUserFSRSWeights() : null;
     const reviewLogs = global.VocabSRS?.getReviewHistoryLog ? global.VocabSRS.getReviewHistoryLog() : [];
 
@@ -1252,6 +1435,29 @@
       `;
     }).join('');
 
+    const calendarCellsHtml = workload.workload.map(w => {
+      let level = 0;
+      if (w.count > 0 && w.count <= 10) level = 1;
+      else if (w.count <= 20) level = 2;
+      else if (w.count <= 30) level = 3;
+      else if (w.count > 30) level = 4;
+
+      const isToday = w.dayOffset === 0;
+      const levelLabels = isEn ? ['0 words', 'Calm', 'Normal', 'Heavy', 'Peak Overload'] : ['0語', '快適', '適正', '注意', '過密'];
+      const levelText = levelLabels[level] || '適正';
+      const badgeTitle = `${w.date} (${w.label}): ${w.count}${isEn ? ' words scheduled' : '語の復習予定'}`;
+      return `
+        <div class="workload-day-cell l-${level} ${isToday ? 'today' : ''}" title="${badgeTitle}" data-act="show-day-workload" data-date="${esc(w.date)}" data-count="${w.count}" onclick="VocabAnkiView.showDayWorkloadDetails('${esc(w.date)}', ${w.count})">
+          <div class="day-header">${w.shortDate}${isToday ? (isEn ? ' (Today)' : ' (本日)') : ''}</div>
+          <div class="day-count">${w.count}</div>
+          <span class="day-pill">${levelText}</span>
+        </div>
+      `;
+    }).join('');
+
+    const peakDay = workload.workload.reduce((max, w) => (w.count > max.count ? w : max), { count: 0, date: '-', label: '-' });
+    const isPeakHeavy = peakDay.count > _workloadTargetCap;
+
     const optStatusHtml = fsrsWeights
       ? `<span class="badge ok">${t('analytics.badge_optimized', { count: fsrsWeights.logCount || reviewLogs.length, imp: fsrsWeights.improvement || '0' }, isEn ? `Optimized (${fsrsWeights.logCount || reviewLogs.length} reviews / +${fsrsWeights.improvement || '0'}% precision)` : `最適化中 (${fsrsWeights.logCount || reviewLogs.length}件 / 精度+${fsrsWeights.improvement || '0'}%)`)}</span>`
       : reviewLogs.length >= 20
@@ -1285,7 +1491,7 @@
             ${optStatusHtml}
           </div>
           <div style="font-size:12px;color:var(--s);line-height:1.6">
-            <p style="margin:0 0 8px 0" data-i18n="analytics.fsrs_weights_desc">直近${reviewLogs.length}件の復習ログに基づき、あなたの忘却速度に数理最適化された間隔で出題します。</p>
+            <p style="margin:0 0 8px 0">${t('analytics.fsrs_weights_desc', { count: reviewLogs.length })}</p>
             <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
               <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Stability Scaling Factor' : '安定度スケーリング係数'}">S-Scale: ${Number(fsrsWeights?.sScale || 1.0).toFixed(2)}x</span>
               <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Forgetting Curve Decay Rate (Negative Exponent)' : '忘却曲線の減衰率（負の指数）'}">Decay: ${Number(fsrsWeights?.decayFactor || -0.5).toFixed(2)}</span>
@@ -1294,8 +1500,8 @@
               <span class="badge" style="background:var(--b);font-family:monospace;font-size:11px" title="${isEn ? 'Next Interval Multiplier on Easy' : 'Easy評価時の次回係数'}">Easy: ${Number(fsrsWeights?.wEasy || 1.6).toFixed(2)}x</span>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button type="button" class="btn-ac-o btn-xs" onclick="VocabAnkiView.triggerManualOptimize()" data-i18n="analytics.btn_optimize">今すぐFSRS最適化を実行</button>
-              <button type="button" class="btn-o btn-xs" onclick="VocabAnkiView.triggerResetWeights()" data-i18n="analytics.btn_reset_weights">標準重みにリセット</button>
+              <button type="button" class="btn-ac-o btn-xs" data-act="manual-optimize" data-i18n="analytics.btn_optimize">${t('analytics.btn_optimize', '今すぐFSRS最適化を実行')}</button>
+              <button type="button" class="btn-o btn-xs" data-act="reset-weights" data-i18n="analytics.btn_reset_weights">${t('analytics.btn_reset_weights', '標準重みにリセット')}</button>
             </div>
           </div>
         </div>
@@ -1324,30 +1530,101 @@
 
       <div class="analytics-card" style="margin-top:14px">
         <div class="analytics-card-hd">
-          <span data-i18n="analytics.workload_title">向こう14日間の日別予測復習負荷 (Workload Forecast)</span>
-          <span style="font-size:12px;color:var(--s)">${t('analytics.workload_total', { total: workload.totalUpcoming }, isEn ? `14-Day Total: <strong>${workload.totalUpcoming} words</strong>` : `14日合計: <strong>${workload.totalUpcoming}語</strong>`)}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span data-i18n="analytics.workload_title">向こうの日別予測復習負荷 (Workload Forecast)</span>
+            <div class="workload-range-btns" style="display:flex;gap:4px">
+              <button type="button" class="btn-o btn-xs ${forecastDays === 7 ? 'active' : ''}" data-act="set-workload-days" data-days="7">7日</button>
+              <button type="button" class="btn-o btn-xs ${forecastDays === 14 ? 'active' : ''}" data-act="set-workload-days" data-days="14">14日</button>
+              <button type="button" class="btn-o btn-xs ${forecastDays === 30 ? 'active' : ''}" data-act="set-workload-days" data-days="30">30日</button>
+            </div>
+          </div>
+          <span style="font-size:12px;color:var(--s)">${t('analytics.workload_total', { total: workload.totalUpcoming, days: forecastDays }, isEn ? `${forecastDays}-Day Total: <strong>${workload.totalUpcoming} words</strong>` : `${forecastDays}日合計: <strong>${workload.totalUpcoming}語</strong>`)}</span>
         </div>
         <div class="workload-chart">
           ${chartBarsHtml}
         </div>
-        <p style="margin:6px 0 0 0;font-size:11px;color:var(--m)" data-i18n="analytics.workload_note">※各バーは各日に復習満期を迎える予定単語数です。緑は本日分、赤は30語以上の過密日を示します。</p>
+        <p style="margin:6px 0 10px 0;font-size:11px;color:var(--m)" data-i18n="analytics.workload_note">※各バーは各日に復習満期を迎える予定単語数です。緑は本日分、赤は30語以上の過密日を示します。</p>
+
+        <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--b)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:700;color:var(--t)" data-i18n="analytics.calendar_heatmap_title">日別復習予測カレンダー (クリックで該当日詳細プレビュー)</span>
+            <div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--m)">
+              <span class="day-pill" style="background:rgba(16,185,129,0.15);color:#10b981">快適 (1-10)</span>
+              <span class="day-pill" style="background:rgba(59,130,246,0.15);color:#3b82f6">適正 (11-20)</span>
+              <span class="day-pill" style="background:rgba(245,158,11,0.18);color:#f59e0b">注意 (21-30)</span>
+              <span class="day-pill" style="background:rgba(239,68,68,0.2);color:#ef4444">過密 (31+)</span>
+            </div>
+          </div>
+          <div class="workload-calendar-grid">
+            ${calendarCellsHtml}
+          </div>
+        </div>
+      </div>
+
+      <div class="analytics-card" style="margin-top:14px">
+        <div class="analytics-card-hd">
+          <span data-i18n="analytics.smoothing_title">復習負荷のスマート平滑化 &amp; バッファ調整 (Workload Smoothing)</span>
+          <span class="badge ${isPeakHeavy ? 'warn' : 'ok'}">
+            ${isPeakHeavy ? (isEn ? 'Peak Overload Detected' : '特定日過密あり') : (isEn ? 'Load Balanced' : '負荷バランス良好')}
+          </span>
+        </div>
+        <div style="font-size:12px;color:var(--s);line-height:1.6">
+          <p style="margin:0 0 10px 0" data-i18n="analytics.smoothing_desc">
+            連休や多忙期の復習スパイクによる挫折を防ぐため、記憶定着度が高い安全な単語（R≥85%）を前後の空き日へなだらかに再配分（ファジング）します。
+          </p>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--b);border-radius:6px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-weight:700;color:var(--t)" data-i18n="analytics.target_cap_lbl">1日の目標復習上限:</span>
+              <select id="workloadCapSelect" class="input-sm" style="padding:4px 8px;border-radius:4px;border:1px solid var(--b);background:var(--bg);color:var(--t)">
+                <option value="15" ${_workloadTargetCap === 15 ? 'selected' : ''}>15語 / 日 (ゆったり)</option>
+                <option value="20" ${_workloadTargetCap === 20 ? 'selected' : ''}>20語 / 日 (標準)</option>
+                <option value="25" ${_workloadTargetCap === 25 ? 'selected' : ''}>25語 / 日 (推奨)</option>
+                <option value="30" ${_workloadTargetCap === 30 ? 'selected' : ''}>30語 / 日 (集中)</option>
+                <option value="40" ${_workloadTargetCap === 40 ? 'selected' : ''}>40語 / 日 (高負荷)</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:11px;color:var(--m)">最大集中日: <strong style="color:${isPeakHeavy ? '#ef4444' : 'var(--t)'}">${peakDay.date} (${peakDay.count}語)</strong></span>
+              <button type="button" class="btn-ac btn-sm" data-act="smooth-workload" style="font-weight:700;padding:5px 14px" data-i18n="analytics.btn_smooth">
+                過密日を平滑化 (Fuzz &amp; Smooth)
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     `;
   }
 
+  let _isRenderingAnalytics = false;
   function renderAnalyticsDashboard(containerId = 'analyticsDashboardBody') {
+    if (_isRenderingAnalytics) return;
     const el = document.getElementById(containerId);
     if (!el) return;
-    el.innerHTML = buildAnalyticsDashboardHtml();
-    if (global.VocabI18n?.applyI18nToDOM) {
-      global.VocabI18n.applyI18nToDOM(el);
+    _isRenderingAnalytics = true;
+    try {
+      el.innerHTML = buildAnalyticsDashboardHtml();
+      if (global.VocabI18n?.applyI18nToDOM) {
+        global.VocabI18n.applyI18nToDOM(el);
+      }
+    } catch (err) {
+      console.warn('[Analytics Render Error]', err);
+      const errTxt = global.VocabI18n?.t ? global.VocabI18n.t('analytics.load_error', 'データの集計中にエラーが発生しました。単語一覧を更新してください。') : 'データの集計中にエラーが発生しました。単語一覧を更新してください。';
+      el.innerHTML = `<div style="padding:24px 16px;text-align:center;color:var(--s)">${errTxt}</div>`;
+    } finally {
+      _isRenderingAnalytics = false;
     }
   }
 
   function openAnalyticsModal() {
     renderAnalyticsDashboard('analyticsDashboardBody');
-    if (typeof global.toggleModal === 'function') {
-      global.toggleModal('analyticsModal', true);
+    const toggleFn = (typeof global.toggleModal === 'function')
+      ? global.toggleModal
+      : (typeof global.VocabModal?.toggleModal === 'function')
+        ? global.VocabModal.toggleModal
+        : null;
+
+    if (toggleFn) {
+      toggleFn('analyticsModal', true);
     } else {
       const modal = document.getElementById('analyticsModal');
       if (modal) {
@@ -1358,8 +1635,14 @@
   }
 
   function closeAnalyticsModal() {
-    if (typeof global.toggleModal === 'function') {
-      global.toggleModal('analyticsModal', false);
+    const toggleFn = (typeof global.toggleModal === 'function')
+      ? global.toggleModal
+      : (typeof global.VocabModal?.toggleModal === 'function')
+        ? global.VocabModal.toggleModal
+        : null;
+
+    if (toggleFn) {
+      toggleFn('analyticsModal', false);
     } else {
       const modal = document.getElementById('analyticsModal');
       if (modal) {
@@ -1392,6 +1675,74 @@
       const okMsg = global.VocabI18n?.t ? global.VocabI18n.t('analytics.reset_ok') : 'FSRS重みを初期値にリセットしました。';
       showToast(okMsg, 'ok');
       renderAnalyticsDashboard();
+    }
+  }
+
+  function showDayWorkloadDetails(dateStr, count) {
+    if (!dateStr) return;
+    const list = global.VocabCore?.App?.entries || [];
+    const todayYmd = (d) => {
+      const yr = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      return `${yr}-${mo}-${da}`;
+    };
+
+    const matching = list.filter(item => {
+      if (!item || !item.nextReview || item.isDeleted) return false;
+      return todayYmd(new Date(item.nextReview)) === dateStr;
+    });
+
+    const showToast = global.VocabModal?.showToast || alert;
+    const wordsPreview = matching.map(x => x.word || x.foreign || '').filter(Boolean).slice(0, 6).join(', ');
+    const moreText = matching.length > 6 ? ` ほか${matching.length - 6}語` : '';
+
+    const isEn = (global.VocabI18n?.getLocale?.() || 'ja') !== 'ja';
+    const detailMsg = isEn
+      ? `${dateStr}: ${matching.length || count} words scheduled${wordsPreview ? ` (${wordsPreview}${moreText})` : ''}`
+      : `${dateStr}: ${matching.length || count}語予定${wordsPreview ? ` (${wordsPreview}${moreText})` : ''}`;
+
+    showToast(detailMsg, 'info', 4500);
+  }
+
+  function triggerWorkloadSmoothing() {
+    const sel = document.getElementById('workloadCapSelect');
+    const cap = sel ? Number(sel.value) : _workloadTargetCap;
+    _workloadTargetCap = cap;
+
+    const list = global.VocabCore?.App?.entries || [];
+    if (!list.length) {
+      const showToast = global.VocabModal?.showToast || alert;
+      const emptyMsg = global.VocabI18n?.t ? global.VocabI18n.t('analytics.empty_entries', '平滑化対象の単語が登録されていません。') : '平滑化対象の単語が登録されていません。';
+      showToast(emptyMsg, 'info');
+      return;
+    }
+
+    if (!global.VocabSRS?.smoothReviewWorkload) return;
+    const res = global.VocabSRS.smoothReviewWorkload(list, cap, _workloadForecastDays);
+    const showToast = global.VocabModal?.showToast || alert;
+
+    if (res.success && res.shiftedCount > 0) {
+      const activeCfg = global.VocabCore?.getActivePairConfig ? global.VocabCore.getActivePairConfig() : null;
+      const pairKey = activeCfg ? activeCfg.key : 'distinction_entries';
+      if (typeof global.VocabCore?.setJson === 'function') {
+        global.VocabCore.setJson(pairKey, list, true);
+      } else if (typeof global.VocabStorage?.setJson === 'function') {
+        global.VocabStorage.setJson(pairKey, list, true);
+      } else if (typeof global.VocabStorage?.idbCommitLangData === 'function') {
+        global.VocabStorage.idbCommitLangData(pairKey, list);
+      }
+
+      const okMsg = global.VocabI18n?.t
+        ? global.VocabI18n.t('analytics.smooth_workload_ok', { count: res.shiftedCount, days: res.affectedDays })
+        : `${res.shiftedCount}語の復習期日を平滑化・分散しました（影響日数: ${res.affectedDays}日）。`;
+      showToast(okMsg, 'ok', 4000);
+      renderAnalyticsDashboard();
+    } else {
+      const noneMsg = global.VocabI18n?.t
+        ? global.VocabI18n.t('analytics.smooth_workload_none')
+        : (res.message || '平滑化が必要な過密日はありません。目標上限はすでに満たされています。');
+      showToast(noneMsg, 'info', 3500);
     }
   }
 
@@ -1428,6 +1779,57 @@
     openAnalyticsModal,
     closeAnalyticsModal,
     triggerManualOptimize,
-    triggerResetWeights
+    triggerResetWeights,
+    showDayWorkloadDetails,
+    triggerWorkloadSmoothing,
+    smoothReviewWorkload: (...args) => global.VocabSRS?.smoothReviewWorkload?.(...args)
   };
+
+  global.openAnalyticsModal = global.openAnalyticsModal || openAnalyticsModal;
+  global.closeAnalyticsModal = global.closeAnalyticsModal || closeAnalyticsModal;
+
+  // [P2-1 解決] CSP準拠のイベント委譲リスナー（インライン onclick / onkeydown の完全排除）
+  if (typeof document !== 'undefined') {
+    document.addEventListener('click', (event) => {
+      const btn = event.target && typeof event.target.closest === 'function' ? event.target.closest('[data-act]') : null;
+      if (!btn || typeof btn.getAttribute !== 'function') return;
+      const act = btn.getAttribute('data-act');
+      if (act === 'cloze-check') {
+        window.VocabAnkiView?.checkClozeTyping?.();
+      } else if (act === 'open-analytics') {
+        openAnalyticsModal();
+      } else if (act === 'close-analytics') {
+        closeAnalyticsModal();
+      } else if (act === 'manual-optimize') {
+        triggerManualOptimize();
+      } else if (act === 'reset-weights') {
+        triggerResetWeights();
+      } else if (act === 'smooth-workload') {
+        triggerWorkloadSmoothing();
+      } else if (act === 'set-workload-days') {
+        const days = Number(btn.getAttribute('data-days')) || 14;
+        _workloadForecastDays = days;
+        renderAnalyticsDashboard();
+      } else if (act === 'show-day-workload') {
+        const dStr = btn.getAttribute('data-date');
+        const cVal = Number(btn.getAttribute('data-count')) || 0;
+        showDayWorkloadDetails(dStr, cVal);
+      }
+    });
+
+    document.addEventListener('change', (event) => {
+      if (event.target && event.target.id === 'workloadCapSelect') {
+        _workloadTargetCap = Number(event.target.value) || 25;
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.target && typeof event.target.matches === 'function' && event.target.matches('[data-act="cloze-input"]')) {
+        if (event.key === 'Enter' && !event.isComposing && event.keyCode !== 229) {
+          event.preventDefault();
+          window.VocabAnkiView?.checkClozeTyping?.();
+        }
+      }
+    });
+  }
 })(typeof window !== 'undefined' ? window : globalThis);

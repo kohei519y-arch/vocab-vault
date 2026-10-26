@@ -28,6 +28,8 @@
     remoteTombstones,
     remoteClearedAt,
     lastSyncAt,
+    isFullResyncAfterExpiry = false,
+    originalLastSyncAt = 0,
     mergeWordsFn,
     isTombstonedFn,
     makeWordKeyFn
@@ -67,8 +69,27 @@
       }
     });
 
+    // [P0-5 解決 & ゾンビ復活防止] 90日超オフライン復帰時（墓石TTL経過によるパージ後）のゾンビ復活防止
+    // リモート全件に存在せず、かつ前回同期以前に更新されたきりのローカル単語は他端末で削除されたと判定して除外
+    // ※オフライン復習(reviewUpdatedAt)の更新によってサーバー側でパージ済みの削除単語が復活するのを防ぐため、
+    // 単語本体の更新日時 (localUpd) を基準に判定する。
+    let effectiveLocalEntries = Array.isArray(localEntries) ? localEntries : [];
+    if (isFullResyncAfterExpiry && originalLastSyncAt > 0) {
+      effectiveLocalEntries = effectiveLocalEntries.filter(it => {
+        if (!it) return false;
+        const wk = it.wordKey || makeWordKeyFn(it.word, sLang, it.meanings?.[0]?.pos, it.homographIndex);
+        const inRemote = (it.id && remoteUpdById.has(it.id)) || (wk && remoteUpdByWk.has(wk));
+        if (inRemote) return true;
+        const localUpd = Number(it.updatedAt) || 1;
+        if (localUpd <= originalLastSyncAt) {
+          return false;
+        }
+        return true;
+      });
+    }
+
     const mergedEntries = mergeWordsFn(
-      localEntries,
+      effectiveLocalEntries,
       remoteEntries,
       lang,
       false,
@@ -119,28 +140,77 @@
   const DEFAULT_SUPABASE_URL = 'https://adeujoftwnoognfnyfuw.supabase.co';
   const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_PrZyawrfpRMWWl03AeHsDg_zi04RgG2';
 
-  // 項目25: オフライン復習キューと定期同期の衝突を防ぐアトミックトランザクションロック
+  // 項目25: オフライン復習キューと定期同期の衝突を防ぐアトミックトランザクションロック（Web Locks API によるタブ間排他対応）
   let _syncMutex = Promise.resolve();
 
-  async function acquireSyncLock(taskFn) {
+  async function _acquireLocalMutex(taskFn, timeoutMs = 45000) {
     let release;
+    let released = false;
+    const safeRelease = () => {
+      if (!released) {
+        released = true;
+        if (release) release();
+      }
+    };
     const nextLock = new Promise(resolve => { release = resolve; });
     const currentLock = _syncMutex;
-    _syncMutex = _syncMutex.then(() => nextLock);
+    // 前タスクのrejectでchainが汚染されないよう、catchで握りつぶしてnextLockへ繋ぐ
+    _syncMutex = currentLock.then(() => nextLock, () => nextLock);
 
-    await currentLock;
+    // currentLockのrejectは待機側で握りつぶす（キュー進行を保証）
+    // [デッドロック防止] 前タスク待機にも上限を設け、異常クラッシュ時の永久停止を排除
+    let waitTimer = null;
+    const waitPromise = new Promise((_, reject) => {
+      waitTimer = setTimeout(() => reject(new Error('Sync mutex wait timeout')), timeoutMs);
+    });
+
     try {
-      return await taskFn();
+      await Promise.race([currentLock.catch(() => {}), waitPromise]);
+    } catch {
+      console.warn('[Sync] Lock wait timed out, resetting mutex chain');
+      _syncMutex = Promise.resolve();
     } finally {
-      release();
+      if (waitTimer) clearTimeout(waitTimer);
     }
+
+    let taskTimer = null;
+    try {
+      const taskPromise = taskFn();
+      const taskTimeoutPromise = new Promise((_, reject) => {
+        taskTimer = setTimeout(() => reject(new Error('Sync operation timed out')), timeoutMs);
+      });
+      return await Promise.race([taskPromise, taskTimeoutPromise]);
+    } finally {
+      if (taskTimer) clearTimeout(taskTimer);
+      safeRelease();
+    }
+  }
+
+  async function acquireSyncLock(taskFn, lockName = 'vocab_vault_sync_lock') {
+    // 1. ブラウザ複数タブ間の排他ロック (Web Locks API)
+    if (typeof navigator !== 'undefined' && navigator.locks && typeof navigator.locks.request === 'function') {
+      return await navigator.locks.request(lockName, { mode: 'exclusive' }, async () => {
+        return await _acquireLocalMutex(taskFn);
+      });
+    }
+    // 2. フォールバック: 同一タブ内 Mutex
+    return await _acquireLocalMutex(taskFn);
   }
 
   function getConfig() {
     const override = (typeof window !== 'undefined' && window.SUPABASE_CONFIG_OVERRIDE) ? window.SUPABASE_CONFIG_OVERRIDE : {};
     const url = (override.url || safeLsGet(SUPABASE_URL_KEY, '') || DEFAULT_SUPABASE_URL).trim().replace(/\/+$/, '');
     const anonKey = (override.anonKey || safeLsGet(SUPABASE_ANON_KEY, '') || DEFAULT_SUPABASE_ANON_KEY).trim();
-    return { url, anonKey, configured: Boolean(url && anonKey && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url)) };
+    // 許可ホスト: 公式 *.supabase.co またはユーザーが明示的に指定した任意の https/localhost URL (セルフホスト対応)
+    const isOfficial = /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url);
+    const isHttps = /^https:\/\/[a-z0-9.-]+(:[0-9]+)?(\/.*)?$/i.test(url);
+    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:[0-9]+)?(\/.*)?$/i.test(url);
+    return {
+      url,
+      anonKey,
+      configured: Boolean(url && anonKey && (isOfficial || isHttps || isLocalhost)),
+      isOfficial
+    };
   }
 
   function saveConfig(url, anonKey) {
@@ -170,9 +240,20 @@
     return getConfig().configured;
   }
 
+  const SUPPORTED_LANGS = ['en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'];
+
+  function getUser() {
+    try {
+      const s = getSession();
+      return s?.user || null;
+    } catch { return null; }
+  }
+
   let _refreshPromise = null;
+  let _signOutInProgress = false;
 
   async function ensureValidToken() {
+    if (_signOutInProgress) return null;
     const cfg = getConfig();
     let sess = getSession();
     if (!cfg.configured || !sess) return null;
@@ -180,7 +261,9 @@
     if (sess.expires_at && sess.expires_at - nowSec > 60) {
       return sess.access_token;
     }
-    if (!sess.refresh_token) return sess.access_token;
+    if (!sess.refresh_token) {
+      return (sess.expires_at && nowSec >= sess.expires_at) ? null : sess.access_token;
+    }
 
     if (_refreshPromise) {
       return _refreshPromise;
@@ -198,10 +281,12 @@
           return null;
         }
         const next = await r.json();
+        if (_signOutInProgress) return null;
         setSession(next);
         return next.access_token;
       } catch {
-        return sess.access_token;
+        // [P1-10 解決] オフライン等でリフレッシュ失敗時に期限切れトークンを返却せず、後続の401クラッシュを回避
+        return (sess.expires_at && nowSec >= sess.expires_at) ? null : sess.access_token;
       } finally {
         _refreshPromise = null;
       }
@@ -212,7 +297,7 @@
 
   async function signInOrSignUp(email, password, isSignUp = false) {
     const cfg = getConfig();
-    if (!cfg.configured) throw new Error('Supabase URL (https://xxx.supabase.co) と Anon Key を正しく入力してください。');
+    if (!cfg.configured) throw new Error('Supabase URL (https://xxx.supabase.co または 自社HTTPS) と Anon Key を正しく入力してください。');
     const endpoint = isSignUp ? `${cfg.url}/auth/v1/signup` : `${cfg.url}/auth/v1/token?grant_type=password`;
     const r = await fetch(endpoint, {
       method: 'POST',
@@ -227,107 +312,141 @@
 
   async function signOut() {
     const cfg = getConfig();
-    const token = await ensureValidToken();
-    if (cfg.configured && token) {
-      fetch(`${cfg.url}/auth/v1/logout`, {
-        method: 'POST',
-        headers: { apikey: cfg.anonKey, Authorization: `Bearer ${token}` }
-      }).catch(() => {});
+    _signOutInProgress = true;
+    try {
+      const token = await ensureValidToken().catch(() => null);
+      if (cfg.configured && token) {
+        try {
+          await fetch(`${cfg.url}/auth/v1/logout`, {
+            method: 'POST',
+            headers: { apikey: cfg.anonKey, Authorization: `Bearer ${token}` }
+          });
+        } catch { /* ネットワーク切断時は無視してローカルセッションを破棄 */ }
+      }
+    } finally {
+      setSession(null);
+      _signOutInProgress = false;
+      _refreshPromise = null;
     }
-    setSession(null);
   }
 
   async function syncLangWithSupabase(targetKeyOrLang, appHooks) {
-    const cfg = getConfig();
-    const token = await ensureValidToken();
-    const sess = getSession();
-    if (!cfg.configured || !token || !sess?.user?.id) {
-      throw new Error('クラウド未ログインです。');
-    }
-    const uid = sess.user.id;
-    const rawTarget = String(targetKeyOrLang || 'en_ja').trim();
-    // [P0-2 解決] PostgreSQL CHECK (lang IN ('en','ja','fr','de')) 制約遵守と異言語ペア (en_en, fr_de 等) の完全分離
-    let dbLang = 'en', dbPair = 'en_ja';
-    if (rawTarget.startsWith('distinction_entries') && global.VocabStorage?.keyToPair) {
-      const p = global.VocabStorage.keyToPair(rawTarget);
-      dbLang = p.srcLang || 'en';
-      dbPair = `${dbLang}_${p.tgtLang || 'ja'}`;
-    } else if (/^[a-z]{2}_[a-z]{2}$/i.test(rawTarget)) {
-      const parts = rawTarget.toLowerCase().split('_');
-      dbLang = (['en', 'ja', 'fr', 'de'].includes(parts[0])) ? parts[0] : 'en';
-      const tgt = (['en', 'ja', 'fr', 'de'].includes(parts[1])) ? parts[1] : 'ja';
-      dbPair = `${dbLang}_${tgt}`;
-    } else {
-      dbLang = (['en', 'ja', 'fr', 'de'].includes(rawTarget)) ? rawTarget : 'en';
-      dbPair = `${dbLang}_ja`;
-    }
-    const targetKey = dbPair;
-
-    const lastSyncKey = `${LAST_SYNC_PREFIX}${uid}_${targetKey}`;
-    const lastSyncAt = Number(safeLsGet(lastSyncKey, '0')) || 0;
-    const headers = {
-      apikey: cfg.anonKey,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    };
-
-    // [P0-3 解決] クライアント時計依存を完全排除: pull 前にサーバー現在時刻を取得
-    let serverNow = Date.now();
-    try {
-      const snRes = await fetch(`${cfg.url}/rest/v1/rpc/server_now_ms`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: '{}'
-      });
-      if (snRes.ok) {
-        const snData = await snRes.json();
-        if (Number.isFinite(Number(snData)) && Number(snData) > 0) {
-          serverNow = Number(snData);
-        }
+    return acquireSyncLock(async () => {
+      const cfg = getConfig();
+      const token = await ensureValidToken();
+      const sess = getSession();
+      if (!cfg.configured || !token || !sess?.user?.id) {
+        throw new Error('クラウド未ログインです。');
       }
-    } catch (e) {
-      console.warn('[Sync] Failed to fetch server_now_ms, falling back to local time:', e);
-    }
+      const uid = sess.user.id;
+      const rawTarget = String(targetKeyOrLang || 'en_ja').trim();
+      // [P0-1 解決] 10言語完全サポート (en, ja, fr, de, es, it, pt, nl, zh, ko)
+      let dbLang = 'en', dbPair = 'en_ja';
+      if (rawTarget.startsWith('distinction_entries') && global.VocabStorage?.keyToPair) {
+        const p = global.VocabStorage.keyToPair(rawTarget);
+        dbLang = (SUPPORTED_LANGS.includes(p.srcLang)) ? p.srcLang : 'en';
+        const tgt = (SUPPORTED_LANGS.includes(p.tgtLang)) ? p.tgtLang : 'ja';
+        dbPair = `${dbLang}_${tgt}`;
+      } else if (/^[a-z]{2}_[a-z]{2}$/i.test(rawTarget)) {
+        const parts = rawTarget.toLowerCase().split('_');
+        dbLang = (SUPPORTED_LANGS.includes(parts[0])) ? parts[0] : 'en';
+        const tgt = (SUPPORTED_LANGS.includes(parts[1])) ? parts[1] : 'ja';
+        dbPair = `${dbLang}_${tgt}`;
+      } else {
+        dbLang = (SUPPORTED_LANGS.includes(rawTarget)) ? rawTarget : 'en';
+        dbPair = `${dbLang}_ja`;
+      }
+      const targetKey = dbPair;
 
-    // [P0-3 解決] 90日以上オフラインだった端末は墓石パージ済みリスクがあるため全件再同期
-    const TOMBSTONE_TTL_MS = 90 * 86400 * 1000;
-    let effectiveLastSyncAt = lastSyncAt;
-    if (lastSyncAt > 0 && (serverNow - lastSyncAt) > TOMBSTONE_TTL_MS) {
-      console.warn(`[Sync] Last sync was > 90 days ago (${new Date(lastSyncAt).toISOString()}). Falling back to full sync.`);
-      effectiveLastSyncAt = 0;
-    }
+      const lastSyncKey = `${LAST_SYNC_PREFIX}${uid}_${targetKey}`;
+      let lastSyncAt = Number(safeLsGet(lastSyncKey, '0')) || 0;
+      if (lastSyncAt === 0 && global.VocabStorage?.idbGet) {
+        try {
+          const idbCursor = await global.VocabStorage.idbGet(lastSyncKey);
+          if (idbCursor && Number(idbCursor) > 0) lastSyncAt = Number(idbCursor);
+        } catch {}
+      }
+      const headers = {
+        apikey: cfg.anonKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
 
-    // [P0-5 & 項目24] PostgREST チャンク分割 Pull & 進捗通知
-    async function fetchAllPaginated(baseUrl, idField = 'id', onPageProgress = null) {
-      const PAGE_SIZE = 100;
-      let allRows = [];
-      let offset = 0;
-      const seenKeys = new Set();
-      while (true) {
-        const sep = baseUrl.includes('?') ? '&' : '?';
-        const sortParam = baseUrl.includes('order=') ? '' : `&order=${encodeURIComponent(idField)}.asc`;
-        const pageUrl = `${baseUrl}${sep}limit=${PAGE_SIZE}&offset=${offset}${sortParam}`;
-        const r = await fetch(pageUrl, { headers });
-        if (!r.ok) throw new Error(`同期Pull失敗 (HTTP ${r.status})`);
-        const rows = await r.json();
-        if (!Array.isArray(rows) || rows.length === 0) break;
-        for (const row of rows) {
-          const key = (idField && row[idField] !== undefined) ? String(row[idField]) : JSON.stringify(row);
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            allRows.push(row);
+      // [P0-3 解決] クライアント時計依存を完全排除: pull 前にサーバー現在時刻を取得
+      let serverNow = 0;
+      try {
+        const snRes = await fetch(`${cfg.url}/rest/v1/rpc/server_now_ms`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: '{}'
+        });
+        if (snRes.ok) {
+          const snData = await snRes.json();
+          if (Number.isFinite(Number(snData)) && Number(snData) > 0) {
+            serverNow = Number(snData);
           }
         }
-        if (typeof onPageProgress === 'function') {
-          onPageProgress(allRows.length);
-        }
-        if (rows.length < PAGE_SIZE) break;
-        offset += PAGE_SIZE;
-        // UIスレッドを解放してプログレス表示を確実に再描画
-        await new Promise(res => setTimeout(res, 0));
+      } catch (e) {
+        console.warn('[Sync] Failed to fetch server_now_ms:', e);
       }
-      return allRows;
-    }
+      if (!serverNow) {
+        // [P1-⑩ 解決] サーバ時刻が取得できない限り同期カーソルを前進させない（差分抜けを防止）
+        throw new Error('サーバ基準時刻の取得に失敗しました。ネットワーク接続を確認して再試行してください。');
+      }
+
+      // [P0-3 & P0-5 解決] 90日以上オフラインだった端末は墓石パージ済みリスクがあるため全件再同期
+      const TOMBSTONE_TTL_MS = 90 * 86400 * 1000;
+      let effectiveLastSyncAt = lastSyncAt;
+      const isFullResyncAfterExpiry = lastSyncAt > 0 && (serverNow - lastSyncAt) > TOMBSTONE_TTL_MS;
+      if (isFullResyncAfterExpiry) {
+        console.warn(`[Sync] Last sync was > 90 days ago (${new Date(lastSyncAt).toISOString()}). Falling back to full sync.`);
+        effectiveLastSyncAt = 0;
+      }
+
+      // [P0-1 解決] PostgREST カーソル方式（server_updated_at, idField）Pull & 上限時刻固定
+      async function fetchAllPaginated(baseUrl, idField = 'id', onPageProgress = null) {
+        const PAGE_SIZE = 500;
+        let allRows = [];
+        let cursorTs = effectiveLastSyncAt;
+        let cursorId = '';
+        const seenKeys = new Set();
+        while (true) {
+          const sep = baseUrl.includes('?') ? '&' : '?';
+          let cursorFilter = '';
+          if (cursorId) {
+            cursorFilter = `&or=(server_updated_at.gt.${cursorTs},and(server_updated_at.eq.${cursorTs},${encodeURIComponent(idField)}.gt.${encodeURIComponent(cursorId)}))`;
+          } else if (cursorTs > 0) {
+            cursorFilter = `&server_updated_at=gt.${cursorTs}`;
+          }
+          // 同期開始時のサーバー時刻 (serverNow) を上限に固定し、同期中の追加更新による重複や抜け漏れを防止
+          const timeBound = `&server_updated_at=lte.${serverNow}`;
+          const sortParam = `&order=server_updated_at.asc,${encodeURIComponent(idField)}.asc&limit=${PAGE_SIZE}`;
+          const pageUrl = `${baseUrl}${sep}${timeBound}${cursorFilter}${sortParam}`;
+
+          const r = await fetch(pageUrl, { headers });
+          if (!r.ok) throw new Error(`同期Pull失敗 (HTTP ${r.status})`);
+          const rows = await r.json();
+          if (!Array.isArray(rows) || rows.length === 0) break;
+          for (const row of rows) {
+            const key = (idField && row[idField] !== undefined) ? String(row[idField]) : JSON.stringify(row);
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              allRows.push(row);
+            }
+          }
+          if (typeof onPageProgress === 'function') {
+            onPageProgress(allRows.length);
+          }
+          const lastItem = rows[rows.length - 1];
+          cursorTs = Number(lastItem.server_updated_at) || cursorTs;
+          cursorId = String(lastItem[idField] || '');
+
+          if (rows.length < PAGE_SIZE) break;
+          // UIスレッドを解放してプログレス表示を確実に再描画
+          await new Promise(res => setTimeout(res, 0));
+        }
+        return allRows;
+      }
 
     const reportProgress = (msg) => {
       if (typeof appHooks?.onSyncProgress === 'function') {
@@ -340,12 +459,10 @@
 
     // [P0-3 解決] 取得条件は server_updated_at.gt のみに統一（updated_at 系の不整合ORを排除）
     const uveCols = 'id,lang,pair,word_key,num,word,homograph_index,folder,category,interval,repetition,efactor,next_review,updated_at,review_updated_at,is_deleted,card_data,server_updated_at';
-    const entryFilter = effectiveLastSyncAt > 0 ? `&server_updated_at=gt.${effectiveLastSyncAt}` : '';
-    const tombFilter = effectiveLastSyncAt > 0 ? `&deleted_at=gt.${effectiveLastSyncAt}` : '';
 
     const [remoteEntryRows, remoteTombRows, wmRes] = await Promise.all([
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}${entryFilter}&select=${uveCols}&order=server_updated_at.asc,id.asc`, 'id', count => reportProgress(`受信中 ${count}件`)),
-      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}${tombFilter}&select=tomb_key,deleted_at&order=deleted_at.asc,tomb_key.asc`, 'tomb_key'),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_vocab_entries?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}&select=${uveCols}`, 'id', count => reportProgress(`受信中 ${count}件`)),
+      fetchAllPaginated(`${cfg.url}/rest/v1/user_tombstones?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}&select=tomb_key,deleted_at,server_updated_at`, 'tomb_key'),
       fetch(`${cfg.url}/rest/v1/user_lang_watermarks?user_id=eq.${encodeURIComponent(uid)}&lang=eq.${encodeURIComponent(dbLang)}&pair=eq.${encodeURIComponent(dbPair)}&select=cleared_at`, { headers })
     ]);
 
@@ -396,6 +513,8 @@
       remoteTombstones,
       remoteClearedAt,
       lastSyncAt: effectiveLastSyncAt,
+      isFullResyncAfterExpiry,
+      originalLastSyncAt: lastSyncAt,
       mergeWordsFn: appHooks.mergeWords,
       isTombstonedFn: appHooks.isTombstoned,
       makeWordKeyFn: appHooks.makeWordKey
@@ -438,15 +557,27 @@
         const chunk = delta.entriesToPush.slice(i, i + CHUNK_SIZE);
         const pct = Math.min(100, Math.round(((i + chunk.length) / delta.entriesToPush.length) * 100));
         reportProgress(`送信中 ${pct}%`);
+        const clipCardData = (card) => {
+          let str = JSON.stringify(card);
+          if (str.length <= 45000) return card;
+          const c = { ...card };
+          if (c.notes && c.notes.length > 500) c.notes = c.notes.slice(0, 500);
+          if (c.history_note && c.history_note.length > 500) c.history_note = c.history_note.slice(0, 500);
+          if (Array.isArray(c.derivatives) && c.derivatives.length > 5) c.derivatives = c.derivatives.slice(0, 5);
+          if (Array.isArray(c.phrases) && c.phrases.length > 5) c.phrases = c.phrases.slice(0, 5);
+          if (c.etymology && c.etymology.length > 2000) c.etymology = c.etymology.slice(0, 2000);
+          return c;
+        };
+
         const entryPayload = chunk.map(it => {
-          const cleanCard = {
+          const cleanCard = clipCardData({
             ...it,
             folder: it.folder || null,
             grammar_forms: it.grammar_forms || null,
             history_note: it.history_note || null,
             contextSentence: it.contextSentence || null,
             homographIndex: (it.homographIndex && it.homographIndex > 1) ? it.homographIndex : null
-          };
+          });
           delete cleanCard.card_data; // 自己参照ネストによる肥大化を防止
           return {
             user_id: uid,
@@ -487,15 +618,17 @@
     const SYNC_OVERLAP_MS = 120000;
     const nextSyncCursor = Math.max(0, serverNow - SYNC_OVERLAP_MS);
     safeLsSet(lastSyncKey, String(nextSyncCursor));
+    // [P2-⑲ 解決] localStorage容量超過時でも同期カーソルを維持するためIndexedDBへミラー保存
+    if (global.VocabStorage?.idbPut) {
+      await global.VocabStorage.idbPut(lastSyncKey, nextSyncCursor).catch(() => {});
+    }
 
-    // FSRS重み・学習ログのクラウド同期をバックグラウンド実行（非同期・ノンブロッキング）
-    syncAppSettingsWithSupabase().catch(() => {});
-
-    return {
-      pulled: remoteEntries.length,
-      pushed: delta.entriesToPush.length,
-      tombPushed: delta.tombstonesToPush.length
-    };
+      return {
+        pulled: remoteEntries.length,
+        pushed: delta.entriesToPush.length,
+        tombPushed: delta.tombstonesToPush.length
+      };
+    });
   }
 
   async function syncAppSettingsWithSupabase() {
@@ -539,17 +672,27 @@
           await pushSettingRow(cfg, token, user.id, 'vv_user_fsrs_weights', localWeights, nowTs);
         }
 
-        // 2. FSRS復習履歴ログの同期
+        // 2. [P0-2 解決] FSRS復習履歴ログの同期（500件到達後も最新ログを確実に同期）
         const localLogs = global.VocabSRS?.getReviewHistoryLog?.() || [];
         const cloudLogsRow = cloudMap['vv_review_history_log'];
         if (cloudLogsRow && Array.isArray(cloudLogsRow.setting_val)) {
           const mergedLogs = mergeHistoryLogs(localLogs, cloudLogsRow.setting_val);
           global.VocabSRS?.saveReviewHistoryLog?.(mergedLogs);
-          if (mergedLogs.length > (cloudLogsRow.setting_val.length || 0)) {
-            await pushSettingRow(cfg, token, user.id, 'vv_review_history_log', mergedLogs, Date.now());
+          const cloudArr = cloudLogsRow.setting_val;
+          const cloudMaxTs = cloudArr.length ? Number(cloudArr[cloudArr.length - 1]?.timestamp || 0) : 0;
+          const mergedMaxTs = mergedLogs.length ? Number(mergedLogs[mergedLogs.length - 1]?.timestamp || 0) : 0;
+          const cloudTail = cloudArr.length ? `${cloudArr[cloudArr.length - 1]?.word}_${cloudArr[cloudArr.length - 1]?.timestamp}` : '';
+          const mergedTail = mergedLogs.length ? `${mergedLogs[mergedLogs.length - 1]?.word}_${mergedLogs[mergedLogs.length - 1]?.timestamp}` : '';
+
+          const hasNewerLogs = mergedLogs.length > cloudArr.length || mergedMaxTs > cloudMaxTs || cloudTail !== mergedTail;
+          if (hasNewerLogs) {
+            const safeTs = Math.max(Date.now(), mergedMaxTs, (Number(cloudLogsRow.updated_at) || 0) + 1);
+            await pushSettingRow(cfg, token, user.id, 'vv_review_history_log', mergedLogs, safeTs);
           }
         } else if (localLogs.length > 0) {
-          await pushSettingRow(cfg, token, user.id, 'vv_review_history_log', localLogs, Date.now());
+          const localMaxTs = Number(localLogs[localLogs.length - 1]?.timestamp || 0);
+          const safeTs = Math.max(Date.now(), localMaxTs);
+          await pushSettingRow(cfg, token, user.id, 'vv_review_history_log', localLogs, safeTs);
         }
       }
     } catch (e) {
@@ -558,7 +701,7 @@
   }
 
   async function pushSettingRow(cfg, token, userId, key, val, ts) {
-    await fetch(`${cfg.url}/rest/v1/user_app_settings`, {
+    const res = await fetch(`${cfg.url}/rest/v1/user_app_settings`, {
       method: 'POST',
       headers: {
         apikey: cfg.anonKey,
@@ -572,7 +715,11 @@
         setting_val: val,
         updated_at: ts
       })
-    }).catch(() => {});
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(`設定同期Push失敗 [${key}] (HTTP ${res.status}): ${err.message || err.error || ''}`);
+    }
   }
 
   function mergeHistoryLogs(a, b) {
@@ -588,7 +735,7 @@
     return res.slice(-500);
   }
 
-  async function callVocabGenerateProxy({ lang, srcLang, tgtLang, useHist, fName, folder, items, words }) {
+  async function callVocabGenerateProxy({ lang, srcLang, tgtLang, useHist, fName, folder, items, words, requestId }) {
     const cfg = getConfig();
     if (!cfg.configured) throw new Error('Supabase設定が未構成です。');
     const token = await ensureValidToken().catch(() => null);
@@ -597,10 +744,12 @@
     const tLang = tgtLang || 'ja';
     const finalItems = Array.isArray(items) ? items : (Array.isArray(words) ? words : []);
     const safeFName = fName || folder || '';
+    const reqId = requestId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('req_' + Date.now() + '_' + Math.random().toString(36).slice(2)));
 
     const headers = {
       apikey: cfg.anonKey,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-request-id': reqId
     };
     if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -622,7 +771,7 @@
     if (!r.ok) {
       const err = new Error(data.error || `プロキシ生成エラー (HTTP ${r.status})`);
       err.status = r.status;
-      if (r.status === 429 || (data.error && (data.error.includes('クォータ') || data.error.includes('上限') || data.error.includes('Pro')))) {
+      if (r.status === 429 || data.code === 'QUOTA_EXCEEDED') {
         err.isQuotaExceeded = true;
       }
       throw err;
@@ -630,14 +779,16 @@
     return data;
   }
 
-  async function callOcrProxy({ imageBase64, mimeType = 'image/jpeg', lang = 'en' } = {}) {
+  async function callOcrProxy({ imageBase64, mimeType = 'image/jpeg', lang = 'en', requestId } = {}) {
     const cfg = getConfig();
     if (!cfg.configured) throw new Error('Supabase設定が未構成です。');
     const token = await ensureValidToken().catch(() => null);
+    const reqId = requestId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('ocr_' + Date.now() + '_' + Math.random().toString(36).slice(2)));
 
     const headers = {
       apikey: cfg.anonKey,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-request-id': reqId
     };
     if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -656,7 +807,7 @@
     if (!r.ok) {
       const err = new Error(data.error || `OCR解析エラー (HTTP ${r.status})`);
       err.status = r.status;
-      if (r.status === 429 || (data.error && (data.error.includes('クォータ') || data.error.includes('上限') || data.error.includes('Pro')))) {
+      if (r.status === 429 || data.code === 'QUOTA_EXCEEDED') {
         err.isQuotaExceeded = true;
       }
       throw err;
@@ -664,14 +815,16 @@
     return data;
   }
 
-  async function callPassageExtractProxy({ passage, lang = 'en', maxCnt = 12, levelPrompt = '' } = {}) {
+  async function callPassageExtractProxy({ passage, lang = 'en', tgtLang = 'ja', maxCnt = 12, levelPrompt = '', requestId } = {}) {
     const cfg = getConfig();
     if (!cfg.configured) throw new Error('Supabase設定が未構成です。');
     const token = await ensureValidToken().catch(() => null);
+    const reqId = requestId || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : ('ext_' + Date.now() + '_' + Math.random().toString(36).slice(2)));
 
     const headers = {
       apikey: cfg.anonKey,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-request-id': reqId
     };
     if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -682,6 +835,7 @@
         action: 'extract_passage',
         passage,
         lang,
+        tgtLang,
         maxCnt,
         levelPrompt
       })
@@ -691,7 +845,7 @@
     if (!r.ok) {
       const err = new Error(data.error || `長文抽出エラー (HTTP ${r.status})`);
       err.status = r.status;
-      if (r.status === 429 || (data.error && (data.error.includes('クォータ') || data.error.includes('上限') || data.error.includes('Pro')))) {
+      if (r.status === 429 || data.code === 'QUOTA_EXCEEDED') {
         err.isQuotaExceeded = true;
       }
       throw err;
@@ -854,24 +1008,19 @@
 
     if (!r.ok) {
       const errData = await r.json().catch(() => ({}));
-      // 404 (Edge Function未デプロイ時) の場合のみDB直接RPCを試行（DB側でもアクティブ課金をブロック）
-      if (r.status === 404) {
-        const rRpc = await fetch(`${cfg.url}/rest/v1/rpc/delete_user_account`, {
-          method: 'POST',
-          headers: {
-            apikey: cfg.anonKey,
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({})
-        });
-        if (!rRpc.ok) {
-          const rpcErr = await rRpc.json().catch(() => ({}));
-          throw new Error(rpcErr.message || rpcErr.error || `アカウント削除エラー (HTTP ${rRpc.status})`);
-        }
-      } else {
-        throw new Error(errData.error || errData.message || `アカウント削除・課金解約に失敗しました (HTTP ${r.status})。Stripeポータルより定期課金を解約の上、再度お試しください。`);
+      throw new Error(errData.error || errData.message || `アカウント削除・課金解約に失敗しました (HTTP ${r.status})。Stripeカスタマーポータルより定期課金を解約の上、サポートへお問い合わせください。`);
+    }
+
+    // 退会成功時：端末内の全データ（IndexedDB / LocalStorage / オフラインキュー / 復習履歴）を完全消去
+    try {
+      if (global.VocabStorage?.clearAllClientStorageData) {
+        await global.VocabStorage.clearAllClientStorageData();
       }
+      if (global.VocabSRS?.clearReviewHistoryLog) {
+        global.VocabSRS.clearReviewHistoryLog();
+      }
+    } catch (e) {
+      console.warn('[Sync] Failed to clear client storage on account deletion:', e);
     }
 
     setSession(null);
@@ -882,13 +1031,27 @@
   async function exportAllUserDataJson() {
     const bundle = {};
     const allPairs = (global.VocabCore?.getAllKnownPairConfigs || global.getAllKnownPairConfigs)?.() || [];
-    const keysToExport = new Set(['en', 'ja', 'fr', 'de']);
+    const keysToExport = new Set(SUPPORTED_LANGS);
     allPairs.forEach(p => {
       const id = p.pairId || p.key;
       if (id) keysToExport.add(id);
     });
     for (const l of keysToExport) {
-      const b = await global.VocabStorage?.idbFetchLangBundle?.(l, true);
+      let b = await global.VocabStorage?.idbFetchLangBundle?.(l, true);
+      if (!b?.words?.length) {
+        const memWords = global.VocabStorage?.state?.mem?.[l];
+        let lsWords = null;
+        if (!memWords && typeof localStorage !== 'undefined') {
+          try {
+            const raw = localStorage.getItem(l);
+            if (raw) lsWords = JSON.parse(raw);
+          } catch (_) {}
+        }
+        const fallbackWords = Array.isArray(memWords) ? memWords : (Array.isArray(lsWords) ? lsWords : null);
+        if (fallbackWords && fallbackWords.length) {
+          b = Object.assign({}, b, { words: fallbackWords });
+        }
+      }
       if (b && (b.words?.length || b.clearAt || (b.tombs && b.tombs.length) || (b.snaps && b.snaps.length))) {
         bundle[l] = b;
       }
@@ -914,6 +1077,7 @@
     saveConfig,
     getSession,
     setSession,
+    getUser,
     isCloudReady,
     isProxyReady,
     signInOrSignUp,

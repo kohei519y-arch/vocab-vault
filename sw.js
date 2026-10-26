@@ -3,10 +3,14 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v48-10langs';
+const CACHE_NAME = 'vocab-vault-v51-tab-sync-and-forecast';
 
 // [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
+// [P2-⑥ 解決] AbortController 非対応環境（旧WebView/組み込みブラウザ）でのフォールバック
 function fetchWithTimeout(request, timeoutMs = 3000) {
+  if (typeof AbortController === 'undefined') {
+    return fetch(request);
+  }
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   return fetch(request, { signal: controller.signal })
@@ -60,7 +64,7 @@ self.addEventListener('message', event => {
   } else if (event.data && typeof event.data === 'object') {
     if (event.data.type === 'SHOW_NOTIFICATION' && self.registration?.showNotification) {
       const { title, options } = event.data;
-      self.registration.showNotification(title || '【Vocab Vault】忘却臨界点アラート', Object.assign({
+      self.registration.showNotification(title || '【Vocab Vault】', Object.assign({
         icon: './icons/icon-192.png',
         badge: './icons/favicon-32.png',
         tag: 'vocab-forgetting-alert',
@@ -70,7 +74,7 @@ self.addEventListener('message', event => {
     } else if (event.data.type === 'SCHEDULE_NOTIFICATION' && event.data.delayMs > 0) {
       setTimeout(() => {
         if (self.registration?.showNotification) {
-          self.registration.showNotification(event.data.title || '【Vocab Vault】忘却臨界点アラート', Object.assign({
+          self.registration.showNotification(event.data.title || '【Vocab Vault】', Object.assign({
             icon: './icons/icon-192.png',
             badge: './icons/favicon-32.png',
             tag: 'vocab-forgetting-alert',
@@ -144,15 +148,20 @@ self.addEventListener('fetch', event => {
                  url.pathname === '/vocab-vault';
 
   // 1. HTML (ページ遷移): Network-First (タイムアウト3秒で弱電波ハングを防ぎキャッシュへフォールバック)
+  // [P1-⑬ 解決] サーバが5xxエラーを返した場合もキャッシュへフォールバック
   if (isHtml) {
     event.respondWith(
       fetchWithTimeout(event.request, 3000)
-        .then(res => {
-          if (res && res.status === 200) {
+        .then(async res => {
+          if (res && res.ok) {
             const clone = res.clone();
             caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
+            return res;
           }
-          return res;
+          const cache = await caches.open(CACHE_NAME);
+          const cached = await cache.match(event.request, { ignoreSearch: true });
+          if (cached) return cached;
+          return (await cache.match('./index.html')) || (await cache.match('./')) || res;
         })
         .catch(async () => {
           const cache = await caches.open(CACHE_NAME);

@@ -553,9 +553,9 @@
         { pos: 'V[T]', text: '検疫隔離する、遮断する' }
       ],
       core: 'ペスト感染を防ぐために設定された「40日（quaranta）の停泊隔離」。',
-      etymology: 'イタリア語（ヴェネツィア方言）quarantena（40日間）に由来し、ラテン語 quadraginta（40）から派生。14世紀のヴェネツィア共和国で、ペスト疑いのある船をラグーナに40日間留め置いた公衆衛生制度が発祥。',
+      etymology: 'イタリア語（ヴェネツィア方言）quarantena（40日間）に由来し、ラテン語 quadraginta（40）から派生。14世紀のヴェネツィア共和国で、ペスト疑いのある船をラグーナに40日間留め置いた公衆衛生制度が発祥。印欧祖語 *kʷetwṓr-（4の派生・40）に遡る。',
       etymologyConfidence: 'certain',
-      etymologyTags: ['*kʷetwóres'],
+      etymologyTags: ['*kʷetwṓr-'],
       history_note: '14世紀中葉の黒死病（ペスト）禍において、ヴェネツィア共和国が寄港船に40日間の海上隔離（quarantina）を義務付けた史上初の近代検疫制度。',
       example: {
         foreign: 'Incoming travelers were placed in strict <b>quarantine</b> for two weeks.',

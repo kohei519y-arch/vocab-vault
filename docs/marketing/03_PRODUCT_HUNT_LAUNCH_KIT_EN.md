@@ -17,7 +17,7 @@ Stop brute-force memorization. Vocab Vault connects English vocabulary through I
 
 ## 3. Maker's First Comment (To post immediately upon launch)
 
-> Hey Product Hunt community! 👋
+> Hey Product Hunt community! 
 > 
 > I'm the solo maker behind **Vocab Vault**.
 > 
@@ -25,15 +25,15 @@ Stop brute-force memorization. Vocab Vault connects English vocabulary through I
 > 
 > I built **Vocab Vault** to bridge this gap:
 > 
-> 🧠 **Indo-European Root Networks**: When you look up a word like *inspect*, it connects to its Proto-Indo-European root `*spek-` (to see/observe), visually linking *respect*, *expect*, and *spectacle* on an interactive 2D physics graph.
+>  **Indo-European Root Networks**: When you look up a word like *inspect*, it connects to its Proto-Indo-European root `*spek-` (to see/observe), visually linking *respect*, *expect*, and *spectacle* on an interactive 2D physics graph.
 > 
-> ⚡ **Local-First & Zero-Build**: No accounts required, no bloated build steps. Built with pure modular JavaScript and IndexedDB. It works 100% offline, installs as a PWA, and your data lives directly in your browser.
+>  **Local-First & Zero-Build**: No accounts required, no bloated build steps. Built with pure modular JavaScript and IndexedDB. It works 100% offline, installs as a PWA, and your data lives directly in your browser.
 > 
-> 🔄 **Cognitive SRS Algorithm**: An evolved SM-2 scheduler with anchor bonuses for densely connected roots and relative overdue ratio queueing.
+>  **Cognitive SRS Algorithm**: An evolved SM-2 scheduler with anchor bonuses for densely connected roots and relative overdue ratio queueing.
 > 
-> 📦 **Zero Lock-in**: Export anytime to Obsidian-ready Markdown or Anki TSV with one click.
+>  **Zero Lock-in**: Export anytime to Obsidian-ready Markdown or Anki TSV with one click.
 > 
-> Try the pre-loaded 50-word Starter Pack instantly without signing up. I’d love to hear your thoughts, feedback, and etymological discoveries! 🚀
+> Try the pre-loaded 50-word Starter Pack instantly without signing up. I’d love to hear your thoughts, feedback, and etymological discoveries! 
 > 
 > Special PH Launch Offer: Use the built-in lifetime license option for 50% off during launch week!
 

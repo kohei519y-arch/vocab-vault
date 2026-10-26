@@ -147,10 +147,11 @@
         it.contextSentence,
         ...(it.meanings || []).flatMap(m => [m.pos, m.text]),
         ...tags,
-        ...(it.phrases || []).flatMap(p => [p.foreign, p.ja]),
+        ...(it.phrases || []).flatMap(p => [p.foreign, p.ja, p.trans]),
         ...(it.derivatives || []).flatMap(d => [d.word, d.meaning, d.sub_phrase, d.sub_trans]),
         it.example?.foreign,
-        it.example?.ja
+        it.example?.ja,
+        it.example?.trans
       ].filter(Boolean).join('\n');
       meta = {
         tags,
@@ -165,12 +166,70 @@
   }
 
   /**
+   * Trie（接頭辞木）ノードおよびプレフィックスツリー実装
+   * プレフィックス検索を O(N) から O(K + M) へ高速化し、メインスレッドの凍結を防止
+   */
+  class PrefixTrieNode {
+    constructor() {
+      this.children = new Map();
+      this.isWord = false;
+      this.token = null;
+    }
+  }
+
+  class PrefixTrie {
+    constructor() {
+      this.root = new PrefixTrieNode();
+    }
+    clear() {
+      this.root = new PrefixTrieNode();
+    }
+    insert(tok) {
+      if (!tok) return;
+      let curr = this.root;
+      for (let i = 0; i < tok.length; i++) {
+        const ch = tok[i];
+        let next = curr.children.get(ch);
+        if (!next) {
+          next = new PrefixTrieNode();
+          curr.children.set(ch, next);
+        }
+        curr = next;
+      }
+      curr.isWord = true;
+      curr.token = tok;
+    }
+    collectTokens(prefix, max = 250) {
+      if (!prefix) return [];
+      let curr = this.root;
+      for (let i = 0; i < prefix.length; i++) {
+        const ch = prefix[i];
+        curr = curr.children.get(ch);
+        if (!curr) return [];
+      }
+      const res = [];
+      const stack = [curr];
+      while (stack.length > 0 && res.length < max) {
+        const node = stack.pop();
+        if (node.isWord && node.token) {
+          res.push(node.token);
+        }
+        for (const child of node.children.values()) {
+          stack.push(child);
+        }
+      }
+      return res;
+    }
+  }
+
+  /**
    * 転置インデックス（Inverted Index）エンジン
    * 5,000〜50,000語規模でもサブミリ秒（O(1)〜O(K)）でマルチキーワード検索を実現
    */
   const VocabInvertedIndex = {
     postings: new Map(), // token -> Set<string(id|num)>
     itemsMap: new Map(), // string(id|num) -> item
+    trie: new PrefixTrie(),
     indexedCount: 0,
     lastBuiltTs: 0,
 
@@ -190,7 +249,8 @@
         }
       });
 
-      const cjk = s.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g) || [];
+      // 日・中・韓（CJK + Hangul）の文字種を完全に網羅（1文字および隣接2文字バイグラムを転置インデックス化）
+      const cjk = s.match(/[\u3040-\u309F\u30A0-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/g) || [];
       for (let i = 0; i < cjk.length; i++) {
         tokens.add(cjk[i]);
         if (i + 1 < cjk.length) tokens.add(cjk[i] + cjk[i + 1]);
@@ -202,6 +262,7 @@
     build(items) {
       this.postings.clear();
       this.itemsMap.clear();
+      this.trie.clear();
       const list = Array.isArray(items) ? items : [];
 
       list.forEach(it => {
@@ -222,7 +283,10 @@
         tokens.forEach(tok => {
           if (!tok) return;
           let post = this.postings.get(tok);
-          if (!post) this.postings.set(tok, post = new Set());
+          if (!post) {
+            this.postings.set(tok, post = new Set());
+            this.trie.insert(tok);
+          }
           post.add(key);
         });
       });
@@ -242,8 +306,11 @@
         let tokKeys = this.postings.get(tok);
         if (!tokKeys) {
           tokKeys = new Set();
-          for (const [key, set] of this.postings) {
-            if (key.startsWith(tok) || key.includes(tok)) {
+          // [O(K) Trie プレフィックス検索] 全件線形走査を完全撤廃し、Trie木によるプレフィックス走査を実行
+          const matchedToks = this.trie.collectTokens(tok, 250);
+          for (let i = 0; i < matchedToks.length; i++) {
+            const set = this.postings.get(matchedToks[i]);
+            if (set) {
               set.forEach(id => tokKeys.add(id));
               if (tokKeys.size >= 1500) break;
             }
@@ -277,48 +344,85 @@
     }
   };
 
+  let _lastEtyIndexedRef = null;
+  let _lastEtyIndexedLen = -1;
+
   /**
-   * 全言語横断で語根インデックスマップを構築
+   * 全言語横断で語根インデックスマップを構築（アクティブペア即時 + 他ペア遅延インデックス化）
    */
-  function buildEtyIndex(appInstance = global.App) {
+  function buildEtyIndex(appInstance = global.App, force = false) {
     const App = appInstance || global.App || {};
     if (!App.rootIndexMap) App.rootIndexMap = new Map();
+
+    const activeList = Array.isArray(App.entries) ? App.entries : [];
+    // 変更がない場合は同期パース・再構築をスキップしてUI凍結を完全回避
+    if (!force && App.rootIndexMap.size > 0 && _lastEtyIndexedRef === App.entries && _lastEtyIndexedLen === activeList.length) {
+      return;
+    }
+
+    _lastEtyIndexedRef = App.entries;
+    _lastEtyIndexedLen = activeList.length;
     App.rootIndexMap.clear();
 
     const rootBuckets = new Map();
     const getJsonFn = global.getJson || (global.VocabStorage ? global.VocabStorage.getJson : (() => []));
     const activePairKey = global.getActivePairConfig ? global.getActivePairConfig().key : '';
+    const curSrc = App.srcLang || 'en';
 
-    // 基本10言語キー + 保存されている全言語ペアキーを統合走査
+    // 1. アクティブ言語ペアを即時同期インデックス化（メインスレッドを最優先で開放）
+    activeList.forEach(it => {
+      if (!it?.word) return;
+      const l = it.lang || curSrc || 'en';
+      it.lang = l;
+      const uKey = `${activePairKey}:${it.id || it.num}`;
+      const ref = { word: it.word, lang: l, num: it.num, id: it.id, homographIndex: it.homographIndex };
+      getMeta(it, App).roots.forEach(k => {
+        let rm = rootBuckets.get(k);
+        if (!rm) rootBuckets.set(k, rm = new Map());
+        rm.set(uKey, ref);
+      });
+    });
+    rootBuckets.forEach((m, k) => App.rootIndexMap.set(k, [...m.values()]));
+
+    // 2. 非アクティブな他言語ペアの走査
+    // crossLang が不要な場合やメモリ外の巨大データはアイドル時または必要時に遅延インデックス化
     const allPairs = getAllKnownPairConfigs(App);
     const keysToScan = new Map();
     const langs = global.LANGS || {};
     ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko', 'ja'].forEach(l => {
       const k = langs[l]?.key || (l === 'en' ? 'distinction_entries' : `distinction_entries_${l}`);
-      keysToScan.set(k, l);
+      if (k !== activePairKey) keysToScan.set(k, l);
     });
     allPairs.forEach(p => {
-      if (p.key) keysToScan.set(p.key, p.src || 'en');
+      if (p.key && p.key !== activePairKey) keysToScan.set(p.key, p.src || 'en');
     });
 
-    keysToScan.forEach((srcLang, storageKey) => {
-      const list = (storageKey === activePairKey && Array.isArray(App.entries) && App.entries.length)
-        ? App.entries
-        : (getJsonFn(storageKey) || []);
-      list.forEach(it => {
-        if (!it?.word) return;
-        const l = it.lang || srcLang || 'en';
-        it.lang = l;
-        const uKey = `${storageKey}:${it.id || it.num}`;
-        const ref = { word: it.word, lang: l, num: it.num, id: it.id, homographIndex: it.homographIndex };
-        getMeta(it, App).roots.forEach(k => {
-          let rm = rootBuckets.get(k);
-          if (!rm) rootBuckets.set(k, rm = new Map());
-          rm.set(uKey, ref);
+    const indexRemainingKeys = () => {
+      keysToScan.forEach((srcLang, storageKey) => {
+        const list = global.VocabStorage?.state?.mem?.[storageKey] || getJsonFn(storageKey) || [];
+        list.forEach(it => {
+          if (!it?.word) return;
+          const l = it.lang || srcLang || 'en';
+          it.lang = l;
+          const uKey = `${storageKey}:${it.id || it.num}`;
+          const ref = { word: it.word, lang: l, num: it.num, id: it.id, homographIndex: it.homographIndex };
+          getMeta(it, App).roots.forEach(k => {
+            let rm = rootBuckets.get(k);
+            if (!rm) rootBuckets.set(k, rm = new Map());
+            rm.set(uKey, ref);
+          });
         });
       });
-    });
-    rootBuckets.forEach((m, k) => App.rootIndexMap.set(k, [...m.values()]));
+      rootBuckets.forEach((m, k) => App.rootIndexMap.set(k, [...m.values()]));
+    };
+
+    if (App.crossLang) {
+      indexRemainingKeys();
+    } else if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(() => indexRemainingKeys(), { timeout: 2000 });
+    } else if (typeof setTimeout === 'function') {
+      setTimeout(indexRemainingKeys, 100);
+    }
   }
 
   /**
@@ -425,13 +529,16 @@
     return `${sName} → ${tName} (${short})`;
   }
 
+  const _pairCountCache = new Map(); // storageKey -> { rawLen: number, count: number }
+
   /**
-   * 保存されている全言語ペアファイル一覧取得
+   * 保存されている全言語ペアファイル一覧取得（パースキャッシュ適用で起動時のLong Taskを防止）
    */
   function getActivePairFiles(appInstance = global.App) {
     const App = appInstance || global.App || {};
     const pairMap = new Map();
     const getJsonFn = global.getJson || (global.VocabStorage ? global.VocabStorage.getJson : (() => []));
+    const activePairKey = global.getActivePairConfig ? global.getActivePairConfig().key : '';
 
     const scanKeys = new Set();
     if (typeof localStorage !== 'undefined') {
@@ -449,34 +556,66 @@
     }
 
     scanKeys.forEach(k => {
-      const words = getJsonFn(k);
-      if (Array.isArray(words) && words.length > 0) {
+      let count = 0;
+      if (k === activePairKey && App.loadedKey === activePairKey && Array.isArray(App.entries)) {
+        count = App.entries.length;
+      } else if (global.VocabStorage?.state?.mem?.[k] && Array.isArray(global.VocabStorage.state.mem[k])) {
+        count = global.VocabStorage.state.mem[k].length;
+      } else if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(k);
+        if (!raw || raw.trim() === '[]') {
+          count = 0;
+        } else {
+          const cached = _pairCountCache.get(k);
+          if (cached && cached.rawLen === raw.length) {
+            count = cached.count;
+          } else {
+            const words = getJsonFn(k);
+            count = Array.isArray(words) ? words.length : 0;
+            _pairCountCache.set(k, { rawLen: raw.length, count });
+          }
+        }
+      } else {
+        const words = getJsonFn(k);
+        count = Array.isArray(words) ? words.length : 0;
+      }
+
+      if (count > 0) {
         const p = global.VocabStorage ? global.VocabStorage.keyToPair(k) : { srcLang: 'en', tgtLang: 'ja' };
         const id = `${p.srcLang}_${p.tgtLang}`;
         pairMap.set(id, {
           src: p.srcLang,
           tgt: p.tgtLang,
           key: k,
-          count: words.length
+          count
         });
       }
     });
 
     if (!pairMap.size) {
-      pairMap.set('en_ja', { src: 'en', tgt: 'ja', key: global.LANGS?.en?.key || 'distinction_entries_en', count: 0 });
+      pairMap.set('en_ja', { src: 'en', tgt: 'ja', key: global.LANGS?.en?.key || 'distinction_entries', count: 0 });
     }
 
     const curSrc = App.srcLang || 'en';
     const curTgt = App.tgtLang || 'ja';
     const curId = `${curSrc}_${curTgt}`;
+    const cfg = global.getActivePairConfig ? global.getActivePairConfig() : { key: 'distinction_entries' };
+    const curCount = (App.loadedKey === cfg.key && Array.isArray(App.entries))
+      ? App.entries.length
+      : (getJsonFn(cfg.key)?.length || 0);
+
     if (!pairMap.has(curId)) {
-      const cfg = global.getActivePairConfig ? global.getActivePairConfig() : { key: 'distinction_entries' };
       pairMap.set(curId, {
         src: curSrc,
         tgt: curTgt,
         key: cfg.key,
-        count: getJsonFn(cfg.key).length
+        count: curCount
       });
+    } else {
+      const curObj = pairMap.get(curId);
+      if (curObj) {
+        curObj.count = curCount;
+      }
     }
 
     return Array.from(pairMap.values()).map(p => ({
@@ -511,7 +650,34 @@
    */
   function getFiltered(appInstance = global.App) {
     const App = appInstance || global.App || {};
-    const rawQ = (App.qStr || '').trim(), now = Date.now();
+    let rawQ = (App.qStr || '').trim(), now = Date.now();
+    let queryPos = null, queryCat = null, queryStat = null;
+
+    if (rawQ) {
+      rawQ = rawQ.replace(/#([a-zA-Z\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]+)/g, (_, val) => {
+        const vLow = val.toLowerCase();
+        if (vLow === 'noun' || vLow === 'n' || val === '名詞') queryPos = 'noun';
+        else if (vLow === 'verb' || vLow === 'v' || val === '動詞') queryPos = 'verb';
+        else if (vLow === 'adj' || vLow === 'a' || val === '形容詞') queryPos = 'adj';
+        else if (vLow === 'adv' || val === '副詞') queryPos = 'adv';
+        else queryPos = val;
+        return '';
+      });
+      rawQ = rawQ.replace(/@([^\s]+)/g, (_, val) => {
+        queryCat = val;
+        return '';
+      });
+      rawQ = rawQ.replace(/\?([a-zA-Z]+)/g, (_, val) => {
+        queryStat = val.toLowerCase();
+        return '';
+      });
+      rawQ = rawQ.trim();
+    }
+
+    const effectiveStat = queryStat || App.statF || 'all';
+    const effectivePos = queryPos || App.posF || 'all';
+    const effectiveCat = queryCat || App.cat || 'all';
+
     const getActivePairConfigFn = global.getActivePairConfig || (() => ({ key: 'distinction_entries' }));
     const curPairKey = getActivePairConfigFn().key;
     const getJsonFn = global.getJson || (global.VocabStorage ? global.VocabStorage.getJson : (() => []));
@@ -522,10 +688,10 @@
     }) : (App.entries || []);
 
     const baseFiltered = pool.filter(i => {
-      if (!i?.word || !matchStat(i, App.statF || 'all', now)) return false;
-      if (App.cat && App.cat !== 'all' && i.category !== App.cat) return false;
+      if (!i?.word || !matchStat(i, effectiveStat, now)) return false;
+      if (effectiveCat !== 'all' && i.category !== effectiveCat && (!queryCat || !String(i.category || '').toLowerCase().includes(queryCat.toLowerCase()))) return false;
       if (App.fol && App.fol !== 'all' && i.folder !== App.fol) return false;
-      if (!matchPos(i, App.posF || 'all')) return false;
+      if (!matchPos(i, effectivePos)) return false;
       return true;
     });
 
@@ -565,10 +731,47 @@
     }
 
     const sorted = [...matched];
-    if (App.sortBy === 'old') sorted.sort((a, b) => (a.num || 0) - (b.num || 0));
-    else if (App.sortBy === 'due') sorted.sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
-    else if (App.sortBy === 'alpha') sorted.sort((a, b) => foldAscii(a.word).localeCompare(foldAscii(b.word)));
-    else sorted.reverse();
+    if (rawQ && (!App.sortBy || App.sortBy === 'new')) {
+      const qFold = foldAscii(rawQ).toLowerCase().replace(/^\*|^-+|-+$/g, '');
+      const calcRelevance = item => {
+        let score = 0;
+        const wFold = foldAscii(item.word || '').toLowerCase();
+        if (wFold === qFold) score += 1000;
+        else if (wFold.startsWith(qFold)) score += 500;
+        else if (wFold.includes(qFold)) score += 200;
+
+        const meanings = item.meanings || [];
+        for (let mIdx = 0; mIdx < meanings.length; mIdx++) {
+          const mText = foldAscii(meanings[mIdx]?.text || '').toLowerCase();
+          if (mText === qFold) { score += 120; break; }
+          if (mText.startsWith(qFold)) { score += 80; break; }
+          if (mText.includes(qFold)) { score += 40; break; }
+        }
+
+        const tags = item.etymologyTags || item.tags || [];
+        for (let tIdx = 0; tIdx < tags.length; tIdx++) {
+          const tFold = foldAscii(String(tags[tIdx])).toLowerCase().replace(/^\*|^-+|-+$/g, '');
+          if (tFold === qFold) { score += 90; break; }
+          if (tFold.includes(qFold)) { score += 50; break; }
+        }
+
+        return score;
+      };
+
+      sorted.sort((a, b) => {
+        const diff = calcRelevance(b) - calcRelevance(a);
+        if (diff !== 0) return diff;
+        return (b.num || 0) - (a.num || 0);
+      });
+    } else if (App.sortBy === 'old') {
+      sorted.sort((a, b) => (a.num || 0) - (b.num || 0));
+    } else if (App.sortBy === 'due') {
+      sorted.sort((a, b) => (a.nextReview || 0) - (b.nextReview || 0));
+    } else if (App.sortBy === 'alpha') {
+      sorted.sort((a, b) => foldAscii(a.word).localeCompare(foldAscii(b.word)));
+    } else {
+      sorted.reverse();
+    }
     return sorted;
   }
 

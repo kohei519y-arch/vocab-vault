@@ -87,7 +87,9 @@
       // キャッシュリビジョンシグネチャ（編集時刻、復習期日、表示モード、検索ハイライトクエリ、フォルダ等）
       const qStr = options.queryReg ? String(options.queryReg.source || '') : '';
       const vMode = options.viewMode || (options.appState?.viewMode) || 'academic';
-      const rev = `${item.updatedAt || 0}:${item.interval || 0}:${item.nextReview || 0}:${vMode}:${qStr}:${item.folder || ''}:${options.crossLang ? '1' : '0'}`;
+      const loc = global.VocabI18n?.getLocale?.() || 'ja';
+      const tgtL = options.tgtLang || options.appState?.tgtLang || global.App?.tgtLang || 'ja';
+      const rev = `${item.updatedAt || 0}:${item.interval || 0}:${item.nextReview || 0}:${vMode}:${qStr}:${item.folder || ''}:${options.crossLang ? '1' : '0'}:${loc}:${tgtL}`;
 
       let cardEl = (item.id && existingCardMap.get(item.id)) || existingCardMap.get(itemKey) || existingCardMap.get(item.word);
       // [P2-2 解決] 同形異義語や横断検索時の同一DOMノード重複割り当て競合を完全防止
@@ -99,7 +101,7 @@
         if (dueEl && global.VocabCardView) {
           const isDue = (item.nextReview || 0) <= Date.now();
           dueEl.className = `due ${isDue ? 'is-due' : 'is-fut'}`;
-          dueEl.textContent = global.VocabCardView.relTime(item.nextReview);
+          dueEl.textContent = global.VocabCardView.relTime(item.nextReview, loc);
         }
         usedNodes.add(cardEl);
         finalNodes.push(cardEl);
@@ -334,7 +336,7 @@
     const per = (ctx.perPage && Number.isFinite(ctx.perPage)) ? ctx.perPage : ((appState.per && Number.isFinite(appState.per)) ? appState.per : 30);
     const tot = Math.max(1, Math.ceil(f.length / per));
     appState.page = Math.max(1, Math.min(appState.page, tot));
-    const pageItems = f.slice((appState.page - 1) * per, appState.page * per);
+    const pageItems = appState.printAllMode ? f : f.slice((appState.page - 1) * per, appState.page * per);
 
     // 【改善三：Keyed DOM Reconciliation による差分更新実行】
     reconcileList(list, pageItems, {
@@ -452,11 +454,17 @@
         items = ctx.repairEntriesLocalization(items, pairCfg);
       }
       appState.entries = items;
+      appState.loadedKey = curPairKey;
     }
     if (typeof ctx.buildEtyIndex === 'function') ctx.buildEtyIndex();
     if (typeof ctx.renderSidebarTree === 'function') ctx.renderSidebarTree();
     render(ctx);
     if (typeof ctx.updStats === 'function') ctx.updStats();
+    if (typeof ctx.renderPairFileTabs === 'function') {
+      ctx.renderPairFileTabs();
+    } else if (typeof global.VocabSearch?.renderPairFileTabs === 'function') {
+      global.VocabSearch.renderPairFileTabs(appState);
+    }
   }
 
   /**

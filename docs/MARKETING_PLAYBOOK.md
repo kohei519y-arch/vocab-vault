@@ -108,7 +108,7 @@ flowchart TD
   ・transfer（trans 越えて + fer 運ぶ ＝ 移動する）
 
   全部「運ぶ」という同一の根っこから派生しています。
-  この繋がりを視覚的に体験できるツールを作りました👇
+  この繋がりを視覚的に体験できるツールを作りました
   https://kohei519y-arch.github.io/vocab-vault/
   ```
 

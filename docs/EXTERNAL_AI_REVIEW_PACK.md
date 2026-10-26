@@ -1,10 +1,10 @@
-# 🤖 Vocab Vault — 外部AIレビュー用包括パック & プロンプト
+#  Vocab Vault — 外部AIレビュー用包括パック & プロンプト
 > **対象AI**: Claude 3.7 / OpenAI o1, GPT-4o / DeepSeek R1 / Gemini 2.0 Pro 等  
 > **用途**: 本プロダクトを商用SaaS（月額480円）として本番稼働・一般公開するにあたり、他の最先端AIから多角的・批判的な設計レビューと改善提案を引き出すためのドキュメントです。
  
 ---
  
-## 📋 クイックスタート: コピペ用プロンプト
+##  クイックスタート: コピペ用プロンプト
  
 他のAIチャット（Claude, ChatGPT, DeepSeek等）を開き、**以下の枠内のテキストをそのままコピー＆ペースト**してください。  
 （※コンテキストウィンドウが大きいAIには、このファイル全体をそのまま添付または貼り付けてください）
@@ -39,15 +39,15 @@
 ---
 ### 【出力フォーマット】
 以下の形式で、優先度順に具体的かつ実装コード/SQL付きで提示してください：
-- **🔴 P0 (致命的・リリース阻止リスク)**: 資金流出、データ全消失、重大なセキュリティ脆弱性
-- **🟠 P1 (高優先度・整合性/法務リスク)**: Webhookエッジケース、法規制抵触、UX離脱要因
-- **🟡 P2 (中優先度・品質/スケーラビリティ改善)**: パフォーマンス改善、コードリファクタリング、CVR改善
-- **💡 アーキテクチャ・ビジネスモデルへの戦略的提言**: 今後スケールするための技術・製品ロードマップ
+- ** P0 (致命的・リリース阻止リスク)**: 資金流出、データ全消失、重大なセキュリティ脆弱性
+- ** P1 (高優先度・整合性/法務リスク)**: Webhookエッジケース、法規制抵触、UX離脱要因
+- ** P2 (中優先度・品質/スケーラビリティ改善)**: パフォーマンス改善、コードリファクタリング、CVR改善
+- ** アーキテクチャ・ビジネスモデルへの戦略的提言**: 今後スケールするための技術・製品ロードマップ
 ```
  
 ---
  
-## 🏗️ 1. プロジェクト概要 & 全体アーキテクチャ
+##  1. プロジェクト概要 & 全体アーキテクチャ
  
 ### 1.1 プロダクト概要
 * **サービス名**: Vocab Vault（ヴォキャブ・ヴォールト）
@@ -64,7 +64,7 @@
 ### 1.2 技術スタック
 * **フロントエンド**: Vanilla JavaScript (ES6+), HTML5, Modern CSS3 (Grid/Flexbox/CSS Variables), Service Worker (CacheFirst + NetworkFallback)
 * **暗記エンジン**: SuperMemo SM-2 アルゴリズム改良版（EF factor, Repetition, Interval, NextReviewDate）
-* **データストレージ**: LocalStorage ➔ IndexedDB（自動容量超過フェイルセーフ）➔ Supabase PostgreSQL（端末間差分同期）
+* **データストレージ**: LocalStorage  IndexedDB（自動容量超過フェイルセーフ） Supabase PostgreSQL（端末間差分同期）
 * **バックエンド / BaaS**: Supabase
   - **Auth**: Email / Password 認証
   - **Database**: PostgreSQL 15 (Row Level Security / RLS 適用)
@@ -103,7 +103,7 @@ flowchart TD
 
 ---
 
-## 💾 2. データベース設計 & RLS (Supabase PostgreSQL)
+##  2. データベース設計 & RLS (Supabase PostgreSQL)
 
 本番で使用している DDL スキーマの抜粋です：
 
@@ -298,7 +298,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-## ⚡ 3. サーバーレス関数設計 (Supabase Edge Functions)
+##  3. サーバーレス関数設計 (Supabase Edge Functions)
 
 ### 3.1 `vocab-generate` (AI生成プロキシ)
 * **目的**: クライアントから直接Geminiを呼ばせず、認証・クォータ・プロンプト秘匿化・共有キャッシュを行う。
@@ -320,7 +320,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-## 📱 4. フロントエンド・クライアント設計 (Vanilla JS / PWA)
+##  4. フロントエンド・クライアント設計 (Vanilla JS / PWA)
 
 * **モジュール構成**:
   - `storage.js`: LocalStorage と IndexedDB の透過的ラッパー。容量超過エラー時に IndexedDB 専有モードへ自動フォールバック。
@@ -334,7 +334,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-## 🛠️ 5. 直近で対応完了済みの改善項目 (P0 / P1)
+##  5. 直近で対応完了済みの改善項目 (P0 / P1)
 他のAIが重複して指摘しないよう、以下の改善は**すでに実装・検証完了済み**であることを明記します：
 
 1. **[P0完了] 新規登録時の利用規約・プライバシーポリシー同意の強制バリデーション**
@@ -354,7 +354,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 ---
 
-## 🔍 6. 他のAIに特に深掘りしてほしい検討論点（Open Questions）
+##  6. 他のAIに特に深掘りしてほしい検討論点（Open Questions）
 
 1. **Stripe決済の異常系・エッジケース**:
    - クレジットカードの更新失敗（`invoice.payment_failed`）やリトライ期間中の扱い（`past_due`）において、ユーザーへの督促UIや猶予期間（Grace Period）はどうあるべきか？

@@ -1,0 +1,25 @@
+# Ignore build artifacts and duplicate outputs
+vocab-vault-web/
+Vocab Vault.app/
+*.zip
+dist/
+
+# Ignore large backups and dumps
+VocabVault_Recovered_Full_Backup.json
+VocabVault_All_In_One.txt
+Part1_Backend_DB_Sync.txt
+Part2_Frontend_Logic_FSRS.txt
+Part3_Graph_Catalog_Suite.txt
+ETYMOLOGY_GRAPH_REVIEW_PROMPT.txt
+厳密監査用プロンプト.txt
+ai_audit_prompts/
+deepseek_*.md
+
+
+# Ignore test artifacts & caches
+test-results/
+playwright-report/
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store

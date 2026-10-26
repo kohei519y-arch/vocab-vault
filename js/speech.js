@@ -557,12 +557,16 @@
     // ターゲット要素の自動解決（未指定時はカードの関連要素を探す）
     let targetEl = targetElement;
     if (!targetEl && typeof document !== 'undefined') {
-      const aWord = document.getElementById('aWord');
-      const aEx = document.querySelector('.anki-ex-foreign');
-      if (aEx && aEx.textContent && aEx.textContent.includes(clean.slice(0, 10))) {
-        targetEl = aEx;
-      } else if (aWord && aWord.textContent && aWord.textContent.trim().startsWith(clean.slice(0, 5))) {
-        targetEl = aWord;
+      const ankiModal = document.getElementById('ankiModal') || document.getElementById('anki');
+      const isAnkiVisible = ankiModal && (ankiModal.classList.contains('open') || ankiModal.style.display !== 'none');
+      if (isAnkiVisible) {
+        const aWord = document.getElementById('aWord');
+        const aEx = document.querySelector('.anki-ex-foreign');
+        if (aEx && aEx.textContent && aEx.textContent.includes(clean.slice(0, 10))) {
+          targetEl = aEx;
+        } else if (aWord && aWord.textContent && aWord.textContent.trim().startsWith(clean.slice(0, 5))) {
+          targetEl = aWord;
+        }
       }
     }
 

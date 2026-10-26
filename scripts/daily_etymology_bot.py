@@ -91,8 +91,8 @@ def generate_daily_post():
     for w, desc in item["words"][:5]:
         lines.append(f"・{w}: {desc}")
     
-    lines.append(f"\n💡 語源の深層:\n{item['insight']}")
-    lines.append(f"\nこの繋がりを力学グラフで視覚体験できる無料ツール👇\n{app_url}\n#英語学習 #語源 #TOEIC #英単語")
+    lines.append(f"\n[語源の深層]:\n{item['insight']}")
+    lines.append(f"\nこの繋がりを力学グラフで視覚体験できる無料ツール:\n{app_url}\n#英語学習 #語源 #TOEIC #英単語")
     
     post_text = "\n".join(lines)
     return post_text

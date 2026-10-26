@@ -65,13 +65,18 @@
 
   function checkDevMasterMode() {
     if (typeof window === 'undefined') return false;
+    // 本番ホストでは window.__VV_DEV_MASTER を絶対に信頼しない（dev.html の誤公開・無料Pro化を完全防御）
+    const host = String(window.location?.hostname || '');
+    const isProdHost = host.endsWith('github.io') || host.endsWith('vocab-vault.app') || host.endsWith('vercel.app');
+    if (isProdHost) {
+      try { window.__VV_DEV_MASTER = false; } catch {}
+      return false;
+    }
     if (window.__VV_DEV_MASTER === true) return true;
     const path = String(window.location?.pathname || '');
     const proto = String(window.location?.protocol || '');
-    const host = String(window.location?.hostname || '');
     if (path.endsWith('/dev.html') || path.endsWith('dev.html')) return true;
-    const isProdHost = host.endsWith('github.io') || host.endsWith('vocab-vault.app') || host.endsWith('vercel.app');
-    if (!isProdHost && (proto === 'file:' || host === 'localhost' || host === '127.0.0.1')) {
+    if (proto === 'file:' || host === 'localhost' || host === '127.0.0.1') {
       try {
         return localStorage.getItem('vv_dev_unlocked') === '1';
       } catch {
@@ -275,6 +280,26 @@
     if (!parsed.length && rawStr.trim().length > 2) {
       if (global.VocabStorage) global.VocabStorage.state.loadFailed[storageKey] = true;
       updateStorageStatusUI('error', `${storageKey}のLSデータが破損しています。IDBからの自動復旧を待機中です`);
+      // [P1-⑧] セッション途中でのLS破損時、IDBからの非同期自動復旧を即時トリガー
+      if (global.VocabStorage?.idbFetchLangBundle) {
+        global.VocabStorage.idbFetchLangBundle(storageKey).then(idbBundle => {
+          const idbWords = Array.isArray(idbBundle?.words) ? idbBundle.words : (Array.isArray(idbBundle) ? idbBundle : []);
+          if (idbWords.length > 0) {
+            const restored = mergeWords([], idbWords, storageKey, false);
+            if (global.VocabStorage) {
+              global.VocabStorage.state.mem[storageKey] = restored;
+              global.VocabStorage.state.loadFailed[storageKey] = false;
+            }
+            noteBase(storageKey, restored, true);
+            const curPairKey = getActivePairConfig().key;
+            if (storageKey === curPairKey) {
+              App.entries = restored;
+              if (typeof App.render === 'function') App.render();
+            }
+            updateStorageStatusUI('ok');
+          }
+        }).catch(() => {});
+      }
     }
     const merged = mergeWords(parsed, [], storageKey, false);
     if (global.VocabStorage) global.VocabStorage.state.mem[storageKey] = merged;
@@ -360,7 +385,10 @@
 
         if (idbOk) {
           global.VocabStorage.state.mem[storageKey] = mergedData;
-          if (storageKey === getActivePairConfig().key) App.entries = mergedData;
+          if (storageKey === getActivePairConfig().key) {
+            App.entries = mergedData;
+            App.loadedKey = storageKey;
+          }
           syncAnkiReferences(l, mergedData);
           noteBase(storageKey, mergedData, true);
           if (changed && lsOk) {
@@ -392,7 +420,17 @@
     global.VocabStorage.setJson = setJson;
   }
 
-  function updateStorageStatusUI(state = 'ok', msg = '') {
+  let _lastStorageState = 'ok';
+  let _lastStorageMsg = '';
+
+  function updateStorageStatusUI(state = null, msg = null) {
+    if (state !== null && state !== undefined) {
+      _lastStorageState = state;
+      _lastStorageMsg = (msg !== null && msg !== undefined) ? msg : '';
+    } else {
+      state = _lastStorageState;
+      msg = _lastStorageMsg;
+    }
     const banner = $('storageWarnBanner'), badge = $('storageBadge'), dot = $('cfgDot');
     App.storageError = (state === 'error');
     const curLocale = global.VocabI18n?.getLocale?.() || 'ja';
@@ -481,14 +519,15 @@
     if ($('srcLangSel') && $('srcLangSel').value !== s) $('srcLangSel').value = s;
     if ($('tgtLangSel') && $('tgtLangSel').value !== t) $('tgtLangSel').value = t;
 
-    renderPairFileTabs();
-
     if ($('anki')?.style.display === 'block') exitAnki();
     if (window.innerWidth <= 768) closeSidebar();
 
     const curPairCfg = getActivePairConfig();
     let curItems = getJson(curPairCfg.key);
     curItems = repairEntriesLocalization(curItems, curPairCfg);
+    App.entries = Array.isArray(curItems) ? curItems : [];
+    App.loadedKey = curPairCfg.key;
+
     const pairId = curPairCfg.pairId || `${s}_${t}`;
     const cleared = global.VocabStorage ? global.VocabStorage.getClearedAt(curPairCfg.key) : 0;
     const starterLoaded = lsGet(`vv_starter_loaded_${pairId}`) === '1';
@@ -499,6 +538,7 @@
     } else {
       load(1);
     }
+    renderPairFileTabs();
   }
 
   function repairEntriesLocalization(entries, pairCfg) {
@@ -888,6 +928,7 @@
     buildEtyIndex,
     renderSidebarTree,
     updStats,
+    renderPairFileTabs: () => renderPairFileTabs(),
     createCardElement: (i, opts) => createCardElement(i, opts),
     enhanceA11y
   });
@@ -1295,7 +1336,10 @@
         setJson,
         activePairKey: getActivePairConfig().key,
         setActiveEntries: m => { App.entries = m; },
-        onComplete: () => load(1)
+        onComplete: () => {
+          load(1);
+          renderPairFileTabs();
+        }
       });
     }
   }
@@ -1422,7 +1466,7 @@
         cards,
         tL => (!App.crossLang || !tL || tL === App.srcLang)
           ? getJson(activePairKey)
-          : getJson(LANGS[tL]?.key || activePairKey),
+          : getJson(global.VocabStorage ? global.VocabStorage.getPairConfig(tL, App.tgtLang || 'ja').key : (LANGS[tL]?.key || activePairKey)),
         App.lang,
         makeLookupKey
       );
@@ -1585,17 +1629,9 @@
     setJson,
     getActivePairKey: () => getActivePairConfig().key,
     getSrcLang: () => App.srcLang,
-    setEntries: list => { App.entries = list; },
+    setEntries: list => { App.entries = list; App.loadedKey = getActivePairConfig().key; },
     switchSrcLang: l => {
-      App.srcLang = l;
-      App.lang = l;
-      App.tgtLang = 'ja';
-      lsSet('vv_src_lang', l);
-      lsSet('vv_active_lang', l);
-      lsSet('vv_tgt_lang', 'ja');
-      if ($('srcLangSel')) $('srcLangSel').value = l;
-      if ($('tgtLangSel')) $('tgtLangSel').value = 'ja';
-      renderPairFileTabs();
+      setLanguagePair(l, 'ja');
     },
     reload: () => load(App.page || 1),
     flushOffline: () => global.VocabSRS?.flushOfflineReviews?.(),
@@ -1605,7 +1641,10 @@
       const activePair = getActivePairConfig();
       const cfg = global.VocabStorage ? global.VocabStorage.resolveConfig(keyOrLang) : { key: keyOrLang, srcLang: keyOrLang };
       const isCurrentActive = (cfg.key === activePair.key) || (cfg.srcLang === App.lang && cfg.key === (LANGS[App.lang]?.key || 'distinction_entries'));
-      if (isCurrentActive) App.entries = merged;
+      if (isCurrentActive) {
+        App.entries = merged;
+        App.loadedKey = cfg.key;
+      }
       syncAnkiReferences(cfg.srcLang, merged);
       if (isCurrentActive && $('anki')?.style.display !== 'block') load(App.page || 1);
       else renderSidebarTree();
@@ -1643,10 +1682,18 @@
 
     if ($('srcLangSel')) $('srcLangSel').value = App.srcLang;
     if ($('tgtLangSel')) $('tgtLangSel').value = App.tgtLang;
+    App.loadedKey = getActivePairConfig().key;
     renderPairFileTabs();
 
     const savedSort = lsGet('vv_sort_by', 'new');
     if (['new', 'old', 'due', 'alpha'].includes(savedSort)) { App.sortBy = savedSort; if ($('sortSel')) $('sortSel').value = savedSort; }
+    const savedViewMode = (typeof window !== 'undefined' && window.innerWidth <= 768)
+      ? (lsGet('vv_view_mode_mobile', '') || lsGet('vv_view_mode', 'academic'))
+      : lsGet('vv_view_mode', 'academic');
+    if (savedViewMode === 'simple' || savedViewMode === 'academic') {
+      App.viewMode = savedViewMode;
+      document.body?.classList.toggle('view-mode-simple', App.viewMode === 'simple');
+    }
     $('btnModeAcademic')?.classList.toggle('active', App.viewMode === 'academic');
     $('btnModeSimple')?.classList.toggle('active', App.viewMode === 'simple');
 
