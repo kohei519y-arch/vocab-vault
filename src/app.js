@@ -2221,6 +2221,16 @@
     toggleVoiceAnkiMode: () => toggleVoiceAnkiMode(),
     requestSmartNotifyPermission: () => global.VocabModal?.requestSmartNotifyPermission?.(),
     updateSmartNotifyUI: () => global.VocabModal?.updateSmartNotifyUI?.(),
+    updateStorageStatusUI,
+    updKeyUI,
+    updCloudUI,
+    updStats,
+    setKey,
+    enhanceA11y,
+    extractEtyTags,
+    mkSpkBtn,
+    speakText,
+    registerWordsList,
     repairEntriesLocalization,
     initApp
   };

@@ -15,17 +15,24 @@ function getMsg(key, fallback) {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "add-to-vocab-vault",
-    title: getMsg("menuAdd", "Add to Vocab Vault: '%s'"),
-    contexts: ["selection"]
-  });
+  const registerMenus = () => {
+    chrome.contextMenus.create({
+      id: "add-to-vocab-vault",
+      title: getMsg("menuAdd", "Add to Vocab Vault: '%s'"),
+      contexts: ["selection"]
+    });
 
-  chrome.contextMenus.create({
-    id: "lookup-in-vocab-vault",
-    title: getMsg("menuLookup", "Look up etymology in Vocab Vault: '%s'"),
-    contexts: ["selection"]
-  });
+    chrome.contextMenus.create({
+      id: "lookup-in-vocab-vault",
+      title: getMsg("menuLookup", "Look up etymology in Vocab Vault: '%s'"),
+      contexts: ["selection"]
+    });
+  };
+  if (chrome.contextMenus?.removeAll) {
+    chrome.contextMenus.removeAll(registerMenus);
+  } else {
+    registerMenus();
+  }
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {

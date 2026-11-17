@@ -561,7 +561,7 @@
     let targetEl = targetElement;
     if (!targetEl && typeof document !== 'undefined') {
       const ankiModal = document.getElementById('ankiModal') || document.getElementById('anki');
-      const isAnkiVisible = ankiModal && (ankiModal.classList?.contains?.('open') || ankiModal.style?.display !== 'none');
+      const isAnkiVisible = Boolean(ankiModal && (ankiModal.classList?.contains?.('open') || ankiModal.style?.display === 'block'));
       if (isAnkiVisible) {
         const aWord = document.getElementById('aWord');
         const aEx = document.querySelector('.anki-ex-foreign');

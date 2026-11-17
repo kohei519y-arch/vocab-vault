@@ -1533,6 +1533,7 @@
 
   // --- グローバルエクスポート ---
   global.VocabMorphology = {
+    canonicalizeCjkChar,
     foldAscii,
     calcLevenshtein,
     findTypoSuggestion,

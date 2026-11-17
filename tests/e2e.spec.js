@@ -547,6 +547,30 @@ test.describe('Vocab Vault — Master E2E Suite', () => {
       return fulfillCorsJson(route, 200, { url: 'http://127.0.0.1:4173/index.html?checkout=mock_ok' });
     });
 
+    // 0. Core cross-module runtime exports availability
+    const exportsCheck = await page.evaluate(() => ({
+      updKeyUI: typeof window.updKeyUI,
+      updCloudUI: typeof window.updCloudUI,
+      updStats: typeof window.updStats,
+      updateStorageStatusUI: typeof window.updateStorageStatusUI,
+      enhanceA11y: typeof window.enhanceA11y,
+      extractEtyTags: typeof window.extractEtyTags,
+      defaultPackMap: typeof window.VocabStarterPack?.DEFAULT_PACK_BY_LANG,
+      canonCjk: typeof window.VocabMorphology?.canonicalizeCjkChar,
+      syncSingleKey: typeof window.VocabStorage?.syncSingleKey,
+    }));
+    expect(exportsCheck).toEqual({
+      updKeyUI: 'function',
+      updCloudUI: 'function',
+      updStats: 'function',
+      updateStorageStatusUI: 'function',
+      enhanceA11y: 'function',
+      extractEtyTags: 'function',
+      defaultPackMap: 'object',
+      canonCjk: 'function',
+      syncSingleKey: 'function',
+    });
+
     // 1. Feedback modal submission and button recovery
     await page.evaluate(() => window.VocabFeedback?.openFeedbackModal?.('opinion'));
     await expect(page.locator('#feedbackModal')).toHaveClass(/open/);

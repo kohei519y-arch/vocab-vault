@@ -456,6 +456,7 @@ async function ensureStarterLocalizations() {
     loadStarterPackData,
     registerPackData,
     lookupStarterWord,
+    DEFAULT_PACK_BY_LANG,
     PACKS,
     PACK_METADATA
   };

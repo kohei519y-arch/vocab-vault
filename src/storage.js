@@ -910,6 +910,45 @@
     if (cfg?.srcLang) delete Storage.mem[cfg.srcLang];
   }
 
+  /** 単一ペアキーの IndexedDB <-> LocalStorage 同期・復元（言語切替時オンデマンド復元にも共用） */
+  async function syncSingleKey(k, ctx = {}, manualSalvage = false) {
+    if (!k) return [];
+    const getJsonFn = typeof ctx?.getJson === 'function'
+      ? ctx.getJson
+      : key => safeParseWords(Storage.mem[key] || (typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null), keyToLang(key))[keyToLang(key)] || [];
+    if (!Storage.dbInst) {
+      await initDatabase();
+    }
+    const cfg = resolveConfig(k);
+    const srcL = cfg.srcLang || keyToLang(k);
+    const pairId = cfg.pairId || cfg.key;
+    const b = await idbFetchLangBundle(k, manualSalvage);
+    if (!b) return getJsonFn(k);
+    if (b.clearAt > getClearedAt(k)) Storage.clearedAt[pairId] = b.clearAt;
+    if (b.tombs) absorbTombArray(getTombstones(k), b.tombs);
+
+    let idbWords = Array.isArray(b.words) ? b.words : [];
+    if (manualSalvage && b.snaps && b.snaps.length) {
+      b.snaps.forEach(arr => {
+        const sWords = safeParseWords(arr, srcL)[srcL];
+        if (sWords && sWords.length) idbWords = mergeWords(idbWords, sWords, k, true);
+      });
+    }
+    // 通常起動時は墓石を尊重 (ignoreTombstones = manualSalvage)
+    const merged = mergeWords(getJsonFn(k), idbWords, k, manualSalvage);
+    if (merged.length > 0 || manualSalvage) {
+      Storage.mem[k] = merged;
+      if (k === LANGS.en.key) Storage.mem.en = merged;
+      if (merged.length <= 500) {
+        try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
+      } else {
+        try { localStorage.removeItem(k); } catch {}
+      }
+      await idbPut(k, merged);
+    }
+    return merged;
+  }
+
   // --- 起動時同期・サルベージ・他タブ同期 (app.js から移管) ---
   /**
    * ctx: { getJson, setJson, getActivePairKey, getSrcLang, switchSrcLang(l), setEntries(list),
@@ -997,39 +1036,9 @@
           }
         } catch {}
 
-        const syncSingleKey = async k => {
-          const cfg = resolveConfig(k);
-          const srcL = cfg.srcLang || keyToLang(k);
-          const pairId = cfg.pairId || cfg.key;
-          const b = await idbFetchLangBundle(k, manualSalvage);
-          if (!b) return;
-          if (b.clearAt > getClearedAt(k)) Storage.clearedAt[pairId] = b.clearAt;
-          if (b.tombs) absorbTombArray(getTombstones(k), b.tombs);
-
-          let idbWords = Array.isArray(b.words) ? b.words : [];
-          if (manualSalvage && b.snaps && b.snaps.length) {
-            b.snaps.forEach(arr => {
-              const sWords = safeParseWords(arr, srcL)[srcL];
-              if (sWords && sWords.length) idbWords = mergeWords(idbWords, sWords, k, true);
-            });
-          }
-          // 通常起動時は墓石を尊重 (ignoreTombstones = manualSalvage)
-          const merged = mergeWords(ctx.getJson(k), idbWords, k, manualSalvage);
-          if (merged.length > 0 || manualSalvage) {
-            Storage.mem[k] = merged;
-            if (k === LANGS.en.key) Storage.mem.en = merged;
-            if (merged.length <= 500) {
-              try { localStorage.setItem(k, JSON.stringify(merged)); } catch {}
-            } else {
-              try { localStorage.removeItem(k); } catch {}
-            }
-            await idbPut(k, merged);
-          }
-        };
-
         if (manualSalvage) {
           // 手動サルベージ時は全言語を待機して集計
-          await Promise.all(Array.from(allKeySet).map(syncSingleKey));
+          await Promise.all(Array.from(allKeySet).map(k => syncSingleKey(k, ctx, true)));
           syncActiveLang(true);
           if (ctx.flushOffline) ctx.flushOffline();
           if (ctx.syncCloud) ctx.syncCloud();
@@ -1037,7 +1046,7 @@
           notifyFn(tot ? `合計 ${tot} 語を検出・復元しました。` : '復元可能なデータは見つかりませんでした。');
         } else {
           // 通常起動時: 現在のアクティブ言語のみを最優先で即時同期し、メインスレッドを直ちに解放
-          await syncSingleKey(activeKey);
+          await syncSingleKey(activeKey, ctx, false);
           syncActiveLang(true);
           if (ctx.flushOffline) ctx.flushOffline();
           if (ctx.syncCloud) ctx.syncCloud();
@@ -1048,7 +1057,7 @@
             const runBackgroundSync = async () => {
               for (const k of remainingKeys) {
                 try {
-                  await syncSingleKey(k);
+                  await syncSingleKey(k, ctx, false);
                 } catch (e) {
                   _warn('[Background Lang Sync Error]', k, e);
                 }
@@ -1262,6 +1271,7 @@
     clearAllWords,
     invalidateCache,
     initStorageAndSync,
+    syncSingleKey,
     syncFromIdbForLang,
     idbPut,
     idbGet,
