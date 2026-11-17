@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email TEXT,
   plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro', 'academic')),
+  is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   monthly_quota INTEGER NOT NULL DEFAULT 5,
   usage_count INTEGER NOT NULL DEFAULT 0,
   pro_monthly_cap INTEGER NOT NULL DEFAULT 3000,
@@ -33,6 +34,8 @@ CREATE INDEX IF NOT EXISTS idx_profiles_stripe_customer
 CREATE INDEX IF NOT EXISTS idx_profiles_stripe_subscription
   ON public.profiles (stripe_subscription_id)
   WHERE stripe_subscription_id IS NOT NULL;
+
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Stripe Webhook 冪等性（Idempotency）保証用テーブル
 CREATE TABLE IF NOT EXISTS public.stripe_events (
@@ -73,6 +76,24 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 既存 auth.users（トリガー作成前の登録ユーザー）への profiles 冪等バックフィル
+INSERT INTO public.profiles (
+  id, email, plan, monthly_quota, usage_count, pro_monthly_cap,
+  quota_reset_at, terms_accepted_at, terms_version
+)
+SELECT
+  u.id,
+  u.email,
+  'free',
+  5,
+  0,
+  3000,
+  (date_trunc('day', NOW()) + INTERVAL '1 day'),
+  NULL,
+  '1.0.0'
+FROM auth.users u
+ON CONFLICT (id) DO NOTHING;
 
 -- 2. user_vocab_entries テーブル（単語帳データ・差分同期・Tombstone論理削除・カラム別LWW）
 CREATE TABLE IF NOT EXISTS public.user_vocab_entries (
@@ -167,12 +188,7 @@ BEGIN
   END IF;
 END $$;
 
--- user_tombstones と user_lang_watermarks の ON CONFLICT (user_id, pair, ...) を100%成功させるユニークインデックス保証
-CREATE UNIQUE INDEX IF NOT EXISTS uq_user_tombstones_user_pair_key
-  ON public.user_tombstones (user_id, pair, tomb_key);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_user_lang_watermarks_user_pair
-  ON public.user_lang_watermarks (user_id, pair);
+-- user_tombstones と user_lang_watermarks は PRIMARY KEY (user_id, pair, ...) がユニーク制約を担保
 
 -- 4.5. user_app_settings テーブル（FSRS重み・学習ログ・クラウド設定同期）
 CREATE TABLE IF NOT EXISTS public.user_app_settings (
@@ -182,8 +198,6 @@ CREATE TABLE IF NOT EXISTS public.user_app_settings (
   updated_at BIGINT NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, setting_key)
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uq_user_app_settings_key
-  ON public.user_app_settings (user_id, setting_key);
 
 
 -- 5. global_dictionary_cache テーブル（共有辞書キャッシュ: コスト0円化＆高速化）
@@ -203,6 +217,13 @@ CREATE TABLE IF NOT EXISTS public.global_dictionary_cache (
 
 CREATE INDEX IF NOT EXISTS idx_gdc_lookup ON public.global_dictionary_cache (lang, word, homograph_index);
 CREATE INDEX IF NOT EXISTS idx_gdc_lang_wordkey ON public.global_dictionary_cache (lang, word_key);
+
+-- 既存の 4言語限定 CHECK 制約がある場合は 10言語対応へ冪等に更新
+ALTER TABLE public.global_dictionary_cache
+  DROP CONSTRAINT IF EXISTS global_dictionary_cache_lang_check;
+ALTER TABLE public.global_dictionary_cache
+  ADD CONSTRAINT global_dictionary_cache_lang_check
+  CHECK (lang IN ('en', 'ja', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'));
 
 -- 6. wiktionary_references テーブル（Wiktionary事前取り込み用）
 CREATE TABLE IF NOT EXISTS public.wiktionary_references (
@@ -262,11 +283,12 @@ ALTER TABLE public.wiktionary_references ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_feedbacks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guest_rate_limits ENABLE ROW LEVEL SECURITY;
 
--- profiles: 本人のみ参照（直接の更新・挿入は権限剥奪）
+-- profiles: 本人のみ参照（直接の更新・挿入・削除は権限剥奪）
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can read own profile" ON public.profiles;
 CREATE POLICY "Users can read own profile" ON public.profiles
   FOR SELECT USING (auth.uid() = id);
+REVOKE INSERT, UPDATE, DELETE ON public.profiles FROM anon, authenticated;
 
 -- user_vocab_entries: 本人のみ参照（直接のINSERT/UPDATE/DELETEは剥奪し、LWWとカラム別マージを保証する sync_vocab_entries_batch RPC 経由に強制一本化）
 DROP POLICY IF EXISTS "Users can manage own vocab entries" ON public.user_vocab_entries;
@@ -322,8 +344,8 @@ DECLARE
   v_user_count INTEGER;
   v_auth_uid UUID := auth.uid();
 BEGIN
-  -- 投稿者のなりすまし完全防止
-  IF NEW.user_id IS NOT NULL AND (v_auth_uid IS NULL OR NEW.user_id <> v_auth_uid) THEN
+  -- 投稿者のなりすまし完全防止 (Service Role 経由以外の場合、本人のみ許可)
+  IF COALESCE(auth.role(), '') <> 'service_role' AND NEW.user_id IS NOT NULL AND (v_auth_uid IS NULL OR NEW.user_id <> v_auth_uid) THEN
     RAISE EXCEPTION 'UNAUTHORIZED_FEEDBACK_USER_ID: Cannot submit feedback on behalf of another user.';
   END IF;
 
@@ -1304,4 +1326,136 @@ GRANT EXECUTE ON FUNCTION public.server_now_ms() TO anon, authenticated, service
 
 -- [P0-1 解決] 今後の関数にも波及しないよう、スキーマ全体の既定関数実行権限も剥奪
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.check_feedback_rate_limit() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.sync_tombstone_to_entries() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.clamp_sync_timestamps() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.sync_watermark_to_entries() FROM PUBLIC, anon, authenticated;
+
+CREATE INDEX IF NOT EXISTS idx_user_feedbacks_user_id
+  ON public.user_feedbacks (user_id)
+  WHERE user_id IS NOT NULL;
+
+
+-- ==============================================================================
+-- 管理者判定ヘルパー & 管理者専用サーバーメトリクス取得 RPC（非公開 private スキーマ分離）
+-- ==============================================================================
+CREATE SCHEMA IF NOT EXISTS private;
+REVOKE ALL ON SCHEMA private FROM PUBLIC, anon, authenticated;
+GRANT USAGE ON SCHEMA private TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION private.is_current_user_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, private
+AS $$
+DECLARE
+  v_uid UUID := auth.uid();
+  v_is_admin BOOLEAN := FALSE;
+  v_jwt JSONB := COALESCE(auth.jwt(), '{}'::JSONB);
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  IF COALESCE(v_jwt->'app_metadata'->>'role', '') = 'admin'
+     OR LOWER(COALESCE(v_jwt->'app_metadata'->>'is_admin', 'false')) = 'true' THEN
+    RETURN TRUE;
+  END IF;
+
+  SELECT COALESCE(is_admin, FALSE) INTO v_is_admin
+  FROM public.profiles
+  WHERE id = v_uid;
+
+  RETURN COALESCE(v_is_admin, FALSE);
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.is_current_user_admin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private.is_current_user_admin() TO authenticated, service_role;
+
+-- user_feedbacks: 本人または管理者のみ閲覧可
+DROP POLICY IF EXISTS "Users can view own feedbacks" ON public.user_feedbacks;
+CREATE POLICY "Users can view own feedbacks" ON public.user_feedbacks
+  FOR SELECT USING ((select auth.uid()) = user_id OR private.is_current_user_admin());
+
+CREATE OR REPLACE FUNCTION private.get_admin_dashboard_metrics()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, private
+AS $$
+DECLARE
+  v_total_users BIGINT := 0;
+  v_pro_users BIGINT := 0;
+  v_free_users BIGINT := 0;
+  v_admin_users BIGINT := 0;
+  v_today_ai_usage BIGINT := 0;
+  v_total_vocab_entries BIGINT := 0;
+  v_cache_entries BIGINT := 0;
+  v_verified_cache_entries BIGINT := 0;
+  v_total_cache_hits BIGINT := 0;
+  v_wikt_refs BIGINT := 0;
+  v_feedback_count BIGINT := 0;
+  v_recent_feedbacks JSONB := '[]'::JSONB;
+BEGIN
+  IF COALESCE(auth.role(), '') <> 'service_role' AND NOT private.is_current_user_admin() THEN
+    RAISE EXCEPTION 'FORBIDDEN_ADMIN_ONLY: Administrator privileges required.';
+  END IF;
+
+  SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE plan IN ('pro', 'academic')),
+    COUNT(*) FILTER (WHERE plan = 'free'),
+    COUNT(*) FILTER (WHERE COALESCE(is_admin, FALSE) = TRUE),
+    COALESCE(SUM(CASE WHEN quota_reset_at > NOW() THEN usage_count ELSE 0 END), 0)
+  INTO v_total_users, v_pro_users, v_free_users, v_admin_users, v_today_ai_usage
+  FROM public.profiles;
+
+  SELECT COUNT(*) INTO v_total_vocab_entries
+  FROM public.user_vocab_entries
+  WHERE is_deleted = FALSE;
+
+  SELECT
+    COUNT(*),
+    COUNT(*) FILTER (WHERE verified = TRUE),
+    COALESCE(SUM(hit_count), 0)
+  INTO v_cache_entries, v_verified_cache_entries, v_total_cache_hits
+  FROM public.global_dictionary_cache;
+
+  SELECT COUNT(*) INTO v_wikt_refs FROM public.wiktionary_references;
+  SELECT COUNT(*) INTO v_feedback_count FROM public.user_feedbacks;
+
+  SELECT COALESCE(jsonb_agg(row_to_json(f)), '[]'::JSONB)
+  INTO v_recent_feedbacks
+  FROM (
+    SELECT id, category, rating, content, willingness_to_pay, active_lang, created_at
+    FROM public.user_feedbacks
+    ORDER BY created_at DESC
+    LIMIT 10
+  ) f;
+
+  RETURN jsonb_build_object(
+    'total_users', v_total_users,
+    'pro_users', v_pro_users,
+    'free_users', v_free_users,
+    'admin_users', v_admin_users,
+    'today_ai_usage', v_today_ai_usage,
+    'total_vocab_entries', v_total_vocab_entries,
+    'cache_entries', v_cache_entries,
+    'verified_cache_entries', v_verified_cache_entries,
+    'total_cache_hits', v_total_cache_hits,
+    'wiktionary_refs', v_wikt_refs,
+    'feedback_count', v_feedback_count,
+    'recent_feedbacks', v_recent_feedbacks,
+    'fetched_at', NOW()
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION private.get_admin_dashboard_metrics() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION private.get_admin_dashboard_metrics() TO service_role;
 

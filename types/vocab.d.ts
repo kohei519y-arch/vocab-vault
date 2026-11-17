@@ -3,7 +3,37 @@
  * 全モジュール共通の単語エントリ・FSRS・同期・辞書スキーマ型定義
  */
 
-export type LanguageCode = 'en' | 'fr' | 'de' | 'ja';
+export type LanguageCode = 'en' | 'ja' | 'fr' | 'de' | 'es' | 'it' | 'pt' | 'nl' | 'zh' | 'ko';
+
+export interface VocabDialogOptions {
+  title?: string;
+  confirmText?: string;
+  cancelText?: string;
+  danger?: boolean;
+  defaultValue?: string;
+  placeholder?: string;
+}
+
+export interface VocabDOMApi {
+  clear(el: Element | any): void;
+  setSafeHtml(el: Element | any, rawHtml: string): void;
+  createEl(tag: string, attrs?: Record<string, any> | null, children?: any): Element | any;
+  stripUnsafeHtmlString(raw: string): string;
+}
+
+export interface VocabTelemetryEntry {
+  type: string;
+  message: string;
+  detail: string;
+  at: string;
+}
+
+export interface VocabTelemetryApi {
+  captureError(type: string, message: string, detail?: string): void;
+  getErrors(): VocabTelemetryEntry[];
+  clearErrors(): void;
+  setHook(fn: ((entry: VocabTelemetryEntry) => void) | null): void;
+}
 
 export type PartOfSpeech =
   | 'Noun' | 'N[C]' | 'N[U]' | 'N[C/U]' | 'N[pl]' | 'N[m]' | 'N[f]' | 'N[n]'

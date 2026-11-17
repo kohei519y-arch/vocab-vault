@@ -1,0 +1,155 @@
+/** Vocab Vault Starter Pack Data (it_pre1) */
+export default [
+    {
+      id: 'it_pre1_concepire',
+      num: 1,
+      word: 'concepire',
+      homographIndex: 1,
+      phonetic: '/kontʃeˈpiːre/',
+      grammar_forms: 'concepisco, concepii, concepito; V[T]',
+      category: '哲学・芸術',
+      meanings: [{ pos: 'V[T]', text: '（思想・芸術作品を）構想する、心に描く、理解する' }],
+      core: '多様な着想を心の中で「一つに掴み取る（*kap-）」こと。',
+      etymology: 'ラテン語 concipere（con- 共に ＋ capere 掴む）に由来し、印欧祖語 *kap-（掴む）に遡る。英語 conceive と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*kap-'],
+      history_note: 'ルネサンス芸術論における「構想（concetto）」の源泉となる動詞。',
+      example: {
+        foreign: 'Gli architetti del Rinascimento seppero <b>concepire</b> lo spazio urbano come un’opera d’arte armoniosa.',
+        ja: 'ルネサンスの建築家たちは都市空間を調和のとれた芸術作品として<b>構想する</b>すべを知っていた。',
+        trans: 'ルネサンスの建築家たちは都市空間を調和のとれた芸術作品として構想するすべを知っていた。',
+        used_form: 'concepire'
+      },
+      derivatives: [{ word: 'concetto', phonetic: '/konˈtʃɛtto/', pos: 'N[m]', meaning: '概念、構想、コンセプト' }],
+      phrases: [{ foreign: 'concepire un progetto', ja: 'プロジェクトを構想する' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_sostenere',
+      num: 2,
+      word: 'sostenere',
+      homographIndex: 1,
+      phonetic: '/sosteˈneːre/',
+      grammar_forms: 'sostengo, sostenni, sostenuto; V[T]',
+      category: '論理・環境',
+      meanings: [{ pos: 'V[T]', text: '支える、支持する；（理論・主張を）唱える；（試験などを）受ける' }],
+      core: '下から（sub-）しっかりと保ち続けて（tenere）崩落を防ぐこと。',
+      etymology: 'ラテン語 sustinere（sub- 下から ＋ tenere 保つ）に由来し、印欧祖語 *ten-（張る、保つ）に遡る。英語 sustain と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*ten-'],
+      history_note: '「持続可能な発展（sviluppo sostenibile）」や「論文審査を受ける（sostenere una tesi）」で必須。',
+      example: {
+        foreign: 'Numerosi economisti continuano a <b>sostenere</b> la necessità di riforme strutturali.',
+        ja: '多くの経済学者が構造改革の必要性を<b>主張し（支持し）</b>続けている。',
+        trans: '多くの経済学者が構造改革の必要性を主張し続けている。',
+        used_form: 'sostenere'
+      },
+      derivatives: [{ word: 'sostenibile', phonetic: '/sosteˈniːbile/', pos: 'Adj', meaning: '持続可能な、妥当な' }],
+      phrases: [{ foreign: 'sostenere una tesi', ja: '論旨を主張する・口頭試問を受ける' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_costituire',
+      num: 3,
+      word: 'costituire',
+      homographIndex: 1,
+      phonetic: '/kostiˈtwiːre/',
+      grammar_forms: 'costituisco, costituii, costituito; V[T]',
+      category: '法学・政治',
+      meanings: [{ pos: 'V[T]', text: '構成する、形成する；設立する、制定する' }],
+      core: '複数の要素を「共にしっかりと立たせて（con- + statuere）一つの体系を築く」こと。',
+      etymology: 'ラテン語 constituere（con- 共に ＋ statuere 立たせる）に由来し、印欧祖語 *sta-（立つ）に遡る。英語 constitute と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sta-'],
+      history_note: 'イタリア共和国憲法（Costituzione）の根幹をなす法学・政治学用語。',
+      example: {
+        foreign: 'Il patrimonio artistico e culturale <b>costituisce</b> una risorsa fondamentale per la nazione.',
+        ja: '芸術的・文化的遺産は国家にとって根本的な資源を<b>構成している</b>。',
+        trans: '芸術的・文化的遺産は国家にとって根本的な資源を構成している。',
+        used_form: 'costituisce'
+      },
+      derivatives: [{ word: 'costituzione', phonetic: '/kostitutˈtsjoːne/', pos: 'N[f]', meaning: '憲法、構成、設立' }],
+      phrases: [{ foreign: 'costituire un ostacolo', ja: '障害となる' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_trasferire',
+      num: 4,
+      word: 'trasferire',
+      homographIndex: 1,
+      phonetic: '/trasfeˈriːre/',
+      grammar_forms: 'trasferisco, trasferii, trasferito; V[T]',
+      category: '社会・経済',
+      meanings: [{ pos: 'V[T]', text: '移す、移転する、譲渡する；（再帰 trasferirsi）引っ越す、移住する' }],
+      core: '向こう側へ（tras-）運び渡す（ferre）こと。',
+      etymology: 'ラテン語 transferre（trans- 越えて ＋ ferre 運ぶ）に由来し、印欧祖語 *bher-（運ぶ）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*bher-'],
+      history_note: '中世イタリア都市国家の商業・金融から現代の資金移動まで一貫して使われる動詞。',
+      example: {
+        foreign: 'L’azienda ha deciso di <b>trasferire</b> la propria sede legale a Milano.',
+        ja: 'その企業は登記上の本社をミラノへ<b>移転する</b>ことを決定した。',
+        trans: 'その企業は登記上の本社をミラノへ移転することを決定した。',
+        used_form: 'trasferire'
+      },
+      derivatives: [{ word: 'trasferimento', phonetic: '/trasferiˈmento/', pos: 'N[m]', meaning: '移転、転勤、送金' }],
+      phrases: [{ foreign: 'trasferirsi all’estero', ja: '海外へ移住する' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_prospettiva',
+      num: 5,
+      word: 'prospettiva',
+      homographIndex: 1,
+      phonetic: '/prospetˈtiːva/',
+      grammar_forms: 'pl. prospettive; N[f]',
+      category: '美学・展望',
+      meanings: [{ pos: 'N[f]', text: '遠近法、透視図法；将来の展望、見通し、観点' }],
+      core: '前方（pro-）を遠くまで見通す（specere）視覚と構想。',
+      etymology: 'ラテン語 prospicere（前を見る）に由来し、印欧祖語 *spec-（見る）に遡る。英語 perspective / prospect と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*spec-'],
+      history_note: '15世紀フィレンツェでブルネレスキとアルベルティが確立した「線遠近法（prospettiva lineare）」の歴史語。',
+      example: {
+        foreign: 'L’invenzione della <b>prospettiva</b> rivoluzionò il modo di rappresentare la realtà nel Quattrocento.',
+        ja: '<b>遠近法</b>の発明は、15世紀における現実の描写方法を革命的に変えた。',
+        trans: '遠近法の発明は、15世紀における現実の描写方法を革命的に変えた。',
+        used_form: 'prospettiva'
+      },
+      derivatives: [{ word: 'prospettico', phonetic: '/proˈspɛttiko/', pos: 'Adj', meaning: '遠近法の、将来展望の' }],
+      phrases: [{ foreign: 'prospettive di crescita', ja: '成長の見通し' }],
+      lang: 'it',
+      pair: 'it_ja'
+    },
+    {
+      id: 'it_pre1_presiedere',
+      num: 6,
+      word: 'presiedere',
+      homographIndex: 1,
+      phonetic: '/preˈzjɛːdere/',
+      grammar_forms: 'presiedo, presiedetti, presieduto; V[T/I]',
+      category: '政治・統治',
+      meanings: [{ pos: 'V[T/I]', text: '議長を務める、主宰する、統括する' }],
+      core: '集団の前方（pre-）に座って（sedere）全体を導き守護すること。',
+      etymology: 'ラテン語 praesidere（前に座る、守る）に由来し、印欧祖語 *sed-（座る）に遡る。英語 preside と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sed-'],
+      history_note: '議会や国際会議の議長権を表す格式高い統治動詞。',
+      example: {
+        foreign: 'Il primo ministro è stato chiamato a <b>presiedere</b> il vertice straordinario europeo.',
+        ja: '首相は欧州臨時首脳会議の<b>議長を務める</b>よう要請された。',
+        trans: '首相は欧州臨時首脳会議の議長を務めるよう要請された。',
+        used_form: 'presiedere'
+      },
+      derivatives: [{ word: 'presidente', phonetic: '/preziˈdɛnte/', pos: 'N[m/f]', meaning: '大統領、議長、会長' }],
+      phrases: [{ foreign: 'presiedere una commissione', ja: '委員会を主宰する' }],
+      lang: 'it',
+      pair: 'it_ja'
+    }
+  ];
+
+  // --- ポルトガル語 (Portuguese / CELPE-Bras) スターターパック ---

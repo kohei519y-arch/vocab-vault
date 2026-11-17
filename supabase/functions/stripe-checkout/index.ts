@@ -6,12 +6,36 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import Stripe from "https://esm.sh/stripe@14.18.0?target=deno";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const ALLOWED_ORIGINS = [
+  "https://vocab-vault-six.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:4173",
+  "http://localhost:8080",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:4173",
+  "http://127.0.0.1:8080",
+];
+
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
+  if (/^chrome-extension:\/\/[a-p]{32}$/i.test(origin)) return true;
+  return false;
+}
+
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = (req.headers.get("origin") || "").trim();
+  return {
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin) ? origin : "https://vocab-vault-six.vercel.app",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -50,20 +74,12 @@ serve(async (req) => {
     const body = await req.json();
     const { priceId = "price_pro_monthly", returnUrl, currency = "jpy", interval = "month" } = body;
 
-    // [セキュリティ修正] Open Redirect 防止: 許可されたオリジンまたは https URL のみ許可
-    const ALLOWED_ORIGINS = [
-      "https://vocabvault.app",
-      "https://kohei519y-arch.github.io",
-      "http://localhost:3000",
-      "http://localhost:8080",
-      "http://127.0.0.1:8080",
-    ];
-    let safeReturnUrl = "https://kohei519y-arch.github.io/vocab-vault/";
+    // [セキュリティ修正] Open Redirect 防止: 許可されたオリジンのみ許可
+    let safeReturnUrl = "https://vocab-vault-six.vercel.app/";
     if (typeof returnUrl === "string" && returnUrl.trim()) {
       try {
         const parsedUrl = new URL(returnUrl.trim());
-        const isAllowedVercel = /^https:\/\/vocab-vault(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(parsedUrl.origin);
-        if (ALLOWED_ORIGINS.includes(parsedUrl.origin) || isAllowedVercel) {
+        if (isAllowedOrigin(parsedUrl.origin)) {
           safeReturnUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
         }
       } catch {
@@ -97,11 +113,22 @@ serve(async (req) => {
         email: user.email || profile?.email,
         metadata: { supabase_user_id: user.id },
       });
-      customerId = customer.id;
-      await supabaseAdmin
+      const { data: updatedProf } = await supabaseAdmin
         .from("profiles")
-        .update({ stripe_customer_id: customerId })
-        .eq("id", user.id);
+        .update({ stripe_customer_id: customer.id })
+        .eq("id", user.id)
+        .is("stripe_customer_id", null)
+        .select("stripe_customer_id")
+        .maybeSingle();
+      customerId = updatedProf?.stripe_customer_id;
+      if (!customerId) {
+        const { data: latestProf } = await supabaseAdmin
+          .from("profiles")
+          .select("stripe_customer_id")
+          .eq("id", user.id)
+          .single();
+        customerId = latestProf?.stripe_customer_id || customer.id;
+      }
     } else {
       // Stripe 側に既に active / trialing のサブスクリプションが存在しないか直接検証（Webhook遅延時の二重課金防止）
       const existingSubs = await stripe.subscriptions.list({
@@ -160,6 +187,21 @@ serve(async (req) => {
           },
         ];
 
+    // Stripe Connect 自動レベニューシェア（ロイヤリティ自動分配）設定
+    // STRIPE_CONNECT_DESTINATION_ACCOUNT が設定されている場合、決済ごとに STRIPE_ROYALTY_FEE_PERCENT（デフォルト20%）を
+    // 開発者ロイヤリティとして自動徴収し、残額を運営パートナー口座へ自動送金する
+    const connectDestination = (Deno.env.get("STRIPE_CONNECT_DESTINATION_ACCOUNT") ?? "").trim();
+    const rawRoyaltyPct = Number(Deno.env.get("STRIPE_ROYALTY_FEE_PERCENT") ?? "20");
+    const royaltyPct = Number.isFinite(rawRoyaltyPct) ? Math.min(90, Math.max(1, rawRoyaltyPct)) : 20;
+
+    const subscriptionData: Record<string, any> = {
+      metadata: { supabase_user_id: user.id, plan: "pro" },
+    };
+    if (connectDestination.startsWith("acct_")) {
+      subscriptionData.application_fee_percent = royaltyPct;
+      subscriptionData.transfer_data = { destination: connectDestination };
+    }
+
     // Stripe Checkout Session 作成
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -167,9 +209,7 @@ serve(async (req) => {
       payment_method_types: ["card"],
       mode: "subscription",
       line_items: lineItems,
-      subscription_data: {
-        metadata: { supabase_user_id: user.id, plan: "pro" },
-      },
+      subscription_data: subscriptionData,
       metadata: { supabase_user_id: user.id, plan: "pro" },
       success_url: `${safeReturnUrl}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${safeReturnUrl}?checkout=cancel`,

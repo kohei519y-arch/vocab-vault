@@ -6,20 +6,36 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 import Stripe from "https://esm.sh/stripe@14.18.0?target=deno";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
 const ALLOWED_ORIGINS = [
-  "https://vocabvault.app",
-  "https://kohei519y-arch.github.io",
+  "https://vocab-vault-six.vercel.app",
   "http://localhost:3000",
+  "http://localhost:4173",
   "http://localhost:8080",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:4173",
   "http://127.0.0.1:8080",
 ];
 
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
+  if (/^chrome-extension:\/\/[a-p]{32}$/i.test(origin)) return true;
+  return false;
+}
+
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = (req.headers.get("origin") || "").trim();
+  return {
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin) ? origin : "https://vocab-vault-six.vercel.app",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
+
 serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -56,12 +72,11 @@ serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    let safeReturnUrl = "https://kohei519y-arch.github.io/vocab-vault/";
+    let safeReturnUrl = "https://vocab-vault-six.vercel.app/";
     if (typeof body?.returnUrl === "string" && body.returnUrl.trim()) {
       try {
         const parsed = new URL(body.returnUrl.trim());
-        const isAllowedVercel = /^https:\/\/vocab-vault(?:-[a-z0-9-]+)?\.vercel\.app$/i.test(parsed.origin);
-        if (ALLOWED_ORIGINS.includes(parsed.origin) || isAllowedVercel) {
+        if (isAllowedOrigin(parsed.origin)) {
           safeReturnUrl = `${parsed.origin}${parsed.pathname}`;
         }
       } catch {}

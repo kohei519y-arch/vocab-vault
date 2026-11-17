@@ -1,0 +1,1876 @@
+/**
+ * Vocab Vault — Graph Layout Engine (js/graph_layout.js)
+ * 4-Tier Lineage Skill Tree Layout, Polar Coordinates & O(N) Spatial Hash Relaxation
+ */
+(function (global) {
+  'use strict';
+
+  const defaultGraphState = {
+    canvas: null,
+    ctx: null,
+    nodes: [],
+    edges: [],
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    width: 800,
+    height: 600,
+    colorMode: 'lang',
+    physicsEnabled: false,
+    clusterOnly: false,
+    selectedNode: null,
+    hoverNode: null,
+    filterQuery: '',
+    langFilter: 'all',
+    treeEasingRaf: null,
+    layoutMode: 'network',
+    activeViewTab: 'network',
+    timelineEra: 0,
+    treeMaskMode: false,
+    eikenSkillMode: false,
+    focusedRootKey: null,
+    unlockParticles: []
+  };
+  global._sharedGraphState = global._sharedGraphState || defaultGraphState;
+  const getGraphState = () => global.VocabGraph?.graphState || global._sharedGraphState;
+  /** @type {any} */
+  const graphState = new Proxy({}, {
+    get: (_, prop) => getGraphState()[prop],
+    set: (_, prop, val) => {
+      getGraphState()[prop] = val;
+      return true;
+    }
+  });
+
+  /**
+   * 10言語対応 大語族・語源系統分類タクソノミー (Language Families & Etymological Traditions)
+   */
+  const ETYMOLOGY_FAMILIES = {
+    all: {
+      id: 'all',
+      label: '全語源系統 (All Families)',
+      shortLabel: '全語源',
+      desc: '全10言語の言語系統と語源ネットワークを網羅',
+      coreRoot: '大語源ネットワーク (Global Lineage)',
+      coreMeaning: 'Indo-European, Sinospheric, Koreanic & Japonic',
+      langs: ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko', 'ja'],
+      color: '#38bdf8'
+    },
+    germanic: {
+      id: 'germanic',
+      label: 'ゲルマン語派 (Germanic)',
+      shortLabel: 'ゲルマン',
+      desc: '英語 (en)・ドイツ語 (de)・オランダ語 (nl) の西ゲルマン固有語幹とグリムの法則',
+      coreRoot: 'ゲルマン祖語 (Proto-Germanic / PGmc)',
+      coreMeaning: 'Germanic Roots & Grimm\'s Law',
+      langs: ['en', 'de', 'nl'],
+      color: '#84cc16'
+    },
+    romance: {
+      id: 'romance',
+      label: 'ロマンス語派 (Romance)',
+      shortLabel: 'ロマンス',
+      desc: 'フランス語 (fr)・スペイン語 (es)・イタリア語 (it)・ポルトガル語 (pt) の通俗ラテン語根幹',
+      coreRoot: 'ラテン・ロマンス祖語 (Proto-Romance)',
+      coreMeaning: 'Vulgar Latin & Romance Roots',
+      langs: ['fr', 'es', 'it', 'pt'],
+      color: '#06b6d4'
+    },
+    hellenic: {
+      id: 'hellenic',
+      label: 'ヘレニック古典派 (Hellenic & Classical)',
+      shortLabel: '古典ギリシャ',
+      desc: '古典ギリシャ語に由来する国際学術・科学技術接頭辞体系 (tele-, bio-, auto- 等)',
+      coreRoot: '古典ギリシャ語幹 (Ancient Greek)',
+      coreMeaning: 'Classical Academic & Scientific Prefixes',
+      langs: ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl'],
+      color: '#c084fc'
+    },
+    sinospheric: {
+      id: 'sinospheric',
+      label: 'シノ・チベット語族 / 漢語字源 (Sino-Tibetan)',
+      shortLabel: '漢語・字源',
+      desc: '中国語 (zh) および東アジア共有語幹。六書（象形・会意・形声）に基づく漢字字源体系',
+      coreRoot: '古代漢語字源 (Proto-Sinitic / CJK)',
+      coreMeaning: 'Six Writings & Character Origins (六書・字源)',
+      langs: ['zh'],
+      color: '#f43f5e'
+    },
+    koreanic: {
+      id: 'koreanic',
+      label: '朝鮮語族 (Koreanic: 固有語・漢字語)',
+      shortLabel: '朝鮮語族',
+      desc: '韓国語 (ko) の独自語幹（固有語）および東アジア漢字語音韻体系',
+      coreRoot: '朝鮮祖語・漢字音韻 (Proto-Koreanic)',
+      coreMeaning: 'Native Korean & Sino-Korean (固有語・漢字語)',
+      langs: ['ko'],
+      color: '#fb923c'
+    },
+    japonic: {
+      id: 'japonic',
+      label: '日本語族 (Japonic: 和語・漢語)',
+      shortLabel: '日本語族',
+      desc: '日本語 (ja) の大和言葉（和語固有語幹）および和製漢語・音読み体系',
+      coreRoot: '日本語祖語・和語漢語体系 (Proto-Japonic)',
+      coreMeaning: 'Yamato & Sino-Japanese (和語・和製漢語)',
+      langs: ['ja'],
+      color: '#eab308'
+    }
+  };
+
+  /**
+   * 単語・言語から大語族・語源系統を判定
+   */
+  function detectWordFamily(item, itemLang = '') {
+    const lang = String(itemLang || item?.lang || 'en').toLowerCase();
+    const word = String(item?.word || '');
+    const ety = String(item?.etymology || '').toLowerCase();
+    const roots = Array.isArray(item?.etymologyTags) ? item.etymologyTags : [];
+
+    if (lang === 'zh') return 'sinospheric';
+    if (lang === 'ko') return 'koreanic';
+    if (lang === 'ja') return 'japonic';
+    if (['fr', 'es', 'it', 'pt'].includes(lang)) return 'romance';
+    if (['de', 'nl'].includes(lang)) return 'germanic';
+
+    if (roots.some(r => /^(?:tele|bio|photo|auto|micro|macro|poly|hyper|hypo|syn|sym|dia)-/i.test(r)) ||
+        ['tele-', 'bio-', 'photo-', 'auto-', 'micro-'].some(p => word.toLowerCase().startsWith(p))) {
+      return 'hellenic';
+    }
+    if (ety.includes('french') || ety.includes('latin') || ety.includes('romance') ||
+        ['con', 'com', 'sub', 'per', 'trans', 'dis', 'pro', 'pre'].some(p => word.toLowerCase().startsWith(p))) {
+      return 'romance';
+    }
+    return 'germanic';
+  }
+
+  const getEnglishPairKeyAndEntries = () => {
+    if (global.VocabGraph?.getEnglishPairKeyAndEntries) {
+      return global.VocabGraph.getEnglishPairKeyAndEntries();
+    }
+    const app = global.VocabCore?.App || global.App;
+    const activeCfg = (global.VocabCore?.getActivePairConfig || global.getActivePairConfig)?.() || { key: 'distinction_entries', srcLang: 'en', tgtLang: 'ja' };
+    const isEnJaActive = (activeCfg.srcLang || app?.srcLang || app?.lang || 'en') === 'en' && (activeCfg.tgtLang || app?.tgtLang || 'ja') === 'ja';
+    let entries = [];
+    if (isEnJaActive && Array.isArray(app?.entries) && app.entries.length) {
+      entries = app.entries;
+    } else {
+      const storageKey = activeCfg.key || 'distinction_entries';
+      const stored = (global.VocabStorage?.state?.mem?.[storageKey] || global.VocabStorage?.getRawEntries?.(storageKey) || localStorage?.getItem?.(storageKey));
+      if (typeof stored === 'string') {
+        try { entries = JSON.parse(stored) || []; } catch (_) { entries = []; }
+      } else if (Array.isArray(stored)) {
+        entries = stored;
+      }
+    }
+    return { pairKey: activeCfg.key || 'distinction_entries', entries };
+  };
+
+  const populateRootJumpSelect = roots => (global.VocabGraphViews?.populateRootJumpSelect || global.VocabGraph?.populateRootJumpSelect)?.(roots);
+  const updateBreadcrumbUI = roots => (global.VocabGraphViews?.updateBreadcrumbUI || global.VocabGraph?.updateBreadcrumbUI)?.(roots);
+
+  const CANONICAL_ROOT_ALIASES = {
+    // *sta- (立つ)
+    'sta': '*sta-', 'stā': '*sta-', 'steh': '*sta-', 'steh2': '*sta-', 'steh₂': '*sta-', 'stah': '*sta-', 'stare': '*sta-', 'stāre': '*sta-', 'stand': '*sta-',
+    // *gen- (生む)
+    'gen': '*gen-', 'genh': '*gen-', 'genh1': '*gen-', 'genh₁': '*gen-', 'genə': '*gen-', 'gna': '*gen-', 'gnā': '*gen-', 'gene': '*gen-',
+    // *bhrāthēr (兄弟)
+    'bhrather': '*bhrāthēr', 'bhrater': '*bhrāthēr', 'bhrāter': '*bhrāthēr', 'bhrātēr': '*bhrāthēr', 'bhrehter': '*bhrāthēr', 'bhrehtēr': '*bhrāthēr', 'brother': '*bhrāthēr', 'bruder': '*bhrāthēr',
+    // *mātēr (母)
+    'mater': '*mātēr', 'māter': '*mātēr', 'mehtēr': '*mātēr', 'mehter': '*mātēr',
+    // *pətēr (父)
+    'pater': '*pətēr', 'pātēr': '*pətēr', 'pehter': '*pətēr',
+    // *spec- (見る)
+    'spec': '*spec-', 'spek': '*spec-', 'speḱ': '*spec-', 'spic': '*spec-', 'spect': '*spec-',
+    // *kap- (掴む・頭)
+    'kap': '*kap-', 'cap': '*kap-', 'cept': '*kap-', 'cip': '*kap-', 'kaput': '*kap-', 'caput': '*kap-',
+    // *ten- (伸ばす)
+    'ten': '*ten-', 'tend': '*ten-', 'ton': '*ten-', 'tenh': '*ten-', 'tenh2': '*ten-', 'tenh₂': '*ten-',
+    // *dic- (言う・示す)
+    'dic': '*dic-', 'deik': '*dic-', 'deyk': '*dic-', 'dict': '*dic-',
+    // *vid- (見る・知る)
+    'vid': '*vid-', 'weid': '*vid-', 'woyd': '*vid-', 'vis': '*vid-', 'wit': '*vid-',
+    // *sed- (座る)
+    'sed': '*sed-', 'sēd': '*sed-', 'sedh': '*sed-', 'sess': '*sed-', 'sit': '*sed-',
+    // *voc- (呼ぶ・声)
+    'voc': '*voc-', 'wek': '*voc-', 'wekw': '*voc-', 'wekʷ': '*voc-', 'vox': '*voc-',
+    // *bher- (運ぶ)
+    'bher': '*bher-', 'fer': '*bher-', 'phor': '*bher-',
+    // *ped- (足)
+    'ped': '*ped-', 'pod': '*ped-', 'pēd': '*ped-', 'pes': '*ped-',
+    // *dhe- (置く・作る)
+    'dhe': '*dhe-', 'dhē': '*dhe-', 'fac': '*dhe-', 'fec': '*dhe-', 'fic': '*dhe-',
+    // *ag- (動かす・導く)
+    'ag': '*ag-', 'aǵ': '*ag-', 'act': '*ag-', 'ig': '*ag-',
+    // *mit- (送る)
+    'mit': '*mit-', 'miss': '*mit-',
+    // *ven- (来る)
+    'ven': '*ven-', 'vent': '*ven-', 'gwem': '*ven-', 'gʷem': '*ven-',
+    // *trah- (引く)
+    'trah': '*trah-', 'tract': '*trah-', 'tragh': '*trah-',
+    // *vert- (回る)
+    'vert': '*vert-', 'vers': '*vert-', 'wer': '*vert-', 'wert': '*vert-'
+  };
+
+  /**
+   * 語根キーの安全な正規化 & 表記ゆれ・同根統合（印欧祖語PIEおよび東アジア漢字字源 *政 等に両対応）
+   */
+  function cleanRootKey(k) {
+    if (!k) return '';
+    let s = String(k).trim();
+    // 漢字字源ラベル（「字源: *政」「한자: *政」等）のプレフィックスは除去して正規化へ通す
+    s = s.replace(/^(?:字源|漢字|한자|hanzi|hanja|kanji|cjk|root)\s*[:：]\s*/i, '').trim();
+    // 言語名ラベル（フランス語:, 中世ラテン語:, etc.）やコロン付きテキストは語根ではないので完全に排除
+    if (/[:：]/.test(s)) {
+      return '';
+    }
+
+    // 東アジア漢字字源ルート（*政, *経, *信 等の単一漢字ルート）の判定と繁体・簡体・新字体統合
+    const cjkClean = s.replace(/^\*/, '').replace(/-$/, '').trim();
+    if (/^[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(cjkClean)) {
+      const canonFn = global.VocabMorphology?.canonicalizeCjkChar;
+      const cChar = typeof canonFn === 'function' ? canonFn(cjkClean) : cjkClean;
+      return `*${cChar}`;
+    }
+
+    const sLower = s.toLowerCase();
+    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/.test(sLower)) {
+      return '';
+    }
+    const rawClean = sLower.replace(/^\*/, '').replace(/-$/, '').trim();
+    if (rawClean.length < 2) return '';
+
+    const flat = rawClean
+      .replace(/[āáàâä]/g, 'a')
+      .replace(/[ēéèêë]/g, 'e')
+      .replace(/[īíìîï]/g, 'i')
+      .replace(/[ōóòôö]/g, 'o')
+      .replace(/[ūúùûü]/g, 'u')
+      .replace(/[h₁₂₃₄]/g, '');
+
+    if (CANONICAL_ROOT_ALIASES[rawClean]) return CANONICAL_ROOT_ALIASES[rawClean];
+    if (CANONICAL_ROOT_ALIASES[flat]) return CANONICAL_ROOT_ALIASES[flat];
+
+    const normFn = global.VocabMorphology?.normRootKey || global.normRootKey || global.VocabCore?.normRootKey;
+    if (typeof normFn === 'function') {
+      const res = normFn(k);
+      if (!res || /[:：]/.test(res)) return '';
+      const resRaw = res.replace(/^\*/, '').replace(/-$/, '');
+      if (/^[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(resRaw)) {
+        return `*${resRaw}`;
+      }
+      if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/.test(res)) return '';
+      if (CANONICAL_ROOT_ALIASES[resRaw]) return CANONICAL_ROOT_ALIASES[resRaw];
+      return res.startsWith('*') ? res : `*${res}`;
+    }
+    return sLower.startsWith('*') ? sLower : `*${sLower}`;
+  }
+
+  /**
+   * 語根キーの代表原義（コアイメージ・日本語意味）を取得（天体図ネットワークでの視覚的実用化）
+   */
+  function getRootMeaning(rootKey, connectedWords = []) {
+    if (!rootKey) return '';
+    const cleanK = cleanRootKey(rootKey);
+    if (!cleanK) return '';
+    const rawK = cleanK.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+
+    const sanitizeMeaning = s => String(s || '').replace(/[<>"'`\\]/g, '').trim();
+
+    // 1. BUILTIN_ETYMOLOGY_KNOWLEDGE の照合
+    const builtinRoots = (global.VocabDictionary?.BUILTIN_ETYMOLOGY_KNOWLEDGE || global.BUILTIN_ETYMOLOGY_KNOWLEDGE)?.roots || {};
+    for (const [k, info] of Object.entries(builtinRoots)) {
+      const bRaw = k.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+      if (bRaw === rawK || bRaw.replace(/h[1-4]/g, '') === rawK.replace(/h[1-4]/g, '')) {
+        if (info.meaning) {
+          return sanitizeMeaning(info.meaning.split(/[,、/／]/).slice(0, 2).join('・'));
+        }
+      }
+    }
+
+    // 2. VocabEikenCatalog の照合
+    if (global.VocabEikenCatalog) {
+      const getRootFn = typeof global.VocabEikenCatalog.getRoot === 'function'
+        ? global.VocabEikenCatalog.getRoot.bind(global.VocabEikenCatalog)
+        : (rk => (global.VocabEikenCatalog.ROOTS || []).find(r => r && (r.rootKey === rk || (r.rootKey && r.rootKey.replace(/^\*/, '').replace(/-$/, '') === (rk || '').replace(/^\*/, '').replace(/-$/, '')))));
+      const eikenRoot = getRootFn(cleanK) || getRootFn(`*${rawK}-`) || getRootFn(`*${rawK}`);
+      if (eikenRoot?.meaning) {
+        return sanitizeMeaning(eikenRoot.meaning.split(/[,、/／]/).slice(0, 2).join('・'));
+      }
+    }
+
+    // 3. 接続単語の語源解説文 (etymology) 内の括弧から抽出
+    if (Array.isArray(connectedWords) && connectedWords.length > 0) {
+      for (const w of connectedWords) {
+        const ety = String(w.item?.etymology || '');
+        const escRaw = rawK.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const match = ety.match(new RegExp(`\\*${escRaw}[^\\(（]*[\\(（]([^\\)）]{1,12})[\\)）]`, 'i'));
+        if (match && match[1]) {
+          const m = sanitizeMeaning(match[1].split(/[,、/／]/).slice(0, 2).join('・'));
+          if (m && !m.includes('http') && m.length <= 10) return m;
+        }
+      }
+      for (const w of connectedWords) {
+        if (w.item?.core && typeof w.item.core === 'string') {
+          const m = sanitizeMeaning(w.item.core.split(/[,、/／]/)[0]);
+          if (m && m.length <= 10) return m;
+        }
+      }
+    }
+
+    return '';
+  }
+
+  /**
+   * ノードオブジェクトまたはプロパティから語根キー（*sta- 等）を安全に抽出
+   */
+  function resolveRootKey(n) {
+    if (!n) return '';
+    if (typeof n.rootLabel === 'string' && n.rootLabel.trim().length > 0) return n.rootLabel.trim();
+    if (Array.isArray(n.connectedRoots) && n.connectedRoots.length > 0) {
+      const first = n.connectedRoots[0];
+      if (typeof first === 'string' && first.trim().length > 0) return first.trim();
+      if (first && typeof first.label === 'string' && first.label.trim().length > 0) return first.label.trim();
+    }
+    return '';
+  }
+
+  /**
+   * 系統樹モードにおける古典分岐（Branch）の正規化・集約
+   * - 重複する同義接頭辞（con- / com-, in- / im- 等）を統合し、過密と文字衝突を根絶
+   * - ラテン語とロマンス語（仏・西・伊・葡）、西ゲルマン語（英・独・蘭）、東アジア漢字文化圏（中・韓・日）を統合
+   */
+  function normalizeBranch(bLabel) {
+    if (!bLabel) return 'Germanic: 西ゲルマン語群根幹 (Old English)';
+    let clean = String(bLabel).trim();
+    if (clean.startsWith('Sinospheric:') || clean.startsWith('Koreanic:') || clean.startsWith('Japonic:')) return clean;
+    clean = clean.replace(/^(Latin|Romance|Germanic|Greek|Borrowed|Italic|Sinospheric|Koreanic|Japonic):\s*/i, '');
+
+    if (clean.startsWith('con-') || clean.startsWith('com-')) return 'Italic: con- / com- (共に)';
+    if (clean.startsWith('in-') || clean.startsWith('im-') || clean.startsWith('il-') || clean.startsWith('ir-')) return 'Italic: in- / im- (中に/否定)';
+    if (clean.startsWith('ad-') || clean.startsWith('ac-') || clean.startsWith('ap-') || clean.startsWith('at-')) return 'Italic: ad- (向かって)';
+    if (clean.startsWith('sub-') || clean.startsWith('suc-') || clean.startsWith('suf-') || clean.startsWith('sup-') || clean.startsWith('sus-') || clean.startsWith('sotto-')) return 'Italic: sub- (下に)';
+    if (clean.startsWith('per-') || clean.startsWith('par-') || clean.startsWith('por-')) return 'Italic: per- (完全に)';
+    if (clean.startsWith('ob-') || clean.startsWith('op-')) return 'Italic: ob- (対して)';
+    if (clean.startsWith('ex-') || clean.startsWith('ef-') || clean.startsWith('es-')) return 'Italic: ex- (外に)';
+    if (clean.startsWith('re-') || clean.startsWith('ri-')) return 'Italic: re- (再び/後)';
+    if (clean.startsWith('de-') || clean.startsWith('dis-') || clean.startsWith('dé-') || clean.startsWith('des-')) return 'Italic: de- / dis- (分離/解除)';
+    if (clean.startsWith('pro-') || clean.startsWith('pre-') || clean.startsWith('pour-')) return 'Italic: pre- / pro- (前に)';
+    if (clean.startsWith('trans-') || clean.startsWith('tra-') || clean.startsWith('tras-')) return 'Italic: trans- (越えて)';
+    if (clean.startsWith('sur-') || clean.startsWith('sobre-') || clean.startsWith('sopra-')) return 'Italic: sur- / sobre- (上に/超越)';
+    if (clean.startsWith('フランス') || clean.startsWith('ロマンス') || clean.startsWith('イベロ') || clean.startsWith('イタリア') || clean.includes('romance') || clean.includes('french')) return 'Romance: ロマンス諸語根幹 (仏・西・伊・葡)';
+    if (clean.startsWith('西ゲルマン') || clean.startsWith('古英語') || clean.includes('old english')) return 'Germanic: 西ゲルマン語群根幹 (Old English)';
+    if (clean.startsWith('オランダ') || ['ont-', 'her-', 'aan-', 'uit-', 'tegen-', 'wan-'].some(x => clean.startsWith(x))) return 'Germanic: オランダ・低地ゲルマン語幹';
+    if (clean.startsWith('ドイツ') || ['ver-', 'be-', 'auf-', 'ent-', 'er-', 'ge-', 'ab-', 'vor-', 'nach-', 'aus-', 'zer-'].some(x => clean.startsWith(x))) return 'Germanic: ドイツ・西ゲルマン語幹';
+    if (clean.startsWith('ギリシャ') || ['dia-', 'anti-', 'tele-', 'photo-', 'syn-', 'sym-', 'auto-', 'micro-', 'macro-', 'poly-', 'mono-', 'hyper-', 'hypo-'].some(x => clean.startsWith(x))) return 'Greek: ギリシャ古典語幹';
+
+    return bLabel;
+  }
+
+  /**
+   * 語源テキスト・接頭辞から古典分岐（第2階層: Branch）を抽出
+   * 印欧祖語（英・仏・独・西・伊・葡・蘭）および東アジア漢字字源（中・韓・日）の双方に対応
+   */
+  function extractBranchInfo(item, rootKey, itemLang = '') {
+    const ety = String(item?.etymology || '').toLowerCase();
+    const word = String(item?.word || '').toLowerCase();
+    const rawWord = String(item?.word || '');
+    const gram = String(item?.grammar_forms || '');
+    const lang = String(itemLang || item?.lang || 'en').toLowerCase();
+    const isCjkRoot = Boolean(rootKey && /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]$/.test(String(rootKey).trim()));
+
+    // 0a. シノ・チベット語族（中国語・漢語字源本源構文）
+    if (lang === 'zh' || (isCjkRoot && !['ja', 'ko'].includes(lang))) {
+      const cjkText = `${rawWord} ${gram} ${item?.etymology || ''}`;
+      if (/^[不非無未反否]/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
+        return 'Sinospheric: 不-/非-/無- (否定・対抗接頭系)';
+      }
+      if (/[化性的度力権観論法制権]$/.test(rawWord) || /[化性的度力権観論法制]$/.test(gram)) {
+        return 'Sinospheric: -化/-性/-論/-制 (抽象・制度派生系)';
+      }
+      if (/^[超全多総高大新再共国際]/.test(rawWord)) {
+        return 'Sinospheric: 超-/全-/共- (程度・統合接頭系)';
+      }
+      return 'Sinospheric: 中国語・漢語本源構文 (Chinese)';
+    }
+
+    // 0b. 朝鮮語族（韓国語: 固有語 および 漢字語）
+    if (lang === 'ko') {
+      if (/^[불비무미반]/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
+        return 'Koreanic: 不-/非-/無- 漢字接頭系 (Sino-Korean Prefix)';
+      }
+      if (/(?:화|성|적|도|력|권|관|론|법|제)$/.test(rawWord)) {
+        return 'Koreanic: -化/-性/-論 制度派生系 (Sino-Korean Derivation)';
+      }
+      if (isCjkRoot || /[\u4E00-\u9FFF]/.test(rawWord)) {
+        return 'Koreanic: 韓国漢字語・東アジア共有語幹 (Korean Hanja)';
+      }
+      return 'Koreanic: 固有語・韓半島独自語幹 (Native Korean)';
+    }
+
+    // 0c. 日本語族（日本語: 和語・大和言葉 および 漢語・和製漢語）
+    if (lang === 'ja') {
+      if (/^[不非無未反否]/.test(rawWord) || /^[不非無未反否]/.test(gram)) {
+        return 'Japonic: 不-/非-/無- 漢語接頭系 (Sino-Japanese Prefix)';
+      }
+      if (/[化性的度力権観論法制権]$/.test(rawWord)) {
+        return 'Japonic: -化/-性/-論 漢語派生系 (Sino-Japanese Derivation)';
+      }
+      if (isCjkRoot || /[\u4E00-\u9FFF]/.test(rawWord)) {
+        return 'Japonic: 和製漢語・東アジア漢字複合語 (Japanese Kanji)';
+      }
+      return 'Japonic: 和語・大和言葉固有語幹 (Yamato Roots)';
+    }
+
+    // 1. 古典ラテン語系の主要接頭辞（同義異形を統合し、過密と衝突を根絶）
+    const latinPrefixes = [
+      { p: 'con', label: 'con- / com- (共に)' },
+      { p: 'com', label: 'con- / com- (共に)' },
+      { p: 'sub', label: 'sub- (下に)' },
+      { p: 'suc', label: 'sub- (下に)' },
+      { p: 'suf', label: 'sub- (下に)' },
+      { p: 'sup', label: 'sub- (下に)' },
+      { p: 'sus', label: 'sub- (下に)' },
+      { p: 'in', label: 'in- / im- (中に/否定)' },
+      { p: 'im', label: 'in- / im- (中に/否定)' },
+      { p: 'il', label: 'in- / im- (中に/否定)' },
+      { p: 'ir', label: 'in- / im- (中に/否定)' },
+      { p: 'ex', label: 'ex- (外に)' },
+      { p: 'per', label: 'per- (完全に)' },
+      { p: 'trans', label: 'trans- (越えて)' },
+      { p: 're', label: 're- (再び/後)' },
+      { p: 'pro', label: 'pre- / pro- (前に)' },
+      { p: 'pre', label: 'pre- / pro- (前に)' },
+      { p: 'de', label: 'de- / dis- (分離/解除)' },
+      { p: 'dis', label: 'de- / dis- (分離/解除)' },
+      { p: 'di', label: 'de- / dis- (分離/解除)' },
+      { p: 'ad', label: 'ad- (向かって)' },
+      { p: 'ac', label: 'ad- (向かって)' },
+      { p: 'ap', label: 'ad- (向かって)' },
+      { p: 'at', label: 'ad- (向かって)' },
+      { p: 'ob', label: 'ob- (対して)' },
+      { p: 'op', label: 'ob- (対して)' },
+      { p: 'inter', label: 'inter- (相互)' },
+      { p: 'contra', label: 'contra- (対抗)' },
+      { p: 'counter', label: 'counter- (対抗)' }
+    ];
+
+    // 2. ロマンス諸語（フランス・スペイン・イタリア・ポルトガル）固有の変形・接頭辞階層
+    const romancePrefixes = [
+      { p: 'sur', label: 'sur- / sobre- (上に/超越)' },
+      { p: 'sobre', label: 'sur- / sobre- (上に/超越)' },
+      { p: 'sopra', label: 'sur- / sobre- (上に/超越)' },
+      { p: 'sotto', label: 'sub- (下に)' },
+      { p: 'en', label: 'en- / em- (内部化/促成)' },
+      { p: 'em', label: 'en- / em- (内部化/促成)' },
+      { p: 'dé', label: 'de- / dis- (分離/解除)' },
+      { p: 'des', label: 'de- / dis- (分離/解除)' },
+      { p: 'ri', label: 're- (再び/後)' },
+      { p: 'par', label: 'per- (完全に)' },
+      { p: 'por', label: 'per- (完全に)' },
+      { p: 'tras', label: 'trans- (越えて)' },
+      { p: 'tra', label: 'trans- (越えて)' },
+      { p: 'entre', label: 'entre- (相互/中間)' },
+      { p: 'més', label: 'més- (過誤/悪)' },
+      { p: 'pour', label: 'pre- / pro- (前に)' }
+    ];
+
+    // 3. 西ゲルマン語群・英語本来語（古英語）の固有接頭辞階層
+    const germanicPrefixes = [
+      { p: 'under', label: 'under- (下層/基底)' },
+      { p: 'over', label: 'over- (超過/支配)' },
+      { p: 'fore', label: 'fore- (予め/前方)' },
+      { p: 'with', label: 'with- (対抗/後退)' },
+      { p: 'out', label: 'out- (外部/凌駕)' },
+      { p: 'mis', label: 'mis- (誤り/悪)' },
+      { p: 'after', label: 'after- (追従/後)' }
+    ];
+
+    // 4. ドイツ語・オランダ語（西ゲルマン大陸諸語）固有の前綴り階層
+    const germanDutchPrefixes = [
+      { p: 'ver', label: 'ver- (変化/完了)' },
+      { p: 'ent', label: 'ent- / ont- (分離/開始)' },
+      { p: 'ont', label: 'ent- / ont- (分離/開始)' },
+      { p: 'zer', label: 'zer- (解体/破壊)' },
+      { p: 'er', label: 'er- / her- (獲得/再起)' },
+      { p: 'her', label: 'er- / her- (獲得/再起)' },
+      { p: 'ge', label: 'ge- (集合/完了)' },
+      { p: 'auf', label: 'auf- / op- (上方/開始)' },
+      { p: 'op', label: 'auf- / op- (上方/開始)' },
+      { p: 'aus', label: 'aus- / uit- (脱出/徹底)' },
+      { p: 'uit', label: 'aus- / uit- (脱出/徹底)' },
+      { p: 'ab', label: 'ab- / af- (離脱/減少)' },
+      { p: 'af', label: 'ab- / af- (離脱/減少)' },
+      { p: 'vor', label: 'vor- / voor- (前方/事前)' },
+      { p: 'voor', label: 'vor- / voor- (前方/事前)' },
+      { p: 'nach', label: 'nach- / na- (追従/後)' },
+      { p: 'aan', label: 'an- / aan- (接触/開始)' },
+      { p: 'onder', label: 'under- (下層/基底)' },
+      { p: 'tegen', label: 'tegen- / wider- (対抗)' },
+      { p: 'be', label: 'be- (他動化/強調)' }
+    ];
+
+    // 5. ギリシャ古典語系の接頭辞
+    const greekPrefixes = [
+      { p: 'tele', label: 'tele- (遠方)' },
+      { p: 'photo', label: 'photo- (光)' },
+      { p: 'dia', label: 'dia- (貫通/横断)' },
+      { p: 'syn', label: 'syn- (共に)' },
+      { p: 'sym', label: 'sym- (共に)' },
+      { p: 'anti', label: 'anti- (反対/対抗)' },
+      { p: 'auto', label: 'auto- (自身)' },
+      { p: 'micro', label: 'micro- (微小)' },
+      { p: 'macro', label: 'macro- (巨大)' },
+      { p: 'poly', label: 'poly- (多数)' },
+      { p: 'mono', label: 'mono- (単一)' },
+      { p: 'hyper', label: 'hyper- (超過)' },
+      { p: 'hypo', label: 'hypo- (下位)' }
+    ];
+
+    // --- 分岐判定 ---
+
+    // A. ロマンス諸語（フランス語・スペイン語・イタリア語・ポルトガル語）
+    const isRomance = ['fr', 'es', 'it', 'pt'].includes(lang) || ety.includes('french') || ety.includes('spanish') || ety.includes('italian') || ety.includes('portuguese') || ety.includes('français') || ety.includes('old french') || ety.includes('anglo-norman');
+    if (isRomance) {
+      // 1) ロマンス語固有変形接頭辞
+      const matchedRomance = romancePrefixes.find(pr => {
+        if (word.startsWith(pr.p) || ety.includes(`${pr.p}-`)) {
+          if (pr.p === 'en' && ['end', 'enemy', 'entire', 'entry'].includes(word)) return false;
+          if (pr.p === 'em' && ['empire', 'empty'].includes(word)) return false;
+          return true;
+        }
+        return false;
+      });
+      if (matchedRomance) return `Italic: ${matchedRomance.label}`;
+
+      // 2) ラテン共通接頭辞
+      const matchedLatin = latinPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedLatin) return `Italic: ${matchedLatin.label}`;
+
+      return 'Romance: ロマンス諸語根幹 (仏・西・伊・葡)';
+    }
+
+    // B. ドイツ語・オランダ語（大陸西ゲルマン語群）
+    const isGermanDutch = lang === 'de' || lang === 'nl' || ety.includes('german') || ety.includes('dutch') || ety.includes('deutsch') || ety.includes('nederlands') || ety.includes('old high german');
+    if (isGermanDutch) {
+      const matchedGerman = germanDutchPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedGerman) return `Germanic: ${matchedGerman.label}`;
+      return lang === 'nl' ? 'Germanic: オランダ・低地ゲルマン語幹' : 'Germanic: ドイツ・西ゲルマン語幹';
+    }
+
+    // C. ギリシャ古典語系
+    const isGreek = ety.includes('greek') || ety.includes('hellenic') || greekPrefixes.some(pr => word.startsWith(pr.p));
+    if (isGreek) {
+      const matchedGreek = greekPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedGreek) return `Greek: ${matchedGreek.label}`;
+      return 'Greek: ギリシャ古典語幹';
+    }
+
+    // D. ゲルマン祖語・古英語（本来語根）
+    const isExplicitGermanic = ety.includes('old english') || ety.includes('proto-germanic') || ety.includes('germanic') || ety.includes('anglo-saxon') || ety.includes('norse');
+    if (isExplicitGermanic) {
+      // 1) ゲルマン固有主要接頭辞
+      const matchedGmc = germanicPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+      if (matchedGmc) return `Germanic: ${matchedGmc.label}`;
+
+      // 2) 特殊語根 (*sta- 等)
+      if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh') || word.includes('staan'))) {
+        return 'Germanic: *standaną (立つ)';
+      }
+
+      // 3) un- / be- / for- 特殊接頭辞
+      if (word.startsWith('un') && word.length > 3 && !['unit', 'unite', 'uncle', 'under', 'unique', 'union', 'until'].some(w => word.startsWith(w))) {
+        return 'Germanic: un- (否定/反転)';
+      }
+      if ((word.startsWith('be') && ['become', 'behold', 'befall', 'believe', 'behave', 'beset', 'beware', 'beside', 'between', 'beyond'].some(w => word.startsWith(w))) || ety.includes('be-')) {
+        return 'Germanic: be- (強調/他動化)';
+      }
+      if ((word.startsWith('for') && ['forbid', 'forgive', 'forget', 'forgo', 'forlorn', 'forsake', 'forbear'].some(w => word.startsWith(w))) || ety.includes('for-')) {
+        return 'Germanic: for- (徹底/禁止)';
+      }
+      if (word.startsWith('up') && ['upright', 'uphold', 'upset', 'upward', 'upbringing', 'upgrade', 'uproar', 'upheaval', 'upside'].some(w => word.startsWith(w))) {
+        return 'Germanic: up- (上方/向上)';
+      }
+
+      return 'Germanic: 古英語本来語幹 (Old English Core)';
+    }
+
+    // E. ラテン系英語（接頭辞あり、またはetymologyにlatin記載）
+    const matchedLatinPrefix = latinPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+    if (matchedLatinPrefix) {
+      return `Italic: ${matchedLatinPrefix.label}`;
+    }
+    if (ety.includes('latin') || ety.includes('lat.')) {
+      if (rootKey === '*sta-') return 'Latin: stāre (立つ)';
+      return 'Latin: 古典ラテン語幹';
+    }
+
+    // F. 日本語借用語
+    if (lang === 'ja') {
+      return 'Borrowed: 外来・学術受容';
+    }
+
+    // G. 英語の標準語根派生（本来語・接頭辞付き本来語フォールバック）
+    const matchedDefaultGmc = germanicPrefixes.find(pr => word.startsWith(pr.p) || ety.includes(`${pr.p}-`));
+    if (matchedDefaultGmc) {
+      return `Germanic: ${matchedDefaultGmc.label}`;
+    }
+    if (word.startsWith('un') && word.length > 3 && !['unit', 'unite', 'uncle', 'under', 'unique', 'union', 'until'].some(w => word.startsWith(w))) {
+      return 'Germanic: un- (否定/反転)';
+    }
+    if (rootKey === '*sta-' && (word.includes('stand') || word.includes('stund') || word.includes('steh') || word.includes('staan'))) {
+      return 'Germanic: *standaną (立つ)';
+    }
+
+    return 'Germanic: 西ゲルマン語群根幹 (Old English)';
+  }
+
+  /**
+   * 単語帳データから語根グラフネットワークデータを構築（通常星系 / 4階層系統樹両対応）
+   */
+  function buildGraphData(filterRootKey = '', clusterOnly = false, langFilter = 'all', inGraphState = null) {
+    const nodes = [];
+    const rootMap = new Map();
+    const nodeMap = new Map();
+    const graphState = inGraphState || global.VocabGraph?.graphState || {};
+    const isTree = (graphState.layoutMode === 'tree');
+
+    const getJsonFn = global.getJson || global.VocabCore?.getJson || (k => {
+      try {
+        const raw = (global.VocabStorage ? global.VocabStorage.lsGet(k, '[]') : (typeof localStorage !== 'undefined' ? localStorage.getItem(k) : '[]'));
+        return JSON.parse(raw || '[]');
+      } catch { return []; }
+    });
+    const isValidRootFn = global.VocabMorphology?.isValidRootForEntry || global.isValidRootForEntry || global.VocabCore?.isValidRootForEntry || (() => true);
+
+    // 全登録言語ペア辞書、または標準10言語キーから単語を収集
+    const allPairs = (global.VocabCore?.getAllKnownPairConfigs || global.getAllKnownPairConfigs)?.() || [];
+    const defaultLangs = (global.LANG_KEYS || global.VocabStorage?.LANG_KEYS || global.VocabCore?.LANG_KEYS || ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko', 'ja']);
+    const langMap = global.LANGS || global.VocabStorage?.LANGS || global.VocabCore?.LANGS || {
+      en: { key: 'distinction_entries' },
+      fr: { key: 'distinction_entries_fr' },
+      de: { key: 'distinction_entries_de' },
+      es: { key: 'distinction_entries_es' },
+      it: { key: 'distinction_entries_it' },
+      pt: { key: 'distinction_entries_pt' },
+      nl: { key: 'distinction_entries_nl' },
+      zh: { key: 'distinction_entries_zh' },
+      ko: { key: 'distinction_entries_ko' },
+      ja: { key: 'distinction_entries_ja' }
+    };
+    const langKeysMap = new Map();
+    allPairs.forEach(p => {
+      if (p?.key) langKeysMap.set(p.key, { key: p.key, lang: p.src || p.srcLang || 'en' });
+    });
+    defaultLangs.forEach(l => {
+      const k = langMap[l]?.key || (l === 'en' ? 'distinction_entries' : `distinction_entries_${l}`);
+      if (!langKeysMap.has(k)) langKeysMap.set(k, { key: k, lang: l });
+    });
+    const langKeys = Array.from(langKeysMap.values());
+
+    const targetLang = (langFilter && langFilter !== 'all') ? langFilter.toLowerCase() : '';
+    const targetRoot = filterRootKey ? cleanRootKey(filterRootKey) : '';
+    const familyFilter = (graphState?.familyFilter && graphState.familyFilter !== 'all') ? graphState.familyFilter.toLowerCase() : '';
+
+    langKeys.forEach(({ key, lang }) => {
+      const srcL = lang || 'en';
+      if (targetLang && srcL !== targetLang) return;
+      if (familyFilter) {
+        const famMeta = ETYMOLOGY_FAMILIES[familyFilter];
+        if (famMeta && Array.isArray(famMeta.langs) && !famMeta.langs.includes(srcL)) {
+          return;
+        }
+      }
+
+      const list = getJsonFn(key);
+      (Array.isArray(list) ? list : []).forEach(item => {
+        if (!item || !item.word) return;
+
+        if (familyFilter) {
+          const itemFam = detectWordFamily(item, srcL);
+          if (familyFilter === 'indo_european') {
+            if (!['germanic', 'romance', 'hellenic', 'indo_european'].includes(itemFam)) return;
+          } else if (itemFam !== familyFilter) {
+            return;
+          }
+        }
+
+        // 1. 語根タグの取得（未設定の場合は解説文から正規表現フォールバック抽出・結果をメモ化）
+        let itemRoots = item._cachedRoots;
+        if (!itemRoots) {
+          itemRoots = (Array.isArray(item.etymologyTags) ? item.etymologyTags : [])
+            .map(cleanRootKey)
+            .filter(r => r && isValidRootFn(r, item));
+
+          if (!itemRoots.length && item.etymology) {
+            const pieMatches = String(item.etymology).match(/\*([a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]+(?:-[a-zāēīōūăĕĭŏŭáéíóúàèìòùâêîôûəǭḗh₁₂₃₄ḱǵʷʰ]*)?)/gi);
+            const cjkMatches = String(item.etymology).match(/\*([\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF])/g);
+            const combined = [...(pieMatches || []), ...(cjkMatches || [])];
+            if (combined.length) {
+              itemRoots = combined.map(cleanRootKey).filter(r => r && isValidRootFn(r, item));
+            }
+          }
+          // 東アジア言語（zh, ko, ja）で語源タグが未設定の場合、見出し語または活用欄の漢字から共通漢字字源を自動抽出
+          if (!itemRoots.length && ['zh', 'ko', 'ja'].includes(srcL)) {
+            const cjkSource = `${item.word || ''}${item.grammar_forms || ''}`;
+            const cjkChars = cjkSource.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g);
+            if (cjkChars && cjkChars.length > 0) {
+              itemRoots = [...new Set(cjkChars.slice(0, 2).map(ch => cleanRootKey(`*${ch}`)))].filter(Boolean);
+            }
+          }
+          item._cachedRoots = itemRoots;
+        }
+
+        if (!itemRoots.length) return;
+
+        const wId = `word:${srcL}:${item.word}#${item.homographIndex || 1}`;
+        let wNode = nodeMap.get(wId);
+        if (!wNode) {
+          wNode = {
+            id: wId,
+            label: item.word,
+            type: 'word',
+            level: 3,
+            lang: srcL,
+            meaning: item.meanings?.[0]?.text || '',
+            pos: item.meanings?.[0]?.pos || '',
+            radius: 8.0,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            item,
+            connectedRoots: [],
+            connectedWords: []
+          };
+          nodeMap.set(wId, wNode);
+        }
+
+        itemRoots.forEach(rKey => {
+          if (targetRoot && !rKey.includes(targetRoot.replace(/^\*/, ''))) return;
+
+          let rNode = rootMap.get(rKey);
+          if (!rNode) {
+            rNode = {
+              id: `root:${rKey}`,
+              label: rKey,
+              type: 'root',
+              level: 1,
+              radius: 12.0,
+              x: 0,
+              y: 0,
+              vx: 0,
+              vy: 0,
+              childCount: 0,
+              connectedRoots: [],
+              connectedWords: []
+            };
+            rootMap.set(rKey, rNode);
+          }
+          if (!rNode.connectedWords.includes(wNode)) {
+            rNode.childCount++;
+            rNode.connectedWords.push(wNode);
+          }
+          if (!wNode.connectedRoots.includes(rNode)) {
+            wNode.connectedRoots.push(rNode);
+          }
+        });
+      });
+    });
+
+    // 英検準1級 頻出語根カタログのスキルツリー統合
+    const eikenProgressMap = new Map();
+    if (global.VocabEikenCatalog) {
+      const eStats = global.VocabEikenCatalog.calcProgress(getEnglishPairKeyAndEntries().entries);
+      eStats.forEach(s => {
+        const cleanK = cleanRootKey(s.rootKey);
+        eikenProgressMap.set(cleanK, s);
+      });
+
+      // 系統樹モード (isTree) またはスキルツリーモード時は、未開拓の準1級語根も全てツリーに包含
+      if (isTree || graphState.eikenSkillMode) {
+        global.VocabEikenCatalog.getRoots().forEach(r => {
+          const rKey = cleanRootKey(r.rootKey);
+          if (targetRoot && !rKey.includes(targetRoot.replace(/^\*/, ''))) return;
+
+          let rNode = rootMap.get(rKey);
+          if (!rNode) {
+            rNode = {
+              id: `root:${rKey}`,
+              label: rKey,
+              type: 'root',
+              level: 1,
+              radius: 14.0,
+              x: 0,
+              y: 0,
+              vx: 0,
+              vy: 0,
+              childCount: 0,
+              connectedRoots: [],
+              connectedWords: [],
+              isEikenRoot: true,
+              eikenRank: r.rank,
+              eikenMeaning: r.meaning,
+              eikenDesc: r.desc,
+              isLockedRoot: true
+            };
+            rootMap.set(rKey, rNode);
+          } else {
+            rNode.isEikenRoot = true;
+            rNode.eikenRank = r.rank;
+            rNode.eikenMeaning = r.meaning;
+            rNode.eikenDesc = r.desc;
+          }
+          const pStat = eikenProgressMap.get(rKey);
+          if (pStat) {
+            rNode.eikenStats = pStat;
+          }
+        });
+      }
+    }
+
+    let finalRoots = Array.from(rootMap.values());
+
+    // 2語以上接続する重要語根クラスタのみに絞り込み（スキルツリーモード時は準1級語根を保持）
+    if (clusterOnly && !graphState.eikenSkillMode) {
+      finalRoots = finalRoots.filter(r => r.childCount >= 2 || r.isEikenRoot);
+    }
+
+    const validWordIds = new Set();
+    const finalEdges = [];
+    const registeredWordsLower = new Set(Array.from(nodeMap.values()).map(w => w.label.toLowerCase()));
+    const builtinRoots = (global.VocabDictionary?.BUILTIN_ETYMOLOGY_KNOWLEDGE || global.BUILTIN_ETYMOLOGY_KNOWLEDGE)?.roots || {};
+
+    if (!isTree) {
+      // --- 通常の星系ネットワークモード ---
+      let activeRoots = finalRoots;
+      if (graphState.focusedRootKey) {
+        const found = finalRoots.filter(r => r.label === graphState.focusedRootKey);
+        if (found.length > 0) {
+          activeRoots = found;
+        }
+      }
+
+      activeRoots.forEach(rNode => {
+        rNode.radius = rNode.childCount >= 5 ? 18.0 : (rNode.childCount >= 3 ? 15.0 : (rNode.childCount >= 2 ? 12.5 : 10.0));
+        nodes.push(rNode);
+        rNode.connectedWords.forEach(wNode => {
+          validWordIds.add(wNode.id);
+          finalEdges.push({ source: rNode, target: wNode, kind: 'direct' });
+        });
+      });
+
+      nodeMap.forEach(wNode => {
+        if (validWordIds.has(wNode.id)) {
+          nodes.push(wNode);
+        }
+      });
+
+      // 星系アイランド初期配置（適切な間隔で重なりを防止）
+      const totalRoots = activeRoots.length;
+      const cols = Math.max(1, Math.ceil(Math.sqrt(totalRoots * 1.55)));
+      const spacing = 460;
+
+      activeRoots.forEach((rNode, idx) => {
+        const row = Math.floor(idx / cols);
+        const col = idx % cols;
+        const jitterX = (Math.random() - 0.5) * 30;
+        const jitterY = (Math.random() - 0.5) * 30;
+        rNode.x = (col - cols / 2) * spacing + jitterX;
+        rNode.y = (row - Math.ceil(totalRoots / cols) / 2) * spacing + jitterY;
+        rNode.vx = 0;
+        rNode.vy = 0;
+      });
+
+      const placedWords = new Set();
+      activeRoots.forEach(rNode => {
+        const cCount = rNode.connectedWords.length;
+        rNode.connectedWords.forEach((wNode, cIdx) => {
+          if (!placedWords.has(wNode.id)) {
+            placedWords.add(wNode.id);
+            const angle = (cIdx / Math.max(1, cCount)) * Math.PI * 2;
+            const dist = 100 + (cIdx % 5) * 24;
+            wNode.x = rNode.x + Math.cos(angle) * dist;
+            wNode.y = rNode.y + Math.sin(angle) * dist;
+            wNode.vx = 0;
+            wNode.vy = 0;
+          }
+        });
+      });
+    } else {
+      // --- 4階層・言語進化系統樹 & スキルツリー (Lineage Skill Tree) モード ---
+      const branchMap = new Map();
+      const ghostBuds = [];
+      const twigs = [];
+
+      function getPhylumForWord(w) {
+        const l = (w.lang || 'en').toLowerCase();
+        if (l === 'zh') return 'sinospheric';
+        if (l === 'ko') return 'koreanic';
+        if (l === 'ja') return 'japonic';
+        return 'indo_european';
+      }
+
+      function buildPhylumRoots() {
+        const famKey = (graphState.familyFilter || 'all').toLowerCase();
+
+        const PHYLA_METAS = {
+          indo_european: {
+            id: 'root:pie:unified',
+            label: '印欧語族 / PIE (Proto-Indo-European)',
+            meaning: 'Germanic, Romance & Classical Hellenic',
+            phylum: 'indo_european',
+            targetX: 0,
+            targetY: 0
+          },
+          sinospheric: {
+            id: 'root:sinospheric:unified',
+            label: 'シノ・チベット語族 / Sino-Tibetan',
+            meaning: 'Proto-Sinitic & Six Writings (古代漢語字源・六書)',
+            phylum: 'sinospheric',
+            isCjkRoot: true,
+            targetX: 2400,
+            targetY: -400
+          },
+          koreanic: {
+            id: 'root:koreanic:unified',
+            label: '朝鮮語族 / Koreanic',
+            meaning: 'Native Korean & Sino-Korean (固有語・漢字音韻体系)',
+            phylum: 'koreanic',
+            targetX: 2400,
+            targetY: 1400
+          },
+          japonic: {
+            id: 'root:japonic:unified',
+            label: '日本語族 / Japonic',
+            meaning: 'Yamato & Sino-Japanese (和語大和言葉・和製漢語)',
+            phylum: 'japonic',
+            targetX: 2400,
+            targetY: 3200
+          }
+        };
+
+        function makeRoot(meta, words) {
+          return {
+            id: meta.id,
+            label: meta.label,
+            meaning: meta.meaning,
+            phylum: meta.phylum,
+            isCjkRoot: Boolean(meta.isCjkRoot),
+            type: 'root',
+            level: 1,
+            radius: 26.0,
+            childCount: words.length,
+            connectedWords: words,
+            x: meta.targetX || 0,
+            y: meta.targetY || 0,
+            targetX: meta.targetX || 0,
+            targetY: meta.targetY || 0,
+            vx: 0,
+            vy: 0
+          };
+        }
+
+        const phylaWordMap = {
+          indo_european: [],
+          sinospheric: [],
+          koreanic: [],
+          japonic: []
+        };
+        const allWordsSeen = new Set();
+        finalRoots.forEach(r => {
+          (r.connectedWords || []).forEach(w => {
+            if (!allWordsSeen.has(w.id)) {
+              allWordsSeen.add(w.id);
+              const pKey = getPhylumForWord(w);
+              if (phylaWordMap[pKey]) phylaWordMap[pKey].push(w);
+            }
+          });
+        });
+
+        if (famKey === 'sinospheric') {
+          return [makeRoot({ ...PHYLA_METAS.sinospheric, targetX: 0, targetY: 0 }, phylaWordMap.sinospheric)];
+        }
+        if (famKey === 'koreanic') {
+          return [makeRoot({ ...PHYLA_METAS.koreanic, targetX: 0, targetY: 0 }, phylaWordMap.koreanic)];
+        }
+        if (famKey === 'japonic') {
+          return [makeRoot({ ...PHYLA_METAS.japonic, targetX: 0, targetY: 0 }, phylaWordMap.japonic)];
+        }
+        if (famKey === 'germanic' || famKey === 'romance' || famKey === 'hellenic') {
+          const famMeta = ETYMOLOGY_FAMILIES[famKey];
+          const langs = new Set(famMeta?.langs || []);
+          const words = phylaWordMap.indo_european.filter(w => langs.has(w.lang));
+          const ieMeta = { ...PHYLA_METAS.indo_european, targetX: 0, targetY: 0 };
+          if (famKey === 'germanic') {
+            ieMeta.label = 'ゲルマン祖語 (Proto-Germanic / PGmc)';
+            ieMeta.meaning = "Germanic Roots & Grimm's Law";
+          } else if (famKey === 'romance') {
+            ieMeta.label = 'ラテン・ロマンス祖語 (Proto-Romance)';
+            ieMeta.meaning = 'Vulgar Latin & Romance Roots';
+          } else if (famKey === 'hellenic') {
+            ieMeta.label = '古典ギリシャ語幹 (Classical Greek)';
+            ieMeta.meaning = 'Classical Academic & Scientific Prefixes';
+          }
+          return [makeRoot(ieMeta, words)];
+        }
+
+        const activePhyla = [];
+        if (phylaWordMap.indo_european.length > 0 || allWordsSeen.size === 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.indo_european, phylaWordMap.indo_european));
+        }
+        if (phylaWordMap.sinospheric.length > 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.sinospheric, phylaWordMap.sinospheric));
+        }
+        if (phylaWordMap.koreanic.length > 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.koreanic, phylaWordMap.koreanic));
+        }
+        if (phylaWordMap.japonic.length > 0) {
+          activePhyla.push(makeRoot(PHYLA_METAS.japonic, phylaWordMap.japonic));
+        }
+
+        return activePhyla.length > 0 ? activePhyla : [makeRoot(PHYLA_METAS.indo_european, [])];
+      }
+
+      let isUnifiedPIE = !graphState.focusedRootKey;
+      let activeRoots = [];
+
+      if (isUnifiedPIE) {
+        // 多核大語族体系 (Multi-Centroid Galactic Architecture): 4大語族独立コア配置
+        activeRoots = buildPhylumRoots();
+      } else {
+        const fKey = cleanRootKey(graphState.focusedRootKey);
+        const fKeyFlat = fKey.replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+        const found = finalRoots.filter(r => {
+          const rFlat = (r.label || '').replace(/^\*/, '').replace(/-$/, '').toLowerCase();
+          return r.label === fKey || rFlat === fKeyFlat || r.label === graphState.focusedRootKey;
+        });
+        if (found.length > 0) {
+          activeRoots = found;
+        } else {
+          // 指定語根が見つからない場合は多核大語族体系にフォールバック（200語根が散らばるのを防止）
+          isUnifiedPIE = true;
+          activeRoots = buildPhylumRoots();
+        }
+      }
+
+      activeRoots.forEach(rNode => {
+        rNode.level = 1;
+        rNode.radius = isUnifiedPIE ? 26.0 : 18.0;
+        const realmInfo = global.VocabMorphology?.getSemanticRealmForRoot
+          ? global.VocabMorphology.getSemanticRealmForRoot(rNode.label)
+          : { id: 'structure', label: '構造・物質 (Structure)', color: '#f472b6' };
+        rNode.realm = realmInfo;
+        nodes.push(rNode);
+
+        // 第2階層: ブランチ (Branch) の抽出と接続
+        const branchGroups = new Map();
+        rNode.connectedWords.forEach(wNode => {
+          validWordIds.add(wNode.id);
+          const primRoot = wNode.connectedRoots?.[0]?.label || rNode.label;
+          let bLabel = extractBranchInfo(wNode.item, primRoot, wNode.lang);
+          if (isTree || isUnifiedPIE) {
+            bLabel = normalizeBranch(bLabel);
+          }
+
+          // 形態素語幹 (Level 4: Morphological Stem) の付与
+          const stemInfo = global.VocabMorphology?.extractMorphologicalStem
+            ? global.VocabMorphology.extractMorphologicalStem(wNode.label, primRoot, wNode.item)
+            : { stem: '', label: '', core: '' };
+          wNode.stem = stemInfo.stem;
+          wNode.stemLabel = stemInfo.label;
+          wNode.stemCore = stemInfo.core;
+          wNode.realm = realmInfo;
+
+          if (!branchGroups.has(bLabel)) branchGroups.set(bLabel, []);
+          branchGroups.get(bLabel).push(wNode);
+        });
+
+        branchGroups.forEach((wordsInBranch, bLabel) => {
+          // 同一語幹の単語を連続配置するためにソート
+          wordsInBranch.sort((a, b) => (a.stem || '').localeCompare(b.stem || '') || (a.label || '').localeCompare(b.label || ''));
+
+          const bId = isUnifiedPIE ? `branch:${rNode.id}:${bLabel}` : `branch:${rNode.label}:${bLabel}`;
+          let bNode = branchMap.get(bId);
+          if (!bNode) {
+            bNode = {
+              id: bId,
+              label: bLabel,
+              type: 'branch',
+              level: 2,
+              rootLabel: rNode.label,
+              rootId: rNode.id,
+              realm: realmInfo,
+              radius: 9.5,
+              x: 0,
+              y: 0,
+              vx: 0,
+              vy: 0,
+              connectedWords: [],
+              connectedBuds: []
+            };
+            branchMap.set(bId, bNode);
+            nodes.push(bNode);
+            finalEdges.push({ source: rNode, target: bNode, kind: 'root_to_branch' });
+          }
+          if (!bNode.connectedBuds) bNode.connectedBuds = [];
+          wordsInBranch.forEach(wNode => {
+            if (!bNode.connectedWords.includes(wNode)) bNode.connectedWords.push(wNode);
+            finalEdges.push({ source: bNode, target: wNode, kind: 'branch_to_leaf' });
+          });
+        });
+
+        // 第3階層: 未開拓のつぼみ (Ghost Buds / 英検準1級 Fog of War スキルノード) の抽出
+        let unlearnedEikenWords = [];
+        if (global.VocabEikenCatalog) {
+          if (isUnifiedPIE) {
+            const allRoots = global.VocabEikenCatalog.getRoots();
+            for (let i = 0; i < Math.min(12, allRoots.length); i++) {
+              const eList = global.VocabEikenCatalog.getWordsByRoot(allRoots[i].rootKey);
+              unlearnedEikenWords.push(...eList.filter(w => !registeredWordsLower.has(w.word.toLowerCase())));
+              if (unlearnedEikenWords.length >= 25) break;
+            }
+          } else {
+            const eikenList = global.VocabEikenCatalog.getWordsByRoot(rNode.label);
+            unlearnedEikenWords = eikenList.filter(w => !registeredWordsLower.has(w.word.toLowerCase()));
+          }
+        }
+
+        let fallbackWords = [];
+        if (isUnifiedPIE) {
+          const bKeys = Object.keys(builtinRoots);
+          for (let i = 0; i < Math.min(8, bKeys.length); i++) {
+            const rk = bKeys[i];
+            const fList = (builtinRoots[rk]?.words || [])
+              .filter(w => !registeredWordsLower.has(w.toLowerCase()) && !unlearnedEikenWords.some(ew => ew.word.toLowerCase() === w.toLowerCase()))
+              .map(w => ({ word: w, rootLabel: rk }));
+            fallbackWords.push(...fList);
+            if (fallbackWords.length >= 15) break;
+          }
+        } else {
+          fallbackWords = (builtinRoots[rNode.label]?.words || [])
+            .filter(w => !registeredWordsLower.has(w.toLowerCase()) && !unlearnedEikenWords.some(ew => ew.word.toLowerCase() === w.toLowerCase()))
+            .map(w => ({ word: w }));
+        }
+
+        const allUnlearned = [...unlearnedEikenWords, ...fallbackWords];
+        const limitCount = isTree ? 30 : 4;
+        const unlearnedToShow = allUnlearned.slice(0, limitCount);
+
+        unlearnedToShow.forEach(budItem => {
+          const budWord = budItem.word;
+          const budWordData = budItem.meanings ? budItem : (global.VocabEikenCatalog ? global.VocabEikenCatalog.getWord(budWord) : null);
+          const primRoot = budItem.rootLabel || rNode.label;
+          let bLabel = extractBranchInfo(budWordData, primRoot, 'en');
+          if (isTree || isUnifiedPIE) {
+            bLabel = normalizeBranch(bLabel);
+          }
+
+          const bId = isUnifiedPIE ? `branch:${rNode.id}:${bLabel}` : `branch:${rNode.label}:${bLabel}`;
+          let bNode = branchMap.get(bId);
+          if (!bNode) {
+            bNode = {
+              id: bId,
+              label: bLabel,
+              type: 'branch',
+              level: 2,
+              rootLabel: rNode.label,
+              radius: 9.5,
+              x: 0,
+              y: 0,
+              vx: 0,
+              vy: 0,
+              connectedWords: [],
+              connectedBuds: []
+            };
+            branchMap.set(bId, bNode);
+            nodes.push(bNode);
+            finalEdges.push({ source: rNode, target: bNode, kind: 'root_to_branch' });
+          }
+          if (!bNode.connectedBuds) bNode.connectedBuds = [];
+
+          const budStem = global.VocabMorphology?.extractMorphologicalStem
+            ? global.VocabMorphology.extractMorphologicalStem(budWord, primRoot, budWordData)
+            : { stem: '', label: '', core: '' };
+          const budId = `bud:${primRoot}:${budWord}`;
+          const budNode = {
+            id: budId,
+            label: budWord,
+            type: 'ghost_bud',
+            level: 3,
+            rootLabel: primRoot,
+            branchLabel: bLabel,
+            stem: budStem.stem,
+            stemLabel: budStem.label,
+            realm: rNode.realm,
+            radius: 8.0,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            isLocked: true,
+            isSkillNode: true,
+            eikenData: budWordData
+          };
+          bNode.connectedBuds.push(budNode);
+          ghostBuds.push(budNode);
+          nodes.push(budNode);
+          finalEdges.push({ source: bNode, target: budNode, kind: 'bud_edge' });
+        });
+
+        if (typeof document !== 'undefined') {
+          const unlockBtn = document.getElementById('graphUnlockEikenRootBtn');
+          if (unlockBtn) {
+            if (unlearnedEikenWords.length > 0 && !isUnifiedPIE) {
+              unlockBtn.style.display = 'inline-flex';
+              unlockBtn.textContent = `この系統樹を一括習得 (${unlearnedEikenWords.length}語)`;
+              unlockBtn.dataset.root = rNode.label;
+            } else {
+              unlockBtn.style.display = 'none';
+            }
+          }
+        }
+      });
+
+      // 単語ノード（Leaf）の追加と第4階層（Twigs）の抽出
+      nodeMap.forEach(wNode => {
+        if (validWordIds.has(wNode.id)) {
+          wNode.level = 3;
+          nodes.push(wNode);
+
+          // 派生語・熟語 (Twigs) の生成
+          const derivatives = (wNode.item?.derivatives || []).slice(0, 2);
+          const phrases = (wNode.item?.phrases || []).slice(0, 1);
+          [...derivatives.map(d => ({ text: d?.word, kind: 'der' })), ...phrases.map(p => ({ text: p?.foreign, kind: 'phr' }))].forEach((sub, tIdx) => {
+            if (!sub.text || sub.text.toLowerCase() === wNode.label.toLowerCase()) return;
+            const twigId = `twig:${wNode.id}:${tIdx}:${sub.text}`;
+            const tNode = {
+              id: twigId,
+              label: sub.text,
+              type: 'twig',
+              level: 4,
+              parentWord: wNode.label,
+              parentWordId: wNode.id,
+              radius: 4.0,
+              x: 0,
+              y: 0,
+              vx: 0,
+              vy: 0
+            };
+            twigs.push(tNode);
+            nodes.push(tNode);
+            finalEdges.push({ source: wNode, target: tNode, kind: 'leaf_to_twig' });
+          });
+        }
+      });
+
+      // --- 放射状スキルツリー（Radial Skill Tree / 極座標レイアウト）確定座標計算 ---
+      // 同心円半径 (Radius / r):
+      // r = 0   : 中心 印欧祖語ノード (Root: 印欧祖語 / PIE)
+      // r = 120 : 第1軌道 古典分岐ノード (Branch: ゲルマン語派、イタリック語派など)
+      // r = 250〜: 第2軌道〜 多重同心円スタガーによる現代語ノード (Multi-orbit Staggered Leaves: 250, 286, 322, 358px)
+      // r = 380〜: 第3軌道〜 未開拓のつぼみ & 派生小枝 (Ghost Buds & Twigs)
+
+      // セクター（Angle / θ）メタデータ定義（PIE系統 & 東アジア漢字字源系統 完全対応）
+      const SECTOR_METAS = {
+        germanic: {
+          key: 'germanic',
+          label: 'ゲルマン語派 / Germanic',
+          subLabel: '西ゲルマン語群 (英・独・蘭)',
+          colorDark: 'rgba(132, 204, 22, 0.05)',
+          colorDarkBorder: 'rgba(163, 230, 53, 0.15)',
+          colorLight: 'rgba(101, 163, 13, 0.04)',
+          colorLightBorder: 'rgba(101, 163, 13, 0.12)',
+          textColorDark: '#bef264',
+          textColorLight: '#4d7c0f',
+          subTextColorDark: '#86efac',
+          subTextColorLight: '#15803d'
+        },
+        italic_romance: {
+          key: 'italic_romance',
+          label: 'イタリック・ロマンス語派 / Italic & Romance',
+          subLabel: 'ロマンス諸語 (仏・西・伊・葡)',
+          colorDark: 'rgba(56, 189, 248, 0.05)',
+          colorDarkBorder: 'rgba(56, 189, 248, 0.15)',
+          colorLight: 'rgba(2, 132, 199, 0.04)',
+          colorLightBorder: 'rgba(2, 132, 199, 0.12)',
+          textColorDark: '#7dd3fc',
+          textColorLight: '#0369a1',
+          subTextColorDark: '#a5b4fc',
+          subTextColorLight: '#4338ca'
+        },
+        hellenic: {
+          key: 'hellenic',
+          label: 'ヘレニック・古典諸派 / Hellenic & Classical',
+          subLabel: '古典ギリシャ・国際学術語幹',
+          colorDark: 'rgba(192, 132, 252, 0.05)',
+          colorDarkBorder: 'rgba(192, 132, 252, 0.15)',
+          colorLight: 'rgba(147, 51, 234, 0.04)',
+          colorLightBorder: 'rgba(147, 51, 234, 0.12)',
+          textColorDark: '#d8b4fe',
+          textColorLight: '#7e22ce',
+          subTextColorDark: '#e9d5ff',
+          subTextColorLight: '#6b21a8'
+        },
+        sinospheric: {
+          key: 'sinospheric',
+          label: 'シノ・チベット語族 / Sino-Tibetan',
+          subLabel: '古代漢語字源・漢語構文体系',
+          colorDark: 'rgba(244, 63, 94, 0.05)',
+          colorDarkBorder: 'rgba(244, 63, 94, 0.15)',
+          colorLight: 'rgba(225, 29, 72, 0.04)',
+          colorLightBorder: 'rgba(225, 29, 72, 0.12)',
+          textColorDark: '#fda4af',
+          textColorLight: '#be123c',
+          subTextColorDark: '#fbcfe8',
+          subTextColorLight: '#9d174d'
+        },
+        cjk_core: {
+          key: 'cjk_core',
+          label: '漢語本源・基本語幹 / Core Syntax',
+          subLabel: '古代漢語字源・東アジア基本語幹',
+          colorDark: 'rgba(251, 191, 36, 0.05)',
+          colorDarkBorder: 'rgba(251, 191, 36, 0.18)',
+          colorLight: 'rgba(217, 119, 6, 0.04)',
+          colorLightBorder: 'rgba(217, 119, 6, 0.14)',
+          textColorDark: '#fde047',
+          textColorLight: '#b45309',
+          subTextColorDark: '#fef08a',
+          subTextColorLight: '#92400e'
+        },
+        cjk_system: {
+          key: 'cjk_system',
+          label: '抽象・制度派生体系 / System & Derivation',
+          subLabel: '近代受容・概念展開 (-化/-性/-制/-論)',
+          colorDark: 'rgba(45, 212, 191, 0.05)',
+          colorDarkBorder: 'rgba(45, 212, 191, 0.18)',
+          colorLight: 'rgba(13, 148, 136, 0.04)',
+          colorLightBorder: 'rgba(13, 148, 136, 0.14)',
+          textColorDark: '#5eead4',
+          textColorLight: '#0f766e',
+          subTextColorDark: '#99f6e4',
+          subTextColorLight: '#115e59'
+        },
+        cjk_prefix: {
+          key: 'cjk_prefix',
+          label: '接頭・修飾構文 / Prefix & Modifier',
+          subLabel: '否定・程度構造 (不-/非-/無-/超-/全-)',
+          colorDark: 'rgba(244, 63, 94, 0.05)',
+          colorDarkBorder: 'rgba(244, 63, 94, 0.18)',
+          colorLight: 'rgba(225, 29, 72, 0.04)',
+          colorLightBorder: 'rgba(225, 29, 72, 0.14)',
+          textColorDark: '#f43f5e',
+          textColorLight: '#be123c',
+          subTextColorDark: '#fda4af',
+          subTextColorLight: '#9d174d'
+        },
+        koreanic: {
+          key: 'koreanic',
+          label: '朝鮮語族 / Koreanic',
+          subLabel: '韓国固有語・漢字語体系',
+          colorDark: 'rgba(251, 146, 60, 0.05)',
+          colorDarkBorder: 'rgba(251, 146, 60, 0.18)',
+          colorLight: 'rgba(234, 88, 12, 0.04)',
+          colorLightBorder: 'rgba(234, 88, 12, 0.14)',
+          textColorDark: '#fdba74',
+          textColorLight: '#c2410c',
+          subTextColorDark: '#fed7aa',
+          subTextColorLight: '#9a3412'
+        },
+        japonic: {
+          key: 'japonic',
+          label: '日本語族 / Japonic',
+          subLabel: '和語大和言葉・和製漢語体系',
+          colorDark: 'rgba(234, 179, 8, 0.05)',
+          colorDarkBorder: 'rgba(234, 179, 8, 0.18)',
+          colorLight: 'rgba(202, 138, 4, 0.04)',
+          colorLightBorder: 'rgba(202, 138, 4, 0.14)',
+          textColorDark: '#fde047',
+          textColorLight: '#a16207',
+          subTextColorDark: '#fef08a',
+          subTextColorLight: '#854d0e'
+        }
+      };
+
+      function classifyBranchSector(bLabel, isCjk) {
+        const bl = String(bLabel || '').toLowerCase();
+        if (isCjk) {
+          if (bl.includes('制度') || bl.includes('抽象') || bl.includes('-化') || bl.includes('-性') || bl.includes('-制') || bl.includes('-論')) {
+            return 'cjk_system';
+          }
+          if (bl.includes('接頭') || bl.includes('否定') || bl.includes('対抗') || bl.includes('不-') || bl.includes('非-') || bl.includes('無-') || bl.includes('超-') || bl.includes('全-') || bl.includes('共-')) {
+            return 'cjk_prefix';
+          }
+          return 'cjk_core';
+        }
+
+        if (bl.startsWith('koreanic') || bl.includes('korean') || bl.includes('韓国') || bl.includes('朝鮮') || bl.includes('hanja')) {
+          return 'koreanic';
+        }
+        if (bl.startsWith('japonic') || bl.includes('japanese') || bl.includes('和語') || bl.includes('大和') || bl.includes('和製')) {
+          return 'japonic';
+        }
+        if (bl.startsWith('germanic') || bl.includes('german') || bl.includes('old english') || bl.includes('deutsch') || bl.includes('dutch') || bl.includes('nederlands')) {
+          return 'germanic';
+        }
+        if (bl.startsWith('italic') || bl.startsWith('latin') || bl.startsWith('romance') || bl.includes('french') || bl.includes('spanish') || bl.includes('italian') || bl.includes('portuguese') || bl.includes('français') || bl.includes('español') || bl.includes('italiano') || bl.includes('português')) {
+          return 'italic_romance';
+        }
+        if (bl.startsWith('sinospheric') || bl.includes('chinese') || bl.includes('kanji') || bl.includes('漢字') || bl.includes('漢語')) {
+          return 'sinospheric';
+        }
+        return 'hellenic';
+      }
+
+      const isSingleRoot = (activeRoots.length === 1);
+      const cols = Math.max(1, Math.ceil(Math.sqrt(activeRoots.length * 1.4)));
+      const rootSpacing = 1950;
+
+      activeRoots.forEach((rNode, rIdx) => {
+        if (isSingleRoot) {
+          rNode.targetX = 0;
+          rNode.targetY = 0;
+        } else if (typeof rNode.targetX !== 'number' || (rNode.targetX === 0 && rNode.targetY === 0 && rIdx > 0)) {
+          const row = Math.floor(rIdx / cols);
+          const col = rIdx % cols;
+          rNode.targetX = (col - (cols - 1) / 2) * rootSpacing;
+          rNode.targetY = (row - Math.ceil(activeRoots.length / cols) / 2) * rootSpacing;
+        }
+
+        const isCjk = Boolean(rNode.label && /^\*[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/.test(String(rNode.label).trim())) || Boolean(rNode.isCjkRoot);
+        const sectorKeys = isCjk
+          ? ['cjk_core', 'cjk_system', 'cjk_prefix']
+          : ['germanic', 'italic_romance', 'sinospheric', 'koreanic', 'japonic', 'hellenic'];
+
+        const rBranches = Array.from(branchMap.values()).filter(b => b.rootId ? (b.rootId === rNode.id) : (b.rootLabel === rNode.label));
+        const sectorBranches = {};
+        sectorKeys.forEach(k => { sectorBranches[k] = []; });
+
+        rBranches.forEach(bNode => {
+          const sec = classifyBranchSector(bNode.label, isCjk);
+          if (!sectorBranches[sec]) sectorBranches[sec] = [];
+          sectorBranches[sec].push(bNode);
+        });
+
+        // 言語系統ごとの単語数に応じた動的セクター角度割り当て（ラテン・ロマンス等の過密セクターに十分な角度領域を確保）
+        const secWeights = {};
+        let totalWeight = 0;
+        sectorKeys.forEach(k => {
+          const bList = sectorBranches[k] || [];
+          const wCount = bList.reduce((acc, b) => acc + Math.max(2, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
+          const w = bList.length > 0 ? Math.max(4, wCount) : 0;
+          secWeights[k] = w;
+          totalWeight += w;
+        });
+
+        const fullCircle = Math.PI * 2;
+        const activeSecKeys = sectorKeys.filter(k => (sectorBranches[k] || []).length > 0);
+        const dynamicSectorDefs = {};
+
+        if (activeSecKeys.length === 1) {
+          const onlyKey = activeSecKeys[0];
+          dynamicSectorDefs[onlyKey] = {
+            ...SECTOR_METAS[onlyKey],
+            start: -Math.PI,
+            end: Math.PI,
+            center: 0,
+            span: fullCircle
+          };
+        } else if (activeSecKeys.length > 1) {
+          // 最低確保角度（過少セクターでも文字衝突を防ぐ）
+          const minAnglePerActive = Math.max(0.62, fullCircle / (activeSecKeys.length * 2.3));
+          const remainingAngle = Math.max(0.2, fullCircle - activeSecKeys.length * minAnglePerActive);
+          let currentStart = isCjk ? (-Math.PI * 0.5) : (-3 * Math.PI / 4);
+
+          activeSecKeys.forEach(secKey => {
+            const proportion = totalWeight > 0 ? (secWeights[secKey] / totalWeight) : (1 / activeSecKeys.length);
+            const span = minAnglePerActive + remainingAngle * proportion;
+            dynamicSectorDefs[secKey] = {
+              ...SECTOR_METAS[secKey],
+              start: currentStart,
+              end: currentStart + span,
+              center: currentStart + span / 2,
+              span: span
+            };
+            currentStart += span;
+          });
+        }
+
+        // セクターごとの厳格な角度正規化・多重同心円スタガー配置
+        activeSecKeys.forEach(secKey => {
+          const sDef = dynamicSectorDefs[secKey];
+          const bList = sectorBranches[secKey];
+          if (!sDef || !bList || bList.length === 0) return;
+          const numB = bList.length;
+
+          const pad = 0.05;
+          const totalSpan = Math.max(0.12, sDef.span - pad * 2);
+
+          // セクター内の各ブランチの重みと正規化スパン計算（単語数に応じた正確な角度配分で過密を完全解消）
+          const totalWordsInSector = bList.reduce((sum, b) => sum + Math.max(1, (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5), 0);
+          const rawSpans = bList.map(b => {
+            const bWords = (b.connectedWords?.length || 0) + (b.connectedBuds?.length || 0) * 0.5;
+            const weight = Math.pow(Math.max(1, bWords), 1.12);
+            return Math.max(0.040, (weight / Math.max(1, totalWordsInSector)) * totalSpan);
+          });
+          const sumRaw = rawSpans.reduce((a, b) => a + b, 0);
+          const normSpans = (numB === 1) ? [totalSpan] : rawSpans.map(s => (s / sumRaw) * totalSpan);
+
+          let currentTheta = sDef.start + pad;
+
+          bList.forEach((bNode, bIdx) => {
+            const branchSpan = normSpans[bIdx];
+            const thetaB = currentTheta + branchSpan / 2;
+            currentTheta += branchSpan;
+
+            // 第1軌道: 古典分岐ノード (4段階スタガー配置でブランチ同士の接触・重合を解消)
+            const bRadius = (numB <= 2) ? 260 : (220 + (bIdx % 4) * 62);
+            bNode.targetX = rNode.targetX + bRadius * Math.cos(thetaB);
+            bNode.targetY = rNode.targetY + bRadius * Math.sin(thetaB);
+            bNode.angle = thetaB;
+            bNode.orbitR = bRadius;
+
+            // 第2軌道〜外周軌道: 現代見出し語ノード (Multi-Orbit Concentric Hexagonal Staggering)
+            const leaves = bNode.connectedWords || [];
+            const leafCount = leaves.length;
+            const baseLeafR = 490;
+            const usableLeafSpan = branchSpan * 0.94;
+
+            if (leafCount > 0) {
+              // 単語1個あたりの必要弧長(78px)から1軌道の安全収容数を計算
+              const minArcPerWord = 78;
+              const capacityPerOrbit = Math.max(1, Math.floor((baseLeafR * usableLeafSpan) / minArcPerWord));
+              // 単語数に応じて軌道数を動的に1〜10軌道に配分
+              const numLeafOrbits = Math.min(10, Math.max(1, Math.ceil(leafCount / Math.max(1, capacityPerOrbit))));
+              const leafOrbitGap = Math.max(72, 88 - numLeafOrbits * 1.5);
+
+              const orbitBuckets = Array.from({ length: numLeafOrbits }, () => []);
+              leaves.forEach((lNode, lIdx) => {
+                orbitBuckets[lIdx % numLeafOrbits].push(lNode);
+              });
+
+              orbitBuckets.forEach((bucket, oIdx) => {
+                const leafR = baseLeafR + oIdx * leafOrbitGap;
+                const countInBucket = bucket.length;
+                if (countInBucket === 0) return;
+
+                if (countInBucket === 1) {
+                  const lNode = bucket[0];
+                  lNode.targetX = rNode.targetX + leafR * Math.cos(thetaB);
+                  lNode.targetY = rNode.targetY + leafR * Math.sin(thetaB);
+                  lNode.angle = thetaB;
+                  lNode.orbitR = leafR;
+                } else {
+                  // 必要弧長に基づく正確な角度幅計算
+                  const neededArcSpan = (countInBucket - 1) * (minArcPerWord / leafR);
+                  const actualSpan = Math.min(usableLeafSpan, Math.max(0.08, neededArcSpan));
+                  const step = actualSpan / (countInBucket - 1);
+                  const staggerOffset = (oIdx % 2 === 1) ? (step * 0.5) : 0;
+
+                  bucket.forEach((lNode, bIdxInOrbit) => {
+                    const offsetFromCenter = (bIdxInOrbit - (countInBucket - 1) / 2) * step;
+                    const thetaL = thetaB + offsetFromCenter + (countInBucket % 2 === 0 ? staggerOffset : 0);
+
+                    lNode.targetX = rNode.targetX + leafR * Math.cos(thetaL);
+                    lNode.targetY = rNode.targetY + leafR * Math.sin(thetaL);
+                    lNode.angle = thetaL;
+                    lNode.orbitR = leafR;
+                  });
+                }
+              });
+
+              // 派生語・成句 (Twigs: 親単語から放射状に78px外側へ分岐し重なりを完全に防止)
+              leaves.forEach(lNode => {
+                const myTwigs = twigs.filter(t => (t.parentWordId ? t.parentWordId === lNode.id : t.parentWord === lNode.label));
+                myTwigs.forEach((tNode, tIdx) => {
+                  const twigOffset = (myTwigs.length === 1) ? 0 : (-0.055 + (0.110 / Math.max(1, myTwigs.length - 1)) * tIdx);
+                  const thetaT = (lNode.angle || 0) + twigOffset;
+                  tNode.targetX = lNode.targetX + 78 * Math.cos(thetaT);
+                  tNode.targetY = lNode.targetY + 78 * Math.sin(thetaT);
+                  tNode.angle = thetaT;
+                });
+              });
+            }
+
+            // 第3軌道以降: 未開拓のつぼみ (Ghost Buds: 単語軌道の外側にゆったり同心配置)
+            const buds = bNode.connectedBuds || [];
+            const budCount = buds.length;
+            if (budCount > 0) {
+              const numLeafOrbitsActual = leafCount > 0 ? Math.min(7, Math.max(1, Math.ceil(leafCount / Math.max(1, Math.floor((baseLeafR * usableLeafSpan) / 48))))) : 0;
+              const maxLeafOrbitR = (leafCount > 0) ? (baseLeafR + (numLeafOrbitsActual - 1) * Math.max(56, 76 - numLeafOrbitsActual * 2.5)) : 420;
+              const budBaseR = maxLeafOrbitR + 80;
+              const budSpan = branchSpan * 0.88;
+              const capacityPerBudOrbit = Math.max(1, Math.floor((budBaseR * budSpan) / 48));
+              const numBudOrbits = Math.min(5, Math.max(1, Math.ceil(budCount / Math.max(1, capacityPerBudOrbit))));
+              const budOrbitGap = 65;
+
+              const budBuckets = Array.from({ length: numBudOrbits }, () => []);
+              buds.forEach((budNode, budIdx) => {
+                budBuckets[budIdx % numBudOrbits].push(budNode);
+              });
+
+              budBuckets.forEach((bBucket, boIdx) => {
+                const budR = budBaseR + boIdx * budOrbitGap;
+                const countInBBucket = bBucket.length;
+                if (countInBBucket === 0) return;
+
+                if (countInBBucket === 1) {
+                  const bNodeSingle = bBucket[0];
+                  bNodeSingle.targetX = rNode.targetX + budR * Math.cos(thetaB);
+                  bNodeSingle.targetY = rNode.targetY + budR * Math.sin(thetaB);
+                  bNodeSingle.angle = thetaB;
+                  bNodeSingle.orbitR = budR;
+                } else {
+                  const neededArcSpan = (countInBBucket - 1) * (48 / budR);
+                  const actualSpan = Math.min(budSpan, Math.max(0.06, neededArcSpan));
+                  const bStep = actualSpan / (countInBBucket - 1);
+                  const bStaggerShift = (boIdx % 2 === 1) ? (bStep * 0.35) : 0;
+
+                  bBucket.forEach((budNode, bbIdx) => {
+                    const offsetFromCenter = (bbIdx - (countInBBucket - 1) / 2) * bStep;
+                    const thetaBud = thetaB + offsetFromCenter + (countInBBucket % 2 === 0 ? bStaggerShift : 0);
+
+                    budNode.targetX = rNode.targetX + budR * Math.cos(thetaBud);
+                    budNode.targetY = rNode.targetY + budR * Math.sin(thetaBud);
+                    budNode.angle = thetaBud;
+                    budNode.orbitR = budR;
+                  });
+                }
+              });
+            }
+          });
+        });
+
+        // 極座標・同心円保護 緩和パス (Polar Radius-Preserving Angular Relaxation)
+        // 従来のCartesian relaxationが同心円を歪めて球状の塊にしてしまう問題を根絶
+        const placedWords = nodes.filter(n => n.targetX !== undefined && (n.type === 'word' || n.type === 'ghost_bud'));
+        const polarPasses = 2;
+        for (let pass = 0; pass < polarPasses; pass++) {
+          for (let i = 0; i < placedWords.length; i++) {
+            const na = placedWords[i];
+            for (let j = i + 1; j < placedWords.length; j++) {
+              const nb = placedWords[j];
+              if (Math.abs((na.orbitR || 0) - (nb.orbitR || 0)) < 36) {
+                const dx = nb.targetX - na.targetX;
+                const dy = nb.targetY - na.targetY;
+                const distSq = dx * dx + dy * dy;
+                const minDist = 46;
+                if (distSq < minDist * minDist && distSq > 0.001) {
+                  const dist = Math.sqrt(distSq);
+                  const overlap = minDist - dist;
+                  let dAngle = (nb.angle || 0) - (na.angle || 0);
+                  while (dAngle > Math.PI) dAngle -= Math.PI * 2;
+                  while (dAngle < -Math.PI) dAngle += Math.PI * 2;
+                  const sign = dAngle >= 0 ? 1 : -1;
+                  const angleShift = (overlap / (na.orbitR || 500)) * 0.45;
+                  na.angle = (na.angle || 0) - sign * angleShift;
+                  nb.angle = (nb.angle || 0) + sign * angleShift;
+                  na.targetX = rNode.targetX + na.orbitR * Math.cos(na.angle);
+                  na.targetY = rNode.targetY + na.orbitR * Math.sin(na.angle);
+                  nb.targetX = rNode.targetX + nb.orbitR * Math.cos(nb.angle);
+                  nb.targetY = rNode.targetY + nb.orbitR * Math.sin(nb.angle);
+                }
+              }
+            }
+          }
+        }
+
+        rNode.dynamicSectorDefs = dynamicSectorDefs;
+        rNode.isCjkTree = isCjk;
+        if (graphState) {
+          if (!graphState.dynamicSectorDefs || rNode.phylum === "indo_european" || rIdx === 0) {
+            graphState.dynamicSectorDefs = dynamicSectorDefs;
+            graphState.isCjkTree = isCjk;
+          }
+        }
+      });
+
+      // 孤立したtwigがあれば親単語に紐づけて配置
+      twigs.forEach((tNode, tIdx) => {
+        if (tNode.targetX === undefined) {
+          const parentNode = (tNode.parentWordId ? nodeMap.get(tNode.parentWordId) : null) ||
+                             nodeMap.get(`word:en:${tNode.parentWord}#1`) ||
+                             nodes.find(n => n.label === tNode.parentWord);
+          if (parentNode && parentNode.targetX !== undefined) {
+            const pAngle = parentNode.angle || 0;
+            const thetaT = pAngle + (tIdx % 2 === 0 ? -0.055 : 0.055);
+            tNode.targetX = parentNode.targetX + 78 * Math.cos(thetaT);
+            tNode.targetY = parentNode.targetY + 78 * Math.sin(thetaT);
+          } else if (parentNode && parentNode.x !== undefined) {
+            tNode.targetX = parentNode.x + 78;
+            tNode.targetY = parentNode.y;
+          }
+        }
+      });
+
+      // 初期位置のセット（系統樹モード時はターゲット確定座標で初期化）
+      // 確定座標が付与されなかった孤立ノードを安全に除外して原点(0,0)集中を防止
+      const validNodes = [];
+      const validNodeSet = new Set();
+      nodes.forEach(n => {
+        if (n.targetX !== undefined) {
+          n.x = n.targetX;
+          n.y = n.targetY;
+          validNodes.push(n);
+          validNodeSet.add(n);
+        }
+      });
+      nodes.length = 0;
+      nodes.push(...validNodes);
+
+      // 言語横断・同根語共鳴エッジ (Cross-Language Cognate Resonance Links)
+      // 異なる言語に属し同一の語根を共有する単語間に高精度な調和リンクを形成
+      const activeRootsForCognates = (activeRoots.length === 1 && activeRoots[0].id.includes(':unified'))
+        ? finalRoots
+        : activeRoots;
+
+      activeRootsForCognates.forEach(r => {
+        const words = (r.connectedWords || []).filter(w => validNodeSet.has(w));
+        if (words.length >= 2) {
+          const byLang = new Map();
+          words.forEach(w => {
+            const l = (w.lang || 'en').toLowerCase();
+            if (!byLang.has(l)) byLang.set(l, []);
+            byLang.get(l).push(w);
+          });
+          const langEntries = Array.from(byLang.entries());
+          for (let i = 0; i < langEntries.length; i++) {
+            for (let j = i + 1; j < langEntries.length; j++) {
+              const [l1, list1] = langEntries[i];
+              const [l2, list2] = langEntries[j];
+              const w1 = list1[0];
+              const w2 = list2[0];
+              if (w1 && w2 && w1 !== w2) {
+                finalEdges.push({
+                  source: w1,
+                  target: w2,
+                  kind: 'cognate_cross',
+                  rootKey: r.label,
+                  langs: [l1, l2]
+                });
+              }
+            }
+          }
+        }
+      });
+
+      const validEdges = finalEdges.filter(e => validNodeSet.has(e.source) && validNodeSet.has(e.target));
+      finalEdges.length = 0;
+      finalEdges.push(...validEdges);
+    }
+
+    if (graphState) {
+      graphState.allRoots = finalRoots;
+    }
+
+    // クイックジャンプ用セレクター (#graphRootJumpSel) & パンくずバーの動的更新
+    populateRootJumpSelect(finalRoots);
+    updateBreadcrumbUI(finalRoots);
+
+    return { nodes, edges: finalEdges };
+  }
+  /**
+   * 10,000語規模の超大規模グラフ向けオフスレッド/Web Worker 物理レイアウト計算関数
+   * メインスレッドのUIをブロックせずに座標緩和を反復計算
+   */
+  function computeOffThreadPositions(nodes, edges, iterations = 30) {
+    if (!Array.isArray(nodes) || !nodes.length) return nodes;
+    const totalNodes = nodes.length;
+    const isLarge = totalNodes > 100;
+    const kRepulsion = isLarge ? 520 : 640;
+    const maxRepulseDist = isLarge ? 165 : 195;
+    const maxRepulseDistSq = maxRepulseDist * maxRepulseDist;
+    const kSpring = 0.040;
+    const springLength = 76;
+    const damping = 0.84;
+    const maxSpeed = 3.4;
+    const kGravity = 0.00010;
+
+    const simNodes = nodes.map(n => ({
+      id: n.id,
+      x: Number.isFinite(n.x) ? n.x : 0,
+      y: Number.isFinite(n.y) ? n.y : 0,
+      vx: Number.isFinite(n.vx) ? n.vx : 0,
+      vy: Number.isFinite(n.vy) ? n.vy : 0,
+      radius: n.radius || 8,
+      type: n.type || 'leaf'
+    }));
+
+    const nodeIndexMap = new Map();
+    simNodes.forEach((n, i) => nodeIndexMap.set(n.id, i));
+
+    const simEdges = (edges || []).map(e => ({
+      s: typeof e.source === 'object' ? nodeIndexMap.get(e.source.id) : nodeIndexMap.get(e.source),
+      t: typeof e.target === 'object' ? nodeIndexMap.get(e.target.id) : nodeIndexMap.get(e.target)
+    })).filter(e => e.s !== undefined && e.t !== undefined);
+
+    for (let it = 0; it < iterations; it++) {
+      for (let i = 0; i < totalNodes; i++) {
+        const n1 = simNodes[i];
+        for (let j = i + 1; j < totalNodes; j++) {
+          const n2 = simNodes[j];
+          const dx = n2.x - n1.x;
+          const dy = n2.y - n1.y;
+          const distSq = dx * dx + dy * dy;
+          if (distSq > maxRepulseDistSq || distSq < 1) continue;
+          const dist = Math.sqrt(distSq);
+          const minDist = (n1.radius || 8) + (n2.radius || 8) + 14;
+          let force = (dist < minDist) ? ((minDist - dist) / minDist) * 4.2 : (kRepulsion / distSq) * (1 - dist / maxRepulseDist);
+          if (force > 4.5) force = 4.5;
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          n1.vx -= fx; n1.vy -= fy;
+          n2.vx += fx; n2.vy += fy;
+        }
+      }
+
+      for (let i = 0; i < simEdges.length; i++) {
+        const e = simEdges[i];
+        const s = simNodes[e.s], t = simNodes[e.t];
+        const dx = t.x - s.x;
+        const dy = t.y - s.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        let force = (dist - springLength) * kSpring;
+        if (force > 3.0) force = 3.0;
+        if (force < -3.0) force = -3.0;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        s.vx += fx; s.vy += fy;
+        t.vx += fx; t.vy += fy;
+      }
+
+      for (let i = 0; i < totalNodes; i++) {
+        const n = simNodes[i];
+        n.vx -= n.x * kGravity;
+        n.vy -= n.y * kGravity;
+        n.vx *= damping;
+        n.vy *= damping;
+        const speed = Math.sqrt(n.vx * n.vx + n.vy * n.vy);
+        if (speed > maxSpeed) {
+          n.vx = (n.vx / speed) * maxSpeed;
+          n.vy = (n.vy / speed) * maxSpeed;
+        }
+        n.x += n.vx;
+        n.y += n.vy;
+      }
+    }
+
+    return simNodes;
+  }
+
+
+  global.VocabGraphLayout = {
+    ETYMOLOGY_FAMILIES,
+    detectWordFamily,
+    CANONICAL_ROOT_ALIASES,
+    cleanRootKey,
+    getRootMeaning,
+    resolveRootKey,
+    normalizeBranch,
+    extractBranchInfo,
+    buildGraphData,
+    computeOffThreadPositions
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+export {};

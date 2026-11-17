@@ -9,6 +9,16 @@
   let floatingBtn = null;
   let activeSelectedWord = '';
 
+  function getMsg(key, fallback, sub) {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.i18n && chrome.i18n.getMessage) {
+        const val = chrome.i18n.getMessage(key, sub);
+        if (val) return val;
+      }
+    } catch {}
+    return fallback;
+  }
+
   function removeFloatingBtn() {
     if (floatingBtn && floatingBtn.parentNode) {
       floatingBtn.parentNode.removeChild(floatingBtn);
@@ -17,26 +27,36 @@
     activeSelectedWord = '';
   }
 
+  function renderFloatingContent(container, label) {
+    container.replaceChildren();
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', 'M12 5v14M5 12h14');
+    svg.appendChild(path);
+    const span = document.createElement('span');
+    span.textContent = label;
+    container.appendChild(svg);
+    container.appendChild(span);
+  }
+
   document.addEventListener('mouseup', (e) => {
-    // ボタン自体のクリック時は無視
     if (floatingBtn && floatingBtn.contains(e.target)) return;
 
     const sel = window.getSelection();
     const text = (sel ? sel.toString() : '').trim();
 
-    // 1〜3単語程度（2〜40文字の英単語・ラテン文字・単語）を対象とする
     if (sel && sel.rangeCount > 0 && text.length >= 2 && text.length <= 40 && !text.includes('\n') && /^[A-Za-zÀ-ÿ\s'-]+$/.test(text)) {
       activeSelectedWord = text;
       const range = sel.getRangeAt(0);
       const rect = range.getBoundingClientRect();
+      const addLabel = getMsg('addToVault', 'Add to Vault');
 
       if (!floatingBtn) {
         floatingBtn = document.createElement('div');
         floatingBtn.className = 'vv-floating-btn';
-        floatingBtn.innerHTML = `
-          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-          <span>Vaultに追加</span>
-        `;
+        renderFloatingContent(floatingBtn, addLabel);
         document.body.appendChild(floatingBtn);
 
         floatingBtn.addEventListener('mousedown', (ev) => {
@@ -52,9 +72,12 @@
           chrome.runtime.sendMessage(
             { action: 'ADD_WORD', word: activeSelectedWord, lang: 'en' },
             (res) => {
-              if (res && res.success) {
+              if (res && res.success && floatingBtn) {
                 floatingBtn.classList.add('added');
-                floatingBtn.innerHTML = `<span>追加完了 (${res.count})</span>`;
+                floatingBtn.replaceChildren();
+                const doneSpan = document.createElement('span');
+                doneSpan.textContent = getMsg('addedCount', `Added (${res.count})`, [String(res.count)]);
+                floatingBtn.appendChild(doneSpan);
                 setTimeout(() => {
                   removeFloatingBtn();
                 }, 1000);

@@ -41,8 +41,15 @@
     config.userContentController = userContent;
     WKPreferences *prefs = config.preferences;
     prefs.javaScriptCanOpenWindowsAutomatically = YES;
-    [prefs setValue:@YES forKey:@"developerExtrasEnabled"];
-    [prefs setValue:@YES forKey:@"allowFileAccessFromFileURLs"];
+    @try {
+        [prefs setValue:@YES forKey:@"developerExtrasEnabled"];
+    } @catch (NSException *e) {}
+    @try {
+        [prefs setValue:@YES forKey:@"allowFileAccessFromFileURLs"];
+    } @catch (NSException *e) {}
+    @try {
+        [config setValue:@YES forKey:@"allowUniversalAccessFromFileURLs"];
+    } @catch (NSException *e) {}
 
     self.webView = [[WKWebView alloc] initWithFrame:[[self.window contentView] bounds] configuration:config];
     [self.webView setAutoresizingMask:(NSViewWidthSizable | NSViewHeightSizable)];
@@ -121,7 +128,7 @@
         targetUrl = [NSURL fileURLWithPath:resIndex];
         readAccessUrl = [NSURL fileURLWithPath:[bundleResPath stringByAppendingPathComponent:@"web"]];
     } else {
-        targetUrl = [NSURL URLWithString:@"https://kohei519y-arch.github.io/vocab-vault/"];
+        targetUrl = [NSURL URLWithString:@"https://vocab-vault-six.vercel.app/"];
     }
 
     if (readAccessUrl && targetUrl.isFileURL) {
@@ -135,6 +142,14 @@
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
+    return YES;
+}
+
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
+    if (self.window) {
+        [self.window makeKeyAndOrderFront:self];
+        [self.window orderFrontRegardless];
+    }
     return YES;
 }
 
@@ -442,7 +457,10 @@
     }
 
     if (navigationAction.navigationType == WKNavigationTypeLinkActivated) {
-        if (![scheme isEqualToString:@"file"] && ![url.host containsString:@"github.io"] && ![url.host containsString:@"vercel.app"]) {
+        NSString *host = url.host.lowercaseString ?: @"";
+        BOOL isLocal = [scheme isEqualToString:@"file"] || [host isEqualToString:@"localhost"] || [host isEqualToString:@"127.0.0.1"];
+        BOOL isOfficialHost = [host isEqualToString:@"vocab-vault-six.vercel.app"] || [host isEqualToString:@"vocabvault.app"];
+        if (!isLocal && !isOfficialHost) {
             [[NSWorkspace sharedWorkspace] openURL:url];
             decisionHandler(WKNavigationActionPolicyCancel);
             return;

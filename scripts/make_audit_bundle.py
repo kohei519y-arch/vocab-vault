@@ -33,43 +33,47 @@ ALL_SOURCE_FILES = [
     'sw.js',
     'manifest.json',
 
-    # 2. Core Storage, App & Events
-    'js/storage.js',
-    'js/app.js',
-    'js/events.js',
-    'js/modal.js',
-    'js/navigation.js',
+    # 2. Core Storage, DOM Safety, App & Events
+    'src/bootstrap.js',
+    'src/dom_safe.js',
+    'src/chunk_loader.js',
+    'src/storage.js',
+    'src/app.js',
+    'src/events.js',
+    'src/modal.js',
+    'src/navigation.js',
 
     # 3. Spaced Repetition (FSRS-4.5 / SM-2) & Analytics
-    'js/anki.js',
-    'js/anki_view.js',
+    'src/anki.js',
+    'src/anki_view.js',
 
     # 4. Search, Filtering, List & Card Rendering
-    'js/search.js',
-    'js/list_view.js',
-    'js/card_view.js',
+    'src/search.js',
+    'src/list_view.js',
+    'src/card_view.js',
 
     # 5. Mindmap, Morphology Matrix & Lineage Graph Engine
-    'js/graph.js',
-    'js/graph_views.js',
-    'js/graph_layout.js',
-    'js/graph_renderer.js',
-    'js/graph_webgl.js',
-    'js/morphology.js',
+    'src/graph.js',
+    'src/graph_views.js',
+    'src/graph_layout.js',
+    'src/graph_renderer.js',
+    'src/graph_webgl.js',
+    'src/morphology.js',
 
     # 6. AI Generation, Queue, OCR, Dictionary & Speech
-    'js/queue.js',
-    'js/dictionary.js',
-    'js/ocr.js',
-    'js/speech.js',
+    'src/queue.js',
+    'src/dictionary.js',
+    'src/ocr.js',
+    'src/speech.js',
 
     # 7. Distributed Sync, Export, Catalogs & Feedback
-    'js/sync.js',
-    'js/export.js',
-    'js/starter_pack.js',
-    'js/eiken_catalog.js',
-    'js/feedback.js',
-    'js/i18n.js',
+    'src/sync.js',
+    'src/export.js',
+    'src/starter_pack.js',
+    'src/eiken_catalog.js',
+    'src/feedback.js',
+    'src/i18n.js',
+    'src/entry.js',
 
     # 8. Supabase Backend Schema & Edge Functions
     'supabase/schema.sql',

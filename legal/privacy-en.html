@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — Vocab Vault</title>
+  <meta name="description" content="Privacy Policy for Vocab Vault explaining data collection, third-party processors, offline storage, and immediate account deletion.">
+  <style>
+    :root { --bg: #0f172a; --bg-card: #1e293b; --t: #f8fafc; --t-m: #94a3b8; --b: #334155; --ac: #38bdf8; --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    @media (prefers-color-scheme: light) { :root { --bg: #f8fafc; --bg-card: #ffffff; --t: #0f172a; --t-m: #64748b; --b: #e2e8f0; --ac: #0284c7; } }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--t); font-family: var(--font); line-height: 1.75; padding: 0 16px 60px; }
+    header { max-width: 800px; margin: 0 auto; padding: 24px 0 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--b); }
+    .brand { font-size: 18px; font-weight: 700; color: var(--t); text-decoration: none; }
+    .nav-links { display: flex; gap: 8px; }
+    .nav-links a { color: var(--ac); text-decoration: none; font-size: 13.5px; padding: 6px 12px; border: 1px solid var(--b); border-radius: 6px; }
+    main { max-width: 800px; margin: 32px auto 0; background: var(--bg-card); border: 1px solid var(--b); border-radius: 12px; padding: 36px 32px; }
+    h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
+    .meta { font-size: 13px; color: var(--t-m); margin-bottom: 28px; }
+    h2 { font-size: 17px; font-weight: 700; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--b); }
+    p, li { font-size: 14.5px; margin-bottom: 10px; }
+    ul { padding-left: 20px; margin-bottom: 16px; }
+    footer { max-width: 800px; margin: 40px auto 0; text-align: center; font-size: 13px; color: var(--t-m); }
+    .footer-nav { display: flex; justify-content: center; gap: 16px; margin-bottom: 12px; }
+    .footer-nav a { color: var(--t-m); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="../index.html" class="brand">Vocab Vault</a>
+    <div class="nav-links">
+      <a href="privacy.html">日本語</a>
+      <a href="../index.html">Back to App</a>
+    </div>
+  </header>
+  <main>
+    <h1>Privacy Policy</h1>
+    <div class="meta">Last updated: November 16, 2026</div>
+    <p>Vocab Vault Operations respects your privacy. This policy describes how personal and learning data are collected, processed, and deleted.</p>
+    <h2>1. Information Collected</h2>
+    <ul>
+      <li><strong>Account Data:</strong> Email address, hashed authentication credentials, and session tokens.</li>
+      <li><strong>Learning Data:</strong> Vocabulary entries, FSRS review schedules, notes, and sync watermarks across your 10 supported languages.</li>
+      <li><strong>Billing Data:</strong> Payment card numbers are handled exclusively by Stripe, Inc. and never stored on our servers.</li>
+    </ul>
+    <h2>2. Purpose of Processing</h2>
+    <ul>
+      <li>Providing cloud synchronization, spaced-repetition scheduling, and AI etymology generation.</li>
+      <li>Managing subscriptions, preventing abuse, and enforcing rate limits.</li>
+    </ul>
+    <h2>3. Infrastructure & Subprocessors</h2>
+    <ul>
+      <li><strong>Supabase, Inc.</strong> — Database hosting and authentication protected with TLS and Row Level Security.</li>
+      <li><strong>Stripe, Inc.</strong> — Subscription billing and Customer Portal management.</li>
+      <li><strong>Google Cloud (Gemini API)</strong> — Word and passage queries are transmitted without user email or identity fields.</li>
+    </ul>
+    <h2>4. Local Storage & Cookies</h2>
+    <p>IndexedDB and localStorage are used strictly for offline-first persistence and user preferences. No third-party advertising trackers are used.</p>
+    <h2>5. Permanent Account Deletion</h2>
+    <p>You may permanently erase your account, cancel active Stripe subscriptions, and wipe all cloud and local records from Settings at any time.</p>
+  </main>
+  <footer>
+    <div class="footer-nav">
+      <a href="terms-en.html">Terms</a>
+      <a href="privacy-en.html">Privacy</a>
+      <a href="tokushoho.html">Specified Commercial Transactions Act (JA)</a>
+    </div>
+    <div>&copy; 2026 Vocab Vault. All rights reserved.</div>
+  </footer>
+</body>
+</html>

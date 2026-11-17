@@ -1,0 +1,155 @@
+/** Vocab Vault Starter Pack Data (es_pre1) */
+export default [
+    {
+      id: 'es_pre1_concebir',
+      num: 1,
+      word: 'concebir',
+      homographIndex: 1,
+      phonetic: '/konθeˈβiɾ/',
+      grammar_forms: 'concibo, concebí, concebido; V[T]',
+      category: '哲学・認識',
+      meanings: [{ pos: 'V[T]', text: '（思想・計画を）構想する、思い描く、理解する；懐胎する' }],
+      core: '心の中に散らばる要素を「余さず掴み取って（capere）一つの概念を結実させる」こと。',
+      etymology: 'ラテン語 concipere（con- 共に ＋ capere 掴む）に由来し、印欧祖語 *kap-（掴む）に遡る。英語 conceive、フランス語 concevoir と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*kap-'],
+      history_note: 'イベリア・ロマンス語における哲学的・芸術的構想の基幹動詞。',
+      example: {
+        foreign: 'Resulta imposible <b>concebir</b> la modernidad sin el desarrollo del pensamiento crítico.',
+        ja: '批判的思考の発展なしに近代を<b>思い描く（構想する）</b>ことは不可能である。',
+        trans: '批判的思考の発展なしに近代を思い描くことは不可能である。',
+        used_form: 'concebir'
+      },
+      derivatives: [{ word: 'concepción', phonetic: '/konθepˈθjon/', pos: 'N[f]', meaning: '構想、概念、受胎' }],
+      phrases: [{ foreign: 'concebir una idea', ja: 'アイデアを構想する' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_mantener',
+      num: 2,
+      word: 'mantener',
+      homographIndex: 1,
+      phonetic: '/manteˈneɾ/',
+      grammar_forms: 'mantengo, mantuve, mantenido; V[T]',
+      category: '政治・社会',
+      meanings: [{ pos: 'V[T]', text: '維持する、保つ；扶養する；（主張を）堅持する' }],
+      core: '手（mano）でしっかりと張り詰めたまま保持し（tener）、崩れないように支えること。',
+      etymology: 'ラテン語 manu tenere（手で保つ；manus 手 ＋ tenere 保つ）に由来し、印欧祖語 *ten-（伸ばす、張る、保つ）に遡る。英語 maintain と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*ten-'],
+      history_note: '外交秩序や制度の持続可能性を論じるDELE B2/C1最頻出動詞。',
+      example: {
+        foreign: 'El banco central decidió <b>mantener</b> los tipos de interés para controlar la inflación.',
+        ja: '中央銀行はインフレを抑制するために金利を<b>維持する</b>ことを決定した。',
+        trans: '中央銀行はインフレを抑制するために金利を維持することを決定した。',
+        used_form: 'mantener'
+      },
+      derivatives: [{ word: 'mantenimiento', phonetic: '/manteniˈmjento/', pos: 'N[m]', meaning: '維持、保守管理' }],
+      phrases: [{ foreign: 'mantener el equilibrio', ja: '均衡を保つ' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_establecer',
+      num: 3,
+      word: 'establecer',
+      homographIndex: 1,
+      phonetic: '/estaβleˈθeɾ/',
+      grammar_forms: 'establezco, establecí, establecido; V[T]',
+      category: '法学・制度',
+      meanings: [{ pos: 'V[T]', text: '確立する、設立する、（法・基準を）制定する' }],
+      core: '揺らぐことのない堅固な土台の上に立たせる（*sta-）こと。',
+      etymology: 'ラテン語 stabilire（堅固にする；stare 立つ）に由来し、印欧祖語 *sta-（立つ）に遡る。英語 establish、フランス語 établir と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*sta-'],
+      history_note: '憲法条文や国際条約において規範・制度を創設する際の標準動詞。',
+      example: {
+        foreign: 'El tratado busca <b>establecer</b> un marco jurídico vinculante para las emisiones de carbono.',
+        ja: 'その条約は炭素排出に対する法的拘束力のある枠組みを<b>確立する</b>ことを目指している。',
+        trans: 'その条約は炭素排出に対する法的拘束力のある枠組みを確立することを目指している。',
+        used_form: 'establecer'
+      },
+      derivatives: [{ word: 'establecimiento', phonetic: '/estaβleθiˈmjento/', pos: 'N[m]', meaning: '設立、施設、機関' }],
+      phrases: [{ foreign: 'establecer un precedente', ja: '先例を確立する' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_transferir',
+      num: 4,
+      word: 'transferir',
+      homographIndex: 1,
+      phonetic: '/tɾansfeˈɾiɾ/',
+      grammar_forms: 'transfiero, transferí, transferido; V[T]',
+      category: '経済・法務',
+      meanings: [{ pos: 'V[T]', text: '移転する、譲渡する、送金する、移管する' }],
+      core: '境界を越えて（trans-）向こう側へと運び渡す（ferre）こと。',
+      etymology: 'ラテン語 transferre（trans- 越えて ＋ ferre 運ぶ）に由来し、印欧祖語 *bher-（運ぶ）に遡る。英語 transfer と同根。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*bher-'],
+      history_note: '権限委譲（transferencia de competencias）などスペインの自治州制度でも核心となる概念。',
+      example: {
+        foreign: 'El Gobierno acordó <b>transferir</b> nuevas competencias fiscales a las regiones autónomas.',
+        ja: '政府は自治州へ新たな財政権限を<b>移管する</b>ことで合意した。',
+        trans: '政府は自治州へ新たな財政権限を移管することで合意した。',
+        used_form: 'transferir'
+      },
+      derivatives: [{ word: 'transferencia', phonetic: '/tɾansfeˈɾenθja/', pos: 'N[f]', meaning: '移転、送金、技術移転' }],
+      phrases: [{ foreign: 'transferencia tecnológica', ja: '技術移転' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_perspectiva',
+      num: 5,
+      word: 'perspectiva',
+      homographIndex: 1,
+      phonetic: '/peɾspekˈtiβa/',
+      grammar_forms: 'pl. perspectivas; N[f]',
+      category: '思想・芸術',
+      meanings: [{ pos: 'N[f]', text: '視点、観点、展望、遠近法' }],
+      core: '障害物を貫いて隅々まで（per-）見通す（specere）視座。',
+      etymology: '後期ラテン語 perspectiva（per- 貫いて ＋ specere 見る）に由来し、印欧祖語 *spec-（見る）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*spec-'],
+      history_note: 'スペイン哲学者オルテガ・イ・ガセットの「視点主義（perspectivismo）」の中核概念。',
+      example: {
+        foreign: 'Debemos analizar el fenómeno demográfico desde una <b>perspectiva</b> histórica e interdisciplinaria.',
+        ja: '我々は歴史的かつ学際的な<b>観点（視座）</b>からその人口動態現象を分析しなければならない。',
+        trans: '我々は歴史的かつ学際的な観点からその人口動態現象を分析しなければならない。',
+        used_form: 'perspectiva'
+      },
+      derivatives: [{ word: 'perspicaz', phonetic: '/peɾspiˈkaθ/', pos: 'Adj', meaning: '洞察力のある、鋭敏な' }],
+      phrases: [{ foreign: 'en perspectiva', ja: '大局的に見て、将来を見据えて' }],
+      lang: 'es',
+      pair: 'es_ja'
+    },
+    {
+      id: 'es_pre1_contradecir',
+      num: 6,
+      word: 'contradecir',
+      homographIndex: 1,
+      phonetic: '/kontɾaðeˈθiɾ/',
+      grammar_forms: 'contradigo, contradije, contradicho; V[T]',
+      category: '論理・討論',
+      meanings: [{ pos: 'V[T]', text: '〜と矛盾する、反論する、反駁する' }],
+      core: '相手の言明に対して真っ向から（contra-）逆のことを言う（decir）こと。',
+      etymology: 'ラテン語 contradicere（contra- 対抗して ＋ dicere 言う）に由来し、印欧祖語 *dic-（示す・言う）に遡る。',
+      etymologyConfidence: 'certain',
+      etymologyTags: ['*dic-'],
+      history_note: '学術討論・法廷弁論における論理的反証の基礎動詞。',
+      example: {
+        foreign: 'Los datos empíricos recopilados parecen <b>contradecir</b> la hipótesis inicial.',
+        ja: '収集された実証データは初期の仮説と<b>矛盾する</b>ように思われる。',
+        trans: '収集された実証データは初期の仮説と矛盾するように思われる。',
+        used_form: 'contradecir'
+      },
+      derivatives: [{ word: 'contradicción', phonetic: '/kontɾaðikˈθjon/', pos: 'N[f]', meaning: '矛盾、反論' }],
+      phrases: [{ foreign: 'caer en contradicción', ja: '自己矛盾に陥る' }],
+      lang: 'es',
+      pair: 'es_ja'
+    }
+  ];
+
+  // --- イタリア語 (Italian / CILS B2) スターターパック ---

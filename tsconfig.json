@@ -1,23 +1,26 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "CommonJS",
-    "checkJs": false,
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "checkJs": true,
     "allowJs": true,
     "strict": false,
     "noEmit": true,
-    "baseUrl": ".",
+    "skipLibCheck": true,
     "paths": {
-      "*": ["types/*"]
+      "*": ["./types/*"]
     }
   },
   "include": [
-    "js/**/*",
+    "src/**/*",
     "types/**/*"
   ],
   "exclude": [
     "node_modules",
+    "dist",
     "Vocab Vault.app",
-    "vocab-vault-web"
+    "vocab-vault-web",
+    "supabase"
   ]
 }

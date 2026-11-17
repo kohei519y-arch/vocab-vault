@@ -1,34 +1,60 @@
 #!/usr/bin/env python3
 import os
+import sys
 import subprocess
 import shutil
+
+INCLUDE_DEV_MAC = "--dev-mac" in sys.argv[1:]
 
 # 1. Bundle web app inside Vocab Vault.app/Contents/Resources/web/
 res_dir = "Vocab Vault.app/Contents/Resources/web"
 os.makedirs(res_dir, exist_ok=True)
 
-for fn in ["index.html", "dev.html", "manifest.json", "sw.js"]:
+mac_files = ["index.html", "manifest.json", "sw.js"]
+if INCLUDE_DEV_MAC:
+    mac_files.append("dev.html")
+for fn in mac_files:
     shutil.copy(fn, res_dir)
 
-for folder in ["css", "js", "icons", "legal"]:
+mac_dev_html = os.path.join(res_dir, "dev.html")
+if not INCLUDE_DEV_MAC and os.path.exists(mac_dev_html):
+    os.remove(mac_dev_html)
+
+for folder in ["css", "icons", "legal", "dist"]:
+    if not os.path.exists(folder):
+        continue
     dest = os.path.join(res_dir, folder)
     if os.path.exists(dest):
         shutil.rmtree(dest)
     shutil.copytree(folder, dest)
+res_legacy_js = os.path.join(res_dir, "js")
+if os.path.exists(res_legacy_js):
+    shutil.rmtree(res_legacy_js)
+res_guard_prod = os.path.join(res_dir, "dist", "dev_guard.js")
+if not INCLUDE_DEV_MAC and os.path.exists(res_guard_prod):
+    os.remove(res_guard_prod)
 
 # Sync to vocab-vault-web (Production Web / GitHub Pages PWA)
 web_dir = "vocab-vault-web"
 if os.path.exists(web_dir):
     for fn in ["index.html", "manifest.json", "sw.js"]:
         shutil.copy(fn, web_dir)
-    for folder in ["css", "js", "icons", "legal"]:
+    for folder in ["css", "icons", "legal", "dist"]:
+        if not os.path.exists(folder):
+            continue
         dest = os.path.join(web_dir, folder)
         if os.path.exists(dest):
             shutil.rmtree(dest)
         shutil.copytree(folder, dest)
-    dev_html_prod = os.path.join(web_dir, "dev.html")
-    if os.path.exists(dev_html_prod):
-        os.remove(dev_html_prod)
+    for stale_item in [
+        os.path.join(web_dir, "dev.html"),
+        os.path.join(web_dir, "dist", "dev_guard.js"),
+        os.path.join(web_dir, "js"),
+    ]:
+        if os.path.isdir(stale_item):
+            shutil.rmtree(stale_item)
+        elif os.path.exists(stale_item):
+            os.remove(stale_item)
 
 # 2. Compile Native Cocoa WebKit Mach-O Standalone Shell
 native_src = "scripts/native_app/main.m"

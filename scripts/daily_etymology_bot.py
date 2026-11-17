@@ -82,7 +82,7 @@ def generate_daily_post():
     day_of_year = datetime.datetime.now().timetuple().tm_yday
     item = ROOTS[day_of_year % len(ROOTS)]
     
-    app_url = "https://kohei519y-arch.github.io/vocab-vault/"
+    app_url = "https://vocab-vault-six.vercel.app/"
     
     lines = [
         f"【今日の一撃語根】{item['root']}（意味: {item['meaning']}）\n",

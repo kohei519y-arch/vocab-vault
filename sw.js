@@ -3,7 +3,7 @@
  * Strategy: Network-First for HTML/CSS/JS (Eliminates stale black screen cache bugs)
  *           Cache-First/SWR for media assets
  */
-const CACHE_NAME = 'vocab-vault-v51-tab-sync-and-forecast';
+const CACHE_NAME = 'vocab-vault-v63-esm-lazy-chunks';
 
 // [P1-5 解決] 弱電波（Lie-fi）時のホワイトアウト・ハングアップを防ぐ安全タイムアウト付きフェッチ
 // [P2-⑥ 解決] AbortController 非対応環境（旧WebView/組み込みブラウザ）でのフォールバック
@@ -21,35 +21,39 @@ const PRECACHE_ASSETS = [
   './',
   './index.html',
   './css/app.css',
-  './js/i18n.js',
-  './js/storage.js',
-  './js/anki.js',
-  './js/sync.js',
-  './js/ocr.js',
-  './js/morphology.js',
-  './js/eiken_catalog.js',
-  './js/graph_layout.js',
-  './js/graph_webgl.js',
-  './js/graph_renderer.js',
-  './js/graph_views.js',
-  './js/graph.js',
-  './js/feedback.js',
-  './js/dictionary.js',
-  './js/starter_pack.js',
-  './js/export.js',
-  './js/speech.js',
-  './js/card_view.js',
-  './js/queue.js',
-  './js/modal.js',
-  './js/search.js',
-  './js/navigation.js',
-  './js/anki_view.js',
-  './js/list_view.js',
-  './js/events.js',
-  './js/app.js',
+  './dist/app.bundle.js',
+  './dist/chunks/i18n-fr.js',
+  './dist/chunks/i18n-de.js',
+  './dist/chunks/i18n-es.js',
+  './dist/chunks/i18n-it.js',
+  './dist/chunks/i18n-pt.js',
+  './dist/chunks/i18n-nl.js',
+  './dist/chunks/i18n-zh.js',
+  './dist/chunks/i18n-ko.js',
+  './dist/chunks/starter-locs.js',
+  './dist/chunks/starter-academic.js',
+  './dist/chunks/starter-business.js',
+  './dist/chunks/starter-essential.js',
+  './dist/chunks/starter-classical_roots.js',
+  './dist/chunks/starter-philosophy.js',
+  './dist/chunks/starter-medical_roots.js',
+  './dist/chunks/starter-legal_roots.js',
+  './dist/chunks/starter-tech_ai.js',
+  './dist/chunks/starter-gre_verbal.js',
+  './dist/chunks/starter-fr_pre1.js',
+  './dist/chunks/starter-de_pre1.js',
+  './dist/chunks/starter-es_pre1.js',
+  './dist/chunks/starter-it_pre1.js',
+  './dist/chunks/starter-pt_pre1.js',
+  './dist/chunks/starter-nl_pre1.js',
+  './dist/chunks/starter-zh_pre1.js',
+  './dist/chunks/starter-ko_pre1.js',
+  './dist/chunks/starter-ja_pre1.js',
   './manifest.json',
   './legal/terms.html',
+  './legal/terms-en.html',
   './legal/privacy.html',
+  './legal/privacy-en.html',
   './legal/tokushoho.html',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -253,6 +257,9 @@ self.addEventListener('notificationclick', event => {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
       for (const client of windowClients) {
         if (client.url.includes('vocab-vault') || client.url.includes('vocabvault') || client.url.includes('localhost') || client.url.includes('127.0.0.1')) {
+          if ('navigate' in client && targetUrl && targetUrl !== './') {
+            client.navigate(targetUrl).catch(() => {});
+          }
           if ('focus' in client) return client.focus();
         }
       }

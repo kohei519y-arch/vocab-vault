@@ -1,0 +1,18 @@
+{
+  "extName": { "message": "Vocab Vault Quick Collector" },
+  "extDesc": { "message": "Quick 10-language vocabulary collector & etymology lookup for Vocab Vault." },
+  "menuAdd": { "message": "Add to Vocab Vault: '%s'" },
+  "menuLookup": { "message": "Look up etymology in Vocab Vault: '%s'" },
+  "openApp": { "message": "Open App" },
+  "addWord": { "message": "Add" },
+  "collected": { "message": "Collected Words" },
+  "copyAll": { "message": "Copy All" },
+  "copied": { "message": "Copied!" },
+  "clear": { "message": "Clear" },
+  "confirmClear": { "message": "Tap again to clear" },
+  "emptyQueue": { "message": "No collected words yet. Select text on any page to add." },
+  "inputPlaceholder": { "message": "Enter word (e.g. serendipity)" },
+  "footerHint": { "message": "Select any word while browsing to save in 1 tap" },
+  "addToVault": { "message": "Add to Vault" },
+  "addedCount": { "message": "Added ($COUNT$)", "placeholders": { "count": { "content": "$1" } } }
+}

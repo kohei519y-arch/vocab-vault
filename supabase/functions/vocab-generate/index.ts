@@ -5,10 +5,33 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.8";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id, x-vv-client",
-};
+const STATIC_ALLOWED_ORIGINS = new Set([
+  "https://vocab-vault-six.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:4173",
+  "http://localhost:8080",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:4173",
+  "http://127.0.0.1:8080",
+]);
+
+function isAllowedOrigin(origin: string): boolean {
+  if (!origin) return false;
+  if (STATIC_ALLOWED_ORIGINS.has(origin)) return true;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) return true;
+  if (/^chrome-extension:\/\/[a-p]{32}$/i.test(origin)) return true;
+  return false;
+}
+
+function buildCorsHeaders(req: Request): Record<string, string> {
+  const origin = (req.headers.get("origin") || "").trim();
+  return {
+    "Access-Control-Allow-Origin": isAllowedOrigin(origin) ? origin : "https://vocab-vault-six.vercel.app",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-request-id, x-vv-client",
+    "Vary": "Origin",
+  };
+}
 
 interface RequestItem {
   reqIndex: number;
@@ -47,9 +70,9 @@ function refundGuestMemory(clientIp: string, count: number) {
 const ipBurstTracker = new Map<string, { count: number; resetAt: number }>();
 
 function isValidIp(ip: string): boolean {
-  if (!ip || typeof ip !== "string") return false;
+  if (!ip || typeof ip !== "string" || ip.length > 45) return false;
   const ipv4 = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-  const ipv6 = /^(?:[a-fA-F0-9]{1,4}:){7}[a-fA-F0-9]{1,4}$|^::1$/;
+  const ipv6 = /^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
   return ipv4.test(ip) || ipv6.test(ip);
 }
 
@@ -121,10 +144,13 @@ function sanitizeCard(card: any, origItem?: RequestItem) {
   if (meanings.length === 0) meanings.push({ pos: "N", text: word });
 
   // [P1-2 解決] 外国語例文はプレーンテキストとして保持（<b>タグの強制埋め込みを撤廃）
-  const exForeign = norm(card?.example?.foreign);
+  const exForeign = norm(card?.example?.foreign).replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
   const exJa = norm(card?.example?.ja);
   const exTrans = norm(card?.example?.trans || exJa);
-  const usedForm = norm(card?.example?.used_form || word);
+  let usedForm = norm(card?.example?.used_form || word);
+  if (exForeign && usedForm && !exForeign.toLowerCase().includes(usedForm.toLowerCase()) && exForeign.toLowerCase().includes(word.toLowerCase())) {
+    usedForm = word;
+  }
 
   const derivatives = (Array.isArray(card?.derivatives) ? card.derivatives : [])
     .map((d: any) => ({
@@ -178,6 +204,7 @@ function sanitizeCard(card: any, origItem?: RequestItem) {
 }
 
 serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -199,7 +226,7 @@ serve(async (req) => {
   let reservedExtractGuest = false;
   let itemsToGenerate: RequestItem[] = [];
   const clientIp = getClientIp(req);
-  const requestId = req.headers.get("x-request-id") || crypto.randomUUID();
+  const requestId = crypto.randomUUID();
 
   try {
     // [NEW-P0-1 解決] nowMs の宣言を1回に統一
@@ -404,7 +431,7 @@ serve(async (req) => {
       const candidateVisionModels = [
         "gemini-2.5-flash",
         "gemini-2.0-flash",
-        "gemini-1.5-flash",
+        "gemini-2.5-flash-lite",
       ];
 
       const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, "").trim();
@@ -447,7 +474,7 @@ serve(async (req) => {
 
           if (res.ok) {
             const data = await res.json();
-            const parts = data.candidates?.[0]?.content?.parts || [];
+            const parts = (data.candidates?.[0]?.content?.parts || []).filter((p: any) => !p?.thought);
             ocrText = parts.map((p: any) => p.text || "").join("").trim();
             if (ocrText) break;
           }
@@ -578,8 +605,9 @@ serve(async (req) => {
       }
 
       const candidateModels = [
-        Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash",
-        "gemini-1.5-flash",
+        Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.5-flash-lite",
       ].filter(Boolean);
 
       const targetCount = Math.min(Math.max(1, parseInt(String(maxCnt), 10) || 12), 30);
@@ -607,7 +635,7 @@ serve(async (req) => {
         },
       };
 
-      const reqPayload = JSON.stringify({
+      const getExtractPayload = (includeThinking: boolean) => JSON.stringify({
         systemInstruction: { parts: [{ text: extractSysPrompt }] },
         contents: [{ role: "user", parts: [{ text: `<passage>\n${safePassageText}\n</passage>` }] }],
         generationConfig: {
@@ -615,26 +643,41 @@ serve(async (req) => {
           maxOutputTokens: 4096,
           responseMimeType: "application/json",
           responseSchema: extractSchema,
+          ...(includeThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         },
       });
 
       let extractItems: any[] = [];
       for (const m of candidateModels) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+        const isModernFlash = m.includes("2.5") || m.includes("3");
         try {
-          const res = await fetch(endpoint, {
+          let res = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "x-goog-api-key": geminiApiKey,
             },
-            body: reqPayload,
+            body: getExtractPayload(isModernFlash),
             signal: AbortSignal.timeout(20000),
           });
 
+          if (res.status === 400 && isModernFlash) {
+            res = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": geminiApiKey,
+              },
+              body: getExtractPayload(false),
+              signal: AbortSignal.timeout(20000),
+            });
+          }
+
           if (res.ok) {
             const data = await res.json();
-            const textContent = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            const parts = (data.candidates?.[0]?.content?.parts || []).filter((p: any) => !p?.thought);
+            const textContent = parts.map((p: any) => p?.text || "").join("").trim();
             if (textContent) {
               try {
                 const parsed = JSON.parse(textContent);
@@ -735,6 +778,8 @@ serve(async (req) => {
         targetSenseOrMeaning: it?.targetSenseOrMeaning ? sanitizePromptString(it.targetSenseOrMeaning, 100) : undefined,
         contextSentence: it?.contextSentence ? sanitizePromptString(it.contextSentence, 300) : undefined,
         contextPos: it?.contextPos ? sanitizePromptString(it.contextPos, 30) : undefined,
+        wiktionaryRef: it?.wiktionaryRef ? sanitizePromptString(it.wiktionaryRef, 1500) : undefined,
+        wiktionaryIpa: it?.wiktionaryIpa ? sanitizePromptString(it.wiktionaryIpa, 60) : undefined,
       }))
       .filter(it => it.reqWord.length > 0);
 
@@ -826,13 +871,16 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
 3. 【歴史的・文脈的用法の反映】:
    - 見出し語に特定の時代・歴史的出来事・制度的変遷に根ざす顕著な歴史的・政治的・思想的用法がある場合、現代標準語義に加えて必ずmeaningsに歴史的語義を含め、history_noteに時代背景や制度的文脈を具体的に記述すること（最大70字）。特筆すべき歴史的用法がない一般的な語彙はhistory_noteを空文字""とすること。
 4. 自然な例文(example.foreign)と日本語訳(example.ja & example.trans):
-   - 例文には必ず見出し語を含めること。外国語例文(example.foreign)はHTMLタグを付与せずプレーンテキストとすること。
+   - 例文には必ず見出し語を含め、冠詞・主語と動詞の一致・時制・文頭大文字・文末句読点まで文法的に完全な1文とすること。外国語例文(example.foreign)はHTMLタグを付与せずプレーンテキストとすること。
    - 日本語訳(example.ja)では、見出し語に対応する訳語箇所を必ず <b>訳語</b> のように <b> タグで囲むこと。
-   - used_form には外国語例文中で実際に使われている活用形を記載すること。
+   - used_form には外国語例文中で実際に使われている活用形を一字一句一致させて記載すること。
+   - 入力語が実在しない語・スペルミスで意味や語源が裏付けられない場合は、捏造せず etymologyConfidence を "unknown" として事実のみを記載すること。
 ${!useHist ? "※歴史補足(history_note)は簡潔にとどめ、現代の主要語義と基本語根を優先すること。\n" : ""}
-5. Unicode文字化け防止:
-   - 発音記号(IPA・ピンイン・ハングル発音変化)、ウムラウト、アクサン記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること。
-6. 品詞(pos)は ${sInfo.pos} 等に準拠すること。
+5. Unicode文字化け防止・音声・語形変化の充実:
+   - 発音記号(IPA・ピンイン・ハングル発音変化)、ウムラウト、アクサン記号などは壊れたエスケープを避け、UTF-8正規化された正確な文字で出力すること（wiktionaryIpaがあれば優先採用）。
+   - grammar_forms には名詞の複数形（例: 複数形: bears）、動詞の活用形（例: 活用: has / had / having）、形容詞の比較変化（例: 比較変化: harder / hardest）、または成句の統語構造を必ず明記すること。
+   - phrases（重要熟語・コロケーション 1〜3個）および derivatives（主要派生語 0〜2個）も適切に出力すること。
+6. 品詞(pos)は ${sInfo.pos} 等に準拠し、多義語は3〜5個の語義（現代語義＋専門・歴史語義）に分割して出力すること。
 ${safeFName ? `分野の指定: ${safeFName}` : ""}`;
       } else if (tLang === "en") {
         serverSystemPrompt = `You are a high-level academic dictionary from ${sInfo.en} to English specializing in etymology, cognate networks, and conceptual history.
@@ -994,13 +1042,19 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
       }
 
       const hasRealCustomSense = item.targetSenseOrMeaning && !DUMMY_OCR_SENSES.has(item.targetSenseOrMeaning.trim());
+      const hasJaText = (str: any) => typeof str === "string" && /[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(str);
+      const isTargetLangMatched = (tLang !== "ja") || (
+        hasJaText(cached?.card_data?.meanings?.[0]?.text) ||
+        hasJaText(cached?.card_data?.etymology) ||
+        hasJaText(cached?.card_data?.core)
+      );
       const isCompleteCard = cached?.card_data &&
         Array.isArray(cached.card_data.meanings) &&
         cached.card_data.meanings.length > 0 &&
         Boolean(cached.card_data.etymology || cached.card_data.core);
 
-      // キャッシュ即時返却（検証済み、または意味・語源等の必須項目が完全整合している場合）
-      if (cached && cached.card_data && (cached.verified || isCompleteCard) && !hasRealCustomSense && !hasDomainContext) {
+      // キャッシュ即時返却（検証済みかつ意味・語源等の必須項目が完全整合し、解説言語が合致している場合のみ）
+      if (cached && cached.card_data && cached.verified === true && isCompleteCard && isTargetLangMatched && !hasRealCustomSense && !hasDomainContext) {
         cachedResults.push(sanitizeCard(cached.card_data, item));
         // [P2-2 解決] hit_count更新を確実に完了させるため Promise 配列へ格納
         cacheUpdatePromises.push(
@@ -1162,13 +1216,14 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
 
       // Gemini呼び出し (モデル自動フォールバックチェーン: 2.0-flash -> 1.5-flash)
       const candidateModels = [
-        Deno.env.get("GEMINI_MODEL") || "gemini-2.0-flash",
-        "gemini-1.5-flash",
+        Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-2.5-flash-lite",
       ].filter(Boolean);
 
       const userContent = `<user_request>\n対象語(${itemsToGenerate.length}件):\n${JSON.stringify(itemsToGenerate)}\n${safeFName ? `分野:${safeFName}\n` : ""}</user_request>`;
-      const dynamicMaxTokens = itemsToGenerate.length === 1 ? (useHist ? 3000 : 2500) : (itemsToGenerate.length <= 3 ? 4500 : (itemsToGenerate.length <= 6 ? 6000 : 8192));
-      const reqPayload = JSON.stringify({
+      const dynamicMaxTokens = itemsToGenerate.length === 1 ? (useHist ? 3500 : 2500) : (itemsToGenerate.length <= 3 ? 5000 : (itemsToGenerate.length <= 6 ? 6500 : 8192));
+      const getGenPayload = (includeThinking: boolean) => JSON.stringify({
         systemInstruction: { parts: [{ text: serverSystemPrompt }] },
         contents: [{ role: "user", parts: [{ text: userContent }] }],
         generationConfig: {
@@ -1176,6 +1231,7 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
           maxOutputTokens: dynamicMaxTokens,
           responseMimeType: "application/json",
           responseSchema: serverResponseSchema,
+          ...(includeThinking ? { thinkingConfig: { thinkingBudget: useHist ? 512 : 0 } } : {}),
         },
         safetySettings: [
           { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
@@ -1190,18 +1246,31 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
       let successfulModel = candidateModels[0];
 
       for (const m of candidateModels) {
-        // [P1-4 修正] APIキーをクエリURLから排除し、x-goog-api-key ヘッダーでセキュアに送信 & 15秒タイムアウト設定
+        // [P1-4 修正] APIキーをクエリURLから排除し、x-goog-api-key ヘッダーでセキュアに送信 & 15秒/25秒タイムアウト設定
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+        const isModernFlash = m.includes("2.5") || m.includes("3");
         try {
-          const res = await fetch(endpoint, {
+          let res = await fetch(endpoint, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               "x-goog-api-key": geminiApiKey,
             },
-            body: reqPayload,
-            signal: AbortSignal.timeout(15000),
+            body: getGenPayload(isModernFlash),
+            signal: useHist ? AbortSignal.timeout(25000) : AbortSignal.timeout(15000),
           });
+
+          if (res.status === 400 && isModernFlash) {
+            res = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": geminiApiKey,
+              },
+              body: getGenPayload(false),
+              signal: useHist ? AbortSignal.timeout(25000) : AbortSignal.timeout(15000),
+            });
+          }
 
           if (res.ok) {
             aiResponse = res;
@@ -1245,7 +1314,9 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
       }
 
       const aiData = await aiResponse.json();
-      const rawText = aiData.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
+      const allParts = aiData.candidates?.[0]?.content?.parts || [];
+      const nonThoughtParts = allParts.filter((p: any) => !p?.thought);
+      const rawText = (nonThoughtParts.length ? nonThoughtParts : allParts).map((p: any) => p?.text || "").join("").trim() || "[]";
       let parsedAi: any;
       try {
         parsedAi = JSON.parse(cleanJsonString(rawText));
@@ -1299,11 +1370,12 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
       const failedCount = itemsToGenerate.length - generatedResults.length;
       if (failedCount > 0) {
         if (user && reservedUser) {
+          const isFullFailure = generatedResults.length === 0;
           const { data: refundData } = await supabaseAdmin.rpc("reserve_or_refund_quota", {
             p_user_id: user.id,
             p_item_count: failedCount,
             p_is_refund: true,
-            p_request_id: `${requestId}_generate_partial_refund`,
+            p_request_id: isFullFailure ? `${requestId}_generate` : `${requestId}_generate_partial_refund`,
           });
           if (refundData?.remaining !== undefined) quotaRemaining = refundData.remaining;
         } else if (!user && reservedGuest) {
@@ -1337,10 +1409,14 @@ ${safeFName ? `Field: ${safeFName}` : ""}`;
             word_key: wk,
             card_data: card,
             hit_count: 1,
-            // [P1-① 解決] verified=true は学術的裏付け（certain かつ 語根タグ非空、または Wiktionary整合）に厳格限定
+            // [P1-① 解決] verified=true は学術的裏付け（certain かつ 語根タグ非空、または Wiktionary整合）かつ例文品質検証済みに厳格限定
             verified: Boolean(
               card.word &&
               card.meanings?.length > 0 &&
+              !/^(?:placeholder|n\/a|unknown)$/i.test(String(card.meanings[0]?.text || "").trim()) &&
+              card.example?.foreign &&
+              !/<[a-z][\s\S]*>/i.test(card.example.foreign) &&
+              /[.!?。！？]["'”’」』）\]]*$/u.test(card.example.foreign) &&
               card.etymology &&
               ((card.etymologyConfidence === 'certain' && Array.isArray(card.etymologyTags) && card.etymologyTags.length > 0) || card.wiktGrounded === true)
             ),

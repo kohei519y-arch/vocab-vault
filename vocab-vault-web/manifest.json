@@ -1,7 +1,7 @@
 {
   "name": "Vocab Vault — 語源・概念史・単語帳",
   "short_name": "Vocab Vault",
-  "description": "英・仏・独の3言語横断、語源・印欧祖語・概念史を深く学ぶ高機能単語帳",
+  "description": "10言語（en/ja/fr/de/es/it/pt/nl/zh/ko）対応、語源・印欧祖語・概念史を深く学ぶ高機能単語帳",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

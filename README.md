@@ -3,13 +3,13 @@
 
 [![Deploy to GitHub Pages](https://github.com/kohei519y-arch/vocab-vault/actions/workflows/deploy.yml/badge.svg)](https://github.com/kohei519y-arch/vocab-vault/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
-[![Zero Build Step](https://img.shields.io/badge/Build-Zero%20npm%20step-emerald.svg)](https://kohei519y-arch.github.io/vocab-vault/)
-[![Local-First](https://img.shields.io/badge/Storage-IndexedDB%20Local--First-cyan.svg)](https://kohei519y-arch.github.io/vocab-vault/)
+[![Zero Build Step](https://img.shields.io/badge/Build-Zero%20npm%20step-emerald.svg)](https://vocab-vault-six.vercel.app/)
+[![Local-First](https://img.shields.io/badge/Storage-IndexedDB%20Local--First-cyan.svg)](https://vocab-vault-six.vercel.app/)
 
 > **Stop atomized rote memorization.**  
 > Master English vocabulary through its deep Proto-Indo-European root lineages, visualized in real-time physics spring networks and reinforced with mathematically optimal spaced repetition.
 
- **Live Web Application**: [https://kohei519y-arch.github.io/vocab-vault/](https://kohei519y-arch.github.io/vocab-vault/)  
+ **Live Web Application**: [https://vocab-vault-six.vercel.app/](https://vocab-vault-six.vercel.app/)  
 *(Zero sign-up required. 100% Client-Side & Local-First)*
 
 ---
@@ -39,7 +39,7 @@
 ##  Quick Start
 
 ### 1. Web (No Install Needed)
-Open [https://kohei519y-arch.github.io/vocab-vault/](https://kohei519y-arch.github.io/vocab-vault/) in any modern browser (desktop or mobile).
+Open [https://vocab-vault-six.vercel.app/](https://vocab-vault-six.vercel.app/) in any modern browser (desktop or mobile).
 
 ### 2. Local Development
 ```bash

@@ -1,0 +1,631 @@
+/**
+ * VocabVault - Keyboard Shortcuts, Word Suggest, and UI Navigation Module
+ *
+ * 【設計思想・単一責任】
+ * キーボードファースト操作（Linear / Vim ライクな J/K/Space/E/R/? ナビゲーション）、
+ * 単語登録時のインクリメンタルサジェスト（完全一致・部分一致・印欧祖語語根）、
+ * カードフォーカス枠線およびアクセシビリティスクロールの統括。
+ */
+
+(function (global) {
+  'use strict';
+
+  // 重要印欧祖語語根リスト（サジェスト用マスターデータ）
+  const DEFAULT_PIE_ROOTS = [
+    '*sta-', '*genh₁-', '*bʰer-', '*sekʷ-', '*men-', '*wer-',
+    '*kʷel-', '*dʰeh₁-', '*weid-', '*med-', '*kap-', '*ten-'
+  ];
+
+  /**
+   * 文字列エスケープヘルパー
+   */
+  const esc = s => global.VocabStorage?.esc
+    ? global.VocabStorage.esc(s)
+    : (global.VocabCore?.esc ? global.VocabCore.esc(s) : String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])));
+
+  /**
+   * 単語および祖語語根の候補リストを抽出・ソート
+   * @param {string} query
+   * @param {Array} currentList - 現在の言語ペアの登録単語配列
+   * @param {Array} [pieRoots] - 祖語語根配列
+   * @returns {Array} suggestions
+   */
+  function buildSuggestions(query, currentList = [], pieRoots = DEFAULT_PIE_ROOTS) {
+    const raw = (query || '').trim().toLowerCase();
+    if (!raw) return [];
+
+    const foldFn = global.VocabMorphology?.foldAscii || (s => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/œ/g, 'oe').replace(/æ/g, 'ae').replace(/ß/g, 'ss'));
+    const rawFold = foldFn(raw);
+    const exactMatches = [];
+    const prefixMatches = [];
+    const subMatches = [];
+    const list = Array.isArray(currentList) ? currentList : [];
+
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      if (!item || !item.word) continue;
+      const wLow = String(item.word).toLowerCase();
+      const wFold = foldFn(item.word);
+      const isExact = wLow === raw || (rawFold && wFold === rawFold);
+      const isPrefix = !isExact && (wLow.startsWith(raw) || (rawFold && wFold.startsWith(rawFold)));
+      const isSub = !isExact && !isPrefix && raw.length >= 3 && (wLow.includes(raw) || (rawFold && wFold.includes(rawFold)));
+      if (isExact || isPrefix || isSub) {
+        const entry = {
+          type: 'word',
+          word: item.word,
+          meaning: item.meanings?.[0]?.text || '',
+          pos: item.meanings?.[0]?.pos || '',
+          folder: item.folder || '',
+          isRegistered: true,
+          isExact,
+          item
+        };
+        if (isExact) exactMatches.push(entry);
+        else if (isPrefix) {
+          if (prefixMatches.length < 7) prefixMatches.push(entry);
+        } else {
+          if (subMatches.length < 7) subMatches.push(entry);
+        }
+      }
+    }
+
+    const suggestions = [...exactMatches, ...prefixMatches, ...subMatches].slice(0, 7);
+
+    const roots = Array.isArray(pieRoots) && pieRoots.length ? pieRoots : DEFAULT_PIE_ROOTS;
+    for (let i = 0; i < roots.length; i++) {
+      if (suggestions.length >= 8) break;
+      const r = roots[i];
+      const cleanR = r.replace(/[\*h₁-₃\-]/g, '').toLowerCase();
+      if (cleanR.startsWith(raw) || r.toLowerCase().includes(raw)) {
+        suggestions.push({
+          type: 'root',
+          word: r,
+          meaning: '印欧祖語・重要語根',
+          pos: 'Root',
+          isRegistered: false,
+          isExact: false
+        });
+      }
+    }
+
+    // スペルミス・タイポのサジェスト判定 (もしかして判定)
+    if (!suggestions.some(s => s.isExact) && global.VocabMorphology?.findTypoSuggestion) {
+      const activeLang = list[0]?.lang || global.VocabCore?.App?.srcLang || global.App?.srcLang || global.App?.lang || 'en';
+      const typo = global.VocabMorphology.findTypoSuggestion(raw, activeLang, list);
+      if (typo) {
+        suggestions.unshift({
+          type: 'typo',
+          word: typo.suggestion,
+          meaning: `「${raw}」の修正候補（もしかして）`,
+          pos: 'スペル修正',
+          isRegistered: false,
+          isExact: false,
+          isTypo: true
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * サジェスト要素の HTML を生成
+   * @param {Array} suggestions
+   * @param {Function} [escFn]
+   * @returns {string} HTML
+   */
+  function renderSuggestHtml(suggestions, escFn = esc) {
+    if (!Array.isArray(suggestions) || !suggestions.length) return '';
+
+    return suggestions.map((s, idx) => {
+      if (s.isTypo) {
+        return `
+          <div class="suggest-item typo-suggest" data-idx="${idx}" data-type="typo" data-word="${escFn(s.word)}" style="background:rgba(245,158,11,0.08);border-left:3px solid var(--warn)">
+            <div class="suggest-item-left">
+              <span class="suggest-item-word" style="color:var(--warn)">もしかして: <strong style="color:var(--t)">${escFn(s.word)}</strong></span>
+              <span class="suggest-item-meaning">${escFn(s.meaning)}</span>
+            </div>
+            <span class="suggest-item-badge" style="background:rgba(245,158,11,0.15);color:var(--warn);border:1px solid rgba(245,158,11,0.3)">
+              スペル補正
+            </span>
+          </div>
+        `;
+      }
+      const jumpW = (s.item && s.item.homographIndex > 1) ? `${s.word}#${s.item.homographIndex}` : s.word;
+      return `
+        <div class="suggest-item ${s.isExact ? 'exact-match' : ''}" data-idx="${idx}" data-type="${s.type}" data-word="${escFn(jumpW)}">
+          <div class="suggest-item-left">
+            <span class="suggest-item-word">${escFn(s.word)}${s.folder ? `<small style="margin-left:6px;font-size:10px;color:var(--m)">[${escFn(s.folder)}]</small>` : ''}</span>
+            <span class="suggest-item-meaning">${escFn(s.meaning)}</span>
+          </div>
+          <span class="suggest-item-badge ${s.isExact ? 'exact' : s.isRegistered ? 'registered' : s.type === 'root' ? 'root' : ''}">
+            ${s.isExact ? '登録済(タップで移動)' : s.isRegistered ? '登録済' : s.type === 'root' ? '語根' : escFn(s.pos)}
+          </span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  /**
+   * カード要素のフォーカス状態を更新
+   * @param {number} newIdx
+   * @param {Array<HTMLElement>} cards
+   * @returns {number} clampedIndex
+   */
+  function clampAndFocusCard(newIdx, cards) {
+    if (!cards || !cards.length) return -1;
+    const clampedIdx = Math.max(0, Math.min(newIdx, cards.length - 1));
+    cards.forEach((c, i) => {
+      if (c && c.classList && typeof c.classList.toggle === 'function') {
+        c.classList.toggle('card-focused', i === clampedIdx);
+      }
+    });
+    const targetCard = cards[clampedIdx];
+    if (targetCard && typeof targetCard.scrollIntoView === 'function') {
+      try {
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch {
+        targetCard.scrollIntoView();
+      }
+    }
+    return clampedIdx;
+  }
+
+  /**
+   * 現在フォーカスされているカードに対応する単語データを取得
+   * @param {number} focusedIndex
+   * @param {Array<HTMLElement>} cards
+   * @param {Function} getListFn
+   * @param {string} currentLang
+   * @param {Function} [makeLkFn]
+   * @returns {Object|null}
+   */
+  function getFocusedCardItem(focusedIndex, cards, getListFn, currentLang, makeLkFn) {
+    if (!cards || focusedIndex < 0 || focusedIndex >= cards.length) return null;
+    const targetCard = cards[focusedIndex];
+    if (!targetCard) return null;
+    const cardId = targetCard.dataset?.id;
+    const lk = targetCard.dataset?.word;
+    const tL = targetCard.dataset?.lang || currentLang;
+    const list = typeof getListFn === 'function' ? getListFn(tL) : [];
+    if (!Array.isArray(list)) return null;
+
+    if (cardId) {
+      const byId = list.find(i => i && i.id === cardId);
+      if (byId) return byId;
+    }
+
+    const mkLk = makeLkFn || ((w, l, idx) => {
+      if (global.VocabMorphology && typeof global.VocabMorphology.makeLookupKey === 'function') {
+        return global.VocabMorphology.makeLookupKey(w, l, idx);
+      }
+      const base = l === 'de' ? String(w || '').trim() : String(w || '').trim().toLowerCase();
+      return Number(idx) > 1 ? `${base}#${Number(idx)}` : base;
+    });
+
+    return list.find(i => mkLk(i.word, tL, i.homographIndex) === lk) || null;
+  }
+
+  /**
+   * 単語入力サジェスト UI の初期化とイベントバインド
+   * @param {Object} options
+   * @returns {Object} controls
+   */
+  function initWordSuggest(options = {}) {
+    const doc = typeof document !== 'undefined' ? document : null;
+    const input = options.input || (doc ? doc.getElementById('inWord') : null);
+    const box = options.box || (doc ? doc.getElementById('wordSuggestBox') : null);
+    if (!input || !box) return null;
+
+    let activeIndex = -1;
+
+    function renderSuggestions(query) {
+      const currentList = typeof options.getCurrentList === 'function' ? options.getCurrentList() : [];
+      const suggestions = buildSuggestions(query, currentList, options.pieRoots);
+
+      if (!suggestions.length) {
+        box.style.display = 'none';
+        global.VocabDOM?.clear(box);
+        activeIndex = -1;
+        return;
+      }
+
+      activeIndex = -1;
+      global.VocabDOM?.setSafeHtml(box, renderSuggestHtml(suggestions, options.esc || esc));
+      box.style.display = 'flex';
+    }
+
+    function updateActiveSuggestion(items) {
+      items.forEach((it, idx) => {
+        if (it.classList) it.classList.toggle('active', idx === activeIndex);
+        if (idx === activeIndex && typeof it.scrollIntoView === 'function') {
+          try {
+            it.scrollIntoView({ block: 'nearest' });
+          } catch {}
+        }
+      });
+    }
+
+    let suggestDebounceTimer = null;
+    let isInputComposing = false;
+    let compositionEndedAt = 0;
+
+    function cancelSuggest() {
+      if (suggestDebounceTimer) {
+        clearTimeout(suggestDebounceTimer);
+        suggestDebounceTimer = null;
+      }
+      box.style.display = 'none';
+      global.VocabDOM?.clear(box);
+      activeIndex = -1;
+    }
+
+    function applySuggestion(el) {
+      if (!el) return;
+      const type = el.dataset?.type;
+      const word = el.dataset?.word;
+      cancelSuggest();
+      if (type === 'typo') {
+        input.value = word;
+        input.focus();
+        return;
+      }
+      input.value = '';
+      try { input.blur(); } catch {}
+      if (type === 'word') {
+        if (typeof options.onJumpWord === 'function') options.onJumpWord(word);
+      } else if (type === 'root') {
+        if (typeof options.onOpenRootGraph === 'function') options.onOpenRootGraph(word);
+      }
+    }
+
+    const scheduleSuggestRender = val => {
+      clearTimeout(suggestDebounceTimer);
+      suggestDebounceTimer = null;
+      if (!val || !val.trim()) {
+        cancelSuggest();
+        return;
+      }
+      // 70ms のデバウンスでキーストロークごとの重たい同期サジェスト走査を抑制
+      suggestDebounceTimer = setTimeout(() => {
+        suggestDebounceTimer = null;
+        if (!input.value || !input.value.trim() || input.value !== val) return;
+        renderSuggestions(val);
+      }, 70);
+    };
+
+    const onCompositionStart = () => {
+      isInputComposing = true;
+    };
+    const onCompositionEnd = e => {
+      isInputComposing = false;
+      compositionEndedAt = Date.now();
+      scheduleSuggestRender((e && e.target && typeof e.target.value === 'string') ? e.target.value : input.value);
+    };
+    const onBlurResetCompose = () => {
+      isInputComposing = false;
+    };
+    input.addEventListener('compositionstart', onCompositionStart);
+    input.addEventListener('compositionend', onCompositionEnd);
+    input.addEventListener('blur', onBlurResetCompose);
+
+    const onInput = e => {
+      if (e?.isComposing || isInputComposing) return;
+      scheduleSuggestRender(e.target.value);
+    };
+    input.addEventListener('input', onInput);
+
+    const onKeydown = e => {
+      if (e.isComposing || isInputComposing || e.keyCode === 229 || (Date.now() - compositionEndedAt < 60)) return;
+      if (box.style.display === 'none') return;
+      const items = box.querySelectorAll('.suggest-item');
+      if (!items.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeIndex = (activeIndex + 1) % items.length;
+        updateActiveSuggestion(items);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIndex = (activeIndex - 1 + items.length) % items.length;
+        updateActiveSuggestion(items);
+      } else if (e.key === 'Enter') {
+        if (activeIndex >= 0) {
+          e.preventDefault();
+          const selItem = items[activeIndex];
+          applySuggestion(selItem);
+        } else {
+          const firstExact = box.querySelector('.suggest-item.exact-match');
+          if (firstExact) {
+            e.preventDefault();
+            applySuggestion(firstExact);
+          }
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        if (typeof e.stopPropagation === 'function') e.stopPropagation();
+        cancelSuggest();
+      }
+    };
+    input.addEventListener('keydown', onKeydown);
+
+    const onBoxClick = e => {
+      const item = e.target.closest?.('.suggest-item');
+      if (item) applySuggestion(item);
+    };
+    box.addEventListener('click', onBoxClick);
+
+    const onDocClick = e => {
+      if (!e.target.closest?.('#inWordWrap')) {
+        cancelSuggest();
+      }
+    };
+    if (doc) doc.addEventListener('click', onDocClick);
+
+    const formEl = input.form || null;
+    if (formEl && typeof formEl.addEventListener === 'function') {
+      formEl.addEventListener('submit', cancelSuggest);
+    }
+
+    return {
+      renderSuggestions,
+      applySuggestion,
+      cancelSuggest,
+      destroy: () => {
+        cancelSuggest();
+        input.removeEventListener('compositionstart', onCompositionStart);
+        input.removeEventListener('compositionend', onCompositionEnd);
+        input.removeEventListener('blur', onBlurResetCompose);
+        input.removeEventListener('input', onInput);
+        input.removeEventListener('keydown', onKeydown);
+        box.removeEventListener('click', onBoxClick);
+        if (formEl && typeof formEl.removeEventListener === 'function') formEl.removeEventListener('submit', cancelSuggest);
+        if (doc) doc.removeEventListener('click', onDocClick);
+      }
+    };
+  }
+
+  /**
+   * グローバルキーボードショートカットのディスパッチャ
+   * @param {KeyboardEvent} e
+   * @param {Object} ctx
+   * @returns {boolean} handled
+   */
+  function handleGlobalKeydown(e, ctx = {}) {
+    if (!e || e.isComposing || e.keyCode === 229) return false;
+    const doc = typeof document !== 'undefined' ? document : null;
+    const activeEl = /** @type {any} */ (doc?.activeElement);
+    const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeEl?.tagName) || Boolean(activeEl?.isContentEditable);
+    const isAnkiOpen = typeof ctx.isAnkiOpen === 'function' ? ctx.isAnkiOpen() : Boolean(ctx.isAnkiOpen);
+    const anyModalOpen = typeof ctx.anyModalOpen === 'function' ? ctx.anyModalOpen() : Boolean(ctx.anyModalOpen);
+
+    if (e.key === 'Escape') {
+      const popover = doc?.getElementById('readerWordPopover');
+      if (popover && popover.style?.display && popover.style.display !== 'none') {
+        if (global.VocabModal && typeof global.VocabModal.closeReaderPopover === 'function') {
+          global.VocabModal.closeReaderPopover();
+        } else if (typeof global.closeReaderPopover === 'function') {
+          global.closeReaderPopover();
+        } else {
+          popover.style.display = 'none';
+        }
+        return true;
+      }
+      if (anyModalOpen) {
+        if (typeof ctx.closeAllModals === 'function') ctx.closeAllModals();
+        return true;
+      }
+      if (typeof window !== 'undefined' && window.innerWidth <= 768 && doc?.body?.classList && !doc.body.classList.contains('side-collapsed')) {
+        if (typeof ctx.closeSidebar === 'function') ctx.closeSidebar();
+        else {
+          doc.body.classList.add('side-collapsed');
+          doc.body.classList.remove('side-open-lock');
+        }
+        return true;
+      }
+      if (isAnkiOpen) {
+        if (typeof ctx.exitAnki === 'function') ctx.exitAnki();
+        return true;
+      }
+      if (typeof ctx.getFocusedCardIndex === 'function' && ctx.getFocusedCardIndex() >= 0) {
+        if (typeof ctx.clearCardFocus === 'function') ctx.clearCardFocus();
+        return true;
+      }
+    }
+
+    if (e.key === 'Tab' && anyModalOpen && doc?.querySelector) {
+      const openModal = /** @type {any} */ (doc.querySelector('.modal-ov.open .modal') || doc.querySelector('.modal-ov.open'));
+      if (openModal && typeof openModal.querySelectorAll === 'function') {
+        const focusables = /** @type {HTMLElement[]} */ (Array.from(openModal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')))
+          .filter(el => {
+            if (!el || typeof el.focus !== 'function') return false;
+            if (typeof el.hasAttribute === 'function' && el.hasAttribute('disabled')) return false;
+            if (el.getAttribute?.('aria-hidden') === 'true') return false;
+            if (typeof window !== 'undefined' && typeof window.getComputedStyle === 'function') {
+              try {
+                const s = window.getComputedStyle(el);
+                if (s.display === 'none' || s.visibility === 'hidden') return false;
+              } catch {}
+            }
+            return true;
+          });
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          const active = doc.activeElement;
+          if (e.shiftKey) {
+            if (active === first || (openModal.contains && !openModal.contains(active))) {
+              if (typeof e.preventDefault === 'function') e.preventDefault();
+              last.focus();
+              return true;
+            }
+          } else {
+            if (active === last || (openModal.contains && !openModal.contains(active))) {
+              if (typeof e.preventDefault === 'function') e.preventDefault();
+              first.focus();
+              return true;
+            }
+          }
+        } else {
+          // [P2-⑦ 解決] フォーカス可能要素がない空/ローディングモーダル時、背後要素への漏洩を遮断
+          if (typeof e.preventDefault === 'function') e.preventDefault();
+          if (typeof openModal.focus === 'function') {
+            if (!openModal.hasAttribute('tabindex')) openModal.setAttribute('tabindex', '-1');
+            openModal.focus();
+          }
+          return true;
+        }
+      }
+    }
+
+    if ((!inInput && e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) || (e.altKey && e.code === 'KeyF')) {
+      e.preventDefault();
+      if (typeof ctx.focusSearch === 'function') ctx.focusSearch();
+      return true;
+    } else if (e.altKey && e.code === 'KeyK') {
+      e.preventDefault();
+      if (typeof ctx.focusInput === 'function') ctx.focusInput();
+      return true;
+    } else if (e.altKey && e.code === 'KeyL') {
+      e.preventDefault();
+      if (typeof ctx.openExtractModal === 'function') ctx.openExtractModal();
+      return true;
+    } else if (e.altKey && e.code === 'KeyM') {
+      e.preventDefault();
+      if (typeof ctx.toggleMask === 'function') ctx.toggleMask();
+      return true;
+    } else if (isAnkiOpen && !inInput && !anyModalOpen) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
+      if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
+        e.preventDefault();
+        if (typeof ctx.ankiToggleMode === 'function') ctx.ankiToggleMode();
+        return true;
+      } else if (e.code === 'KeyR' || e.key === 'r' || e.key === 'R' || e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        if (typeof ctx.ankiSpeak === 'function') ctx.ankiSpeak();
+        return true;
+      } else if (e.code === 'KeyZ' || e.key === 'z' || e.key === 'Z') {
+        e.preventDefault();
+        if (typeof ctx.ankiUndo === 'function') ctx.ankiUndo();
+        return true;
+      } else if (e.code === 'Space' || e.key === 'Enter') {
+        e.preventDefault();
+        if (typeof ctx.ankiAdvance === 'function') ctx.ankiAdvance();
+        return true;
+      } else if (['1', '2', '3', '4'].includes(e.key)) {
+        e.preventDefault();
+        if (typeof ctx.ankiRate === 'function') ctx.ankiRate(parseInt(e.key, 10) - 1);
+        return true;
+      }
+    } else if (!inInput && !anyModalOpen && !isAnkiOpen) {
+      // OS標準ショートカット（Cmd+S, Cmd+D, Ctrl+R等）との衝突防止
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
+
+      // 耳学モード実行中の専用キー操作（Space: 一時停止/再開, J: 前へ, L: 次へ）
+      const playlistState = global.VocabSpeech?.getPlaylistState ? global.VocabSpeech.getPlaylistState() : null;
+      if (playlistState && playlistState.isRunning) {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          if (typeof ctx.togglePlaylist === 'function') ctx.togglePlaylist();
+          return true;
+        } else if (e.key === 'j' || e.key === 'J') {
+          e.preventDefault();
+          if (global.VocabSpeech?.prevPlaylistItem) global.VocabSpeech.prevPlaylistItem();
+          return true;
+        } else if (e.key === 'l' || e.key === 'L') {
+          e.preventDefault();
+          if (global.VocabSpeech?.nextPlaylistItem) global.VocabSpeech.nextPlaylistItem();
+          return true;
+        }
+      }
+
+      if (e.key === 'Home') {
+        e.preventDefault();
+        if (typeof global.VocabCore?.setPage === 'function') global.VocabCore.setPage(1);
+        return true;
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        const appState = ctx.appState || global.VocabCore?.App;
+        if (appState && typeof global.VocabCore?.setPage === 'function') {
+          const per = appState.per || 30;
+          const filtered = global.VocabCore?.getFiltered?.() || appState.entries || [];
+          const tot = Math.max(1, Math.ceil(filtered.length / per));
+          global.VocabCore.setPage(tot);
+        }
+        return true;
+      } else if (e.key === 'PageUp' || e.key === '[') {
+        e.preventDefault();
+        const appState = ctx.appState || global.VocabCore?.App;
+        if (appState && typeof global.VocabCore?.setPage === 'function') {
+          global.VocabCore.setPage((appState.page || 1) - 1);
+        }
+        return true;
+      } else if (e.key === 'PageDown' || e.key === ']') {
+        e.preventDefault();
+        const appState = ctx.appState || global.VocabCore?.App;
+        if (appState && typeof global.VocabCore?.setPage === 'function') {
+          global.VocabCore.setPage((appState.page || 1) + 1);
+        }
+        return true;
+      } else if (e.key === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (typeof ctx.moveCardFocus === 'function') ctx.moveCardFocus(1);
+        return true;
+      } else if (e.key === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (typeof ctx.moveCardFocus === 'function') ctx.moveCardFocus(-1);
+        return true;
+      } else if (e.key === 'l' || e.key === 'L' || e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        if (typeof ctx.togglePlaylist === 'function') ctx.togglePlaylist();
+        return true;
+      } else if (e.key === 's') {
+        e.preventDefault();
+        if (typeof ctx.speakFocusedCard === 'function') ctx.speakFocusedCard();
+        return true;
+      } else if (e.key === 'e') {
+        e.preventDefault();
+        if (typeof ctx.editFocusedCard === 'function') ctx.editFocusedCard();
+        return true;
+      } else if (e.key === 'd') {
+        e.preventDefault();
+        if (typeof ctx.deleteFocusedCard === 'function') ctx.deleteFocusedCard();
+        return true;
+      } else if (e.key === 'n') {
+        e.preventDefault();
+        if (typeof ctx.focusInput === 'function') ctx.focusInput();
+        return true;
+      } else if (e.key === 'r') {
+        e.preventDefault();
+        if (typeof ctx.startAnki === 'function') ctx.startAnki();
+        return true;
+      } else if (e.key === 'a') {
+        e.preventDefault();
+        if (typeof ctx.openAnalyticsModal === 'function') ctx.openAnalyticsModal();
+        return true;
+      } else if (e.key === 'g') {
+        e.preventDefault();
+        if (typeof ctx.openGraph === 'function') ctx.openGraph();
+        return true;
+      } else if (e.key === '?') {
+        e.preventDefault();
+        if (typeof ctx.openShortcutsModal === 'function') ctx.openShortcutsModal();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // --- グローバルエクスポート ---
+  global.VocabNavigation = {
+    DEFAULT_PIE_ROOTS,
+    buildSuggestions,
+    renderSuggestHtml,
+    clampAndFocusCard,
+    getFocusedCardItem,
+    initWordSuggest,
+    handleGlobalKeydown
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+export {};

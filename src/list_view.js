@@ -1,0 +1,725 @@
+/**
+ * VocabVault - List View & Keyed DOM Reconciliation Engine
+ *
+ * 【設計思想・単一責任】
+ * 単語カード一覧の描画・ページング・フィルタリング・ソート、
+ * innerHTML全破棄を根絶する【Keyed DOM Reconciliation（差分更新）】エンジンによる
+ * ゼロ・フリッカー（チラつき防止）＆スクロール位置／フォーカス完全維持の実現。
+ */
+
+(function (global) {
+  'use strict';
+
+  function $(id) {
+    if (global.VocabCore && typeof global.VocabCore.$ === 'function') {
+      return global.VocabCore.$(id);
+    }
+    return typeof document !== 'undefined' ? document.getElementById(id) : null;
+  }
+
+  function $$(sel) {
+    if (global.VocabCore && typeof global.VocabCore.$$ === 'function') {
+      return global.VocabCore.$$(sel);
+    }
+    return typeof document !== 'undefined' ? [...document.querySelectorAll(sel)] : [];
+  }
+
+  const esc = s => global.VocabStorage?.esc
+    ? global.VocabStorage.esc(s)
+    : (global.VocabCore?.esc ? global.VocabCore.esc(s) : String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])));
+
+  /**
+   * 【改善三：Keyed DOM Reconciliation（差分DOM更新）】
+   * innerHTML = '' による全要素破棄を完全撤廃し、キー（ID/WordKey）に基づく
+   * 最小限の要素移動・追加・削除・部分属性パッチを実施。
+   * 
+   * @param {HTMLElement} listContainer - #list コンテナ
+   * @param {Array} pageItems - 現在ページで表示すべき単語配列
+   * @param {Object} options - 生成オプション
+   */
+  function reconcileList(listContainer, pageItems = [], options = {}) {
+    if (!listContainer) return;
+
+    // 1. 待機中タスクカード・失敗カード（.loading-card, .gen-err, [data-act="retry-batch"]）を特定・維持
+    const loadingCards = [];
+    const seenCards = new Set();
+    if (typeof listContainer.querySelectorAll === 'function') {
+      const qCards = [...listContainer.querySelectorAll('.loading-card, .gen-err, [data-act="retry-batch"]')];
+      qCards.forEach(c => {
+        if (c && !seenCards.has(c)) { seenCards.add(c); loadingCards.push(c); }
+      });
+    }
+    const reqQueue = options.reqQueue || (options.appState?.reqQueue) || (global.VocabCore?.App?.reqQueue) || [];
+    reqQueue.forEach(t => {
+      if (t.card && !t.isCancelled && !t.isDone && !seenCards.has(t.card)) {
+        seenCards.add(t.card);
+        loadingCards.push(t.card);
+      }
+    });
+
+    // 2. 既存の通常カード要素をマップ化 (キー: data-id または data-word / data-rawWord)
+    const existingCardMap = new Map();
+    const existingCards = typeof listContainer.querySelectorAll === 'function'
+      ? /** @type {HTMLElement[]} */ ([...listContainer.querySelectorAll('.card')]).filter(c => !seenCards.has(c) && !c.classList?.contains('loading-card') && !c.classList?.contains('gen-err') && !c.querySelector?.('[data-act="retry-batch"]'))
+      : [];
+    existingCards.forEach(c => {
+      if (!c.dataset) return;
+      if (c.dataset.id) existingCardMap.set(c.dataset.id, c);
+      if (c.dataset.word) existingCardMap.set(c.dataset.word, c);
+      if (c.dataset.rawWord) existingCardMap.set(c.dataset.rawWord, c);
+    });
+
+    const createCardFn = options.createCardElement || (global.VocabCardView ? global.VocabCardView.createCardElement : null);
+    const finalNodes = [...loadingCards];
+    const usedNodes = new Set(loadingCards);
+    const activeKeys = new Set();
+
+    // 3. 現在ページの各アイテムを差分走査
+    pageItems.forEach(item => {
+      const itemKey = item.id || (global.VocabMorphology ? global.VocabMorphology.makeWordKey(item.word, item.lang, item.meanings?.[0]?.pos, item.homographIndex) : item.word);
+      activeKeys.add(itemKey);
+      if (item.id) activeKeys.add(item.id);
+      if (item.word) activeKeys.add(item.word);
+
+      // キャッシュリビジョンシグネチャ（編集時刻、復習期日、表示モード、検索ハイライトクエリ、フォルダ等）
+      const qStr = options.queryReg ? String(options.queryReg.source || '') : '';
+      const vMode = options.viewMode || (options.appState?.viewMode) || 'academic';
+      const loc = global.VocabI18n?.getLocale?.() || 'ja';
+      const tgtL = options.tgtLang || options.appState?.tgtLang || global.App?.tgtLang || 'ja';
+      const rev = `${item.lang || ''}:${item.num || 0}:${item.updatedAt || 0}:${item.interval || 0}:${item.nextReview || 0}:${vMode}:${qStr}:${item.folder || ''}:${options.crossLang ? '1' : '0'}:${loc}:${tgtL}`;
+
+      let cardEl = (item.id && existingCardMap.get(item.id)) || existingCardMap.get(itemKey) || existingCardMap.get(item.word);
+      // [P2-2 解決] 同形異義語や横断検索時の同一DOMノード重複割り当て競合を完全防止
+      if (cardEl && usedNodes.has(cardEl)) cardEl = null;
+
+      if (cardEl && cardEl.dataset?.rev === rev) {
+        // [完全一致で再利用] 期日バッジ等の動的属性のみ軽量パッチ
+        const dueEl = typeof cardEl.querySelector === 'function' ? cardEl.querySelector('.due') : null;
+        if (dueEl && global.VocabCardView) {
+          const isDue = (item.nextReview || 0) <= Date.now();
+          dueEl.className = `due ${isDue ? 'is-due' : 'is-fut'}`;
+          dueEl.textContent = global.VocabCardView.relTime(item.nextReview, item.tgtLang || tgtL);
+        }
+        usedNodes.add(cardEl);
+        finalNodes.push(cardEl);
+      } else {
+        // [新規作成 または 内容変更時の再生成]
+        try {
+          if (typeof createCardFn === 'function') {
+            const newCard = createCardFn(item, options);
+            if (newCard) {
+              if (newCard.dataset) {
+                newCard.dataset.id = item.id || '';
+                newCard.dataset.rev = rev;
+              }
+              if (cardEl && typeof cardEl.replaceWith === 'function') {
+                cardEl.replaceWith(newCard);
+              }
+              usedNodes.add(newCard);
+              finalNodes.push(newCard);
+            }
+          } else if (cardEl) {
+            usedNodes.add(cardEl);
+            finalNodes.push(cardEl);
+          }
+        } catch (cardErr) {
+          console.warn('[reconcileList Error Barrier] Failed to create or replace card node:', cardErr, item);
+          if (cardEl) {
+            usedNodes.add(cardEl);
+            finalNodes.push(cardEl);
+          }
+        }
+      }
+    });
+
+    // 4. 今回のページから外れた不要カードのみを安全に除去 (GC負荷最小化)
+    existingCards.forEach(c => {
+      if (seenCards.has(c)) return;
+      const key = (c.dataset && (c.dataset.id || c.dataset.word)) || null;
+      if (key && !activeKeys.has(key)) {
+        if (typeof c.remove === 'function') c.remove();
+      }
+    });
+
+    // 5. In-place DOM alignment: innerHTML = '' を撤廃し、最小限の insertBefore で位置調整
+    // フォーカス（document.activeElement）、テキスト選択、スクロール位置を完全保持
+    if (typeof listContainer.insertBefore === 'function' && listContainer.children !== undefined) {
+      let nextRefNode = null;
+      for (let i = finalNodes.length - 1; i >= 0; i--) {
+        const node = finalNodes[i];
+        if (!node) continue;
+        // nextRefNode が実際に listContainer の直下の子ノードか厳格検証（未追加・親不一致時は null にフォールバック）
+        const validRef = (nextRefNode && nextRefNode.parentNode === listContainer) ? nextRefNode : null;
+        // node がまだ親に追加されていない新規ノードであるか、または位置がズレている場合のみ移動
+        if (node.parentNode !== listContainer || node.nextSibling !== validRef) {
+          try {
+            listContainer.insertBefore(node, validRef);
+          } catch (_) {
+            try { listContainer.appendChild(node); } catch (__) {}
+          }
+        }
+        nextRefNode = node;
+      }
+      if (listContainer.children && listContainer.children.length > finalNodes.length) {
+        const finalSet = new Set(finalNodes);
+        const toRemove = [];
+        for (let i = 0; i < listContainer.children.length; i++) {
+          const ch = listContainer.children[i];
+          if (!finalSet.has(ch)) toRemove.push(ch);
+        }
+        toRemove.forEach(ch => ch.remove?.());
+      }
+    } else {
+      // モックDOM環境のフォールバック
+      global.VocabDOM?.clear(listContainer);
+      finalNodes.forEach(node => {
+        if (node && typeof listContainer.appendChild === 'function') listContainer.appendChild(node);
+      });
+    }
+
+    // 6. アクセシビリティ属性の補強
+    if (typeof options.enhanceA11y === 'function') {
+      options.enhanceA11y(listContainer);
+    }
+
+    // 7. 項目17: IntersectionObserver による仮想Windowing視覚監視
+    if (typeof setupCardVisibilityObserver === 'function') {
+      setupCardVisibilityObserver(listContainer);
+    }
+  }
+
+  let _cardObserver = null;
+  /**
+   * 項目17: 画面外カードのレンダリング負荷を最小化する仮想Windowingオブザーバー
+   */
+  function setupCardVisibilityObserver(container) {
+    if (typeof IntersectionObserver === 'undefined' || !container) return null;
+    try {
+      if (_cardObserver) _cardObserver.disconnect();
+      _cardObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.target?.classList) {
+            entry.target.classList.toggle('in-view', entry.isIntersecting);
+          }
+        });
+      }, {
+        root: null,
+        rootMargin: '300px 0px 300px 0px',
+        threshold: 0.01
+      });
+      const cards = typeof container.querySelectorAll === 'function' ? container.querySelectorAll('.card') : [];
+      cards.forEach(c => _cardObserver.observe(c));
+      return _cardObserver;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
+   * 単語カード一覧の描画オーケストレーション
+   */
+  function render(ctx = {}) {
+    const appState = ctx.appState || (global.VocabCore?.App);
+    if (!appState) return;
+
+    if (global.VocabCore?.setFocusedCardIndex) global.VocabCore.setFocusedCardIndex(-1);
+    else appState.focusedCardIndex = -1;
+    const list = $('list'), pag = $('pag');
+    if (!list || !pag) return;
+
+    // 待機中リクエストカードを先行チェック
+    const reqQueue = appState.reqQueue || [];
+    let hasLoadingCards = false;
+    reqQueue.forEach(t => {
+      if (!t.isCancelled && !t.isDone) {
+        hasLoadingCards = true;
+        const hasLoadingCls = t.card && (typeof t.card.classList?.contains === 'function' ? t.card.classList.contains('loading-card') : String(t.card.className || '').includes('loading-card'));
+        if (!hasLoadingCls) {
+          const c = document.createElement('div');
+          c.className = 'card loading-card';
+          global.VocabDOM?.setSafeHtml(c, `<div class="card-acts" style="opacity:1"><button type="button" class="act-icon-btn del-btn" data-act="close-load" aria-label="キャンセル">×</button></div><div class="col-left"><span class="hw">${esc((t.items || []).map(x => x.word).join(', '))}</span></div><div class="right"><div class="load"><div class="spin"></div><span class="st-text">待機中 (${(t.items || []).length}語)...</span></div></div>`);
+          t.card = c;
+        }
+        const alreadyInList = typeof list.contains === 'function' ? list.contains(t.card) : (Array.isArray(list.children) ? list.children.includes(t.card) : false);
+        if (!alreadyInList && typeof list.appendChild === 'function') list.appendChild(t.card);
+      }
+    });
+
+    const f = typeof ctx.getFiltered === 'function' ? ctx.getFiltered() : [];
+    const posGroups = ctx.posGroups || [];
+    const statGroups = ctx.statGroups || [];
+    const posObj = posGroups.find(g => g.id === appState.posF);
+    const statObj = statGroups.find(g => g.id === appState.statF);
+
+    const tL = global.VocabI18n?.getLocale?.() || appState.tgtLang || global.App?.tgtLang || 'ja';
+    const isJa = tL === 'ja';
+    const FOL_PREFIXES = {
+      ja: 'フォルダ: ',
+      de: 'Ordner: ',
+      fr: 'Dossier : ',
+      es: 'Carpeta: ',
+      it: 'Cartella: ',
+      pt: 'Pasta: ',
+      nl: 'Map: ',
+      ko: '폴더: ',
+      zh: '文件夹: ',
+      en: 'Folder: '
+    };
+    const folPrefix = FOL_PREFIXES[tL] || FOL_PREFIXES.en;
+
+    const parts = [
+      (appState.posF && appState.posF !== 'all') ? (posObj ? posObj.label || posObj.name : appState.posF) : null,
+      (appState.cat && appState.cat !== 'all') ? (global.VocabI18n?.translateCategory ? global.VocabI18n.translateCategory(appState.cat, tL) : appState.cat) : ((appState.catF && appState.catF !== 'all') ? (global.VocabI18n?.translateCategory ? global.VocabI18n.translateCategory(appState.catF, tL) : appState.catF) : null),
+      (appState.fol && appState.fol !== 'all') ? `${folPrefix}${appState.fol}` : ((appState.folF && appState.folF !== 'all') ? `${folPrefix}${appState.folF}` : null),
+      (appState.statF && appState.statF !== 'all') ? (statObj ? statObj.label || statObj.name : appState.statF) : null
+    ].filter(Boolean);
+
+    const DEFAULT_HEADINGS = {
+      ja: 'すべての単語',
+      de: 'Alle Wörter',
+      fr: 'Tous les mots',
+      es: 'Todas las palabras',
+      it: 'Tutte le parole',
+      pt: 'Todas as palavras',
+      nl: 'Alle woorden',
+      ko: '모든 단어',
+      zh: '全部单词',
+      en: 'All Words'
+    };
+    const defaultHeading = DEFAULT_HEADINGS[tL] || DEFAULT_HEADINGS.en;
+    const countUnit = isJa ? '件' : (tL === 'ko' ? '개' : (tL === 'zh' ? '个' : 'words'));
+    const headingText = parts.length ? parts.join(' › ') : defaultHeading;
+    const docHeading = $('docHeading');
+    if (docHeading) docHeading.textContent = headingText;
+
+    const docSubCount = $('docSubCount');
+    if (docSubCount) docSubCount.textContent = `${f.length} ${countUnit}`;
+
+    const sortSel = $('sortSel');
+    if (sortSel) sortSel.value = appState.sortBy || appState.sort || 'new';
+
+    const btnModeAcademic = $('btnModeAcademic');
+    if (btnModeAcademic) btnModeAcademic.classList.toggle('active', (appState.viewMode || 'academic') === 'academic');
+
+    const btnModeSimple = $('btnModeSimple');
+    if (btnModeSimple) btnModeSimple.classList.toggle('active', appState.viewMode === 'simple');
+
+    // 後方互換性フォールバック（#docHeading がなく #docTitle が存在する場合）
+    const titleEl = $('docTitle');
+    if (titleEl && !docHeading) {
+      global.VocabDOM?.setSafeHtml(titleEl, `<span>${esc(headingText)}</span><small style="margin-left:8px;font-size:12px;color:var(--s)">${f.length} ${countUnit}</small>`);
+    }
+
+    if ($('sideCount')) $('sideCount').textContent = `${f.length} ${countUnit}`;
+    if ($('resetFiltBtn')) $('resetFiltBtn').style.display = parts.length ? 'inline' : 'none';
+
+    // 空状態のハンドリング
+    if (!f.length && !hasLoadingCards) {
+      const hasFilter = Boolean((appState.q && appState.q.trim()) || (appState.qStr && appState.qStr.trim()) || parts.length);
+      const emptyTitle = isJa ? '単語がありません' : (tL === 'de' ? 'Keine Wörter vorhanden' : (tL === 'fr' ? 'Aucun mot trouvé' : (tL === 'es' ? 'No hay palabras' : (tL === 'it' ? 'Nessuna parola trovata' : (tL === 'pt' ? 'Nenhuma palavra encontrada' : (tL === 'nl' ? 'Geen woorden gevonden' : (tL === 'ko' ? '단어가 없습니다' : (tL === 'zh' ? '暂无单词' : 'No words found'))))))));
+      const resetBtnLbl = isJa ? 'フィルタを解除する' : (tL === 'de' ? 'Filter zurücksetzen' : (tL === 'fr' ? 'Réinitialiser les filtres' : (tL === 'es' ? 'Restablecer filtros' : (tL === 'it' ? 'Reimposta i filtri' : (tL === 'pt' ? 'Redefinir filtros' : (tL === 'nl' ? 'Filters wissen' : (tL === 'ko' ? '필터 해제' : (tL === 'zh' ? '重置筛选' : 'Reset filters'))))))));
+      const noMatchMsg = isJa ? '条件に一致する単語が見つかりませんでした。' : (tL === 'de' ? 'Keine passenden Wörter gefunden.' : (tL === 'fr' ? 'Aucun mot ne correspond aux critères.' : (tL === 'es' ? 'No se encontraron palabras que coincidan.' : (tL === 'it' ? 'Nessuna parola corrisponde ai criteri.' : (tL === 'pt' ? 'Nenhuma palavra corresponde aos critérios.' : (tL === 'nl' ? 'Geen woorden gevonden die aan de criteria voldoen.' : (tL === 'ko' ? '조건에 일치하는 단어를 찾을 수 없습니다.' : (tL === 'zh' ? '未找到符合条件的单词。' : 'No words matched your search criteria.'))))))));
+      const starterPrompt = isJa ? '上のバーから単語を入力して登録するか、厳選された学術スターターパックから即座に学習を開始できます：' : 'Enter a word above to add, or start immediately with curated starter packs:';
+      const academicLbl = isJa ? '学術・教養コア（20選）' : 'Academic Core (20)';
+      const rootsLbl = isJa ? '古典語根マスター（5選）' : 'Classical Roots (5)';
+      const allPacksLbl = isJa ? 'すべてのパックを見る...' : 'View all packs...';
+
+      const sLang = appState.srcLang || appState.lang || 'en';
+      let starterButtonsHtml = '';
+      if (sLang === 'en') {
+        const techLbl = isJa ? 'AI・先端工学（6選）' : 'AI & STEM Roots (6)';
+        starterButtonsHtml = `<button type="button" class="btn-ac" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="academic">${academicLbl}</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="tech_ai">${techLbl}</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="classical_roots">${rootsLbl}</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="open-starter-modal">${allPacksLbl}</button>`;
+      } else {
+        const defPackId = global.VocabStarterPack?.DEFAULT_PACK_BY_LANG?.[sLang] || `${sLang}_pre1`;
+        const meta = global.VocabStarterPack?.PACK_METADATA?.[defPackId];
+        const packName = meta ? `${meta.name}（${meta.count}選）` : `${sLang.toUpperCase()} スターターパック`;
+        starterButtonsHtml = `<button type="button" class="btn-ac" style="font-size:12px;padding:7px 14px" data-act="load-starter" data-pack="${defPackId}">${esc(packName)}</button><button type="button" class="btn-o" style="font-size:12px;padding:7px 14px" data-act="open-starter-modal">${allPacksLbl}</button>`;
+      }
+
+      global.VocabDOM?.setSafeHtml(list, `<div class="empty"><span>${emptyTitle}</span><p>${hasFilter ? `${noMatchMsg}<br><button type="button" class="btn-o" style="margin-top:10px;font-size:12px" data-act="reset-filter">${resetBtnLbl}</button>` : `${starterPrompt}<br><div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px;">${starterButtonsHtml}</div>`}</p></div>`);
+      global.VocabDOM?.clear(pag);
+      return;
+    }
+
+    // ページネーション計算
+    const per = (ctx.perPage && Number.isFinite(ctx.perPage)) ? ctx.perPage : ((appState.per && Number.isFinite(appState.per)) ? appState.per : 30);
+    const tot = Math.max(1, Math.ceil(f.length / per));
+    appState.page = Math.max(1, Math.min(appState.page, tot));
+    const pageItems = appState.printAllMode ? f : f.slice((appState.page - 1) * per, appState.page * per);
+
+    // 【改善三：Keyed DOM Reconciliation による差分更新実行】
+    reconcileList(list, pageItems, {
+      reqQueue: reqQueue,
+      appState: appState,
+      queryReg: appState.qReg,
+      lang: appState.lang,
+      crossLang: appState.crossLang,
+      rootIndexMap: appState.rootIndexMap,
+      viewMode: appState.viewMode,
+      createCardElement: ctx.createCardElement,
+      enhanceA11y: ctx.enhanceA11y
+    });
+
+    global.VocabDOM?.setSafeHtml(pag, renderPaginationHtml(appState.page, tot));
+  }
+
+  /**
+   * ページ番号ウィンドウ（現在ページ前後のピルと省略記号）を生成
+   */
+  function buildPageWindow(current, total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages = new Set([1, total]);
+    for (let i = Math.max(1, current - 1); i <= Math.min(total, current + 1); i++) {
+      pages.add(i);
+    }
+    if (current <= 3) {
+      pages.add(2);
+      pages.add(3);
+      pages.add(4);
+    }
+    if (current >= total - 2) {
+      pages.add(total - 3);
+      pages.add(total - 2);
+      pages.add(total - 1);
+    }
+    const sorted = Array.from(pages).sort((a, b) => a - b);
+    const result = [];
+    for (let i = 0; i < sorted.length; i++) {
+      if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+        result.push('...');
+      }
+      result.push(sorted[i]);
+    }
+    return result;
+  }
+
+  /**
+   * 最初へ・前へ・番号ピル・クイックジャンプ・次へ・最後へを備えた高機能ページネーションHTMLを生成
+   */
+  function renderPaginationHtml(page, tot, targetLocale = null) {
+    if (tot <= 1) return '';
+
+    const isFirst = page === 1;
+    const isLast = page === tot;
+    const tL = targetLocale || global.App?.tgtLang || global.VocabI18n?.getLocale?.() || 'ja';
+    const isJa = tL === 'ja';
+
+    const lblFirst = isJa ? '最初' : (tL === 'ko' ? '처음' : (tL === 'zh' ? '首页' : (tL === 'de' ? 'Erste' : (tL === 'fr' ? 'Début' : (tL === 'es' ? 'Inicio' : (tL === 'it' ? 'Inizio' : (tL === 'pt' ? 'Início' : (tL === 'nl' ? 'Eerste' : 'First'))))))));
+    const lblPrev = isJa ? '前へ' : (tL === 'ko' ? '이전' : (tL === 'zh' ? '上一页' : (tL === 'de' ? 'Zurück' : (tL === 'fr' ? 'Préc' : (tL === 'es' ? 'Ant' : (tL === 'it' ? 'Prec' : (tL === 'pt' ? 'Ant' : (tL === 'nl' ? 'Vorige' : 'Prev'))))))));
+    const lblNext = isJa ? '次へ' : (tL === 'ko' ? '다음' : (tL === 'zh' ? '下一页' : (tL === 'de' ? 'Weiter' : (tL === 'fr' ? 'Suiv' : (tL === 'es' ? 'Sig' : (tL === 'it' ? 'Succ' : (tL === 'pt' ? 'Próx' : (tL === 'nl' ? 'Volgende' : 'Next'))))))));
+    const lblLast = isJa ? '最後' : (tL === 'ko' ? '마지막' : (tL === 'zh' ? '末页' : (tL === 'de' ? 'Letzte' : (tL === 'fr' ? 'Fin' : (tL === 'es' ? 'Final' : (tL === 'it' ? 'Fine' : (tL === 'pt' ? 'Fim' : (tL === 'nl' ? 'Laatste' : 'Last'))))))));
+    const lblPageOf = (p, total) => isJa ? `${p} / ${total} ページ` : (tL === 'ko' ? `${p} / ${total} 페이지` : (tL === 'zh' ? `第 ${p} / ${total} 页` : (tL === 'de' ? `Seite ${p} von ${total}` : (tL === 'fr' ? `Page ${p} sur ${total}` : (tL === 'es' ? `Página ${p} de ${total}` : (tL === 'it' ? `Pagina ${p} di ${total}` : (tL === 'pt' ? `Página ${p} de ${total}` : (tL === 'nl' ? `Pagina ${p} van ${total}` : `Page ${p} of ${total}`))))))));
+    const navAria = isJa ? 'ページネーション' : 'Pagination';
+    const selectTitle = isJa ? 'クリックしてページを直接選択' : 'Select page';
+    const selectAria = isJa ? 'ページ番号を選択' : 'Select page number';
+
+    // 1. 最初へボタン (« 最初)
+    const firstBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="1" ${isFirst ? 'disabled' : ''} title="${lblFirst} (1)" aria-label="${lblFirst}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg><span class="pag-btn-lbl">${lblFirst}</span></button>`;
+
+    // 2. 前へボタン (‹ 前へ)
+    const prevBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="-1" ${isFirst ? 'disabled' : ''} title="${lblPrev}" aria-label="${lblPrev}"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:2px"><polyline points="15 18 9 12 15 6"/></svg><span class="pag-btn-lbl">${lblPrev}</span></button>`;
+
+    // 3. ページ番号ピル（デスクトップ・タブレット用）
+    const pageWindow = buildPageWindow(page, tot);
+    const pillsHtml = pageWindow.map(p => {
+      if (p === '...') {
+        return `<span class="pag-ellipsis">…</span>`;
+      }
+      const activeCls = p === page ? ' active' : '';
+      return `<button type="button" class="btn-o btn-pag btn-pag-num${activeCls}" data-act="page-jump" data-page="${p}" aria-label="${p}" ${p === page ? 'aria-current="page"' : ''}>${p}</button>`;
+    }).join('');
+
+    // 4. クイックジャンプセレクター（全端末共通：タップで全ページから瞬時に選択）
+    let selectOpts = '';
+    for (let p = 1; p <= tot; p++) {
+      selectOpts += `<option value="${p}" ${p === page ? 'selected' : ''}>${lblPageOf(p, tot)}</option>`;
+    }
+    const selectHtml = `<div class="pag-select-wrap" title="${selectTitle}"><select class="pag-select" data-act="page-select" aria-label="${selectAria}">${selectOpts}</select><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" class="pag-select-arr"><polyline points="6 9 12 15 18 9"/></svg></div>`;
+
+    // 5. 次へボタン (次へ ›)
+    const nextBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page" data-dir="1" ${isLast ? 'disabled' : ''} title="${lblNext}" aria-label="${lblNext}"><span class="pag-btn-lbl">${lblNext}</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="9 18 15 12 9 6"/></svg></button>`;
+
+    // 6. 最後へボタン (最後 »)
+    const lastBtn = `<button type="button" class="btn-o btn-pag btn-pag-nav" data-act="page-jump" data-page="${tot}" ${isLast ? 'disabled' : ''} title="${lblLast} (${tot})" aria-label="${lblLast}"><span class="pag-btn-lbl">${lblLast}</span><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></button>`;
+
+    return `<div class="pag-bar" role="navigation" aria-label="${navAria}">${firstBtn}${prevBtn}<div class="pag-center">${selectHtml}<div class="pag-pills">${pillsHtml}</div></div>${nextBtn}${lastBtn}</div>`;
+  }
+
+  /**
+   * 指定ページを読み込んで描画
+   */
+  function load(p = 1, ctx = {}) {
+    const appState = ctx.appState || (global.VocabCore?.App);
+    if (!appState) return;
+
+    if (p) appState.page = p;
+    const curPairKey = ctx.getActivePairKey ? ctx.getActivePairKey() : (global.VocabCore?.getActivePairConfig?.()?.key);
+    if (typeof ctx.getJson === 'function' && curPairKey) {
+      let items = ctx.getJson(curPairKey);
+      if (typeof ctx.repairEntriesLocalization === 'function') {
+        const pairCfg = ctx.getActivePairConfig ? ctx.getActivePairConfig() : null;
+        items = ctx.repairEntriesLocalization(items, pairCfg);
+      }
+      appState.entries = items;
+      appState.loadedKey = curPairKey;
+    }
+    if (typeof ctx.buildEtyIndex === 'function') ctx.buildEtyIndex();
+    if (typeof ctx.renderSidebarTree === 'function') ctx.renderSidebarTree();
+    render(ctx);
+    if (typeof ctx.updStats === 'function') ctx.updStats();
+    if (typeof ctx.renderPairFileTabs === 'function') {
+      ctx.renderPairFileTabs();
+    } else if (typeof global.VocabSearch?.renderPairFileTabs === 'function') {
+      global.VocabSearch.renderPairFileTabs(appState);
+    }
+  }
+
+  /**
+   * フィルタが1つでもアクティブか判定
+   */
+  function hasActiveFilters(appState) {
+    if (!appState) return false;
+    return Boolean(
+      (appState.q && appState.q.trim()) ||
+      (appState.qStr && appState.qStr.trim()) ||
+      (appState.cat && appState.cat !== 'all') ||
+      (appState.catF && appState.catF !== 'all') ||
+      (appState.fol && appState.fol !== 'all') ||
+      (appState.folF && appState.folF !== 'all') ||
+      (appState.posF && appState.posF !== 'all') ||
+      (appState.statF && appState.statF !== 'all') ||
+      appState.crossLang
+    );
+  }
+
+  /**
+   * 全フィルタを一括クリア
+   */
+  function resetFilters(appState, onRender) {
+    if (!appState) return;
+    if (typeof appState.resetFilters === 'function') {
+      appState.resetFilters();
+    } else {
+      appState.statF = appState.cat = appState.catF = appState.posF = appState.fol = appState.folF = 'all';
+      appState.q = '';
+      appState.qStr = '';
+      appState.qReg = null;
+      appState.crossLang = false;
+    }
+    const qSearch = $('qSearch');
+    if (qSearch) qSearch.value = '';
+    if (typeof onRender === 'function') onRender();
+  }
+
+  /**
+   * 単語ジャンプ（該当ページへの直接遷移とスムーズスクロール・発光）
+   */
+  let _activeJumpToken = 0;
+  let _activeJumpTimer = null;
+
+  function jumpToWord(w, tLang, ctx = {}) {
+    if ($('anki')?.style.display === 'block' && typeof ctx.exitAnki === 'function') ctx.exitAnki();
+    try { /** @type {any} */ (document?.activeElement)?.blur?.(); } catch {}
+    if ($('wordSuggestBox')) $('wordSuggestBox').style.display = 'none';
+    if (typeof ctx.closeSidebar === 'function' && typeof window !== 'undefined' && window.innerWidth <= 768) ctx.closeSidebar();
+    if (global.VocabModal && typeof global.VocabModal.closeAllModals === 'function') global.VocabModal.closeAllModals();
+
+    const parseSpecFn = ctx.parseInputWordSpec || (global.VocabMorphology ? global.VocabMorphology.parseInputWordSpec : null);
+    const spec = parseSpecFn ? parseSpecFn(w) : { cleanWord: String(w || '').trim(), homographIndex: 1 };
+    const targetWord = (spec.cleanWord || '').trim();
+    const homoIdx = spec.homographIndex || 1;
+    if (!targetWord) return false;
+
+    const appState = ctx.appState || (global.VocabCore?.App);
+    if (!appState) return false;
+
+    const jumpToken = ++_activeJumpToken;
+    if (_activeJumpTimer !== null) {
+      clearTimeout(_activeJumpTimer);
+      _activeJumpTimer = null;
+    }
+
+    if (appState.searchDebounceTimer) {
+      clearTimeout(appState.searchDebounceTimer);
+      appState.searchDebounceTimer = null;
+    }
+
+    let sLang = tLang || appState.srcLang || appState.lang;
+    const curSrcLang = appState.srcLang || appState.lang;
+    const curTgtLang = appState.tgtLang || 'ja';
+    let targetEntries = Array.isArray(appState.entries) ? appState.entries : [];
+    let targetPairKey = appState.loadedKey || null;
+    let targetTgtLang = curTgtLang;
+    let switchLang = false;
+
+    if (sLang !== curSrcLang) {
+      const pairCfg = global.VocabStorage?.getPairConfig ? global.VocabStorage.getPairConfig(sLang, curTgtLang) : null;
+      if (pairCfg?.key && typeof ctx.getJson === 'function') {
+        targetPairKey = pairCfg.key;
+        targetEntries = ctx.getJson(pairCfg.key);
+      } else {
+        targetEntries = [];
+      }
+    }
+
+    const foldFn = global.VocabMorphology?.foldAscii || (s => String(s ?? '').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/œ/g, 'oe').replace(/æ/g, 'ae').replace(/ß/g, 'ss'));
+    const mkLk = (word, l, idx) => global.VocabMorphology ? global.VocabMorphology.makeLookupKey(word, l, idx) : `${word}_${l}`;
+    const targetLk = mkLk(targetWord, sLang, homoIdx);
+    const baseTargetLk = mkLk(targetWord, sLang, 1);
+    const cleanTargetWord = targetWord.toLowerCase();
+    const foldedTargetWord = foldFn(targetWord);
+
+    const findMatchInList = (list, langCode) => {
+      if (!Array.isArray(list) || !list.length) return null;
+      const pLk = mkLk(targetWord, langCode, homoIdx);
+      const pBaseLk = mkLk(targetWord, langCode, 1);
+      return list.find(it => mkLk(it.word, it.lang || langCode, it.homographIndex) === pLk)
+        || list.find(it => mkLk(it.word, it.lang || langCode, 1) === pBaseLk)
+        || list.find(it => String(it.word || '').trim().toLowerCase() === cleanTargetWord)
+        || (foldedTargetWord ? list.find(it => foldFn(it.word || '').trim() === foldedTargetWord) : null);
+    };
+
+    let targetItem = findMatchInList(targetEntries, sLang);
+    if (targetItem && sLang !== curSrcLang) {
+      switchLang = true;
+    }
+
+    if (!targetItem && typeof ctx.getAllKnownPairs === 'function' && typeof ctx.getJson === 'function') {
+      const allPairs = ctx.getAllKnownPairs();
+      for (const p of allPairs) {
+        if (p.src === sLang && p.tgt === curTgtLang) continue;
+        const list = ctx.getJson(p.key);
+        const match = findMatchInList(list, p.src);
+        if (match) {
+          targetItem = match;
+          sLang = p.src;
+          targetTgtLang = p.tgt;
+          targetPairKey = p.key;
+          targetEntries = list;
+          switchLang = true;
+          break;
+        }
+      }
+    }
+
+    if (!targetItem) {
+      if (typeof ctx.setSearch === 'function') ctx.setSearch(targetWord, true);
+      return false;
+    }
+
+    if (switchLang) {
+      appState.srcLang = sLang;
+      appState.tgtLang = targetTgtLang;
+      appState.lang = sLang;
+      if (targetPairKey) appState.loadedKey = targetPairKey;
+      appState.entries = Array.isArray(targetEntries) ? targetEntries : [];
+      if (typeof ctx.lsSet === 'function') {
+        ctx.lsSet('vv_src_lang', sLang);
+        ctx.lsSet('vv_tgt_lang', targetTgtLang);
+        ctx.lsSet('vv_active_lang', sLang);
+      }
+    }
+
+    const effectiveLang = targetItem.lang || sLang;
+    const resolvedLk = mkLk(targetItem.word || targetWord, effectiveLang, targetItem.homographIndex || homoIdx);
+    const resolvedBaseLk = mkLk(targetItem.word || targetWord, effectiveLang, 1);
+
+    if (typeof appState.resetFilters === 'function') {
+      appState.resetFilters();
+    } else {
+      resetFilters(appState);
+    }
+
+    if (switchLang && typeof ctx.buildEtyIndex === 'function') {
+      ctx.buildEtyIndex();
+    }
+
+    const filtered = typeof ctx.getFiltered === 'function' ? ctx.getFiltered() : [];
+    let itemIndex = filtered.findIndex(it =>
+      it === targetItem || (it.id && targetItem.id && it.id === targetItem.id)
+    );
+    if (itemIndex < 0) {
+      itemIndex = filtered.findIndex(it => mkLk(it.word, it.lang || sLang, it.homographIndex) === resolvedLk);
+    }
+    if (itemIndex < 0) {
+      itemIndex = filtered.findIndex(it => mkLk(it.word, it.lang || sLang, 1) === resolvedBaseLk);
+    }
+    if (itemIndex < 0) {
+      itemIndex = filtered.findIndex(it => String(it.word || '').trim().toLowerCase() === cleanTargetWord);
+    }
+
+    const perPage = (ctx.perPage && Number.isFinite(ctx.perPage)) ? ctx.perPage : ((appState.per && Number.isFinite(appState.per)) ? appState.per : 30);
+    const targetPage = itemIndex >= 0 ? Math.floor(itemIndex / perPage) + 1 : 1;
+    if (switchLang) {
+      const srcSel = $('srcLangSel');
+      const tgtSel = $('tgtLangSel');
+      if (srcSel && appState.srcLang) srcSel.value = appState.srcLang;
+      if (tgtSel && appState.tgtLang) tgtSel.value = appState.tgtLang;
+    }
+
+    const listViewEl = $('listView');
+    if (listViewEl && listViewEl.style?.display === 'none') {
+      listViewEl.style.display = 'block';
+    }
+
+    appState.page = targetPage;
+    if (typeof ctx.onRender === 'function') ctx.onRender();
+
+    // ブラウザURLの同期（?w=単語&lang=言語）: Web版でURLを共有・再読込・ブックマークしても同一単語へ即座に復元
+    if (typeof window !== 'undefined' && window.history && typeof window.history.replaceState === 'function' && window.location && window.location.protocol !== 'file:') {
+      try {
+        const u = new URL(window.location.href);
+        if (u.searchParams && typeof u.searchParams.set === 'function') {
+          u.searchParams.set('w', targetWord);
+          if (sLang && sLang !== 'en') u.searchParams.set('lang', sLang);
+          else if (typeof u.searchParams.delete === 'function') u.searchParams.delete('lang');
+          window.history.replaceState(null, '', u.toString());
+        }
+      } catch {}
+    }
+
+    const scrollHelper = global.VocabCardView?.scrollToCard;
+    const findHelper = global.VocabCardView?.findCardElement;
+    const targetId = targetItem?.id || null;
+
+    function runAttempt(attempt = 0) {
+      if (jumpToken !== _activeJumpToken) return;
+      const cards = (typeof document !== 'undefined' && typeof document.querySelectorAll === 'function') ? [...document.querySelectorAll('#list .card')] : [];
+      const el = findHelper ? findHelper(cards, targetWord, resolvedLk, resolvedBaseLk, targetId) : null;
+      if (el && scrollHelper) {
+        scrollHelper(el, $('mainScroll'), { immediate: true, skipRetry: false });
+        _activeJumpTimer = null;
+        return;
+      }
+      if (!el && attempt < 5) {
+        _activeJumpTimer = setTimeout(() => runAttempt(attempt + 1), 50);
+      } else {
+        _activeJumpTimer = null;
+      }
+    }
+
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => runAttempt(0));
+    } else {
+      _activeJumpTimer = setTimeout(() => runAttempt(0), 10);
+    }
+    return true;
+  }
+
+  // --- グローバルエクスポート ---
+  global.VocabListView = {
+    reconcileList,
+    render,
+    load,
+    buildPageWindow,
+    renderPaginationHtml,
+    hasActiveFilters,
+    resetFilters,
+    jumpToWord,
+    setupCardVisibilityObserver
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+export {};

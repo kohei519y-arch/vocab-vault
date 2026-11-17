@@ -1,0 +1,18 @@
+{
+  "extName": { "message": "Vocab Vault クイック単語コレクター" },
+  "extDesc": { "message": "10言語対応・語源と概念史の単語帳 Vocab Vault へのワンクリック単語登録と語源検索" },
+  "menuAdd": { "message": "Vocab Vault に追加: '%s'" },
+  "menuLookup": { "message": "Vocab Vault で語源を検索: '%s'" },
+  "openApp": { "message": "アプリを開く" },
+  "addWord": { "message": "追加" },
+  "collected": { "message": "収集した単語" },
+  "copyAll": { "message": "一括コピー" },
+  "copied": { "message": "コピー完了!" },
+  "clear": { "message": "クリア" },
+  "confirmClear": { "message": "もう一度押して消去" },
+  "emptyQueue": { "message": "収集した単語はありません。Web閲覧中に単語を選択すると登録できます。" },
+  "inputPlaceholder": { "message": "単語を直接入力 (例: serendipity)" },
+  "footerHint": { "message": "Web閲覧中に単語を選択して1タップ登録" },
+  "addToVault": { "message": "Vaultに追加" },
+  "addedCount": { "message": "追加完了 ($COUNT$)", "placeholders": { "count": { "content": "$1" } } }
+}

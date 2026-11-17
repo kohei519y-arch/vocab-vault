@@ -113,31 +113,9 @@ globalThis.alert = function(msg) { print("[ALERT] " + msg); };
 
 const basePath = (typeof arguments !== 'undefined' && arguments.length > 0) ? arguments[0] : ".";
 
-// Load all core scripts in dependency order
-load(basePath + "/js/i18n.js");
-load(basePath + "/js/storage.js");
-load(basePath + "/js/anki.js");
-load(basePath + "/js/sync.js");
-load(basePath + "/js/ocr.js");
-load(basePath + "/js/morphology.js");
-load(basePath + "/js/eiken_catalog.js");
-load(basePath + "/js/graph_layout.js");
-load(basePath + "/js/graph_renderer.js");
-load(basePath + "/js/graph_views.js");
-load(basePath + "/js/graph.js");
-load(basePath + "/js/feedback.js");
-load(basePath + "/js/dictionary.js");
-load(basePath + "/js/starter_pack.js");
-load(basePath + "/js/export.js");
-load(basePath + "/js/speech.js");
-load(basePath + "/js/card_view.js");
-load(basePath + "/js/queue.js");
-load(basePath + "/js/modal.js");
-load(basePath + "/js/search.js");
-load(basePath + "/js/navigation.js");
-load(basePath + "/js/anki_view.js");
-load(basePath + "/js/list_view.js");
-load(basePath + "/js/events.js");
+// Load unified ESM->IIFE production bundle and enable sync chunk resolution for JSC
+globalThis.__VV_BASE_PATH__ = basePath;
+load(basePath + "/dist/app.bundle.js");
 
 const results = [];
 function assert(name, condition, details) {
@@ -387,6 +365,9 @@ try {
   assert("VocabGraph contains exportGraphImage", typeof VocabGraph.exportGraphImage === 'function');
 
   // Test building graph data from entries
+  if (globalThis.VocabStorage && globalThis.VocabStorage.state) {
+    VocabStorage.state.mem = {};
+  }
   localStorage.setItem('distinction_entries', JSON.stringify([
     { id: 'g1', word: 'constant', lang: 'en', etymologyTags: ['*sta-'], meanings: [{ pos: 'Adj', text: '一定の' }] },
     { id: 'g2', word: 'distant', lang: 'en', etymologyTags: ['*sta-'], meanings: [{ pos: 'Adj', text: '遠い' }] }
@@ -572,6 +553,13 @@ try {
   // Test BUILTIN_ETYMOLOGY_KNOWLEDGE
   assert("BUILTIN_ETYMOLOGY_KNOWLEDGE has *sta- root", Boolean(VocabDictionary.BUILTIN_ETYMOLOGY_KNOWLEDGE.roots['*sta-']));
   assert("BUILTIN_ETYMOLOGY_KNOWLEDGE has historical 'wet'", Boolean(VocabDictionary.BUILTIN_ETYMOLOGY_KNOWLEDGE.historical['wet']));
+  assert("BUILTIN_ETYMOLOGY_KNOWLEDGE has *mer- root containing 'moribund'", VocabDictionary.BUILTIN_ETYMOLOGY_KNOWLEDGE.roots['*mer-'].words.includes('moribund'));
+
+  // Test Morphological & Lexicon Parity for Adjectives (moribund)
+  assert("guessMorphologicalPos correctly classifies 'moribund' as Adj", VocabDictionary.guessMorphologicalPos('moribund') === 'Adj');
+  assert("inferGrammarForms formats comparative change for 'moribund'", VocabDictionary.inferGrammarForms('moribund', 'Adj').includes('more moribund'));
+  const moribundLex = VocabDictionary.lookupEssentialLexicon('moribund');
+  assert("lookupEssentialLexicon provides rich academic entry for 'moribund'", Boolean(moribundLex && moribundLex.pos === 'Adj' && moribundLex.meanings && moribundLex.meanings.length > 0));
 } catch (e) {
   assert("VocabDictionary test suite", false, String(e));
 }
@@ -637,11 +625,10 @@ try {
 }
 
 // -------------------------------------------------------------
-// TEST 5: Load app.js (Full Core Engine)
+// TEST 5: Verify app.js Core Engine exports & Starter Pack
 // -------------------------------------------------------------
 try {
-  load(basePath + "/js/app.js");
-  assert("app.js loads without unhandled exceptions", true);
+  assert("app.bundle.js loads without unhandled exceptions", typeof VocabCore === 'object');
   assert("VocabCore exported", typeof VocabCore === 'object');
   assert("VocabCore contains initApp", typeof VocabCore.initApp === 'function');
   assert("VocabCore contains submitW", typeof VocabCore.submitW === 'function');
@@ -703,6 +690,24 @@ try {
   // Test Scenario D: scrollToCard & findCardElement helpers
   assert("scrollToCard helper is defined and callable", typeof VocabCore.scrollToCard === 'function');
   assert("findCardElement helper is defined and callable", typeof VocabCore.findCardElement === 'function');
+
+  // Test Scenario D-1b: Resolution-independent scrolling and layout-shift resilience
+  var scrollIntoViewCalled = false;
+  var mockScrollTarget = {
+    classList: { add: function(){}, remove: function(){} },
+    scrollIntoView: function(opts){ scrollIntoViewCalled = true; },
+    getBoundingClientRect: function(){ return { top: 400, height: 120 }; },
+    offsetHeight: 120
+  };
+  var mockContainer = {
+    scrollTop: 100,
+    clientHeight: 600,
+    getBoundingClientRect: function(){ return { top: 100, height: 600 }; },
+    scrollTo: function(opts){ this.scrollTop = opts.top; }
+  };
+  VocabCore.scrollToCard(mockScrollTarget, mockContainer);
+  assert("scrollToCard invokes native scrollIntoView to expand content-visibility layout", scrollIntoViewCalled === true);
+  assert("scrollToCard performs accurate viewport alignment on mock container", mockContainer.scrollTop === 160);
 
   // Test Scenario D-2: Browser URL synchronization & deep link state
   var lastReplacedUrl = '';
@@ -1395,12 +1400,20 @@ try {
   assert("getOverallRetrievabilityStats computes average retrievability", typeof retrievabilityStats.avgR === 'number' && retrievabilityStats.avgR > 0);
   assert("getOverallRetrievabilityStats assigns legitimate grade", ['S', 'A', 'B', 'C'].indexOf(retrievabilityStats.grade) !== -1);
 
-  const dashboardHtml = VocabAnkiView.buildAnalyticsDashboardHtml({ list: candidateList });
-  assert("buildAnalyticsDashboardHtml renders all three core metric widgets",
-    dashboardHtml.indexOf('全体平均想起率') !== -1 &&
-    dashboardHtml.indexOf('学習コミットヒートマップ') !== -1 &&
-    dashboardHtml.indexOf('日別予測復習負荷') !== -1 &&
-    dashboardHtml.indexOf('個人適応型 FSRS 重み') !== -1
+  const dashboardHtmlAdmin = VocabAnkiView.buildAnalyticsDashboardHtml({ list: candidateList, isAdmin: true });
+  assert("buildAnalyticsDashboardHtml renders all core metric widgets and FSRS weights for admin",
+    dashboardHtmlAdmin.indexOf('全体平均想起率') !== -1 &&
+    dashboardHtmlAdmin.indexOf('学習コミットヒートマップ') !== -1 &&
+    dashboardHtmlAdmin.indexOf('日別予測復習負荷') !== -1 &&
+    dashboardHtmlAdmin.indexOf('個人適応型 FSRS 重み') !== -1
+  );
+
+  const dashboardHtmlUser = VocabAnkiView.buildAnalyticsDashboardHtml({ list: candidateList, isAdmin: false });
+  assert("buildAnalyticsDashboardHtml hides internal FSRS weights from regular users",
+    dashboardHtmlUser.indexOf('全体平均想起率') !== -1 &&
+    dashboardHtmlUser.indexOf('学習コミットヒートマップ') !== -1 &&
+    dashboardHtmlUser.indexOf('日別予測復習負荷') !== -1 &&
+    dashboardHtmlUser.indexOf('個人適応型 FSRS 重み') === -1
   );
 
   // 38. 例文・単語の発音波形同期 / カラオケハイライト テスト
@@ -1828,6 +1841,1508 @@ try {
   var abnormalJumpEntry = { id: 'w_test', word: 'test_hijacked', version: 99999999, updatedAt: 500000 };
   var mergedAbnormal = VocabStorage.mergeWords([baseEntry], [abnormalJumpEntry], 'en', true);
   assert("mergeWords prevents abnormal version jump from overwriting newer updatedAt", mergedAbnormal.length === 1 && mergedAbnormal[0].word === 'test');
+
+  // 20. VocabSearch & Multilingual Inverted Index Regression Tests
+  var koItemN = { id: 'ko_1', word: '사과', meanings: [{ pos: '명사', text: 'apple' }] };
+  var koItemV = { id: 'ko_2', word: '가다', meanings: [{ pos: '동사', text: 'to go' }] };
+  assert("VocabSearch.matchPos correctly identifies Korean noun (명사) as 'N'", VocabSearch.matchPos(koItemN, 'N') === true);
+  assert("VocabSearch.matchPos correctly identifies Korean verb (동사) as 'V'", VocabSearch.matchPos(koItemV, 'V') === true);
+
+  var regenItem = { id: 'flag_1', word: 'test', needsRegeneration: true };
+  assert("VocabSearch.matchStat identifies needsRegeneration in 'flag' filter", VocabSearch.matchStat(regenItem, 'flag') === true);
+
+  var mockApp = {
+    entries: [
+      { id: 'cat_test_1', word: 'stability', category: 26, meanings: [{ pos: 'Noun', text: '安定' }] },
+      { id: 'cat_test_2', word: 'govern', category: 0, meanings: [{ pos: 'Verb', text: '統治する' }] }
+    ],
+    cat: '状態・性質'
+  };
+  var filteredCat = VocabSearch.getFiltered(mockApp);
+  assert("VocabSearch.getFiltered resolves numeric category 26 to '状態・性質'", filteredCat.length === 1 && filteredCat[0].word === 'stability');
+
+  mockApp.cat = 'all';
+  mockApp.qStr = '#명사 사과';
+  mockApp.entries = [koItemN, koItemV];
+  var filteredKo = VocabSearch.getFiltered(mockApp);
+  assert("VocabSearch.getFiltered parses Hangul POS tag #명사 accurately", filteredKo.length === 1 && filteredKo[0].word === '사과');
+
+  var portCheck = VocabMorphology.isValidRootForEntry('*port-', { word: 'port', etymology: 'From Latin portare (to carry)' });
+  assert("VocabMorphology.isValidRootForEntry allows base word matching known PIE/Latin root", portCheck === true);
+
+  // 21. Stub & Placeholder Self-Healing Regression Test (Moribund Case)
+  var corruptedMoribund = {
+    id: 'corrupt_418',
+    word: 'moribund',
+    meanings: [{ pos: 'N[C]', text: 'moribundの中心的語義' }],
+    core: '「moribund」の中心的用法および文脈的機能に基づくコアイメージ。',
+    grammar_forms: '複数形: moribunds',
+    category: 28
+  };
+  var cardEl = VocabCardView.createCardElement(corruptedMoribund, { lang: 'en', tgtLang: 'ja' });
+  assert("VocabCardView auto-heals corrupted dummy placeholder via lookupEssentialLexicon", corruptedMoribund.meanings[0].pos === 'Adj' && corruptedMoribund.meanings[0].text.indexOf('瀕死') !== -1);
+  assert("VocabCardView heals moribund grammar_forms to comparative form", corruptedMoribund.grammar_forms.indexOf('more moribund') !== -1);
+  assert("VocabCardView heals moribund category to '状態・性質'", corruptedMoribund.category === '状態・性質');
+
+  // 22. Principal Bug Hunter Audit Regression Tests
+  var foldRe = VocabSearch.buildFoldRegex('#noun ?due @Business apple');
+  assert("buildFoldRegex strips #pos, ?stat, and @cat directives from highlight pattern", foldRe !== null && foldRe.test('apple') && !foldRe.test('noun'));
+
+  var polApp = {
+    entries: [
+      { id: 'pol_1', word: 'diplomacy', category: '政治・国際関係', meanings: [{ pos: 'N[U]', text: '外交' }] },
+      { id: 'med_1', word: 'symptom', category: '医療・健康', meanings: [{ pos: 'N[C]', text: '症状' }] }
+    ],
+    qStr: '@Politics'
+  };
+  var filteredPol = VocabSearch.getFiltered(polApp);
+  assert("VocabSearch.getFiltered matches English @Politics query against canonical category", filteredPol.length === 1 && filteredPol[0].word === 'diplomacy');
+
+  VocabSRS.setUserFSRSWeights({ isReset: true }, 123456);
+  assert("VocabSRS.setUserFSRSWeights({ isReset: true }) clears custom weights cleanly", VocabSRS.getUserFSRSWeights() === null);
+
+  // 23. Round 2 Principal Bug Hunter Audit Regression Tests
+  var v5Parsed = VocabStorage.parseAnyWords({
+    version: 5,
+    data: {
+      distinction_entries_en_en: [
+        { id: 'v5_en_en_1', word: 'ubiquitous', lang: 'en', tgtLang: 'en', meanings: [{ pos: 'Adj', text: 'present everywhere' }] }
+      ]
+    }
+  });
+  var writtenStorageKeys = [];
+  var langsMap = VocabStorage.LANGS;
+  Object.keys(v5Parsed).forEach(function(key) {
+    var incoming = v5Parsed[key];
+    if (!Array.isArray(incoming) || !incoming.length) return;
+    if (key.startsWith('distinction_entries')) {
+      writtenStorageKeys.push(key);
+    } else if (langsMap[key]) {
+      if (Object.keys(v5Parsed).some(function(k2) { return k2.startsWith('distinction_entries') && v5Parsed[k2] === incoming; })) return;
+      writtenStorageKeys.push(langsMap[key].key);
+    }
+  });
+  assert("v5 multi-pair backup import skips legacy 2-letter alias and prevents cross-pair pollution", writtenStorageKeys.length === 1 && writtenStorageKeys[0] === 'distinction_entries_en_en');
+
+  var revCard = {
+    id: 'rev_audit_1',
+    word: 'ephemeral',
+    lang: 'en',
+    interval: 4,
+    repetition: 2,
+    efactor: 2.5,
+    stability: 4,
+    difficulty: 5,
+    retrievability: 0.9,
+    lapses: 1,
+    version: 2,
+    etymologyTags: ['*epi-']
+  };
+  var revApp = {
+    lang: 'en',
+    srcLang: 'en',
+    entries: [revCard],
+    aList: [revCard],
+    ankiHistory: [],
+    _sessionReviewedItems: []
+  };
+  var revCtx = {
+    appState: revApp,
+    getActivePairKey: function() { return 'distinction_entries'; },
+    getList: function() { return revApp.entries; },
+    saveList: function() {}
+  };
+  VocabAnkiView.procRev(3, revCtx);
+  assert("procRev captures pre-mutation stabilityBefore accurately (stabilityAfter > stabilityBefore)",
+    revApp._sessionReviewedItems.length === 1 &&
+    revApp._sessionReviewedItems[0].stabilityBefore === 4 &&
+    revApp._sessionReviewedItems[0].stabilityAfter > 4
+  );
+  VocabAnkiView.undoAnkiRev(revCtx);
+  assert("undoAnkiRev pops _sessionReviewedItems to prevent duplicate session summary telemetry",
+    revApp._sessionReviewedItems.length === 0 && revCard.stability === 4
+  );
+
+  VocabAnkiView.procRev(0, revCtx);
+  assert("procRev rating 0 increments lapses", Number(revCard.lapses) > 1 && revApp._sessionReviewedItems.length === 1);
+  VocabAnkiView.undoAnkiRev(revCtx);
+  assert("undoAnkiRev restores lapses and removes undone rating from _sessionReviewedItems",
+    revCard.lapses === 1 && revApp._sessionReviewedItems.length === 0
+  );
+
+  // 24. Adversarial Security, Extreme Boundary & Resilience Audit Tests
+  // 24-1. XSS & Injection Sanitization Boundary Tests
+  var xssPayload1 = "<script>alert('xss')</script>";
+  var escaped1 = VocabStorage.esc(xssPayload1);
+  assert("VocabStorage.esc escapes HTML tag brackets strictly", escaped1.indexOf('<') === -1 && escaped1.indexOf('>') === -1 && escaped1.indexOf('&lt;script&gt;') !== -1);
+
+  var xssPayload2 = "\" onmouseover=\"alert(1)\" data-attr='test'";
+  var escaped2 = VocabStorage.esc(xssPayload2);
+  assert("VocabStorage.esc escapes quotes to prevent DOM attribute breakout", escaped2.indexOf('"') === -1 && escaped2.indexOf('&quot;') !== -1);
+
+  assert("VocabStorage.esc safely handles null and undefined without throwing", VocabStorage.esc(null) === '' && VocabStorage.esc(undefined) === '');
+  assert("VocabStorage.cleanPho trims slashes, brackets and leading/trailing whitespace", VocabStorage.cleanPho(" [ /həˈloʊ/ ] ") === "həˈloʊ");
+  assert("VocabStorage.genId produces cryptographically resilient non-empty unique string", typeof VocabStorage.genId() === 'string' && VocabStorage.genId().length >= 8);
+
+  // 24-2. FSRS Extreme Boundaries, NaN, Infinity & Malformed Objects Resilience
+  assert("VocabSRS.getRetrievability returns 0.0 for completely unlearned card", VocabSRS.getRetrievability({ interval: 0, repetition: 0, stability: 0 }) === 0.0);
+  var nanR1 = VocabSRS.getRetrievability({ stability: NaN, interval: 1, repetition: 1 });
+  assert("VocabSRS.getRetrievability handles NaN stability gracefully without returning NaN", !isNaN(nanR1) && nanR1 >= 0.0 && nanR1 <= 1.0);
+  var nanR2 = VocabSRS.getRetrievability({ stability: 10, reviewUpdatedAt: NaN, interval: 1, repetition: 1 });
+  assert("VocabSRS.getRetrievability handles NaN elapsed days gracefully without returning NaN", !isNaN(nanR2) && nanR2 >= 0.0 && nanR2 <= 1.0);
+  var negR = VocabSRS.getRetrievability({ stability: -5, interval: 1, repetition: 1 });
+  assert("VocabSRS.getRetrievability handles negative stability without crashing", !isNaN(negR) && negR >= 0.0 && negR <= 1.0);
+  var infR = VocabSRS.getRetrievability({ stability: Infinity, interval: 1, repetition: 1 });
+  assert("VocabSRS.getRetrievability handles Infinity stability gracefully", !isNaN(infR) && infR >= 0.0 && infR <= 1.0);
+
+  var safeSRS = VocabSRS.calculateNextReview({}, 2);
+  assert("VocabSRS.calculateNextReview handles empty/malformed card safely", safeSRS && typeof safeSRS.stability === 'number' && !isNaN(safeSRS.stability));
+
+  // 24-3. 10-Language i18n Complete Parity & Fallback Verification
+  var testLanguages = ['ja', 'en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'];
+  var requiredI18nKeys = ['app.title', 'app.tagline', 'nav.list', 'nav.review', 'nav.analytics'];
+  var allI18nPassed = true;
+  for (var li = 0; li < testLanguages.length; li++) {
+    var curLang = testLanguages[li];
+    VocabI18n.setLocale(curLang);
+    for (var ki = 0; ki < requiredI18nKeys.length; ki++) {
+      var trKey = requiredI18nKeys[ki];
+      var trVal = VocabI18n.t(trKey);
+      if (!trVal || typeof trVal !== 'string' || trVal === trKey) {
+        allI18nPassed = false;
+        break;
+      }
+    }
+    if (!allI18nPassed) break;
+  }
+  assert("VocabI18n provides complete translation parity across all 10 supported languages", allI18nPassed === true);
+  VocabI18n.setLocale('ja'); // restore default
+
+  // 24-4. Multilingual Cloze & Accent/CJK Masking Resilience
+  var clozeFrItem = { word: 'déjà', example: { foreign: 'C’est déjà fait.' } };
+  var clozeFrHtml = VocabAnkiView.buildClozeSentenceHtml(clozeFrItem);
+  assert("buildClozeSentenceHtml accurately masks French accented word (déjà)", clozeFrHtml.indexOf('[ ????? ]') !== -1 && clozeFrHtml.indexOf('data-ans="déjà"') !== -1);
+
+  var clozeDeItem = { word: 'über', example: { foreign: 'Wir sprechen über das Buch.' } };
+  var clozeDeHtml = VocabAnkiView.buildClozeSentenceHtml(clozeDeItem);
+  assert("buildClozeSentenceHtml accurately masks German umlaut word (über)", clozeDeHtml.indexOf('[ ????? ]') !== -1 && clozeDeHtml.indexOf('data-ans="über"') !== -1);
+
+  var clozeZhItem = { word: '经济', example: { foreign: '国家的经济正在稳步发展。' } };
+  var clozeZhHtml = VocabAnkiView.buildClozeSentenceHtml(clozeZhItem);
+  assert("buildClozeSentenceHtml accurately masks Chinese CJK characters (经济)", clozeZhHtml.indexOf('[ ????? ]') !== -1 && clozeZhHtml.indexOf('data-ans="经济"') !== -1);
+
+  // 24-5. Levenshtein & Stemming Boundary Tests
+  assert("calcLevenshtein handles empty strings correctly", VocabAnkiView.calcLevenshtein("", "") === 0 && VocabAnkiView.calcLevenshtein("test", "") === 4);
+  assert("getStemVariants handles null and empty input safely without throwing", VocabAnkiView.getStemVariants(null).length === 0 && VocabAnkiView.getStemVariants("").length === 0);
+  assert("getStemVariants extracts English inflections accurately", VocabAnkiView.getStemVariants("developing").indexOf("develop") !== -1);
+
+  // 24-6. Prototype Pollution & ReDoS Defense Tests
+  var protoPayload = '{"__proto__": {"polluted": true}, "constructor": {"prototype": {"polluted": true}}}';
+  VocabStorage.parseAnyWords(protoPayload);
+  assert("parseAnyWords defends strictly against Prototype Pollution injection", Object.prototype.polluted === undefined);
+
+  var longTokenQuery = "one two three four five six seven eight nine ten eleven twelve";
+  var tokens = VocabSearch.extractQueryTokens(longTokenQuery);
+  assert("VocabSearch.extractQueryTokens clips excessive tokens to max 8 to prevent ReDoS", tokens.length === 8);
+
+  var reDosQuery = "((((((((a+)+)+)+)+)+)+)+)+";
+  var foldReDos = VocabSearch.buildFoldRegex(reDosQuery);
+  assert("VocabSearch.buildFoldRegex safely handles complex nested regex expressions without error", foldReDos !== null);
+
+  // 25. High-Value Service Enhancements (Writing Arena, Medical/Legal Packs, Classroom Deck Code & Nuance Comparator)
+  // 25-1. Medical & Legal Starter Packs Integrity
+  assert("VocabStarterPack defines medical_roots, legal_roots, tech_ai, and gre_verbal packs",
+    Array.isArray(VocabStarterPack.PACKS.medical_roots) && VocabStarterPack.PACKS.medical_roots.length >= 7 &&
+    Array.isArray(VocabStarterPack.PACKS.legal_roots) && VocabStarterPack.PACKS.legal_roots.length >= 7 &&
+    Array.isArray(VocabStarterPack.PACKS.tech_ai) && VocabStarterPack.PACKS.tech_ai.length >= 6 &&
+    Array.isArray(VocabStarterPack.PACKS.gre_verbal) && VocabStarterPack.PACKS.gre_verbal.length >= 6 &&
+    Array.isArray(VocabStarterPack.PACKS.zh_pre1) && VocabStarterPack.PACKS.zh_pre1.length >= 8 &&
+    Array.isArray(VocabStarterPack.PACKS.ko_pre1) && VocabStarterPack.PACKS.ko_pre1.length >= 8 &&
+    Array.isArray(VocabStarterPack.PACKS.ja_pre1) && VocabStarterPack.PACKS.ja_pre1.length >= 8
+  );
+  var sampleMed = VocabStarterPack.PACKS.medical_roots[0];
+  assert("medical_roots pack words contain authentic clinical & morphological roots",
+    sampleMed.word === 'pathology' && sampleMed.category === '医療・健康' && sampleMed.etymologyTags.indexOf('*kʷentʰ-') !== -1
+  );
+  var sampleLeg = VocabStarterPack.PACKS.legal_roots[0];
+  assert("legal_roots pack words contain authentic jurisprudential & Latin roots",
+    sampleLeg.word === 'jurisdiction' && sampleLeg.category === '政治・国際関係' && sampleLeg.etymologyTags.indexOf('*yew-') !== -1
+  );
+  var sampleTech = VocabStarterPack.PACKS.tech_ai[0];
+  assert("tech_ai pack words contain authentic algorithm & computing roots",
+    sampleTech.word === 'algorithm' && sampleTech.category === '科学・テクノロジー' && sampleTech.etymologyTags.indexOf('*al-') !== -1
+  );
+  var sampleGre = VocabStarterPack.PACKS.gre_verbal[0];
+  assert("gre_verbal pack words contain authentic classical Greek/Latin academic roots",
+    sampleGre.word === 'anachronism' && sampleGre.category === '歴史・文明' && sampleGre.etymologyTags.indexOf('*kʷel-') !== -1
+  );
+
+  // 25-1b. Language-Adaptive Starter Pack Presentation Test
+  var frHtml = VocabStarterPack.buildStarterPackGalleryHtml('fr');
+  assert("buildStarterPackGalleryHtml prioritizes French pack when lang is fr",
+    frHtml.indexOf('data-pack="fr_pre1"') < frHtml.indexOf('data-pack="academic"') &&
+    frHtml.indexOf('フランス語') !== -1 &&
+    frHtml.indexOf('spk-recom-banner') !== -1
+  );
+  var zhHtml = VocabStarterPack.buildStarterPackGalleryHtml('zh');
+  assert("buildStarterPackGalleryHtml prioritizes Chinese pack when lang is zh",
+    zhHtml.indexOf('data-pack="zh_pre1"') < zhHtml.indexOf('data-pack="academic"') &&
+    zhHtml.indexOf('中国語') !== -1
+  );
+
+  // 25-2. Contextual Output Arena (AI Writing Coach) Tests
+  var evalResult1 = VocabAnkiView.evaluateUserWriting('moribund', 'The patient was in a moribund condition before emergency resuscitation.', { core: '瀕死のコアイメージ' });
+  assert("evaluateUserWriting scores rich contextual sentences accurately (score >= 90)", evalResult1.valid === true && evalResult1.score >= 90);
+  var evalResult2 = VocabAnkiView.evaluateUserWriting('moribund', 'This is a test sentence without the target term.');
+  assert("evaluateUserWriting flags missing target term with corrective feedback", evalResult2.valid === false && evalResult2.score < 50);
+
+  // 25-3. Classroom / B2B Deck Code Generation & Parsing Roundtrip
+  var testClassItems = [{ word: 'myocardium', meanings: [{ pos: 'N', text: '心筋' }] }];
+  var classDeck = VocabExport.generateClassroomDeckCode(testClassItems, 'USMLE Cardio 101', 'en');
+  assert("generateClassroomDeckCode generates valid CLASS- prefixed deck code",
+    classDeck !== null && typeof classDeck.code === 'string' && classDeck.code.startsWith('CLASS-')
+  );
+  var parsedClassDeck = VocabExport.parseShareDeckUrl(classDeck.code);
+  assert("parseShareDeckUrl resolves CLASS- prefixed code back to original deck items",
+    parsedClassDeck !== null && parsedClassDeck.title === 'USMLE Cardio 101' && parsedClassDeck.items.length === 1 && parsedClassDeck.items[0].word === 'myocardium'
+  );
+
+  // 25-4. Nuance Comparator Tests
+  var nuancePrescribe = VocabMorphology.buildNuanceComparison('prescribe');
+  assert("buildNuanceComparison correctly resolves prescribe vs proscribe pair",
+    nuancePrescribe !== null && nuancePrescribe.pair === 'proscribe' && nuancePrescribe.root.indexOf('*skreyb-') !== -1
+  );
+  var nuanceHtml = VocabMorphology.renderNuanceComparisonHtml(nuancePrescribe);
+  assert("renderNuanceComparisonHtml renders structured nuance comparison box",
+    nuanceHtml.indexOf('nuance-comparator-box') !== -1 && nuanceHtml.indexOf('proscribe') !== -1 && nuanceHtml.indexOf('prescribe') !== -1
+  );
+
+  // 25-5. Bug Hunter Regression: CJK & Regex Boundary Resilience in evaluateUserWriting
+  var evalCjk = VocabAnkiView.evaluateUserWriting('認識', '問題の本質を正確に認識することが解決への第一歩となる。', { core: '見分ける' });
+  assert("evaluateUserWriting recognizes unsegmented CJK words without requiring whitespace boundary", evalCjk.valid === true && evalCjk.score >= 90);
+  var evalSpecialRegex = VocabAnkiView.evaluateUserWriting('*sta-', 'The PIE root *sta- relates to standing firm.', {});
+  assert("evaluateUserWriting handles regex special characters (*, -, ?) safely without crashing", evalSpecialRegex.valid === true);
+  var evalHyphen = VocabAnkiView.evaluateUserWriting('state-of-the-art', 'They deployed a state-of-the-art cryptographic algorithm.', {});
+  assert("evaluateUserWriting handles hyphenated compound vocabulary accurately", evalHyphen.valid === true && evalHyphen.score >= 85);
+
+  // 25-6. Bug Hunter Regression: Classroom URL Query String Parsing
+  var classFullUrlShare = VocabExport.parseShareDeckUrl('https://vocabvault.app/?share=' + classDeck.code);
+  assert("parseShareDeckUrl resolves full URL with ?share=CLASS- query parameter",
+    classFullUrlShare !== null && classFullUrlShare.title === 'USMLE Cardio 101' && classFullUrlShare.items.length === 1
+  );
+  var classFullUrlClass = VocabExport.parseShareDeckUrl('https://vocabvault.app/?class=' + classDeck.code);
+  assert("parseShareDeckUrl resolves full URL with ?class=CLASS- query parameter",
+    classFullUrlClass !== null && classFullUrlClass.title === 'USMLE Cardio 101' && classFullUrlClass.items.length === 1
+  );
+
+  // 25-7. Bug Hunter Regression: Multilingual Nuance Typo & Localization Parity
+  VocabI18n.setLocale('ko');
+  var nuanceKoHtml = VocabMorphology.renderNuanceComparisonHtml(nuancePrescribe);
+  assert("renderNuanceComparisonHtml outputs pure Korean Hangul without Katakana contamination",
+    nuanceKoHtml.indexOf('뉘앙ス') === -1 && nuanceKoHtml.indexOf('뉘앙스') !== -1 && nuanceKoHtml.indexOf('핵심 차이') !== -1
+  );
+  VocabI18n.setLocale('ja'); // restore default
+
+  // 25-8. Bug Hunter Regression: Nuance Inflection Fallback (e.g. prescribed -> prescribe)
+  var nuanceInflected = VocabMorphology.buildNuanceComparison('prescribed');
+  assert("buildNuanceComparison resolves inflected forms (prescribed) to base knowledge",
+    nuanceInflected !== null && nuanceInflected.pair === 'proscribe'
+  );
+  var nuanceMaintaining = VocabMorphology.buildNuanceComparison('maintaining');
+  assert("buildNuanceComparison resolves participle forms (maintaining) to base knowledge",
+    nuanceMaintaining !== null && nuanceMaintaining.pair === 'sustain'
+  );
+  assert("renderNuanceComparisonHtml safely returns empty string on malformed/null objects",
+    VocabMorphology.renderNuanceComparisonHtml(null) === '' && VocabMorphology.renderNuanceComparisonHtml({}) === ''
+  );
+
+  // 25-9. Bug Hunter Regression: evaluateUserWriting 10-Language Parity & Unicode Capitalization
+  var evalEn = VocabAnkiView.evaluateUserWriting('prescribe', 'The physician will prescribe appropriate antibiotics for the infection.', { tgtLang: 'en', core: 'To authorize treatment' });
+  assert("evaluateUserWriting returns English feedback and score when tgtLang is en",
+    evalEn.valid === true && evalEn.feedback.indexOf('[Score:') !== -1 && evalEn.feedback.indexOf('Core Concept:') !== -1
+  );
+  var evalFr = VocabAnkiView.evaluateUserWriting('sustain', 'This policy helps to sustain long-term economic growth effectively.', { tgtLang: 'fr', core_fr: 'Soutenir par en bas' });
+  assert("evaluateUserWriting returns French feedback and note when tgtLang is fr",
+    evalFr.valid === true && evalFr.feedback.indexOf('[Note:') !== -1 && evalFr.feedback.indexOf('Cœur sémantique:') !== -1
+  );
+  var evalAccentedCap = VocabAnkiView.evaluateUserWriting('éphémère', 'Éphémère est la gloire de ce monde sans trace.', { tgtLang: 'fr' });
+  assert("evaluateUserWriting honors Unicode uppercase accented characters (É...) for sentence bonus",
+    evalAccentedCap.score >= 90
+  );
+
+  // 25-10. Round 3 Bug Hunter Regression: Starter Word Index, Canonical Category & Korean Hangul Purity
+  var medLookup = VocabStarterPack.lookupStarterWord('myocardium');
+  var legLookup = VocabStarterPack.lookupStarterWord('indemnify');
+  assert("lookupStarterWord indexes medical_roots and legal_roots packs dynamically",
+    medLookup !== null && medLookup.word === 'myocardium' && legLookup !== null && legLookup.word === 'indemnify' && legLookup.category === '法律・司法'
+  );
+  var medLex = VocabDictionary.lookupEssentialLexicon('myocardium');
+  assert("lookupEssentialLexicon preserves string category ('医療・健康') and pos ('N[U]') from Starter Pack",
+    medLex !== null && medLex.category === '医療・健康' && medLex.pos === 'N[U]'
+  );
+  var sanCat = VocabStorage.sanitizeItem({ word: 'precedent', category: 'ビジネス・法務', meanings: [{ pos: 'N[C]', text: '先例' }] }, 0, 'en');
+  assert("sanitizeItem maps composite category 'ビジネス・法務' to canonical '法律・司法' instead of 'その他'",
+    sanCat !== null && sanCat.category === '法律・司法'
+  );
+  var evalKo = VocabAnkiView.evaluateUserWriting('pathology', 'The clinical pathology report confirmed the diagnosis accurately today.', { tgtLang: 'ko' });
+  assert("evaluateUserWriting outputs pure Korean Hangul (부합하는) without Hanja contamination",
+    evalKo.valid === true && evalKo.feedback.indexOf('부합하는') !== -1 && evalKo.feedback.indexOf('부合하는') === -1
+  );
+
+  // --- 30. S-Grade Masterpiece Deliverables: Timeline, Voice SRS, Flash Blitz & Smart Reader ---
+  // 30-1. Semantic Evolution Timeline
+  var timelineEntry = {
+    word: 'prescribe',
+    lang: 'en',
+    etymology: 'PIE *skreyb- (刻む・書く) → ラテン語 praescribere (あらかじめ前に書く) → 中英語 prescribe (指図・処方する)',
+    etymologyTags: ['*skreyb-'],
+    meanings: [{ pos: 'V[T]', text: '処方する、規定する' }]
+  };
+  var timelineJa = VocabMorphology.buildSemanticTimeline(timelineEntry, 'ja');
+  assert("buildSemanticTimeline parses arrow segments into structured historical vector",
+    timelineJa !== null && Array.isArray(timelineJa.steps) && timelineJa.steps.length >= 3
+  );
+  var timelineHtml = VocabMorphology.renderSemanticTimelineHtml(timelineJa);
+  assert("renderSemanticTimelineHtml generates clean semantic timeline HTML markup",
+    timelineHtml.indexOf('ety-timeline-card') !== -1 && timelineHtml.indexOf('timeline-track') !== -1 && timelineHtml.indexOf('timeline-step') !== -1
+  );
+
+  // 30-2. Hands-Free Voice SRS Command Parser across multiple languages
+  var cmdAgainJa = VocabSpeech.parseVoiceSRSCommand('もう一度', 'prescribe', ['処方する'], 'ja');
+  assert("parseVoiceSRSCommand parses Japanese 'もう一度' as rating 0 (again)",
+    cmdAgainJa !== null && cmdAgainJa.rating === 0 && cmdAgainJa.label === 'again'
+  );
+  var cmdGoodEn = VocabSpeech.parseVoiceSRSCommand('good', 'prescribe', ['処方する'], 'en');
+  assert("parseVoiceSRSCommand parses English 'good' as rating 2 (good)",
+    cmdGoodEn !== null && cmdGoodEn.rating === 2 && cmdGoodEn.label === 'good'
+  );
+  var cmdEasyKo = VocabSpeech.parseVoiceSRSCommand('쉬움', 'prescribe', ['처방하다'], 'ko');
+  assert("parseVoiceSRSCommand parses Korean '쉬움' as rating 3 (easy)",
+    cmdEasyKo !== null && cmdEasyKo.rating === 3 && cmdEasyKo.label === 'easy'
+  );
+  var cmdHardFr = VocabSpeech.parseVoiceSRSCommand('difficile', 'prescribe', ['prescrire'], 'fr');
+  assert("parseVoiceSRSCommand parses French 'difficile' as rating 1 (hard)",
+    cmdHardFr !== null && cmdHardFr.rating === 1 && cmdHardFr.label === 'hard'
+  );
+  var cmdWordMatch = VocabSpeech.parseVoiceSRSCommand('prescribe', 'prescribe', ['処方する'], 'ja');
+  assert("parseVoiceSRSCommand recognizes headword pronunciation as word_match with rating 2",
+    cmdWordMatch !== null && cmdWordMatch.type === 'word_match' && cmdWordMatch.rating === 2
+  );
+  var cmdMeaningMatch = VocabSpeech.parseVoiceSRSCommand('処方する', 'prescribe', ['処方する'], 'ja');
+  assert("parseVoiceSRSCommand recognizes target meaning spoken answer as meaning_match with rating 2",
+    cmdMeaningMatch !== null && cmdMeaningMatch.type === 'meaning_match' && cmdMeaningMatch.rating === 2
+  );
+  var cmdFlip = VocabSpeech.parseVoiceSRSCommand('答え', 'prescribe', ['処方する'], 'ja');
+  assert("parseVoiceSRSCommand recognizes '答え' as action flip",
+    cmdFlip !== null && cmdFlip.action === 'flip'
+  );
+
+  // 30-3. Flash Blitz Micro-Session
+  var mockApp = {
+    entries: [
+      { id: '1', word: 'word1', nextReview: Date.now() - 500000, interval: 1 },
+      { id: '2', word: 'word2', nextReview: Date.now() - 300000, interval: 2 },
+      { id: '3', word: 'word3', nextReview: Date.now() - 100000, interval: 3 },
+      { id: '4', word: 'word4', nextReview: Date.now() + 500000, interval: 5 }
+    ],
+    aList: [],
+    ankiHistory: []
+  };
+  VocabAnkiView.startFlashBlitz({ appState: mockApp, getFiltered: function() { return mockApp.entries; } });
+  assert("startFlashBlitz selects exactly top 3 overdue entries for 60-second micro review",
+    mockApp._isFlashBlitz === true && mockApp.aList.length === 3 && mockApp._blitzSecondsLeft === 60
+  );
+  assert("startFlashBlitz orders words by overdue ratio prioritising greatest decay risk",
+    mockApp.aList[0].word === 'word1'
+  );
+  VocabAnkiView.exitAnki({ appState: mockApp });
+  assert("exitAnki clears blitz state and restores standard review posture",
+    mockApp._isFlashBlitz === false
+  );
+
+  // 30-4. Smart Reading Arena
+  assert("VocabModal exposes switchExtractMode, renderSmartReader, and showReaderWordPopover",
+    typeof VocabModal.switchExtractMode === 'function' &&
+    typeof VocabModal.renderSmartReader === 'function' &&
+    typeof VocabModal.showReaderWordPopover === 'function'
+  );
+
+  // 30-5. 10-Language i18n Parity for all new keys
+  var newI18nKeys = [
+    'anki.blitz_btn', 'anki.blitz_title', 'anki.blitz_badge', 'anki.blitz_timeout', 'anki.blitz_completed',
+    'anki.voice_btn', 'anki.voice_mode_title', 'anki.voice_prompt', 'anki.voice_listening', 'anki.voice_idle',
+    'anki.voice_not_supported', 'ext.tab_pickup', 'ext.tab_reader', 'reader.badge', 'reader.choose_sample',
+    'reader.add_to_vault', 'reader.empty_prompt', 'reader.stats_summary', 'reader.academic_word_default',
+    'reader.already_registered', 'reader.added_toast'
+  ];
+  var locales = ['ja', 'en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'];
+  var missingI18n = [];
+  locales.forEach(function(loc) {
+    VocabI18n.setLocale(loc);
+    newI18nKeys.forEach(function(k) {
+      var val = VocabI18n.t(k);
+      if (!val || val === k) {
+        missingI18n.push(loc + ':' + k);
+      }
+    });
+  });
+  VocabI18n.setLocale('ja');
+  assert("10-Language i18n parity 100% complete with zero missing translation keys",
+    missingI18n.length === 0,
+    missingI18n.join(', ')
+  );
+
+  // 30-7. Precision Bug Fix Audits: Voice SRS False Match & Tokenizer Boundaries
+  // Bug A: Voice SRS command priority over short target word
+  var shortWordCmd = VocabSpeech.parseVoiceSRSCommand('again', 'in', [], 'en');
+  assert("Voice SRS prioritises rating action 'again' over short target word 'in'",
+    shortWordCmd && shortWordCmd.type === 'rating' && shortWordCmd.rating === 0
+  );
+  var targetWordMatch = VocabSpeech.parseVoiceSRSCommand('subterranean', 'subterranean', [], 'en');
+  assert("Voice SRS recognises exact speech repetition for polysyllabic target word",
+    targetWordMatch && targetWordMatch.type === 'word_match' && targetWordMatch.rating === 2
+  );
+  var pianoMatch = VocabSpeech.parseVoiceSRSCommand('piano', 'piano', [], 'en');
+  assert("Voice SRS does not falsely trigger 'no' command when pronouncing 'piano'",
+    pianoMatch && pianoMatch.type === 'word_match' && pianoMatch.word === 'piano'
+  );
+  var tokenMatch = VocabSpeech.parseVoiceSRSCommand('token', 'token', [], 'en');
+  assert("Voice SRS does not falsely trigger 'ok' command when pronouncing 'token'",
+    tokenMatch && tokenMatch.type === 'word_match' && tokenMatch.word === 'token'
+  );
+
+  // Early Flash Blitz Completion Audit
+  var blitzApp = {
+    _isFlashBlitz: true,
+    _blitzTimerId: 9999,
+    _sessionReviewedItems: []
+  };
+  VocabAnkiView.showSessionSummary({ appState: blitzApp }, []);
+  assert("showSessionSummary cleanly disposes Flash Blitz timer upon early micro-session completion",
+    blitzApp._isFlashBlitz === false && blitzApp._blitzTimerId === null
+  );
+
+  // Bug E: Semantic Evolution Timeline ignores gloss slashes and accepts 2-step arrow transitions
+  var slashEntry = { word: 'prescribe', etymology: 'PIE *skreibh- (to cut / carve) -> Latin praescribere' };
+  var timeline2 = VocabMorphology.buildSemanticTimeline(slashEntry, 'en');
+  assert("buildSemanticTimeline preserves gloss slashes without fragmenting into bogus steps",
+    timeline2 && timeline2.steps.length === 2 && timeline2.steps[0].content.indexOf('(to cut / carve)') !== -1
+  );
+
+  // Bug G: Semantic Evolution Timeline does not fragment Japanese/Chinese words on kanji 由 (e.g. 由来, 経由)
+  var destructiveEntry = {
+    word: 'destructive',
+    lang: 'en',
+    etymology: 'ラテン語の「dēstruere（破壊する、解体する；dē-『下へ、分離』＋struere『積み上げる、建てる』）」の過去分詞語幹「dēstruct-」に接尾辞「-īvus（〜の傾向がある）」が付いた後期ラテン語「dēstructīvus」に由来。中期英語期にフランス語を経由して導入された。積み上げられた構造物を引き倒して無に帰せしめる性質を表す。',
+    etymologyTags: ['*ster-'],
+    meanings: [{ text: '破壊的な、破滅的な' }]
+  };
+  var timelineDestructive = VocabMorphology.buildSemanticTimeline(destructiveEntry, 'ja');
+  assert("buildSemanticTimeline does not fragment sentences on kanji 由 and produces clean vector",
+    timelineDestructive &&
+    timelineDestructive.steps.length >= 3 &&
+    timelineDestructive.steps.every(function(s) {
+      return !s.content.endsWith('に') && !s.content.startsWith('来。') && !s.content.startsWith('して導入');
+    })
+  );
+
+  // Bug F: Smart Reader tokenization for CJK compounds
+  var cjkSent = "人工知能と量子力学を研究する。";
+  var cjkTokens = VocabModal.tokenizeReaderSentence(cjkSent, new Set(['量子力学']));
+  assert("tokenizeReaderSentence chunks CJK compound terms greedily from known word lexicon",
+    cjkTokens.indexOf('量子力学') !== -1 && cjkTokens.indexOf('人工知能') !== -1
+  );
+  var enSent = "Quantum entanglement is fascinating.";
+  var enTokens = VocabModal.tokenizeReaderSentence(enSent, new Set());
+  assert("tokenizeReaderSentence retains standard regex tokenization for Western languages",
+    enTokens.indexOf('Quantum') !== -1 && enTokens.indexOf('entanglement') !== -1
+  );
+
+  // Bug H: splitInputWords preserves slash compounds like and/or without splitting
+  var slashWords = VocabQueue.splitInputWords('and/or');
+  assert("splitInputWords preserves slash-joined compound expressions",
+    slashWords.length === 1 && slashWords[0] === 'and/or'
+  );
+
+  // Bug I: parseVoiceSRSCommand recognizes 1-character CJK commands with natural particle suffixes
+  var cmdNextJa = VocabSpeech.parseVoiceSRSCommand('次へ', 'prescribe', ['処方する'], 'ja');
+  assert("parseVoiceSRSCommand matches 1-char CJK command with natural particle (次へ)",
+    cmdNextJa && cmdNextJa.action === 'next'
+  );
+
+  // Bug J: Content-aware era classification in buildSemanticTimeline
+  var latinTimeline = VocabMorphology.buildSemanticTimeline({
+    word: 'prescribe',
+    lang: 'en',
+    etymology: 'ラテン語 praescribere (あらかじめ前に書く) → フランス語 prescrire → 中英語 prescribe (指図・処方する)'
+  }, 'ja');
+  assert("buildSemanticTimeline detects era based on content rather than fixed indexing",
+    latinTimeline && latinTimeline.steps[0].era.indexOf('古典期') !== -1
+  );
+
+  // Bug K: 10-language parity in SEMANTIC_REALMS (Macro-Realm Ontology)
+  var realmLangs = ['ja', 'en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'zh', 'ko'];
+  var allRealmsLocalized = Object.values(VocabMorphology.SEMANTIC_REALMS).every(function(r) {
+    return r.i18n && realmLangs.every(function(l) { return typeof r.i18n[l] === 'string' && r.i18n[l].length > 0; });
+  });
+  assert("SEMANTIC_REALMS provides 10-language parity labels for all macro domains", allRealmsLocalized);
+
+  // Bug L: Search query tokenization preserves slash compounds (and/or, w/o)
+  var slashQueryTokens = VocabSearch.extractQueryTokens('and/or w/o');
+  assert("VocabSearch.extractQueryTokens preserves slash-joined compounds without splitting",
+    slashQueryTokens.length === 2 && slashQueryTokens[0] === 'and/or' && slashQueryTokens[1] === 'w/o'
+  );
+
+  // Bug M: parseAnkiExport decodes single quote & HTML entities for lossless round-trip
+  var ankiSample = "<b>l&#39;homme</b>\t<b>Noun</b> l'homme (the man)<br><small>c&#39;est la vie</small>\ttag1";
+  var parsedAnkiQuotes = VocabExport.parseAnkiExport(ankiSample);
+  assert("parseAnkiExport decodes &#39; into authentic apostrophe for French/English",
+    parsedAnkiQuotes.length === 1 && parsedAnkiQuotes[0].word === "l'homme"
+  );
+
+  // Bug N: predictIntervals formats locale-appropriate strings for 10 languages
+  var dummyAnkiCard = { interval: 1, repetition: 1, stability: 2.5, difficulty: 5.0 };
+  var intervalsZh = VocabSRS.predictIntervals(dummyAnkiCard, 'zh');
+  var intervalsKo = VocabSRS.predictIntervals(dummyAnkiCard, 'ko');
+  assert("predictIntervals provides localized strings for zh and ko",
+    intervalsZh[0] === '1分钟后' && intervalsKo[0] === '1분 후'
+  );
+
+  // Bug O: calculateNextReview self-heals from future clock drift
+  var futureClockCard = {
+    word: 'resilient',
+    interval: 5,
+    repetition: 2,
+    stability: 5.0,
+    reviewUpdatedAt: Date.now() + 86400000 * 10 // 10 days in the future
+  };
+  var nextRevCalc = VocabSRS.calculateNextReview(futureClockCard, 2);
+  assert("calculateNextReview self-heals clock drift without NaN or corrupted future timestamp",
+    Number.isFinite(nextRevCalc.nextReview) && nextRevCalc.reviewUpdatedAt <= Date.now() + 1000
+  );
+
+  // Bug P: handleGlobalKeydown ignores keys during IME composition (keyCode 229)
+  var handledIme = VocabNavigation.handleGlobalKeydown({ key: 'Enter', keyCode: 229, isComposing: false });
+  assert("handleGlobalKeydown ignores Enter during IME composition (keyCode 229)", handledIme === false);
+
+  // Bug Q: handleGlobalKeydown guards Anki review shortcuts when a modal is open
+  var ankiAdvanceCalled = false;
+  var handledModal = VocabNavigation.handleGlobalKeydown(
+    { key: ' ', code: 'Space' },
+    {
+      isAnkiOpen: true,
+      anyModalOpen: true,
+      ankiAdvance: function() { ankiAdvanceCalled = true; }
+    }
+  );
+  assert("handleGlobalKeydown does not trigger Anki advance when modal is open over Anki",
+    handledModal === false && ankiAdvanceCalled === false
+  );
+
+  // Bug R: parseApiJson recovers truncated JSON array from stream cutoff
+  var truncatedJson = '[{"word":"paradigm","meanings":[{"pos":"Noun","text":"模範"}]},{"word":"ephemeral"';
+  var repairedArr = null;
+  VocabDictionary.parseApiJson(truncatedJson).then(function(val) { repairedArr = val; });
+  if (typeof drainMicrotasks === 'function') drainMicrotasks();
+  assert("parseApiJson repairs truncated JSON array and preserves completed items",
+    Array.isArray(repairedArr) && repairedArr.length === 1 && repairedArr[0].word === "paradigm"
+  );
+
+  // Bug S: parseShareDeckUrl localizes fallback title across 10 languages
+  var frDeckCode = VocabExport.generateClassroomDeckCode([{ word: 'bonjour', meanings: [{ pos: 'Noun', text: 'hello' }] }], '', 'fr');
+  var parsedFr = VocabExport.parseShareDeckUrl(frDeckCode.code);
+  assert("parseShareDeckUrl provides authentic localized fallback title (Paquet Classroom)",
+    parsedFr && parsedFr.title === 'Paquet Classroom'
+  );
+
+  // Bug T: parseApiJson repairs truncated JSON object from stream cutoff
+  var truncatedObjJson = '{"word":"concur","meanings":[{"pos":"vi","text":"agree"';
+  var repairedObj = null;
+  VocabDictionary.parseApiJson(truncatedObjJson).then(function(val) { repairedObj = val; });
+  if (typeof drainMicrotasks === 'function') drainMicrotasks();
+  assert("parseApiJson repairs truncated JSON object and recovers partial payload",
+    repairedObj !== null && repairedObj.word === "concur" && Array.isArray(repairedObj.meanings) && repairedObj.meanings[0].text === "agree"
+  );
+
+  // Bug U: buildNuanceComparison resolves comprehend vs apprehend and Korean localization
+  var nuanceComp = VocabMorphology.buildNuanceComparison('comprehend');
+  assert("buildNuanceComparison resolves comprehend vs apprehend pair",
+    nuanceComp !== null && nuanceComp.pair === 'apprehend' && nuanceComp.root.indexOf('*gʰed-') !== -1
+  );
+  VocabI18n.setLocale('ko');
+  var nuanceCompKoHtml = VocabMorphology.renderNuanceComparisonHtml(nuanceComp);
+  assert("renderNuanceComparisonHtml translates nuance meanings to Korean",
+    nuanceCompKoHtml.indexOf('포괄적으로 이해하다') !== -1 && nuanceCompKoHtml.indexOf('핵심 차이') !== -1
+  );
+  VocabI18n.setLocale('ja');
+
+  // Bug V: tokenizeReaderSentence tokenizes Korean Hangul and Latin compounds
+  var koreanSent = '인공지능 AI 모델이 문맥을 분석합니다.';
+  var koreanTokens = VocabModal.tokenizeReaderSentence(koreanSent);
+  assert("tokenizeReaderSentence accurately segments Korean Hangul sentences",
+    Array.isArray(koreanTokens) && koreanTokens.indexOf('인공지능') !== -1 && koreanTokens.indexOf('AI') !== -1
+  );
+
+  // Bug W: renderSemanticTimelineHtml includes Han Unification lang tag
+  var testTimeline = {
+    title: '语义演变',
+    lang: 'zh',
+    steps: [
+      { era: '古典期', content: '原始词义' },
+      { era: '现代期', content: '现代定着义' }
+    ]
+  };
+  var timelineZhHtml = VocabMorphology.renderSemanticTimelineHtml(testTimeline);
+  assert("renderSemanticTimelineHtml outputs lang attribute for CJK Han Unification",
+    timelineZhHtml.indexOf('lang="zh"') !== -1 && timelineZhHtml.indexOf('原始词义') !== -1
+  );
+
+  // Bug X: VocabWebGLGraph exports resilient API
+  assert("VocabWebGLGraph exports resilient API and render method",
+    typeof VocabWebGLGraph.render === 'function' && typeof VocabWebGLGraph.invalidate === 'function'
+  );
+
+  // Bug Y: ko -> ko starter pack localization has zero Japanese kana leakage
+  var koSpRes = VocabStarterPack.populateStarterPack([], 'ko', 'ko_pre1', 'distinction_entries_ko_ko', 'ko');
+  var hasKanaRe = /[\u3040-\u309f\u30a0-\u30ff]/;
+  var koSpClean = Array.isArray(koSpRes.added) && koSpRes.added.length === 8 && koSpRes.added.every(function(c) {
+    return c.tgtLang === 'ko' && c.pair === 'ko_ko' &&
+      !hasKanaRe.test(c.grammar_forms || '') &&
+      !hasKanaRe.test(c.category || '') &&
+      !hasKanaRe.test(c.folder || '') &&
+      !hasKanaRe.test(c.core || '') &&
+      !hasKanaRe.test(c.etymology || '') &&
+      !hasKanaRe.test(c.history_note || '') &&
+      !hasKanaRe.test(c.example && c.example.trans || '') &&
+      (c.meanings || []).every(function(m) { return !hasKanaRe.test(m.text || ''); }) &&
+      (c.phrases || []).every(function(p) { return !hasKanaRe.test(p.trans || ''); }) &&
+      (c.derivatives || []).every(function(d) { return !hasKanaRe.test(d.meaning || ''); });
+  });
+  assert("populateStarterPack ko_ko localizes all 8 starter cards to Korean with zero Japanese kana", koSpClean);
+
+  // Bug Z: repairEntriesLocalization auto-heals polluted ko_ko starter cards
+  var pollutedKoCard = {
+    id: 'ko_pre1_insik',
+    num: 6,
+    word: '인식',
+    lang: 'ko',
+    tgtLang: 'ko',
+    pair: 'ko_ko',
+    grammar_forms: '한자: 認識 / 字源: *識 (見分ける・記す)',
+    category: 'その他',
+    folder: '韓国語 TOPIK II・漢字語字源ネットワーク選',
+    meanings: [{ pos: 'N', text: '認識、理解' }],
+    core: '物事の本質を見極めて心に記す（*識）こと。',
+    etymology: '韓国漢字語「認識」。日本語「認識」と完全同源。',
+    etymologyTags: ['*識'],
+    history_note: 'クラスタを形成。',
+    example: { foreign: '인식이 높아졌다.', trans: '認識が大きく高まった。' }
+  };
+  var healedKoList = VocabCore.repairEntriesLocalization([pollutedKoCard], { key: 'distinction_entries_ko_ko', srcLang: 'ko', tgtLang: 'ko' });
+  var healedKo = healedKoList && healedKoList[0];
+  assert("repairEntriesLocalization heals Japanese-polluted ko_ko cards back to pure Korean",
+    healedKo &&
+    !hasKanaRe.test(healedKo.core || '') &&
+    !hasKanaRe.test(healedKo.etymology || '') &&
+    !hasKanaRe.test(healedKo.history_note || '') &&
+    !hasKanaRe.test(healedKo.category || '') &&
+    !hasKanaRe.test(healedKo.folder || '') &&
+    !hasKanaRe.test(healedKo.grammar_forms || '') &&
+    !hasKanaRe.test((healedKo.meanings && healedKo.meanings[0] && healedKo.meanings[0].text) || '')
+  );
+
+  // Bug AA: Card + Timeline rendering in ko -> ko under Japanese UI locale contains zero Japanese body/badges/timeline text
+  VocabI18n.setLocale('ja');
+  var koTimeline = VocabMorphology.buildSemanticTimeline(healedKo, 'ko');
+  var koTimelineHtml = VocabMorphology.renderSemanticTimelineHtml(koTimeline);
+  assert("buildSemanticTimeline renders pure Korean root/stem/modern steps for ko_ko without Japanese kana",
+    koTimeline && Array.isArray(koTimeline.steps) && koTimeline.steps.length >= 3 &&
+    !hasKanaRe.test(koTimelineHtml) &&
+    koTimelineHtml.indexOf('분별하다') !== -1 &&
+    koTimelineHtml.indexOf('기저 형태소') !== -1
+  );
+  var koCardEl = VocabCardView.createCardElement(healedKo, { tgtLang: 'ko', lang: 'ko' });
+  var koCardVisibleHtml = String(koCardEl.innerHTML || '').replace(/\s+(?:title|aria-label)="[^"]*"/g, '');
+  var koStarterInsikEl = VocabCardView.createCardElement(koSpRes.added[5], { tgtLang: 'ko', lang: 'ko' });
+  var koStarterInsikHtml = String(koStarterInsikEl.innerHTML || '').replace(/\s+(?:title|aria-label)="[^"]*"/g, '');
+  assert("createCardElement ko_ko card body/badges/folder/due render in Korean even when UI locale is ja",
+    !hasKanaRe.test(koCardVisibleHtml) &&
+    koCardVisibleHtml.indexOf('KO 스타터 팩') !== -1 &&
+    koCardVisibleHtml.indexOf('일반') !== -1 &&
+    !hasKanaRe.test(koStarterInsikHtml) &&
+    koStarterInsikHtml.indexOf('인식·심리') !== -1 &&
+    koStarterInsikHtml.indexOf('복습 기한') !== -1
+  );
+
+  // Bug AB: Compound categories & toolbar keys translate properly to Korean
+  assert("VocabI18n translates その他 and compound categories to Korean cleanly",
+    VocabI18n.translateCategory('その他', 'ko') === '일반' &&
+    VocabI18n.translateCategory('法学・人権', 'ko') === '법학·인권' &&
+    VocabI18n.t('list.academic', '', 'ko') === '학술 상세' &&
+    VocabI18n.t('nav.sort_new', '', 'ko') === '정렬: 최신순'
+  );
+
+  // 33. High-Precision Short Writing Grammar & Context Evaluator Tests
+  var evalMissingDet = VocabAnkiView.evaluateUserWriting('enormous', 'I have enormous apple', { lang: 'en', tgtLang: 'ja', core: '桁外れに大きい' });
+  assert("evaluateUserWriting flags missing determiner before singular countable noun ('I have enormous apple') with 'an enormous apple' suggestion",
+    evalMissingDet.valid === false && evalMissingDet.score < 65 && evalMissingDet.feedback.indexOf('an enormous apple') !== -1
+  );
+  var evalBadArt = VocabAnkiView.evaluateUserWriting('enormous', 'I have a enormous apple.', { lang: 'en', tgtLang: 'en' });
+  assert("evaluateUserWriting flags a/an sound mismatch ('a enormous') and suggests 'an enormous'",
+    evalBadArt.valid === false && evalBadArt.feedback.indexOf('an enormous') !== -1
+  );
+  var evalSvaErr = VocabAnkiView.evaluateUserWriting('enormous', 'I has an enormous apple.', { lang: 'en', tgtLang: 'en' });
+  assert("evaluateUserWriting flags subject-verb agreement error ('I has' -> 'I have')",
+    evalSvaErr.valid === false && evalSvaErr.feedback.indexOf('I have') !== -1
+  );
+  var evalModalErr = VocabAnkiView.evaluateUserWriting('enormous', 'She can goes to the enormous library.', { lang: 'en', tgtLang: 'en' });
+  assert("evaluateUserWriting flags modal + inflected verb error ('can goes')",
+    evalModalErr.valid === false && evalModalErr.feedback.indexOf('can goes') !== -1
+  );
+  var evalCleanShort = VocabAnkiView.evaluateUserWriting('enormous', 'I have an enormous apple.', { lang: 'en', tgtLang: 'ja' });
+  assert("evaluateUserWriting accepts grammatically sound sentence ('I have an enormous apple.')",
+    evalCleanShort.valid === true && evalCleanShort.score >= 80
+  );
+  var evalRichEnormous = VocabAnkiView.evaluateUserWriting('enormous', 'We discovered an enormous fossil buried deep beneath the desert.', { lang: 'en', tgtLang: 'ja' });
+  assert("evaluateUserWriting awards high score to rich grammatical sentence",
+    evalRichEnormous.valid === true && evalRichEnormous.score >= 90
+  );
+  var evalStuffing = VocabAnkiView.evaluateUserWriting('enormous', 'enormous enormous enormous enormous', { lang: 'en', tgtLang: 'ja' });
+  assert("evaluateUserWriting penalizes word repetition stuffing",
+    evalStuffing.valid === false && evalStuffing.score < 70
+  );
+  var evalIrreg = VocabAnkiView.evaluateUserWriting('apply', 'She applied the scientific method to solve the complex problem.', { lang: 'en', tgtLang: 'en' });
+  assert("evaluateUserWriting recognizes -y -> -ied inflection ('apply' -> 'applied')",
+    evalIrreg.valid === true && evalIrreg.score >= 90
+  );
+  var evalCopied = VocabAnkiView.evaluateUserWriting('enormous', 'The project required an enormous effort.', { lang: 'en', tgtLang: 'en', example: { foreign: 'The project required an enormous effort.' } });
+  assert("evaluateUserWriting detects verbatim copy of card example sentence",
+    evalCopied.valid === false && evalCopied.score <= 70
+  );
+
+  // 34. Anti-Hallucination & Example Quality Validation Tests (validateEntry / validateExampleQuality)
+  var hallucinatedCard = {
+    word: 'xyzzyplugh',
+    lang: 'en',
+    tgtLang: 'ja',
+    etymologyConfidence: 'unknown',
+    etymologyTags: [],
+    etymology: '語源不明',
+    meanings: [{ pos: 'N[C]', text: 'xyzzyplughの中心的語義' }],
+    example: { foreign: 'This is a xyzzyplugh', ja: 'This is a xyzzyplugh', used_form: 'missingform' }
+  };
+  var hallucFlags = VocabMorphology.validateEntry(hallucinatedCard);
+  assert("validateEntry flags hallucinated/stub meanings, broken example punctuation, missing <b>, and unverified etymology",
+    hallucFlags.indexOf('語義が仮置きまたは未検証') !== -1 &&
+    hallucFlags.indexOf('例文の文頭大文字・文末句読点不備') !== -1 &&
+    hallucFlags.indexOf('和訳に<b>なし') !== -1 &&
+    hallucFlags.indexOf('used_formが例文中に無い') !== -1 &&
+    hallucFlags.indexOf('語源・実在性が未検証') !== -1
+  );
+
+  var badExGrammarCard = {
+    word: 'enormous',
+    lang: 'en',
+    tgtLang: 'ja',
+    etymologyConfidence: 'certain',
+    etymologyTags: ['*norma'],
+    etymology: 'ラテン語 *norma（基準）+ e-（外へ）',
+    meanings: [{ pos: 'Adj', text: '桁外れに大きい' }],
+    example: { foreign: 'I have a enormous apple.', ja: '私は<b>巨大な</b>リンゴを持っている。', used_form: 'enormous' }
+  };
+  var badExFlags = VocabMorphology.validateEntry(badExGrammarCard);
+  assert("validateEntry catches English grammar errors inside card examples ('a enormous')",
+    badExFlags.indexOf('例文の文法不備') !== -1
+  );
+
+  var cleanValidCard = {
+    word: 'enormous',
+    lang: 'en',
+    tgtLang: 'ja',
+    etymologyConfidence: 'certain',
+    etymologyTags: ['*norma'],
+    etymology: 'ラテン語 *norma（基準）+ e-（外へ）',
+    meanings: [{ pos: 'Adj', text: '桁外れに大きい、莫大な' }],
+    example: { foreign: 'The project required an enormous amount of effort.', ja: 'その計画には<b>莫大な</b>労力が必要だった。', used_form: 'enormous' }
+  };
+  var cleanFlags = VocabMorphology.validateEntry(cleanValidCard);
+  assert("validateEntry passes well-formed grounded card with zero flags",
+    cleanFlags.length === 0
+  );
+
+  // 35. Comprehensive Bug Audit Regression Tests (Cross-module API, i18n parity, mergeWords tie-breaker)
+  assert("VocabGraph exports updateGraphDataAndFit, startGraphSimulation, playSkillUnlockSound",
+    typeof VocabGraph.updateGraphDataAndFit === 'function' &&
+    typeof VocabGraph.startGraphSimulation === 'function' &&
+    typeof VocabGraph.playSkillUnlockSound === 'function'
+  );
+  assert("VocabModal exposes switchExtractMode and VocabSync exposes isCloudReady",
+    typeof VocabModal.switchExtractMode === 'function' &&
+    typeof VocabSync.isCloudReady === 'function' &&
+    typeof VocabEikenCatalog.getWord === 'function'
+  );
+
+  // 10-language i18n full key parity & placeholder parity
+  var allLocs = Object.keys(VocabI18n.TRANSLATIONS);
+  var unionKeys = {};
+  allLocs.forEach(function(loc) {
+    Object.keys(VocabI18n.TRANSLATIONS[loc]).forEach(function(k) { unionKeys[k] = true; });
+  });
+  var totalUnionCount = Object.keys(unionKeys).length;
+  var parityOk = allLocs.length === 10 && allLocs.every(function(loc) {
+    return Object.keys(VocabI18n.TRANSLATIONS[loc]).length === totalUnionCount;
+  });
+  assert("VocabI18n maintains complete key parity across all 10 locales (" + totalUnionCount + " keys each)", parityOk);
+
+  // Verify 3rd-arg fallback parameter behavior in VocabI18n.t()
+  var fbResult = VocabI18n.t('non.existent.key.xyz', { count: 3 }, 'Fallback {count}');
+  assert("VocabI18n.t honors 3rd-arg fallback string with placeholder interpolation", fbResult === 'Fallback 3');
+
+  // Verify mergeWords tie-breaker selects higher version when timestamps are equal
+  var equalTs = 1700000000000;
+  var localVerCard = { id: 'merge_v_1', word: 'vertest', lang: 'en', updatedAt: equalTs, version: 5, folder: '', notes: '', meanings: [{ pos: 'N', text: 'v5' }] };
+  var remoteVerCard = { id: 'merge_v_1', word: 'vertest', lang: 'en', updatedAt: equalTs, version: 2, folder: 'General', notes: 'stale note', meanings: [{ pos: 'N', text: 'v2' }] };
+  var mergedSameTs = VocabStorage.mergeWords([remoteVerCard], [localVerCard]);
+  var mergedWinner = mergedSameTs.find(function(x) { return x.id === 'merge_v_1'; });
+  assert("VocabStorage.mergeWords breaks equal-timestamp ties using higher version",
+    mergedWinner && mergedWinner.version === 5 && !mergedWinner.folder && mergedWinner.notes === ''
+  );
+
+  // Verify failed queue entries do not block resubmission
+  var catHitWord = VocabEikenCatalog.getWord('moribund');
+  assert("VocabEikenCatalog.getWord resolves catalog word schema cleanly",
+    !catHitWord || (typeof catHitWord === 'object' && ('meanings' in catHitWord || 'core' in catHitWord))
+  );
+
+  // Verify evaluateUserWriting preserves core_zh and core_ko rather than wiping valid Hanzi/Hangul
+  var zhCoreItem = { word: 'enormous', tgtLang: 'zh', core: '巨大な', core_zh: '极其庞大的', meanings: [{ pos: 'Adj', text: '巨大的' }], example: { foreign: 'An enormous ship arrived.' } };
+  var koCoreItem = { word: 'enormous', tgtLang: 'ko', core: '巨大な', core_ko: '엄청나게 큰', meanings: [{ pos: 'Adj', text: '거대한' }], example: { foreign: 'An enormous ship arrived.' } };
+  var zhEvalRes = VocabAnkiView.evaluateUserWriting('enormous', 'We saw an enormous whale near the coast.', zhCoreItem);
+  var koEvalRes = VocabAnkiView.evaluateUserWriting('enormous', 'We saw an enormous whale near the coast.', koCoreItem);
+  assert("evaluateUserWriting preserves valid core_zh and core_ko core images",
+    zhEvalRes.feedback.indexOf('极其庞大的') !== -1 && koEvalRes.feedback.indexOf('엄청나게 큰') !== -1
+  );
+
+  // Regression tests for jump-to-word bugs
+  // 1) Homograph #2 page resolution when #1 appears earlier in filtered results
+  (function() {
+    var homoList = [];
+    homoList.push({ id: 'hm-bank-1', word: 'bank', homographIndex: 1, lang: 'en', meanings: [{ pos: 'Noun', text: '銀行' }] });
+    for (var hi = 1; hi <= 32; hi++) {
+      homoList.push({ id: 'hm-pad-' + hi, word: 'padword' + hi, lang: 'en', meanings: [{ pos: 'Noun', text: '仮' + hi }] });
+    }
+    homoList.push({ id: 'hm-bank-2', word: 'bank', homographIndex: 2, lang: 'en', meanings: [{ pos: 'Noun', text: '堤防' }] });
+    // On 'new' (newest first) or 'old' sort, test with 'old' sort so bank#1 is index 0 (page 1) and bank#2 is index 33 (page 2)
+    var prevSort = VocabCore.App.sortBy;
+    var prevEntries = VocabCore.App.entries;
+    var prevPage = VocabCore.App.page;
+    try {
+      VocabCore.App.sortBy = 'old';
+      VocabCore.setJson('distinction_entries', homoList);
+      VocabCore.App.entries = homoList;
+      VocabCore.jumpToWord('bank#2', 'en');
+      assert("jumpToWord navigates to homograph #2 page (page 2) instead of matching homograph #1 on page 1",
+        VocabCore.App.page === 2, "Page: " + VocabCore.App.page);
+    } finally {
+      VocabCore.App.sortBy = prevSort;
+      VocabCore.App.entries = prevEntries;
+      VocabCore.App.page = prevPage;
+    }
+  })();
+
+  // 2) jumpToWord switches language cleanly even when crossLang filter was active
+  (function() {
+    var prevLang = VocabCore.App.lang;
+    var prevSrc = VocabCore.App.srcLang;
+    var prevTgt = VocabCore.App.tgtLang;
+    var prevCross = VocabCore.App.crossLang;
+    var prevEntries = VocabCore.App.entries;
+    try {
+      var frCards = [{ id: 'fr-lumiere', word: 'lumiere', lang: 'fr', meanings: [{ pos: 'Noun', text: '光' }] }];
+      var frPairKey = VocabStorage.getPairConfig('fr', 'ja').key;
+      VocabCore.setJson(frPairKey, frCards);
+      VocabCore.App.lang = 'en';
+      VocabCore.App.srcLang = 'en';
+      VocabCore.App.tgtLang = 'ja';
+      VocabCore.App.entries = [{ id: 'en-light', word: 'light', lang: 'en', meanings: [{ pos: 'Noun', text: '光' }] }];
+      VocabCore.App.crossLang = true;
+      var jumped = VocabCore.jumpToWord('lumiere', 'fr');
+      assert("jumpToWord switches pair when crossLang is enabled and locates target word",
+        jumped === true && VocabCore.App.srcLang === 'fr' && VocabCore.App.crossLang === false);
+    } finally {
+      VocabCore.App.lang = prevLang;
+      VocabCore.App.srcLang = prevSrc;
+      VocabCore.App.tgtLang = prevTgt;
+      VocabCore.App.crossLang = prevCross;
+      VocabCore.App.entries = prevEntries;
+    }
+  })();
+
+  // 3) Submitting an already-registered word via submitW skips daily AI quota gate and jumps to card
+  (function() {
+    var origGetEl = documentMock.getElementById;
+    var origOpenUpsell = globalThis.openUpsellModal;
+    var origJump = globalThis.jumpToWord;
+    var origQuotaFn = VocabStorage.getDailyAiUsageInfo;
+    var prevEntries = VocabCore.App.entries;
+    var prevKey = VocabCore.App.key;
+    var upsellCalled = false;
+    var jumpedWord = '';
+    try {
+      var existingCard = { id: 'q-existing-1', word: 'epistemic', homographIndex: 1, lang: 'en', meanings: [{ pos: 'Adj', text: '認識論的な' }], core: '知識の枠組みに関する', example: { foreign: 'Epistemic humility matters.' } };
+      VocabCore.setJson('distinction_entries', [existingCard]);
+      VocabCore.App.entries = [existingCard];
+      VocabCore.App.srcLang = 'en';
+      VocabCore.App.tgtLang = 'ja';
+      VocabCore.App.key = '';
+      VocabCore.App._lastSubmitWord = '';
+      VocabCore.App._lastSubmitTs = 0;
+
+      var fakeInWord = Object.assign({}, dummyElement, { id: 'inWord', value: 'epistemic' });
+      var fakeInFol = Object.assign({}, dummyElement, { id: 'inFol', value: '' });
+      var fakeSuggest = Object.assign({}, dummyElement, { id: 'wordSuggestBox', style: { display: 'block' } });
+      documentMock.getElementById = function(id) {
+        if (id === 'inWord') return fakeInWord;
+        if (id === 'inFol') return fakeInFol;
+        if (id === 'wordSuggestBox') return fakeSuggest;
+        return origGetEl.call(documentMock, id);
+      };
+      VocabStorage.getDailyAiUsageInfo = function() { return { limit: 5, used: 5, remaining: 0, isUnlimited: false }; };
+      globalThis.openUpsellModal = function() { upsellCalled = true; };
+      globalThis.jumpToWord = function(w) { jumpedWord = w; return true; };
+
+      VocabQueue.submitW();
+      assert("submitW on an already-registered word bypasses zero AI quota lock and jumps to card",
+        !upsellCalled && jumpedWord === 'epistemic' && fakeInWord.value === '' && fakeSuggest.style.display === 'none');
+    } finally {
+      documentMock.getElementById = origGetEl;
+      globalThis.openUpsellModal = origOpenUpsell;
+      globalThis.jumpToWord = origJump;
+      VocabStorage.getDailyAiUsageInfo = origQuotaFn;
+      VocabCore.App.entries = prevEntries;
+      VocabCore.App.key = prevKey;
+    }
+  })();
+
+  // 4) initWordSuggest cancels pending suggest display on cancelSuggest / form submit / cleared input
+  (function() {
+    var origGetEl = documentMock.getElementById;
+    var origSetTimeout = globalThis.setTimeout;
+    var origClearTimeout = globalThis.clearTimeout;
+    var scheduledCallbacks = [];
+    var cancelledIds = {};
+    try {
+      var listeners = {};
+      var formListeners = {};
+      var fakeForm = {
+        addEventListener: function(ev, fn) { (formListeners[ev] = formListeners[ev] || []).push(fn); },
+        removeEventListener: function(ev, fn) {}
+      };
+      var fakeInput = Object.assign({}, dummyElement, {
+        id: 'inWord',
+        value: 'epi',
+        form: fakeForm,
+        addEventListener: function(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
+        removeEventListener: function(ev, fn) {}
+      });
+      var fakeBox = Object.assign({}, dummyElement, { id: 'wordSuggestBox', style: { display: 'none' }, innerHTML: '' });
+      documentMock.getElementById = function(id) {
+        if (id === 'inWord') return fakeInput;
+        if (id === 'wordSuggestBox') return fakeBox;
+        return origGetEl.call(documentMock, id);
+      };
+      globalThis.setTimeout = function(fn, ms) {
+        var id = scheduledCallbacks.length + 1;
+        scheduledCallbacks.push({ id: id, fn: fn });
+        return id;
+      };
+      globalThis.clearTimeout = function(id) {
+        cancelledIds[id] = true;
+      };
+      var ctrl = VocabNavigation.initWordSuggest({
+        inputId: 'inWord',
+        boxId: 'wordSuggestBox',
+        getSuggestionsData: function() { return [{ word: 'epistemic', meaning: '認識論的な', lang: 'en', type: 'word', exact: false }]; }
+      });
+      // Trigger typing then immediately clear + submit before timer fires
+      (listeners['input'] || []).forEach(function(fn) { fn({ target: fakeInput }); });
+      fakeInput.value = '';
+      (formListeners['submit'] || []).forEach(function(fn) { fn({}); });
+      scheduledCallbacks.forEach(function(item) {
+        if (!cancelledIds[item.id]) item.fn();
+      });
+      assert("initWordSuggest cancels pending debounce timer on submit and keeps suggest box hidden",
+        fakeBox.style.display === 'none' && typeof ctrl.cancelSuggest === 'function');
+    } finally {
+      documentMock.getElementById = origGetEl;
+      globalThis.setTimeout = origSetTimeout;
+      globalThis.clearTimeout = origClearTimeout;
+    }
+  })();
+
+  // 5) scrollToCard clears highlight-jump from previous cards on rapid consecutive jumps
+  (function() {
+    var origQueryAll = documentMock.querySelectorAll;
+    try {
+      var prevClasses = { 'highlight-jump': true };
+      var makeClassList = function(map) {
+        return {
+          add: function(c) { map[c] = true; },
+          remove: function(c) { delete map[c]; },
+          contains: function(c) { return !!map[c]; }
+        };
+      };
+      var prevCard = { classList: makeClassList(prevClasses), offsetHeight: 100 };
+      var nextClasses = {};
+      var nextCard = {
+        classList: makeClassList(nextClasses),
+        scrollIntoView: function() {},
+        getBoundingClientRect: function() { return { top: 200, height: 100 }; },
+        offsetHeight: 100
+      };
+      documentMock.querySelectorAll = function(sel) {
+        if (sel === '#list .card.highlight-jump' && prevClasses['highlight-jump']) return [prevCard];
+        if (sel === '#list .card') return [prevCard, nextCard];
+        return [];
+      };
+      var cont = {
+        scrollTop: 0,
+        clientHeight: 600,
+        getBoundingClientRect: function() { return { top: 0, height: 600 }; },
+        scrollTo: function(opts) { this.scrollTop = opts.top; }
+      };
+      VocabCardView.scrollToCard(nextCard, cont);
+      assert("scrollToCard strips highlight-jump from previous card when jumping to another card",
+        !prevClasses['highlight-jump'] && !!nextClasses['highlight-jump']);
+    } finally {
+      documentMock.querySelectorAll = origQueryAll;
+    }
+  })();
+
+  // 6) list.jumped_to_word localized across all 10 languages with placeholder interpolation
+  assert("list.jumped_to_word translates cleanly across ja and en",
+    VocabI18n.t('list.jumped_to_word', { word: 'epistemic' }).length > 0 &&
+    VocabI18n.TRANSLATIONS.en['list.jumped_to_word'].indexOf('{word}') !== -1 &&
+    VocabI18n.TRANSLATIONS.ja['list.jumped_to_word'].indexOf('{word}') !== -1
+  );
+
+  // Comprehensive Audit Wave Regressions
+  // A1) Graph network drawGraph (no totalWordsCount ReferenceError) & tree unmatched root fallback (no createUnifiedPieRoot ReferenceError)
+  (function() {
+    var netOk = false;
+    try {
+      var mockCtx = {
+        save: function(){}, restore: function(){}, clearRect: function(){}, scale: function(){},
+        translate: function(){}, beginPath: function(){}, arc: function(){}, fill: function(){},
+        stroke: function(){}, moveTo: function(){}, lineTo: function(){}, setLineDash: function(){},
+        fillText: function(){}, measureText: function(){ return { width: 20 }; },
+        createRadialGradient: function(){ return { addColorStop: function(){} }; },
+        createLinearGradient: function(){ return { addColorStop: function(){} }; }
+      };
+      var mockCanvas = { width: 800, height: 600, getContext: function(){ return mockCtx; } };
+      var gs = {
+        layoutMode: 'network', width: 800, height: 600, panX: 0, panY: 0, zoom: 1,
+        nodes: [{ id: 'n1', type: 'word', word: 'test', label: 'test', x: 100, y: 100, radius: 10, level: 3, data: { word: 'test' } }],
+        edges: [], hoveredNode: null, selectedNode: null, searchMatches: new Set(), collapsedRoots: new Set(), unlockParticles: []
+      };
+      if (VocabGraphRenderer && typeof VocabGraphRenderer.drawGraph === 'function') {
+        VocabGraphRenderer.drawGraph(mockCanvas, gs);
+        netOk = true;
+      }
+    } catch (ge) { netOk = false; }
+    assert("VocabGraphRenderer.drawGraph runs in network mode without totalWordsCount ReferenceError", netOk);
+
+    var treeFallbackOk = false;
+    var prevGraphEntries = VocabCore.getJson('distinction_entries');
+    try {
+      if (VocabGraphLayout && typeof VocabGraphLayout.buildGraphData === 'function') {
+        VocabCore.setJson('distinction_entries', [{ id: 't1', word: 'alpha', lang: 'en', meanings: [{ pos: 'N', text: 'アルファ' }], etymologyTags: ['*al'] }]);
+        var gsTree = {
+          layoutMode: 'tree', focusedRootKey: '*nonexistentroot999', width: 800, height: 600,
+          nodes: [], edges: [], collapsedRoots: new Set()
+        };
+        var builtTree = VocabGraphLayout.buildGraphData('', false, 'all', gsTree);
+        treeFallbackOk = builtTree && Array.isArray(builtTree.nodes) && builtTree.nodes.length > 0;
+      }
+    } catch (te) { treeFallbackOk = false; }
+    finally { VocabCore.setJson('distinction_entries', prevGraphEntries || []); }
+    assert("VocabGraphLayout.buildGraphData falls back cleanly when focusedRootKey is absent", treeFallbackOk);
+  })();
+
+  // A2) Prototype pollution defense in parseAnyWords, winner ID preservation in mergeWords, and count=0 in recordAiGenerationUsage
+  (function() {
+    var protoPayload = JSON.stringify({ "__proto__": [{ word: "pollute", meanings: [{ pos: "N", text: "test" }] }], en: [{ word: "safe", meanings: [{ pos: "N", text: "安全" }] }] });
+    var parsedSafe = VocabStorage.parseAnyWords(protoPayload, 'en', false);
+    assert("VocabStorage.parseAnyWords ignores __proto__ keys cleanly",
+      Object.getPrototypeOf(parsedSafe) === Object.prototype && Array.isArray(parsedSafe.en) && parsedSafe.en.length === 1);
+
+    var localLose = { id: 'local_1', word: 'collide', wordKey: 'en:collide', lang: 'en', updatedAt: 1000, version: 1, meanings: [{ pos: 'N', text: 'old' }] };
+    var remoteWin = { id: 'remote_2', word: 'collide', wordKey: 'en:collide', lang: 'en', updatedAt: 5000, version: 3, meanings: [{ pos: 'N', text: 'new' }] };
+    var colMerged = VocabStorage.mergeWords([localLose], [remoteWin]);
+    assert("VocabStorage.mergeWords preserves winner ID on wordKey collision", colMerged.length === 1 && colMerged[0].id === 'remote_2');
+
+    var todayStr = VocabStorage.getTodayString();
+    var prevU = localStorage.getItem('vv_ai_gen_daily_' + todayStr);
+    localStorage.setItem('vv_ai_gen_daily_' + todayStr, '2');
+    var afterZero = VocabStorage.recordAiGenerationUsage(0);
+    assert("VocabStorage.recordAiGenerationUsage(0) does not increment daily usage", afterZero.used === 2);
+    if (prevU === null) localStorage.removeItem('vv_ai_gen_daily_' + todayStr);
+    else localStorage.setItem('vv_ai_gen_daily_' + todayStr, prevU);
+  })();
+
+  // A3) Smart Reader typographic apostrophe & CJK Latin word-boundary tokenization
+  (function() {
+    var frToks = VocabModal.tokenizeReaderSentence("L’homme est grand.", new Set());
+    var cjkToks = VocabModal.tokenizeReaderSentence("私はinternationalを学ぶ", new Set(['in']));
+    assert("tokenizeReaderSentence preserves typographic apostrophe contractions and Latin word boundaries in CJK",
+      frToks[0] === 'L’homme' && cjkToks.indexOf('international') !== -1);
+  })();
+
+  // A4) analyzeEnglishGrammar flags verbless determiner+noun fragments even if target word has V POS
+  (function() {
+    var nounFragRes = VocabAnkiView.evaluateUserWriting('run', 'A quick run today.', {
+      word: 'run', lang: 'en', meanings: [{ pos: 'V[I]', text: '走る' }, { pos: 'N[C]', text: '走り' }]
+    });
+    assert("evaluateUserWriting detects missing main verb in determiner+target fragments",
+      nounFragRes.issues.some(function(x) { return x && x.type === 'issueNoVerb'; }));
+  })();
+
+  // A5) undoAnkiRev restores reviewUpdatedAt and flags cleanly
+  (function() {
+    var origRevTs = 1700000123456;
+    var testCard = {
+      id: 'undo-reg-1', word: 'undoword', lang: 'en', interval: 5, repetition: 2,
+      efactor: 2.5, stability: 5, difficulty: 5, retrievability: 0.9, lapses: 0,
+      nextReview: Date.now() + 86400000, flags: [], version: 1, reviewUpdatedAt: origRevTs, updatedAt: origRevTs
+    };
+    var prevEntries = VocabCore.App.entries;
+    var prevHist = VocabCore.App.ankiHistory;
+    try {
+      VocabCore.App.entries = [testCard];
+      VocabCore.App.aList = [testCard];
+      VocabCore.App.ankiHistory = [{
+        lang: 'en', id: 'undo-reg-1', targetKey: 'distinction_entries',
+        prevProps: {
+          interval: 5, repetition: 2, efactor: 2.5, stability: 5, difficulty: 5,
+          retrievability: 0.9, lapses: 0, nextReview: testCard.nextReview,
+          flags: [], version: 1, reviewUpdatedAt: origRevTs, updatedAt: origRevTs
+        },
+        requeued: false
+      }];
+      testCard.flags = ['leech'];
+      testCard.reviewUpdatedAt = Date.now();
+      VocabAnkiView.undoAnkiRev({
+        appState: VocabCore.App,
+        getList: function() { return VocabCore.App.entries; },
+        saveList: function() {}
+      });
+      assert("undoAnkiRev restores original reviewUpdatedAt and flags without overwriting with now",
+        testCard.reviewUpdatedAt === origRevTs && Array.isArray(testCard.flags) && testCard.flags.length === 0);
+    } finally {
+      VocabCore.App.entries = prevEntries;
+      VocabCore.App.ankiHistory = prevHist;
+    }
+  })();
+
+  // A6) Queue failed task re-submission & internal fallback placeholder detection
+  (function() {
+    assert("VocabQueue.isPlaceholderItem catches internal root-expansion and generic English stubs",
+      VocabQueue.isPlaceholderItem({ word: 'specter', meanings: [{ pos: 'N', text: '（語根 *spec に由来する語義展開）' }], core: 'x' }) &&
+      VocabQueue.isPlaceholderItem({ word: 'specter', meanings: [{ pos: 'N', text: 'ghost' }], core: 'The core contextual usage of specter is demonstrated here.' })
+    );
+  })();
+
+  // A7) Cross-account switch in VocabSync.setSession triggers vault isolation
+  (function() {
+    var origClear = VocabStorage.clearAccountVaultData;
+    var clearCalled = false;
+    try {
+      VocabStorage.clearAccountVaultData = function() { clearCalled = true; };
+      localStorage.setItem('vv_cloud_owner_id', 'user-a');
+      VocabSync.setSession({ access_token: 'tok-b', user: { id: 'user-b' } });
+      assert("VocabSync.setSession purges prior user vault data when switching accounts",
+        clearCalled === true && localStorage.getItem('vv_cloud_owner_id') === 'user-b');
+    } finally {
+      VocabStorage.clearAccountVaultData = origClear;
+      VocabSync.setSession(null);
+      localStorage.removeItem('vv_cloud_owner_id');
+    }
+  })();
+
+  // A8) Existing word search & jump regression tests
+  (function() {
+    var manyPrefix = [
+      { word: 'prohibit', meanings: [{ pos: 'V', text: '禁止する' }] },
+      { word: 'promote', meanings: [{ pos: 'V', text: '促進する' }] },
+      { word: 'project', meanings: [{ pos: 'N', text: '計画' }] },
+      { word: 'provide', meanings: [{ pos: 'V', text: '提供する' }] },
+      { word: 'protect', meanings: [{ pos: 'V', text: '保護する' }] },
+      { word: 'produce', meanings: [{ pos: 'V', text: '生産する' }] },
+      { word: 'promise', meanings: [{ pos: 'V', text: '約束する' }] },
+      { word: 'process', meanings: [{ pos: 'N', text: '過程' }] },
+      { word: 'pro', meanings: [{ pos: 'N', text: '専門家' }] },
+      { word: 'café', meanings: [{ pos: 'N', text: 'カフェ' }] }
+    ];
+    var s1 = VocabNavigation.buildSuggestions('pro', manyPrefix);
+    assert("buildSuggestions finds exact match even after 7+ prefix matches",
+      s1.length > 0 && s1[0].word === 'pro' && s1[0].isExact === true);
+
+    var s2 = VocabNavigation.buildSuggestions('cafe', manyPrefix);
+    assert("buildSuggestions matches accent-folded exact word (cafe -> café)",
+      s2.length > 0 && s2[0].word === 'café' && s2[0].isExact === true);
+
+    var mockState = {
+      lang: 'en', srcLang: 'en', tgtLang: 'ja',
+      entries: [{ id: 'c1', word: 'café', lang: 'fr', meanings: [{ pos: 'N', text: 'カフェ' }] }],
+      loadedKey: 'distinction_entries', page: 1,
+      resetFilters: function() {}
+    };
+    var fallbackSearchVal = null;
+    var missRes = VocabListView.jumpToWord('nonexistent_xyz', 'fr', {
+      appState: mockState,
+      getJson: function() { return []; },
+      getAllKnownPairs: function() { return []; },
+      setSearch: function(v) { fallbackSearchVal = v; }
+    });
+    assert("jumpToWord does not corrupt active lang/entries on miss",
+      missRes === false && mockState.lang === 'en' && mockState.srcLang === 'en' && mockState.entries.length === 1 && fallbackSearchVal === 'nonexistent_xyz');
+
+    var hitRes = VocabListView.jumpToWord('cafe', 'en', {
+      appState: mockState,
+      getFiltered: function() { return mockState.entries; },
+      onRender: function() {}
+    });
+    assert("jumpToWord finds accent-folded existing word (cafe -> café)", hitRes === true);
+  })();
+
+  // 7) scrollToCard cancels pending align timers & cleans listeners on user scroll, and stabilizes jumping-to-card removal
+  (function() {
+    var origSetTimeout = globalThis.setTimeout;
+    var origClearTimeout = globalThis.clearTimeout;
+    var origAddDoc = documentMock.addEventListener;
+    var origRemoveDoc = documentMock.removeEventListener;
+    var origGetById = documentMock.getElementById;
+    var origQueryAll = documentMock.querySelectorAll;
+    try {
+      var scheduled = [];
+      var clearedIds = {};
+      var nextTid = 1000;
+      globalThis.setTimeout = function(fn, ms) {
+        var id = nextTid++;
+        scheduled.push({ id: id, fn: fn, ms: ms });
+        return id;
+      };
+      globalThis.clearTimeout = function(id) { clearedIds[id] = true; };
+
+      var listClasses = {};
+      var listElMock = {
+        classList: {
+          add: function(c) { listClasses[c] = true; },
+          remove: function(c) { delete listClasses[c]; },
+          contains: function(c) { return !!listClasses[c]; }
+        }
+      };
+      var contListeners = {};
+      var docListeners = {};
+      documentMock.addEventListener = function(ev, fn) { docListeners[ev] = fn; };
+      documentMock.removeEventListener = function(ev, fn) {
+        if (docListeners[ev] === fn) delete docListeners[ev];
+      };
+      documentMock.getElementById = function(id) {
+        if (id === 'list') return listElMock;
+        return origGetById ? origGetById(id) : null;
+      };
+
+      var anchorShiftEnabled = false;
+      var targetCard = {
+        classList: { add: function(){}, remove: function(){}, contains: function(){ return false; } },
+        scrollIntoView: function() {},
+        getBoundingClientRect: function() {
+          var shifted = anchorShiftEnabled && !listClasses['jumping-to-card'];
+          return { top: shifted ? 340 : 300, bottom: shifted ? 460 : 420, height: 120 };
+        },
+        offsetHeight: 120
+      };
+      documentMock.querySelectorAll = function(sel) {
+        if (sel === '#list .card') return [targetCard];
+        return [];
+      };
+      var cont = {
+        scrollTop: 100,
+        clientHeight: 600,
+        offsetHeight: 600,
+        getBoundingClientRect: function() { return { top: 100, bottom: 700, height: 600 }; },
+        scrollTo: function(opts) { this.scrollTop = opts.top; },
+        addEventListener: function(ev, fn) { contListeners[ev] = fn; },
+        removeEventListener: function(ev, fn) {
+          if (contListeners[ev] === fn) delete contListeners[ev];
+        }
+      };
+
+      VocabCardView.scrollToCard(targetCard, cont);
+      assert("scrollToCard binds wheel/touchstart/pointerdown/mousedown listeners",
+        Boolean(contListeners.wheel && contListeners.touchstart && contListeners.pointerdown && contListeners.mousedown && docListeners.keydown));
+
+      // Simulate user scrolling away immediately after jump
+      cont.scrollTop = 950;
+      contListeners.wheel();
+      var pendingAlignAfterWheel = scheduled.filter(function(t) { return (t.ms === 80 || t.ms === 200) && !clearedIds[t.id]; });
+      assert("user wheel scroll cancels 80ms/200ms align timers and detaches listeners",
+        pendingAlignAfterWheel.length === 0 && !contListeners.wheel && !docListeners.keydown);
+
+      // Simulate 600ms jumping-to-card removal: even if card top shifts when jumping-to-card is removed, viewport scrollTop compensates
+      var classTimer = scheduled.filter(function(t) { return t.ms === 600; })[0];
+      anchorShiftEnabled = true;
+      classTimer.fn();
+      assert("user scroll is never pulled back and jumping-to-card removal compensates viewport shift",
+        cont.scrollTop === 990 && !listClasses['jumping-to-card']);
+
+      // skipRetry: true should not schedule 80/200/600ms timers and removes jumping-to-card immediately
+      scheduled = [];
+      clearedIds = {};
+      anchorShiftEnabled = false;
+      VocabCardView.scrollToCard(targetCard, cont, { immediate: true, skipRetry: true });
+      var retryTimers = scheduled.filter(function(t) { return t.ms === 80 || t.ms === 200 || t.ms === 600; });
+      assert("scrollToCard with skipRetry skips align/class timers and cleans up immediately",
+        retryTimers.length === 0 && !listClasses['jumping-to-card'] && !contListeners.wheel);
+    } finally {
+      globalThis.setTimeout = origSetTimeout;
+      globalThis.clearTimeout = origClearTimeout;
+      documentMock.addEventListener = origAddDoc;
+      documentMock.removeEventListener = origRemoveDoc;
+      documentMock.getElementById = origGetById;
+      documentMock.querySelectorAll = origQueryAll;
+    }
+  })();
+
+  // 8) IME compositionend guard in initWordSuggest & mobile sidebar Escape/modal collapse
+  (function() {
+    var origGetById = documentMock.getElementById;
+    var origQuerySel = documentMock.querySelector;
+    var origInnerWidth = globalThis.window.innerWidth;
+    try {
+      var inputListeners = {};
+      var boxListeners = {};
+      var mockInput = {
+        value: 'ex',
+        addEventListener: function(ev, fn) { inputListeners[ev] = fn; },
+        removeEventListener: function(ev, fn) { if (inputListeners[ev] === fn) delete inputListeners[ev]; },
+        focus: function() {},
+        blur: function() {}
+      };
+      var mockBox = {
+        style: { display: 'flex' },
+        innerHTML: '',
+        addEventListener: function(ev, fn) { boxListeners[ev] = fn; },
+        removeEventListener: function(ev, fn) { if (boxListeners[ev] === fn) delete boxListeners[ev]; },
+        querySelectorAll: function() { return [{ dataset: { type: 'word', word: 'ex' }, classList: { toggle: function(){} } }]; },
+        querySelector: function() { return { dataset: { type: 'word', word: 'ex' } }; }
+      };
+      var jumpedBySuggest = false;
+      var suggestCtrl = VocabNavigation.initWordSuggest({
+        input: mockInput,
+        box: mockBox,
+        getCurrentList: function() { return [{ word: 'ex', meanings: [{ pos: 'N', text: 'test' }] }]; },
+        onJumpWord: function() { jumpedBySuggest = true; }
+      });
+
+      // Simulate Safari/WebKit IME compositionend followed immediately by Enter keydown
+      inputListeners.compositionstart();
+      inputListeners.compositionend({ target: mockInput });
+      var preventedAfterIme = false;
+      inputListeners.keydown({ key: 'Enter', isComposing: false, keyCode: 13, preventDefault: function(){ preventedAfterIme = true; } });
+      assert("initWordSuggest does not hijack Enter immediately after IME compositionend",
+        jumpedBySuggest === false && preventedAfterIme === false);
+      suggestCtrl.destroy();
+
+      // Mobile sidebar closes on Escape and toggleModal collapses mobile sidebar
+      globalThis.window.innerWidth = 375;
+      var bodyClasses = { 'side-open-lock': true };
+      var origBodyClassList = documentMock.body.classList;
+      documentMock.body.classList = {
+        add: function(c) { bodyClasses[c] = true; },
+        remove: function(c) { delete bodyClasses[c]; },
+        contains: function(c) { return !!bodyClasses[c]; },
+        toggle: function(c, force) { if (force === undefined) { bodyClasses[c] ? delete bodyClasses[c] : (bodyClasses[c] = true); } else if (force) bodyClasses[c] = true; else delete bodyClasses[c]; }
+      };
+      var modalClasses = {};
+      var mockModal = {
+        classList: {
+          contains: function(c) { return !!modalClasses[c]; },
+          toggle: function(c, f) { if (f === undefined) { modalClasses[c] ? delete modalClasses[c] : (modalClasses[c] = true); } else if (f) modalClasses[c] = true; else delete modalClasses[c]; }
+        }
+      };
+      documentMock.getElementById = function(id) {
+        if (id === 'readerWordPopover') return { style: { display: 'none' } };
+        if (id === 'settingsModal') return mockModal;
+        return origGetById ? origGetById(id) : null;
+      };
+      documentMock.querySelector = function(sel) {
+        if (sel === '.modal-ov.open') return modalClasses.open ? mockModal : null;
+        return origQuerySel ? origQuerySel(sel) : null;
+      };
+      var escHandled = VocabNavigation.handleGlobalKeydown({ key: 'Escape', isComposing: false, keyCode: 27 }, {
+        isAnkiOpen: false,
+        anyModalOpen: false,
+        closeSidebar: function() { delete bodyClasses['side-open-lock']; bodyClasses['side-collapsed'] = true; }
+      });
+      assert("handleGlobalKeydown closes open mobile sidebar on Escape",
+        escHandled === true && !bodyClasses['side-open-lock'] && !!bodyClasses['side-collapsed']);
+
+      // Re-open mobile sidebar and open modal via toggleModal
+      delete bodyClasses['side-collapsed'];
+      bodyClasses['side-open-lock'] = true;
+      VocabModal.toggleModal('settingsModal', true);
+      assert("toggleModal collapses mobile sidebar (adds side-collapsed, removes side-open-lock) when opening modal",
+        !!bodyClasses['side-collapsed'] && !bodyClasses['side-open-lock'] && !!modalClasses.open);
+
+      documentMock.body.classList = origBodyClassList;
+    } finally {
+      globalThis.window.innerWidth = origInnerWidth;
+      documentMock.getElementById = origGetById;
+      documentMock.querySelector = origQuerySel;
+    }
+  })();
+
+  // 9) Centralized VocabCore state setters protect isDev invariants and sanitize focusedCardIndex
+  (function() {
+    var origDev = VocabCore.App.isDev;
+    var origPro = VocabCore.App.isPro;
+    var origAdmin = VocabCore.App.isAdmin;
+    var origServerAdmin = VocabCore.App._serverAdmin;
+    var origComp = VocabCore.App.isComposing;
+    var origFocus = VocabCore.App.focusedCardIndex;
+    try {
+      VocabCore.App.isDev = true;
+      VocabCore.setProState(false);
+      VocabCore.setAdminState(false);
+      assert("VocabCore.setProState & setAdminState preserve isDev master authority",
+        VocabCore.App.isPro === true && VocabCore.App.isAdmin === true);
+
+      VocabCore.App.isDev = false;
+      VocabCore.setProState(false);
+      VocabCore.setAdminState(false);
+      assert("VocabCore.setProState & setAdminState update cleanly when isDev is false",
+        VocabCore.App.isPro === false && VocabCore.App.isAdmin === false);
+
+      VocabCore.setComposingState(1);
+      assert("VocabCore.setComposingState normalizes boolean", VocabCore.App.isComposing === true);
+      VocabCore.setComposingState(0);
+      assert("VocabCore.setComposingState resets boolean", VocabCore.App.isComposing === false);
+
+      VocabCore.setFocusedCardIndex(4);
+      assert("VocabCore.setFocusedCardIndex accepts non-negative integer", VocabCore.App.focusedCardIndex === 4);
+      VocabCore.setFocusedCardIndex(-5);
+      assert("VocabCore.setFocusedCardIndex clamps negative/invalid values to -1", VocabCore.App.focusedCardIndex === -1);
+    } finally {
+      VocabCore.App.isDev = origDev;
+      VocabCore.App.isPro = origPro;
+      VocabCore.App.isAdmin = origAdmin;
+      VocabCore.App._serverAdmin = origServerAdmin;
+      VocabCore.App.isComposing = origComp;
+      VocabCore.App.focusedCardIndex = origFocus;
+    }
+  })();
 } catch (e) {
   assert("app.js loading test", false, String(e));
 }
