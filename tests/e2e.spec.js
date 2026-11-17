@@ -520,6 +520,14 @@ test.describe('Vocab Vault — Master E2E Suite', () => {
     await expect(page.locator('#list .card.gen-err')).toBeVisible();
     await page.waitForTimeout(100);
     expect(await page.evaluate(() => Boolean(window.App?.isProc))).toBe(false);
+
+    // Verify broken Wiktionary/placeholder fallback items are strictly rejected by isPlaceholderItem
+    const placeholderCheck = await page.evaluate(() => ({
+      foreignRawDef: Boolean(window.VocabQueue?.isPlaceholderItem?.({ word: 'predictive', lang: 'en', tgtLang: 'ja', meanings: [{ pos: 'Adj', text: 'Du latin praedictus.' }] }, 'en', 'ja')),
+      stubCore: Boolean(window.VocabQueue?.isPlaceholderItem?.({ word: 'predictive', lang: 'en', tgtLang: 'ja', meanings: [{ pos: 'Adj', text: '予測的な' }], core: '「predictive」の中核概念' }, 'en', 'ja')),
+      stubEty: Boolean(window.VocabQueue?.isPlaceholderItem?.({ word: 'predictive', lang: 'en', tgtLang: 'ja', meanings: [{ pos: 'Adj', text: '予測的な' }], etymology: '語源資料（Wiktionary等）の記録に基づく語彙。古英語・ラテン語等の語形成を経る。' }, 'en', 'ja')),
+    }));
+    expect(placeholderCheck).toEqual({ foreignRawDef: true, stubCore: true, stubEty: true });
   });
 
   test('E2E-15: Mocked feedback submission, Stripe Checkout redirect, and release artifact isolation', async ({ page }) => {

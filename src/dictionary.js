@@ -1852,6 +1852,10 @@
     }
   }
 
+  const WIKT_ETY_SECTION_RE = /^(?:etymology|étymologie|herkunft|etimología|etimologia|herkomst|어원|字源|語源|词源)\b/i;
+  const WIKT_SKIP_SECTION_RE = /^(?:etymology|étymologie|herkunft|etimología|etimologia|herkomst|어원|字源|語源|词源|pronunciation|prononciation|aussprache|pronunciación|pronuncia|uitspraak|発音|발음|发音|alternative forms|variantes|derived terms|dérivés|related terms|apparentés|translations|traductions|übersetzungen|anagrams|anagrammes|further reading|references|références|quellen|usage notes|synonyms|synonymes|antonyms|antonymes|flexions|voir aussi|参照|類義語|対義語|関連語|翻訳)/i;
+  const WIKT_ETY_PROSE_RE = /^(?:from |inherited from |borrowed from |derived from |learned borrowing |orthographic borrowing |calque of |cognate with |compare |see also |ipa\(|rhymes:|du latin|de l'ancien|dérivé de|emprunté au|mot composé de|aus dem |vom |von |del latín|dal latino|do latim|van het )/i;
+
   /**
    * Wiktionary + 辞書API + 翻訳エンジン統合による高精度マルチセンス合成ヘルパー
    */
@@ -1891,13 +1895,13 @@
           else if (/^(idiom|phrase|proverb)\b/i.test(sec)) curPos = 'Idiom';
           continue;
         }
-        if (/^etymology/.test(curSection)) {
+        if (WIKT_ETY_SECTION_RE.test(curSection)) {
           if (!extractedEtyLine && trimmed.length > 15 && !/^(from|see also|compare)$/i.test(trimmed)) {
             extractedEtyLine = trimmed.slice(0, 260);
           }
           continue;
         }
-        if (/^(pronunciation|alternative forms|derived terms|related terms|translations|anagrams|further reading|references|usage notes|synonyms|antonyms)/.test(curSection)) {
+        if (WIKT_SKIP_SECTION_RE.test(curSection)) {
           continue;
         }
         const lower = trimmed.toLowerCase();
@@ -1908,7 +1912,7 @@
           }
           continue;
         }
-        if (/^(from |inherited from |borrowed from |derived from |learned borrowing |orthographic borrowing |calque of |cognate with |compare |see also |ipa\(|rhymes:)/i.test(trimmed)) {
+        if (WIKT_ETY_PROSE_RE.test(trimmed)) {
           if (!extractedEtyLine && /^(from |inherited from |borrowed from |derived from )/i.test(trimmed)) {
             extractedEtyLine = trimmed.slice(0, 260);
           }
@@ -2286,7 +2290,7 @@
           for (const line of lines) {
             const tr = line.trim();
             if (tr.startsWith('=')) {
-              inEty = /^=+etymology/i.test(tr);
+              inEty = WIKT_ETY_SECTION_RE.test(tr.replace(/=/g, '').trim());
               continue;
             }
             if (inEty && tr && tr.length > 15 && !/^(see also|references|further reading)/i.test(tr)) {
@@ -2327,7 +2331,7 @@
               else if (/^prep(osition)?\b/i.test(sec)) wiktPos = 'Prep';
               else if (/^conj(unction)?\b/i.test(sec)) wiktPos = 'Conj';
               else if (/^pron(oun)?\b/i.test(sec)) wiktPos = 'Pron';
-              inSkipSection = /^(etymology|pronunciation|alternative forms|derived terms|related terms|translations|anagrams|further reading|references)/.test(sec);
+              inSkipSection = WIKT_SKIP_SECTION_RE.test(sec);
               continue;
             }
             if (inSkipSection) continue;
@@ -2335,7 +2339,7 @@
             if (
               lower.includes('borrowed from') ||
               lower.includes('etymology') ||
-              /^(from |inherited from |derived from |learned borrowing |orthographic borrowing |calque of |cognate with |compare |see also |ipa\(|rhymes:)/i.test(trimmed) ||
+              WIKT_ETY_PROSE_RE.test(trimmed) ||
               (lower.startsWith(normW + ' (') && /(plural|third-person|present participle|past tense|comparative|countable|uncountable)/i.test(lower))
             ) {
               continue;
@@ -2350,13 +2354,15 @@
         if (wiktPos) pos = wiktPos;
 
         const matched = lookupEssentialLexicon(rawW);
+        const needsJaTrans = (tLang === 'ja' && sLang !== 'ja');
+        const hasJaChars = s => /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf]/.test(String(s || ''));
         if (matched && matched.meanings?.length) {
           meanings = matched.meanings;
-        } else if (it.targetSenseOrMeaning) {
+        } else if (it.targetSenseOrMeaning && (!needsJaTrans || hasJaChars(it.targetSenseOrMeaning))) {
           meanings = [{ pos, text: String(it.targetSenseOrMeaning).trim() }];
         } else if (rootInfo) {
-          meanings = [{ pos, text: defText ? `${rootInfo.meaning}（${defText}）` : `${rootInfo.meaning}（語根 ${rootKey} に由来する語義展開）` }];
-        } else if (defText) {
+          meanings = [{ pos, text: (defText && (!needsJaTrans || hasJaChars(defText))) ? `${rootInfo.meaning}（${defText}）` : `${rootInfo.meaning}（語根 ${rootKey} に由来する語義展開）` }];
+        } else if (defText && (!needsJaTrans || hasJaChars(defText))) {
           meanings = [{ pos, text: defText }];
         } else {
           isDummyPlaceholder = true;
@@ -2371,7 +2377,11 @@
         let exampleTrans = '';
         if (it.contextSentence) {
           exampleForeign = String(it.contextSentence).trim();
-          exampleTrans = tLang === 'ja' ? `文脈用例: ${exampleForeign}` : exampleForeign;
+          const escW = rawW.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const hiCtx = new RegExp(`(${escW})`, 'i').test(exampleForeign)
+            ? exampleForeign.replace(new RegExp(`(${escW})`, 'i'), '<b>$1</b>')
+            : `<b>${rawW}</b> — ${exampleForeign}`;
+          exampleTrans = tLang === 'ja' ? `文脈用例: ${hiCtx}` : hiCtx;
         } else if (wiktFullText) {
           const exLines = wiktFullText.split('\n');
           for (const el of exLines) {

@@ -760,7 +760,9 @@
         /(?:他動詞|自動詞)（(?:動作・作用|状態変化)）|形容詞（状態・性質）|[（\(]英義[:：]|の主要な意味・文脈的語義|学術・文脈語彙/.test(m0) ||
         String(i.core || '').includes('語根・派生関係から構成される学術的概念イメージ。') ||
         String(i.core || '').includes('中心的用法および文脈的機能に基づくコアイメージ') ||
+        /^「.+」の中核概念。?$/.test(String(i.core || '').trim()) ||
         String(i.etymology || '').includes('語源資料（Wiktionary等）の記録に基づく学術語彙。') ||
+        String(i.etymology || '').includes('語源資料（Wiktionary等）の記録に基づく語彙。') ||
         Boolean(i.needsRegeneration) ||
         Boolean(i.isDummyPlaceholder) ||
         (/^[A-Za-z0-9\s\[\],;.:\-_()'"/]+$/.test(m0.trim()) && !/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf]/.test(m0)));

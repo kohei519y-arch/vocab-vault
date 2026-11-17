@@ -132,9 +132,11 @@
       if (/^This context illustrates the academic usage of /i.test(exFor)) return true;
       if (String(entry.core || '').includes('語根・派生関係から構成される学術的概念イメージ。')) return true;
       if (String(entry.core || '').includes('中心的用法および文脈的機能に基づくコアイメージ')) return true;
+      if (/^「.+」の中核概念。?$/.test(String(entry.core || '').trim())) return true;
       if (String(entry.etymology || '').includes('語源資料（Wiktionary等）の記録に基づく学術語彙。')) return true;
+      if (String(entry.etymology || '').includes('語源資料（Wiktionary等）の記録に基づく語彙。')) return true;
       if (!m0 || m0.includes('の語義') || m0.includes('中心的語義') || m0.includes('(Offline') || m0 === entry.word) return true;
-      if (tLang === 'ja' && sLang === 'en' && m0 && /^[A-Za-z0-9\s\[\],;.:\-_()'"/]+$/.test(m0.trim()) && !/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf]/.test(m0)) return true;
+      if (tLang === 'ja' && sLang !== 'ja' && m0 && /^[A-Za-z0-9\s\[\],;.:\-_()'"/À-ÿ]+$/.test(m0.trim()) && !/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf]/.test(m0)) return true;
       return false;
     };
 
@@ -384,15 +386,51 @@
   /**
    * プレースホルダー（未生成ダミーデータ）の厳格判定
    */
-  function isPlaceholderItem(item) {
+  function isPlaceholderItem(item, sLang = '', tLang = '') {
     if (!item) return true;
     if (item.isDummyPlaceholder || item.needsRegeneration) return true;
     if (!Array.isArray(item.meanings) || item.meanings.length === 0) return true;
     const firstM = String(item.meanings[0]?.text || '').trim();
-    if (!firstM || firstM.includes('中心的語義') || (firstM.includes('の語義') && firstM.startsWith(String(item.word || ''))) || firstM === '成句・熟語表現' || /（語根\s+.+\s+に由来する語義展開）/.test(firstM)) {
+    const w = String(item.word || '').trim();
+    if (
+      !firstM ||
+      firstM.includes('中心的語義') ||
+      (firstM.includes('の語義') && w && firstM.startsWith(w)) ||
+      firstM === '成句・熟語表現' ||
+      firstM === w ||
+      /（語根\s+.+\s+に由来する語義展開）/.test(firstM) ||
+      /(?:他動詞|自動詞)（(?:動作・作用|状態変化)）|形容詞（状態・性質）|[（\(]英義[:：]|の主要な意味・文脈的語義|学術・文脈語彙/.test(firstM)
+    ) {
       return true;
     }
-    if (item.core && (item.core.includes('中心的用法および文脈的機能') || item.core.includes('語根・派生関係から構成される学術的概念イメージ') || /The core contextual usage of .+ is demonstrated here\./i.test(item.core))) {
+    const effSrc = sLang || item.lang || 'en';
+    const effTgt = tLang || item.tgtLang || item.targetLang || 'ja';
+    if (effTgt === 'ja' && effSrc !== 'ja' && /^[A-Za-z0-9\s\[\],;.:\-_()'"/À-ÿ]+$/.test(firstM) && !/[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\uff00-\uff9f\u4e00-\u9faf]/.test(firstM)) {
+      return true;
+    }
+    const core = String(item.core || '').trim();
+    if (
+      core && (
+        core.includes('中心的用法および文脈的機能') ||
+        core.includes('語根・派生関係から構成される学術的概念イメージ') ||
+        /^「.+」の中核概念。?$/.test(core) ||
+        /The core contextual usage of .+ is demonstrated here\./i.test(core)
+      )
+    ) {
+      return true;
+    }
+    const ety = String(item.etymology || '').trim();
+    if (
+      ety && (
+        ety.includes('語源資料（Wiktionary等）の記録に基づく学術語彙。') ||
+        ety.includes('語源資料（Wiktionary等）の記録に基づく語彙。古英語・ラテン語等の語形成を経る。') ||
+        ety.includes('個別語源（借用語・新造語等）。確固たるPIE語根は未確定。')
+      )
+    ) {
+      return true;
+    }
+    const exFor = String(item.example?.foreign || '').trim();
+    if (exFor && /^(?:This context illustrates the academic usage of |The (?:core )?contextual usage of )/i.test(exFor)) {
       return true;
     }
     return false;
@@ -607,7 +645,7 @@ etymology:${eInst}
           if (genInternalFn) {
             if (stEl) stEl.textContent = global.VocabI18n?.t ? global.VocabI18n.t('queue.generating_local') : '内蔵AIエンジン (完全機密保護) で生成中...';
             const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
-            const validItems = (Array.isArray(internalRes?.items) ? internalRes.items : []).filter(it => !isPlaceholderItem(it));
+            const validItems = (Array.isArray(internalRes?.items) ? internalRes.items : []).filter(it => !isPlaceholderItem(it, sLang, tLang));
             if (validItems.length > 0) {
               returnedList = validItems;
               usedModel = internalRes?.usedModel || 'builtin-ai-internal';
@@ -639,7 +677,7 @@ etymology:${eInst}
         // 内部組み込みAIエンジン (オンデバイスAI / ビルトイン語源ナレッジベース & Wiktionary)
         if (stEl) stEl.textContent = global.VocabI18n?.t ? global.VocabI18n.t('queue.generating_local') : '内蔵AIエンジン (完全機密保護) で生成中...';
         const internalRes = await genInternalFn(payload, sLang, tLang, fName, useHist, wiktByIdx);
-        const validItems = (Array.isArray(internalRes?.items) ? internalRes.items : []).filter(it => !isPlaceholderItem(it));
+        const validItems = (Array.isArray(internalRes?.items) ? internalRes.items : []).filter(it => !isPlaceholderItem(it, sLang, tLang));
         returnedList = validItems;
         usedModel = internalRes?.usedModel || 'builtin-ai-internal';
       }
@@ -702,7 +740,7 @@ etymology:${eInst}
           wiktGrounded: false, wiktUrl: wRef?.url, contextSentence: matchedInput?.sentence, gen, updatedAt: now,
           tgtLang: tLang
         }, maxNum, sLang);
-        if (!a || isPlaceholderItem(a)) return;
+        if (!a || isPlaceholderItem(a, sLang, tLang)) return;
         if (a.example?.foreign) {
           a.example.foreign = String(a.example.foreign).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
           const hasWholeWord = (hay, needle) => {

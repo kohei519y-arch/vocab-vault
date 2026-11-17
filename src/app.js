@@ -600,7 +600,9 @@
           /^This context illustrates the academic usage of /i.test(exFor) ||
           String(item.core || '').includes('語根・派生関係から構成される学術的概念イメージ。') ||
           String(item.core || '').includes('中心的用法および文脈的機能に基づくコアイメージ') ||
+          /^「.+」の中核概念。?$/.test(String(item.core || '').trim()) ||
           String(item.etymology || '').includes('語源資料（Wiktionary等）の記録に基づく学術語彙。') ||
+          String(item.etymology || '').includes('語源資料（Wiktionary等）の記録に基づく語彙。') ||
           Boolean(item.needsRegeneration) ||
           Boolean(item.isDummyPlaceholder) ||
           !m0 || m0.includes('の語義') || m0.includes('中心的語義') || m0.includes('(Offline') || m0 === w ||
