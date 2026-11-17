@@ -3480,7 +3480,7 @@ body.dark .detail-tab-btn.active {
   padding: 9px 12px;
   border-radius: 7px;
   border: 1px solid var(--b);
-  background: var(--bg);
+  background: var(--bg-main);
   color: var(--t);
   font-size: 13.5px;
 }
