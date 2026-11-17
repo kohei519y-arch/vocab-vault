@@ -35,7 +35,7 @@ test.describe('Vocab Vault — Master E2E Suite', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     const errors = { pageErrors: [], consoleErrors: [], dialogs: [] };
     page._vvErrors = errors;
-    page.on('pageerror', err => errors.pageErrors.push(err.message || String(err)));
+    page.on('pageerror', err => errors.pageErrors.push(err.stack ? `${err.message || String(err)}\n${err.stack}` : (err.message || String(err))));
     page.on('dialog', dialog => {
       errors.dialogs.push(`${dialog.type()}: ${dialog.message()}`);
       dialog.dismiss().catch(() => {});
@@ -456,6 +456,7 @@ test.describe('Vocab Vault — Master E2E Suite', () => {
     await page.evaluate(() => window.VocabCore?.updCloudUI?.());
     await page.waitForFunction(() => true);
     await page.locator('[data-act="cloud-logout"]').click();
+    await page.waitForFunction(() => !window.VocabSync?.isCloudReady?.() && !window.App?.isPro, { timeout: 5000 });
     if (releaseSlowProfile) releaseSlowProfile();
     await page.waitForTimeout(250);
 
@@ -530,6 +531,20 @@ test.describe('Vocab Vault — Master E2E Suite', () => {
 
     let feedbackPayload = null;
     let checkoutPayload = null;
+
+    await page.route('**/rest/v1/**', async route => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
+      return fulfillCorsJson(route, 200, []);
+    });
+
+    await page.route('**/auth/v1/**', async route => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: CORS_HEADERS });
+      }
+      return fulfillCorsJson(route, 200, { id: 'e2e-user-1', email: 'e2e@vocabvault.test' });
+    });
 
     await page.route('**/functions/v1/feedback', async route => {
       if (route.request().method() === 'OPTIONS') {
@@ -607,7 +622,7 @@ test.describe('Vocab Vault — Service Worker E2E', () => {
 
   test('E2E-12: Service Worker precache manifest and static bundle availability over HTTP', async ({ page }) => {
     const errors = { pageErrors: [], consoleErrors: [], dialogs: [] };
-    page.on('pageerror', err => errors.pageErrors.push(err.message || String(err)));
+    page.on('pageerror', err => errors.pageErrors.push(err.stack ? `${err.message || String(err)}\n${err.stack}` : (err.message || String(err))));
     page.on('dialog', dialog => {
       errors.dialogs.push(`${dialog.type()}: ${dialog.message()}`);
       dialog.dismiss().catch(() => {});

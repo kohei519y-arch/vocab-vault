@@ -578,13 +578,8 @@
   async function cloudLogout(ctx = {}) {
     const appState = ctx.appState || global.VocabCore?.App;
     if (!global.VocabSync) return;
-    await global.VocabSync.signOut();
     _profileReqSeq++;
     if (appState) {
-      appState.entries = [];
-      appState.reqQueue = [];
-      appState.aList = [];
-      appState.quotaRemaining = null;
       if (global.VocabCore?.setAdminState) global.VocabCore.setAdminState(false);
       else {
         appState._serverAdmin = false;
@@ -592,6 +587,14 @@
       }
       if (global.VocabCore?.setProState) global.VocabCore.setProState(false);
       else appState.isPro = Boolean(appState.isDev);
+    }
+    await global.VocabSync.signOut();
+    _profileReqSeq++;
+    if (appState) {
+      appState.entries = [];
+      appState.reqQueue = [];
+      appState.aList = [];
+      appState.quotaRemaining = null;
     }
     if (global.VocabCore?.applyAdminVisibility) global.VocabCore.applyAdminVisibility();
     if (typeof ctx.render === 'function') ctx.render();
