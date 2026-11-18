@@ -2503,7 +2503,7 @@
       }
       console.warn('[fetchModels fallback]', e?.message || e);
     }
-    return ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash-lite'];
+    return ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3-flash', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
   }
 
   /**
@@ -2560,6 +2560,11 @@
             setStatus(`混雑中 (${r.status}) — ${Math.round(waitMs / 1000)}秒後に再試行...`);
             await new Promise(res => setTimeout(res, waitMs));
             continue;
+          }
+          if (r.status === 404) {
+            _cachedModels = null;
+            _cachedModelsTs = 0;
+            try { if (typeof localStorage !== 'undefined') localStorage.removeItem('vv_cached_gemini_models'); } catch {}
           }
           lastErr = new Error(`${m}: HTTP ${r.status}`);
           break;

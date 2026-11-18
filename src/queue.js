@@ -383,6 +383,23 @@
     }
   }
 
+  function renderBatchErrorCard(card, items, meta, title, detail, actionsHtml) {
+    if (!card) return;
+    card.className = 'card gen-err';
+    card.dataset.retryItems = JSON.stringify(items);
+    card.dataset.fName = meta.fName || '';
+    card.dataset.useHist = meta.useHist ? '1' : '0';
+    card.dataset.useWikt = meta.useWikt ? '1' : '0';
+    card.dataset.srcLang = meta.sLang;
+    card.dataset.tgtLang = meta.tLang;
+    card.dataset.pairKey = meta.saveKey;
+    card.dataset.requestId = meta.reqId;
+    global.VocabDOM?.setSafeHtml(
+      card,
+      `<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px;max-width:100%;box-sizing:border-box"><div style="min-width:0;flex:1 1 220px"><div style="font-weight:700;color:var(--e);font-size:13px;overflow-wrap:anywhere">${esc(title)}</div><div style="font-size:12px;color:var(--s);margin-top:2px;overflow-wrap:anywhere;word-break:break-word">${esc(detail)}</div></div><div style="display:flex;gap:6px;flex-shrink:0">${actionsHtml}</div></div>`
+    );
+  }
+
   /**
    * プレースホルダー（未生成ダミーデータ）の厳格判定
    */
@@ -625,18 +642,14 @@ etymology:${eInst}
             if (global.showToast) {
               global.showToast(quotaMsg, 'warn', 5000);
             }
-            if (card) {
-              card.className = 'card gen-err';
-              card.dataset.retryItems = JSON.stringify(items);
-              card.dataset.fName = fName || '';
-              card.dataset.useHist = useHist ? '1' : '0';
-              card.dataset.useWikt = useWikt ? '1' : '0';
-              card.dataset.srcLang = sLang;
-              card.dataset.tgtLang = tLang;
-              card.dataset.pairKey = saveKey;
-              card.dataset.requestId = reqId;
-              global.VocabDOM?.setSafeHtml(card, `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成枠上限（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">本日の無料枠(5語/日)に達しました。Proプランで無制限に生成できます。</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="open-upsell" data-reason="無料枠到達">アップグレード</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`);
-            }
+            renderBatchErrorCard(
+              card,
+              items,
+              { fName, useHist, useWikt, sLang, tLang, saveKey, reqId },
+              `AI生成枠上限（${items.map(x => x.word).join(', ')}）`,
+              '本日の無料枠(5語/日)に達しました。Proプランで無制限に生成できます。',
+              '<button type="button" class="btn-ac btn-xs" data-act="open-upsell" data-reason="無料枠到達">アップグレード</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button>'
+            );
             syncPersistedQueue();
             return false;
           }
@@ -657,18 +670,14 @@ etymology:${eInst}
           if (!returnedList.length) {
             // 万一内蔵エンジンでも1件も生成できなかった場合のみエラーUIを提示
             if (global.showToast) global.showToast(proxyErr.message || 'AI生成エラーが発生しました。「再試行」をお試しください。', 'err', 5000);
-            if (card) {
-              card.className = 'card gen-err';
-              card.dataset.retryItems = JSON.stringify(items);
-              card.dataset.fName = fName || '';
-              card.dataset.useHist = useHist ? '1' : '0';
-              card.dataset.useWikt = useWikt ? '1' : '0';
-              card.dataset.srcLang = sLang;
-              card.dataset.tgtLang = tLang;
-              card.dataset.pairKey = saveKey;
-              card.dataset.requestId = reqId;
-              global.VocabDOM?.setSafeHtml(card, `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(proxyErr.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`);
-            }
+            renderBatchErrorCard(
+              card,
+              items,
+              { fName, useHist, useWikt, sLang, tLang, saveKey, reqId },
+              `AI生成エラー（${items.map(x => x.word).join(', ')}）`,
+              proxyErr.message || '一時的な通信エラー',
+              '<button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button>'
+            );
             syncPersistedQueue();
             return false;
           }
@@ -683,18 +692,14 @@ etymology:${eInst}
       }
 
       if (!returnedList || !returnedList.length) {
-        if (card) {
-          card.className = 'card gen-err';
-          card.dataset.retryItems = JSON.stringify(items);
-          card.dataset.fName = fName || '';
-          card.dataset.useHist = useHist ? '1' : '0';
-          card.dataset.useWikt = useWikt ? '1' : '0';
-          card.dataset.srcLang = sLang;
-          card.dataset.tgtLang = tLang;
-          card.dataset.pairKey = saveKey;
-          card.dataset.requestId = reqId;
-          global.VocabDOM?.setSafeHtml(card, `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">エントリの取得に失敗しました</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`);
-        }
+        renderBatchErrorCard(
+          card,
+          items,
+          { fName, useHist, useWikt, sLang, tLang, saveKey, reqId },
+          `AI生成エラー（${items.map(x => x.word).join(', ')}）`,
+          'エントリの取得に失敗しました',
+          '<button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button>'
+        );
         syncPersistedQueue();
         return false;
       }
