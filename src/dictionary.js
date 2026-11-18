@@ -1719,7 +1719,12 @@
     } else if (r && typeof r.json === 'function') {
       data = await r.json();
     } else if (r && typeof r.text === 'function') {
-      data = JSON.parse(await r.text());
+      const rawTxt = await r.text();
+      try {
+        data = JSON.parse(rawTxt);
+      } catch {
+        throw new Error('AI応答のJSON解析に失敗しました。');
+      }
     } else {
       data = r;
     }

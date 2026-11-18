@@ -129,10 +129,12 @@ async function ensureLocale(loc) {
    * 初期ロケールの決定
    */
   function detectInitialLocale() {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved && SUPPORTED_LOCALES.includes(saved)) return saved;
-    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved && SUPPORTED_LOCALES.includes(saved)) return saved;
+      }
+    } catch {}
     if (typeof navigator !== 'undefined') {
       const navLang = (navigator.language || navigator.userLanguage || '').toLowerCase();
       if (navLang.startsWith('ja')) return 'ja';
@@ -193,9 +195,11 @@ async function ensureLocale(loc) {
   function setLocale(newLocale) {
     if (!SUPPORTED_LOCALES.includes(newLocale)) return Promise.resolve(false);
     currentLocale = newLocale;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, newLocale);
-    }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, newLocale);
+      }
+    } catch {}
     ensureLocaleSyncIfJsc(newLocale);
     applyI18nToDOM();
     const emit = () => {

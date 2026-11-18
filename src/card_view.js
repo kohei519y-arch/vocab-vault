@@ -515,12 +515,15 @@
     const isCorruptedDummy = Boolean(
       d.needsRegeneration ||
       d.isDummyPlaceholder ||
+      Boolean(d.needsRegeneration) ||
       meanings.some(x => String(x.text || '').includes('中心的語義') || (String(x.text || '').includes('の語義') && String(x.text || '').startsWith(String(d.word || '')))) ||
-      String(d.core || '').includes('中心的用法および文脈的機能に基づくコアイメージ')
+      String(d.core || '').includes('中心的用法および文脈的機能に基づくコアイメージ') ||
+      /^「.+」の中核概念。?$/.test(String(d.core || '').trim()) ||
+      String(d.etymology || '').includes('語源資料（Wiktionary等）の記録に基づく語彙。')
     );
     const dummyText = tL === 'ja' ? '通信障害等による未完了データです' : (tL === 'ko' ? '통신 장애 등으로 생성이 완료되지 않은 데이터입니다' : (tL === 'zh' ? '由于网络异常等原因，该词条数据尚未生成完整' : 'Incomplete entry due to network interruption'));
     const dummyRegenLbl = tL === 'ja' ? '完全再生成' : (tL === 'ko' ? '전체 재생성' : (tL === 'zh' ? '完全重新生成' : 'Regenerate'));
-    const dummyBannerHtml = isCorruptedDummy ? `<div class="dummy-warning-banner" style="display:flex;align-items:center;justify-content:space-between;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:6px 10px;margin-bottom:8px;font-size:12px;color:var(--e)"><span>${dummyText}</span><button type="button" class="btn-ac btn-xs" data-act="regen-single-word" data-word="${esc(d.word)}" data-id="${esc(d.id)}">${dummyRegenLbl}</button></div>` : '';
+    const dummyBannerHtml = isCorruptedDummy ? `<div class="dummy-warning-banner" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:6px 10px;margin-bottom:8px;font-size:12px;color:var(--e)"><span style="min-width:0;flex:1 1 180px">${dummyText}</span><button type="button" class="btn-ac btn-xs" style="flex-shrink:0" data-act="regen-single-word" data-word="${esc(d.word)}" data-id="${esc(d.id)}">${dummyRegenLbl}</button></div>` : '';
     const mHtml = meanings.map((x, idx) => {
       let mText = String(x.text || '').trim();
       if (tL !== 'ja') {

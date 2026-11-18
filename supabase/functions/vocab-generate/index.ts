@@ -504,26 +504,36 @@ serve(async (req) => {
       });
 
       let ocrText = "";
-      for (const m of candidateVisionModels) {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
-        try {
-          const res = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": geminiApiKey,
-            },
-            body: ocrReqPayload,
-            signal: AbortSignal.timeout(20000),
-          });
+      const triedVisionModels = new Set<string>();
+      const tryVisionModels = async (modelsList: string[]) => {
+        for (const m of modelsList) {
+          if (triedVisionModels.has(m)) continue;
+          triedVisionModels.add(m);
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+          try {
+            const res = await fetch(endpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": geminiApiKey,
+              },
+              body: ocrReqPayload,
+              signal: AbortSignal.timeout(20000),
+            });
 
-          if (res.ok) {
-            const data = await res.json();
-            const parts = (data.candidates?.[0]?.content?.parts || []).filter((p: any) => !p?.thought);
-            ocrText = parts.map((p: any) => p.text || "").join("").trim();
-            if (ocrText) break;
-          }
-        } catch (_fetchErr) {}
+            if (res.ok) {
+              const data = await res.json();
+              const parts = (data.candidates?.[0]?.content?.parts || []).filter((p: any) => !p?.thought);
+              ocrText = parts.map((p: any) => p.text || "").join("").trim();
+              if (ocrText) return;
+            }
+          } catch (_fetchErr) {}
+        }
+      };
+      await tryVisionModels(candidateVisionModels);
+      if (!ocrText) {
+        const discoveredVision = await resolveGeminiCandidateModels(geminiApiKey, true);
+        await tryVisionModels(discoveredVision);
       }
 
       if (!ocrText) {
@@ -689,50 +699,60 @@ serve(async (req) => {
       });
 
       let extractItems: any[] = [];
-      for (const m of candidateModels) {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
-        const isModernFlash = m.includes("2.5") || m.includes("3");
-        try {
-          let res = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "x-goog-api-key": geminiApiKey,
-            },
-            body: getExtractPayload(isModernFlash),
-            signal: AbortSignal.timeout(20000),
-          });
-
-          if (res.status === 400 && isModernFlash) {
-            res = await fetch(endpoint, {
+      const triedExtractModels = new Set<string>();
+      const tryExtractModels = async (modelsList: string[]) => {
+        for (const m of modelsList) {
+          if (triedExtractModels.has(m)) continue;
+          triedExtractModels.add(m);
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+          const isModernFlash = m.includes("2.5") || m.includes("3");
+          try {
+            let res = await fetch(endpoint, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 "x-goog-api-key": geminiApiKey,
               },
-              body: getExtractPayload(false),
+              body: getExtractPayload(isModernFlash),
               signal: AbortSignal.timeout(20000),
             });
-          }
 
-          if (res.ok) {
-            const data = await res.json();
-            const parts = (data.candidates?.[0]?.content?.parts || []).filter((p: any) => !p?.thought);
-            const textContent = parts.map((p: any) => p?.text || "").join("").trim();
-            if (textContent) {
-              try {
-                const parsed = JSON.parse(textContent);
-                if (Array.isArray(parsed)) {
-                  extractItems = parsed;
-                  break;
-                } else if (parsed && typeof parsed === "object") {
-                  extractItems = parsed.words || parsed.items || parsed.candidates || Object.values(parsed).find(Array.isArray) || [];
-                  if (extractItems.length > 0) break;
-                }
-              } catch (_parseErr) {}
+            if (res.status === 400 && isModernFlash) {
+              res = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "x-goog-api-key": geminiApiKey,
+                },
+                body: getExtractPayload(false),
+                signal: AbortSignal.timeout(20000),
+              });
             }
-          }
-        } catch (_fetchErr) {}
+
+            if (res.ok) {
+              const data = await res.json();
+              const parts = (data.candidates?.[0]?.content?.parts || []).filter((p: any) => !p?.thought);
+              const textContent = parts.map((p: any) => p?.text || "").join("").trim();
+              if (textContent) {
+                try {
+                  const parsed = JSON.parse(textContent);
+                  if (Array.isArray(parsed)) {
+                    extractItems = parsed;
+                    return;
+                  } else if (parsed && typeof parsed === "object") {
+                    extractItems = parsed.words || parsed.items || parsed.candidates || Object.values(parsed).find(Array.isArray) || [];
+                    if (extractItems.length > 0) return;
+                  }
+                } catch (_parseErr) {}
+              }
+            }
+          } catch (_fetchErr) {}
+        }
+      };
+      await tryExtractModels(candidateModels);
+      if (extractItems.length === 0) {
+        const discoveredExtract = await resolveGeminiCandidateModels(geminiApiKey, true);
+        await tryExtractModels(discoveredExtract);
       }
 
       if (!extractItems || extractItems.length === 0) {

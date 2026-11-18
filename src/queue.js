@@ -917,21 +917,14 @@ etymology:${eInst}
         [items.slice(0, h), items.slice(h)].forEach(part => enqueueTask({ items: part, fName, useHist, useWikt, targetLang: sLang, srcLang: sLang, tgtLang: tLang, pairKey: saveKey }));
         return true;
       }
-      if (card) {
-        card.className = 'card gen-err';
-        if (card.dataset) {
-          Object.assign(card.dataset, {
-            retryItems: JSON.stringify(items),
-            fName: fName || '',
-            useHist: useHist ? '1' : '0',
-            useWikt: useWikt ? '1' : '0',
-            srcLang: sLang,
-            tgtLang: tLang,
-            pairKey: saveKey
-          });
-        }
-        global.VocabDOM?.setSafeHtml(card, `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--bg-card);border:1px solid var(--e);border-radius:8px;margin-bottom:8px"><div><div style="font-weight:700;color:var(--e);font-size:13px">AI生成エラー（${esc(items.map(x=>x.word).join(', '))}）</div><div style="font-size:12px;color:var(--s);margin-top:2px">${esc(err.message || '一時的な通信エラー')}</div></div><div style="display:flex;gap:6px"><button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button></div></div>`);
-      }
+      renderBatchErrorCard(
+        card,
+        items,
+        { fName, useHist, useWikt, sLang, tLang, saveKey, reqId },
+        `AI生成エラー（${items.map(x => x.word).join(', ')}）`,
+        err.message || '一時的な通信エラー',
+        '<button type="button" class="btn-ac btn-xs" data-act="retry-batch">再試行</button><button type="button" class="btn-o btn-xs" data-act="close-load">削除</button>'
+      );
       return false;
     }
   }
